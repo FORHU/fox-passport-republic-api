@@ -1,0 +1,33 @@
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+
+        <mj-text font-size="16px" color="#000000" font-family="Helvetica"> 
+          Subject: Venue4Use: Insufficient Funds to Continue Your Subscription
+        </mj-text>
+
+        <mj-divider border-color="#F45E43"></mj-divider>
+
+        <mj-text font-size="20px" color="#F45E43" font-family="Helvetica"> 
+          Hello {first_name},
+        </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="Helvetica">
+          We wanted to inform you that your current balance is not sufficient to continue your subscription. To avoid any disruption in service, please update your payment details or add funds to your account at your earliest convenience.
+        </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="Helvetica">
+          If you need any assistance, feel free to contact our support team.
+        </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="Helvetica">
+          Best regards,
+          <br/>
+          Venue4use Team
+        </mj-text>
+
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

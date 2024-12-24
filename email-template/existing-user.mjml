@@ -1,0 +1,19 @@
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        <mj-text font-size="16px" color="#000000" font-family="helvetica"> Dear {first_name}, </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica">
+          Your account has been successfully created. You have been assigned the role of {role}.
+        </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica">
+          If you have any questions, feel free to contact us at support@venue4use.com.
+        </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica"> Best regards,<br />Venue4Use</mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

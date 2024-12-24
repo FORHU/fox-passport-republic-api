@@ -1,0 +1,1644 @@
+openapi: 3.0.0
+info:
+  title: Venue4use api
+  description: API documentation for venue4use api
+  version: ${API_VERSION}
+servers:
+  - url: ${API_URL}
+paths:
+  /api/v1/space:
+    get:
+      tags:
+        - "Spaces"
+      summary: "Get Spaces"
+      description: Fetch a list of spaces based on various filters.
+      parameters:
+        - name: Authorization
+          in: header
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: page
+          in: query
+          schema:
+            type: integer
+          description: "Page number"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+          description: "Number of items per page"
+
+        - name: space_photo
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "URL of the space photo"
+
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "ID of the user"
+
+        - name: venue_id
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "ID of the venue"
+
+        - name: space_id
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "ID of the space"
+
+        - name: keywords
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "Keywords for searching spaces"
+
+        - name: categories
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "Categories of spaces"
+
+        - name: total_guest
+          in: query
+          schema:
+            type: integer
+            nullable: true
+          description: "Total number of guests"
+
+        - name: mark_as_favorite
+          in: query
+          schema:
+            type: boolean
+            nullable: true
+          description: "Mark as favorite"
+
+        - name: start_date
+          in: query
+          schema:
+            type: string
+          description: "Start date"
+
+        - name: end_date
+          in: query
+          schema:
+            type: string
+          description: "End date"
+
+        - name: start_time
+          in: query
+          schema:
+            type: string
+          description: "Start time"
+
+        - name: end_time
+          in: query
+          schema:
+            type: string
+          description: "End time"
+
+        - name: location
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "Location of the space"
+
+        - name: city
+          in: query
+          schema:
+            type: string
+          description: "City of the space"
+
+        - name: state
+          in: query
+          schema:
+            type: string
+          description: "State of the space"
+
+        - name: min_price
+          in: query
+          schema:
+            type: number
+          description: "Minimum price"
+
+        - name: max_price
+          in: query
+          schema:
+            type: number
+          description: "Maximum price"
+
+        - name: capacity_layout
+          in: query
+          schema:
+            type: string
+          description: "Layout capacity of the space"
+
+        - name: representation
+          in: query
+          schema:
+            type: string
+          description: "Representation type"
+          enum:
+            - "THE_WHOLE_VENUE"
+            - "SEMI_PRIVATE_AREA_WITHIN_THE_SPACE"
+            - "PRIVATE_OUTDOOR_SPACE"
+            - "SHARED_SPACE"
+
+        - name: bookings
+          in: query
+          schema:
+            type: object
+            properties:
+              search_date:
+                type: string
+                description: "Search date for bookings"
+          description: "Booking details"
+
+        - name: status
+          in: query
+          schema:
+            oneOf:
+              - type: string
+              - type: array
+                items:
+                  type: string
+          description: "Status (string or array of strings)"
+
+        - name: age_restriction
+          in: query
+          schema:
+            type: boolean
+          description: "Age restriction for the space"
+
+        - name: min_age_requirement
+          in: query
+          schema:
+            type: string
+          description: "Minimum age requirement"
+
+        - name: enforcement_time
+          in: query
+          schema:
+            type: string
+          description: "Enforcement time"
+
+        - name: foods_and_beverages
+          in: query
+          schema:
+            type: string
+          description: "Foods and beverages offered"
+
+        - name: menu_offer
+          in: query
+          schema:
+            type: string
+          description: "Menu offer"
+
+        - name: cancellation_flexibility
+          in: query
+          schema:
+            type: boolean
+          description: "Cancellation flexibility"
+
+        - name: facilities
+          in: query
+          schema:
+            type: string
+          description: "Facilities available"
+
+        - name: allow_events
+          in: query
+          schema:
+            type: string
+          description: "Allow events"
+
+        - name: accessibility_features
+          in: query
+          schema:
+            type: string
+          description: "Accessibility features"
+
+        - name: parking_and_accommodation
+          in: query
+          schema:
+            type: string
+          description: "Parking and accommodation features"
+
+        - name: open_days
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "Days the space is open"
+
+        - name: max_capacity
+          in: query
+          schema:
+            type: integer
+            nullable: true
+          description: "Maximum capacity of the space"
+
+        - name: most_popular
+          in: query
+          schema:
+            type: boolean
+            nullable: true
+          description: "Filter by most popular spaces"
+
+        - name: recently_listed
+          in: query
+          schema:
+            type: boolean
+            nullable: true
+          description: "Filter by recently listed spaces"
+
+      responses:
+        200:
+          description: Spaces fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "SPACES_FETCHED"
+                  data:
+                    type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: false
+                      total_pages:
+                        type: integer
+                        example: 1
+                      total_items:
+                        type: integer
+                        example: 4
+                      current_page:
+                        type: integer
+                        example: 1
+                      size:
+                        type: integer
+                        example: 1000
+                      offset:
+                        type: integer
+                        example: 0
+        500:
+          description: Server error
+    post:
+      tags:
+        - "Spaces"
+      summary: "Create a new space"
+      description: "Creates a new space with the provided details."
+      consumes:
+        - "application/json"
+      produces:
+        - "application/json"
+      parameters:
+        - name: "Authorization"
+          in: "header"
+          description: "Bearer token for authorization"
+          required: true
+          type: "string"
+          default: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - in: "body"
+          name: "body"
+          description: "Space details"
+          required: true
+          schema:
+            type: "object"
+            properties:
+              name:
+                type: "string"
+                description: "Name of the space"
+              venue_id:
+                type: "string"
+                description: "ID of the associated venue"
+              type:
+                type: "string"
+                description: "Type of space"
+              representation:
+                type: "string"
+                description: "Representation type of the space"
+                enum:
+                  - "THE_WHOLE_VENUE"
+                  - "SEMI_PRIVATE_AREA_WITHIN_THE_SPACE"
+                  - "PRIVATE_OUTDOOR_SPACE"
+                  - "SHARED_SPACE"
+              description:
+                type: "string"
+                description: "Description of the space"
+              form_steps:
+                type: "string"
+                description: "Form steps for setting up the space"
+              status:
+                type: "string"
+                description: "Status of the space"
+                enum:
+                  - "DRAFT"
+                  - "INPROGRESS"
+                  - "FOR_APPROVAL"
+      responses:
+        201:
+          description: "Space created successfully"
+          schema:
+            type: "object"
+            properties:
+              message:
+                type: "string"
+                example: "SPACE_CREATED_SUCCESSFULLY"
+        400:
+          description: "Bad Request - Invalid input"
+        401:
+          description: "Unauthorized - Invalid or missing token"
+        500:
+          description: "Internal Server Error"
+
+    delete:
+      tags:
+        - Spaces
+      summary: Delete multiple spaces by IDs
+      description: Deletes multiple spaces specified by an array or single ID in the request body.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                space_ids:
+                  oneOf:
+                    - type: string
+                    - type: array
+                      items:
+                        type: string
+                  description: Space ID or list of space IDs to delete
+                  example: ["67062b7e7a186e825e01239a", "67062b7e7a186e825e01239b"]
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+      responses:
+        200:
+          description: Spaces deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "SPACES_DELETED_SUCCESSFULLY"
+        400:
+          description: "Bad Request - Invalid input"
+        401:
+          description: "Unauthorized - Invalid or missing token"
+        500:
+          description: "Internal Server Error"
+
+  /api/v1/space/{id}:
+    patch:
+      tags:
+        - "Spaces"
+      summary: "Update space details"
+      description: "Updates the details of an existing space based on the provided information."
+      consumes:
+        - "application/json"
+      produces:
+        - "application/json"
+      parameters:
+        - name: "Authorization"
+          in: "header"
+          description: "Bearer token for authorization"
+          required: true
+          type: "string"
+          default: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: "id"
+          in: "path"
+          required: true
+          type: "string"
+          description: "ID of the space to update"
+        - in: "body"
+          name: "body"
+          description: "Details for updating the space"
+          required: true
+          schema:
+            type: "object"
+            properties:
+              name:
+                type: "string"
+                description: "Name of the space"
+              type:
+                type: "string"
+                description: "Type of space"
+              representation:
+                type: "string"
+                description: "Representation type of the space"
+                enum:
+                  - "THE_WHOLE_VENUE"
+                  - "SEMI_PRIVATE_AREA_WITHIN_THE_SPACE"
+                  - "PRIVATE_OUTDOOR_SPACE"
+                  - "SHARED_SPACE"
+              description:
+                type: "string"
+                description: "Description of the space"
+              space_photo:
+                type: "array"
+                items:
+                  type: "string"
+                description: "Array of space photo object id"
+              venue_photo:
+                type: "array"
+                items:
+                  type: "string"
+                description: "Array of venue photo object id"
+              floor_plan:
+                type: "array"
+                items:
+                  type: "string"
+                description: "Array of floor plan object id"
+              capacity_layout:
+                type: "array"
+                description: "Layout and capacity details"
+                items:
+                  type: "object"
+                  properties:
+                    _id:
+                      type: "string"
+                    question:
+                      type: "string"
+                    answer:
+                      type: "boolean"
+                    type:
+                      type: "string"
+                      enum:
+                        - "SPACE"
+                        - "VENUE"
+                    options:
+                      type: "array"
+                      items:
+                        type: "string"
+                    max_capacity:
+                      type: "any"
+                    reference:
+                      type: "string"
+                    key:
+                      type: "string"
+              guest_capacity:
+                type: "object"
+                properties:
+                  minimum:
+                    type: "integer"
+                    description: "Minimum guest capacity"
+                  maximum:
+                    type: "integer"
+                    description: "Maximum guest capacity"
+                  floorspace:
+                    type: "object"
+                    properties:
+                      value:
+                        type: "number"
+                        description: "Value of floor space"
+                      unit:
+                        type: "string"
+                        description: "Unit of floor space"
+                        enum:
+                          - "SQM"
+                          - "SQFT"
+              features:
+                type: "array"
+                description: "Array of feature objects"
+                items:
+                  type: "object"
+                  properties:
+                    _id:
+                      type: "string"
+                    question:
+                      type: "string"
+                    answer:
+                      type: "boolean"
+                    type:
+                      type: "string"
+                      enum:
+                        - "SPACE"
+                        - "VENUE"
+                    options:
+                      type: "array"
+                      items:
+                        type: "string"
+                    max_capacity:
+                      type: "any"
+                    reference:
+                      type: "string"
+                    key:
+                      type: "string"
+              keywords:
+                type: "array"
+                description: "Array of keyword objects"
+                items:
+                  type: "object"
+                  properties:
+                    _id:
+                      type: "string"
+                    keyword:
+                      type: "string"
+                    categories:
+                      type: "array"
+                      items:
+                        type: "string"
+                    type:
+                      type: "string"
+                      enum:
+                        - "SPACE"
+                        - "VENUE"
+              floor_space:
+                type: "object"
+                properties:
+                  value:
+                    type: "number"
+                  unit:
+                    type: "string"
+                    enum:
+                      - "SQM"
+                      - "SQFT"
+                description: "Floor space details"
+              pricing:
+                type: "object"
+                properties:
+                  selected_pricing:
+                    type: "string"
+                    description: "Selected pricing option"
+                    enum:
+                      - "HIRE_FEE"
+                      - "CUSTOM_PRICE"
+                  cleaning_fee:
+                    type: "number"
+                    description: "Cleaning fee"
+                  hire_fee:
+                    type: "object"
+                    description: "Hire fee details"
+                    properties:
+                      days:
+                        type: "array"
+                        description: "Array of days with pricing details"
+                        items:
+                          type: "object"
+                          properties:
+                            name:
+                              type: "string"
+                              description: "Day name"
+                              enum:
+                                - "MONDAY"
+                                - "TUESDAY"
+                                - "WEDNESDAY"
+                                - "THURSDAY"
+                                - "FRIDAY"
+                                - "SATURDAY"
+                                - "SUNDAY"
+                            fullRateCheckkBox:
+                              type: "boolean"
+                              description: "Checkbox for full-day rate"
+                            full_day_hours:
+                              type: "number"
+                              description: "Full-day hours"
+                              nullable: true
+                            hourlyCheckBox:
+                              type: "boolean"
+                              description: "Checkbox for hourly rate"
+                            slots:
+                              type: "object"
+                              description: "Time slots with rates"
+                              properties:
+                                start:
+                                  type: "string"
+                                  description: "Slot start time"
+                                  nullable: true
+                                end:
+                                  type: "string"
+                                  description: "Slot end time"
+                                  nullable: true
+                                rate:
+                                  type: "number"
+                                  description: "Hourly rate"
+                                  nullable: true
+                            full_day_rate:
+                              type: "number"
+                              description: "Full day rate"
+                              nullable: true
+                            currency:
+                              type: "string"
+                              description: "Currency of rate"
+                      minimum_booking_hours:
+                        type: "string"
+                        description: "Minimum booking hours"
+                        nullable: true
+                      hire_fee_comment:
+                        type: "string"
+                        description: "Comments on hire fee"
+                        nullable: true
+                  custom_price:
+                    type: "object"
+                    description: "Custom pricing details"
+                    properties:
+                      prices:
+                        type: "array"
+                        description: "Array of custom prices"
+                        items:
+                          type: "object"
+                          properties:
+                            price:
+                              type: "number"
+                              description: "Price amount"
+                              nullable: true
+                            duration:
+                              type: "string"
+                              description: "Duration of the price validity"
+                              nullable: true
+                            minimum_spend:
+                              type: "number"
+                              description: "Minimum spend amount"
+                              nullable: true
+                            package_per_person:
+                              type: "number"
+                              description: "Package price per person"
+                              nullable: true
+                            time:
+                              type: "object"
+                              description: "Timing details"
+                              properties:
+                                from:
+                                  type: "string"
+                                  description: "Start time"
+                                  nullable: true
+                                to:
+                                  type: "string"
+                                  description: "End time"
+                                  nullable: true
+                            weekdays:
+                              type: "array"
+                              description: "Applicable weekdays"
+                              items:
+                                type: "string"
+                                enum:
+                                  - "MONDAY"
+                                  - "TUESDAY"
+                                  - "WEDNESDAY"
+                                  - "THURSDAY"
+                                  - "FRIDAY"
+                                  - "SATURDAY"
+                                  - "SUNDAY"
+                            type:
+                              type: "string"
+                              description: "Type of pricing"
+                              enum:
+                                - "MINIMUM_SPEND"
+                                - "HIRE_FEE"
+                                - "PACKAGE_FEE"
+                                - "HIRE_FEE_MINIMUM_SPEND"
+                                - "HIRE_FEE_PACKAGE_FEE"
+                      opening_hours_private_hour:
+                        type: "boolean"
+                        description: "Flag for private hour opening hours"
+                      opening_hours_preview:
+                        type: "object"
+                        description: "Preview of opening hours"
+                        properties:
+                          time:
+                            type: "object"
+                            properties:
+                              from:
+                                type: "string"
+                                description: "Opening start time"
+                              to:
+                                type: "string"
+                                description: "Closing time"
+                          weekdays:
+                            type: "array"
+                            items:
+                              type: "string"
+                              enum:
+                                - "MONDAY"
+                                - "TUESDAY"
+                                - "WEDNESDAY"
+                                - "THURSDAY"
+                                - "FRIDAY"
+                                - "SATURDAY"
+                                - "SUNDAY"
+                      flexible_pricing_description:
+                        type: "string"
+                        description: "Description for flexible pricing"
+                        nullable: true
+                      pricing_description:
+                        type: "string"
+                        description: "Pricing description"
+                        nullable: true
+                      catering_prices_description:
+                        type: "string"
+                        description: "Description of catering prices"
+                        nullable: true
+                      package_per_person_description:
+                        type: "string"
+                        description: "Description for package per person"
+                        nullable: true
+                  currency:
+                    type: "string"
+                    description: "Currency for pricing"
+
+              form_steps:
+                type: "number"
+                description: "Form step number"
+              status:
+                type: "string"
+                description: "Status of the space"
+                enum:
+                  - "DRAFT"
+                  - "INPROGRESS"
+                  - "FOR_APPROVAL"
+                  - "DELETED"
+      responses:
+        200:
+          description: "Space updated successfully"
+          schema:
+            type: "object"
+            properties:
+              message:
+                type: "string"
+                example: "SPACE_UPDATED_SUCCESSFULLY"
+              data:
+                type: "object"
+                properties:
+                  id:
+                    type: "string"
+                    description: "ID of the updated space"
+        400:
+          description: "Bad Request - Invalid input"
+        401:
+          description: "Unauthorized - Invalid or missing token"
+        404:
+          description: "Not Found - Space not found"
+        500:
+          description: "Internal Server Error"
+    delete:
+      tags:
+        - Spaces
+      summary: Delete a specific space by ID
+      description: Deletes the space specified by its ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID of the space to delete
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+      responses:
+        400:
+          description: "Bad Request - Invalid input"
+        401:
+          description: "Unauthorized - Invalid or missing token"
+        404:
+          description: "Not Found - Space not found"
+        500:
+          description: "Internal Server Error"
+
+  /api/v1/space/most-popular:
+    get:
+      tags:
+        - "Spaces"
+      summary: "Get Most Popular Spaces"
+      description: Fetch Most popular spaces.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: page
+          in: query
+          schema:
+            type: integer
+          description: "Page number"
+
+        - name: limit
+          in: query
+          schema:
+            type: integer
+          description: "Number of items per page"
+
+        - name: space_photo
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "URL of the space photo"
+
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "ID of the user"
+
+        - name: venue_id
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "ID of the venue"
+
+        - name: space_id
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "ID of the space"
+
+        - name: keywords
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "Keywords for searching spaces"
+
+        - name: categories
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "Categories of spaces"
+
+        - name: total_guest
+          in: query
+          schema:
+            type: integer
+            nullable: true
+          description: "Total number of guests"
+
+        - name: mark_as_favorite
+          in: query
+          schema:
+            type: boolean
+            nullable: true
+          description: "Mark as favorite"
+
+        - name: start_date
+          in: query
+          schema:
+            type: string
+          description: "Start date"
+
+        - name: end_date
+          in: query
+          schema:
+            type: string
+          description: "End date"
+
+        - name: start_time
+          in: query
+          schema:
+            type: string
+          description: "Start time"
+
+        - name: end_time
+          in: query
+          schema:
+            type: string
+          description: "End time"
+
+        - name: location
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "Location of the space"
+
+        - name: city
+          in: query
+          schema:
+            type: string
+          description: "City of the space"
+
+        - name: state
+          in: query
+          schema:
+            type: string
+          description: "State of the space"
+
+        - name: min_price
+          in: query
+          schema:
+            type: number
+          description: "Minimum price"
+
+        - name: max_price
+          in: query
+          schema:
+            type: number
+          description: "Maximum price"
+
+        - name: capacity_layout
+          in: query
+          schema:
+            type: string
+          description: "Layout capacity of the space"
+
+        - name: representation
+          in: query
+          schema:
+            type: string
+          description: "Representation type"
+          enum:
+            - "THE_WHOLE_VENUE"
+            - "SEMI_PRIVATE_AREA_WITHIN_THE_SPACE"
+            - "PRIVATE_OUTDOOR_SPACE"
+            - "SHARED_SPACE"
+
+        - name: bookings
+          in: query
+          schema:
+            type: object
+            properties:
+              search_date:
+                type: string
+                description: "Search date for bookings"
+          description: "Booking details"
+
+        - name: status
+          in: query
+          schema:
+            oneOf:
+              - type: string
+              - type: array
+                items:
+                  type: string
+          description: "Status (string or array of strings)"
+
+        - name: age_restriction
+          in: query
+          schema:
+            type: boolean
+          description: "Age restriction for the space"
+
+        - name: min_age_requirement
+          in: query
+          schema:
+            type: string
+          description: "Minimum age requirement"
+
+        - name: enforcement_time
+          in: query
+          schema:
+            type: string
+          description: "Enforcement time"
+
+        - name: foods_and_beverages
+          in: query
+          schema:
+            type: string
+          description: "Foods and beverages offered"
+
+        - name: menu_offer
+          in: query
+          schema:
+            type: string
+          description: "Menu offer"
+
+        - name: cancellation_flexibility
+          in: query
+          schema:
+            type: boolean
+          description: "Cancellation flexibility"
+
+        - name: facilities
+          in: query
+          schema:
+            type: string
+          description: "Facilities available"
+
+        - name: allow_events
+          in: query
+          schema:
+            type: string
+          description: "Allow events"
+
+        - name: accessibility_features
+          in: query
+          schema:
+            type: string
+          description: "Accessibility features"
+
+        - name: parking_and_accommodation
+          in: query
+          schema:
+            type: string
+          description: "Parking and accommodation features"
+
+        - name: open_days
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "Days the space is open"
+
+        - name: max_capacity
+          in: query
+          schema:
+            type: integer
+            nullable: true
+          description: "Maximum capacity of the space"
+
+        - name: most_popular
+          in: query
+          schema:
+            type: boolean
+            nullable: true
+          description: "Filter by most popular spaces"
+
+        - name: recently_listed
+          in: query
+          schema:
+            type: boolean
+            nullable: true
+          description: "Filter by recently listed spaces"
+
+      responses:
+        200:
+          description: Spaces fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "SPACES_FETCHED"
+                  data:
+                    type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: false
+                      total_pages:
+                        type: integer
+                        example: 1
+                      total_items:
+                        type: integer
+                        example: 4
+                      current_page:
+                        type: integer
+                        example: 1
+                      size:
+                        type: integer
+                        example: 1000
+                      offset:
+                        type: integer
+                        example: 0
+        500:
+          description: Server error
+
+  /api/v1/space/recently-listed:
+    get:
+      tags:
+        - "Spaces"
+      summary: "Get Recently Listed Spaces"
+      description: Fetch Recently Listed Spaces.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          type: "string"
+          default: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: page
+          in: query
+          schema:
+            type: integer
+          description: "Page number"
+
+        - name: limit
+          in: query
+          schema:
+            type: integer
+          description: "Number of items per page"
+
+        - name: space_photo
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "URL of the space photo"
+
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "ID of the user"
+
+        - name: venue_id
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "ID of the venue"
+
+        - name: space_id
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "ID of the space"
+
+        - name: keywords
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "Keywords for searching spaces"
+
+        - name: categories
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "Categories of spaces"
+
+        - name: total_guest
+          in: query
+          schema:
+            type: integer
+            nullable: true
+          description: "Total number of guests"
+
+        - name: mark_as_favorite
+          in: query
+          schema:
+            type: boolean
+            nullable: true
+          description: "Mark as favorite"
+
+        - name: start_date
+          in: query
+          schema:
+            type: string
+          description: "Start date"
+
+        - name: end_date
+          in: query
+          schema:
+            type: string
+          description: "End date"
+
+        - name: start_time
+          in: query
+          schema:
+            type: string
+          description: "Start time"
+
+        - name: end_time
+          in: query
+          schema:
+            type: string
+          description: "End time"
+
+        - name: location
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "Location of the space"
+
+        - name: city
+          in: query
+          schema:
+            type: string
+          description: "City of the space"
+
+        - name: state
+          in: query
+          schema:
+            type: string
+          description: "State of the space"
+
+        - name: min_price
+          in: query
+          schema:
+            type: number
+          description: "Minimum price"
+
+        - name: max_price
+          in: query
+          schema:
+            type: number
+          description: "Maximum price"
+
+        - name: capacity_layout
+          in: query
+          schema:
+            type: string
+          description: "Layout capacity of the space"
+
+        - name: representation
+          in: query
+          schema:
+            type: string
+          description: "Representation type"
+          enum:
+            - "THE_WHOLE_VENUE"
+            - "SEMI_PRIVATE_AREA_WITHIN_THE_SPACE"
+            - "PRIVATE_OUTDOOR_SPACE"
+            - "SHARED_SPACE"
+        - name: bookings
+          in: query
+          schema:
+            type: object
+            properties:
+              search_date:
+                type: string
+                description: "Search date for bookings"
+          description: "Booking details"
+
+        - name: status
+          in: query
+          schema:
+            oneOf:
+              - type: string
+              - type: array
+                items:
+                  type: string
+          description: "Status (string or array of strings)"
+
+        - name: age_restriction
+          in: query
+          schema:
+            type: boolean
+          description: "Age restriction for the space"
+
+        - name: min_age_requirement
+          in: query
+          schema:
+            type: string
+          description: "Minimum age requirement"
+
+        - name: enforcement_time
+          in: query
+          schema:
+            type: string
+          description: "Enforcement time"
+
+        - name: foods_and_beverages
+          in: query
+          schema:
+            type: string
+          description: "Foods and beverages offered"
+
+        - name: menu_offer
+          in: query
+          schema:
+            type: string
+          description: "Menu offer"
+
+        - name: cancellation_flexibility
+          in: query
+          schema:
+            type: boolean
+          description: "Cancellation flexibility"
+
+        - name: facilities
+          in: query
+          schema:
+            type: string
+          description: "Facilities available"
+
+        - name: allow_events
+          in: query
+          schema:
+            type: string
+          description: "Allow events"
+
+        - name: accessibility_features
+          in: query
+          schema:
+            type: string
+          description: "Accessibility features"
+
+        - name: parking_and_accommodation
+          in: query
+          schema:
+            type: string
+          description: "Parking and accommodation features"
+
+        - name: open_days
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: "Days the space is open"
+
+        - name: max_capacity
+          in: query
+          schema:
+            type: integer
+            nullable: true
+          description: "Maximum capacity of the space"
+
+        - name: most_popular
+          in: query
+          schema:
+            type: boolean
+            nullable: true
+          description: "Filter by most popular spaces"
+
+        - name: recently_listed
+          in: query
+          schema:
+            type: boolean
+            nullable: true
+          description: "Filter by recently listed spaces"
+
+      responses:
+        200:
+          description: Spaces fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "SPACES_FETCHED"
+                  data:
+                    type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: false
+                      total_pages:
+                        type: integer
+                        example: 1
+                      total_items:
+                        type: integer
+                        example: 4
+                      current_page:
+                        type: integer
+                        example: 1
+                      size:
+                        type: integer
+                        example: 1000
+                      offset:
+                        type: integer
+                        example: 0
+        500:
+          description: Server error
+
+  /api/v1/space/subscribed:
+    get:
+      tags:
+        - "Spaces"
+      summary: "Fetch subscribed spaces"
+      description: "Retrieves the list of subscribed spaces based on query parameters."
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: "page"
+          in: "query"
+          description: "Page number"
+          required: false
+          type: "integer"
+          default: 1
+        - name: "limit"
+          in: "query"
+          description: "Number of items per page"
+          required: false
+          type: "integer"
+          default: 20
+        - name: "venueId"
+          in: "query"
+          description: "ID of the venue"
+          required: false
+          type: "string"
+        - name: "status"
+          in: "query"
+          description: "Status of the subscription"
+          required: false
+          type: "string"
+
+      responses:
+        200:
+          description: "Successfully fetched subscribed spaces"
+          schema:
+            type: "object"
+            properties:
+              message:
+                type: "string"
+                example: "SUBSCRIBED_SPACES_FETCHED_SUCCESSFULLY"
+              data:
+                type: "object"
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      type: "object"
+                      description: "Space data"
+                      properties:
+                        # Example of a space object (you can expand this schema based on actual structure)
+                        id:
+                          type: "string"
+                        name:
+                          type: "string"
+                        description:
+                          type: "string"
+                  total_pages:
+                    type: "integer"
+                    example: 1
+                  total_items:
+                    type: "integer"
+                    example: 1
+                  current_active:
+                    type: "integer"
+                    example: 1
+                  current_page:
+                    type: "integer"
+                    example: 1
+                  size:
+                    type: "integer"
+                    example: 10
+                  offset:
+                    type: "integer"
+                    example: 0
+        400:
+          description: "Bad Request"
+        500:
+          description: "Internal Server Error"
+  /api/v1/space/space-list:
+    get:
+      tags:
+        - "Spaces"
+      summary: "Fetch list of spaces"
+      description: "Retrieves a list of spaces based on venueId and status."
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: "venueId"
+          in: "query"
+          description: "ID of the venue"
+          required: false
+          type: "string"
+        - name: "status"
+          in: "query"
+          description: "Status of the space"
+          required: false
+          type: "string"
+
+      responses:
+        200:
+          description: "Successfully fetched list of spaces"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  message:
+                    type: "string"
+                    example: "SUBSCRIBED_SPACES_FETCHED_SUCCESSFULLY"
+                  data:
+                    type: "object"
+                    properties:
+                      data:
+                        type: "array"
+                        items:
+                          type: "object"
+                          properties:
+                            _id:
+                              type: "string"
+                              example: "67062b7e7a186e825e01239a"
+                            name:
+                              type: "string"
+                              example: "The Cafe Art 1"
+                            user:
+                              type: "object"
+                              description: "User object (may be empty)"
+                              properties:
+                                # Example user fields (expand as necessary)
+                                id:
+                                  type: "string"
+                                name:
+                                  type: "string"
+                            status:
+                              type: "string"
+                              example: "DRAFT"
+                            space_photo:
+                              type: "array"
+                              items:
+                                type: object
+                                additionalProperties: false
+        400:
+          description: "Bad Request"
+        500:
+          description: "Internal Server Error"

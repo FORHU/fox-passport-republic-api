@@ -1,0 +1,25 @@
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica"> Dear {first_name}, </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica">
+          We have received your request for account recovery and understand the importance of regaining access to your account. Our team is currently
+          reviewing the information you provided and will be in touch with the next steps shortly.
+        </mj-text>
+
+        <mj-button background-color="#4CAF50" color="#ffffff" href="{verification_link}"> Recover Account </mj-button>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica">
+          If you need to provide any additional information or have questions, please do not hesitate to contact us.
+        </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica"> Thank you for your patience. </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica"> Best regards,<br />The Venue4Use Team </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

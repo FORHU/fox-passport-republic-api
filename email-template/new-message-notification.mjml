@@ -1,0 +1,36 @@
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        <!-- Header with a divider -->
+        <mj-divider border-color="#F45E43"></mj-divider>
+        <mj-text font-size="20px" color="#F45E43" font-family="helvetica">New Message Notification</mj-text>
+        <mj-divider border-color="#F45E43"></mj-divider>
+
+        <!-- Message content -->
+        <mj-text font-size="16px" color="#333333" font-family="helvetica">
+          Dear {first_name},
+          <br /><br />
+          You have received a new message from:
+          <br /><br />
+          <strong>Sender:</strong> {sender_first_name}<br />
+          <strong>Email:</strong> {sender_email}<br />
+          <strong>Space:</strong> {inquired_space}<br />
+          <strong>Message:</strong> {message}<br />
+          <br />
+          You can view the message in your account.
+          <br /><br />
+          Best regards,
+          <br />
+          Venue4Use
+        </mj-text>
+
+        <!-- Footer -->
+        <mj-divider border-color="#F45E43"></mj-divider>
+        <mj-text align="center" color="#F45E43" font-family="helvetica" font-size="14px">
+          This is an automated message. Please do not reply.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

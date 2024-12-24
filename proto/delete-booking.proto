@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package booking;
+
+import "google/protobuf/timestamp.proto";
+
+// The QueueService service definition.
+service DeleteBookingService {
+  // Define the InitDeleteBooking RPC method
+  rpc InitDeleteBooking (InitDeleteBookingRequest) returns (InitDeleteBookingResponse);
+}
+
+// The request message containing the booking data
+message InitDeleteBookingRequest {
+  string booking_id = 1;
+  string deletedBy = 2;
+  
+}
+
+message ResultData {
+  bool acknowledged = 1;
+  int32 modifiedCount = 2;
+  int32 matchedCount = 3;
+}
+
+// The response message containing a confirmation of the initialization
+message InitDeleteBookingResponse {
+  string confirmation = 1;
+  ResultData results = 2;
+}

@@ -1,0 +1,46 @@
+<mjml>
+  <mj-head>
+    <mj-style>
+      body {
+      font-family: Arial, sans-serif;
+      }
+    </mj-style>
+  </mj-head>
+  <mj-body>
+    <mj-section>
+    </mj-section>
+    <mj-section padding="20px">
+      <mj-column>
+        <mj-text font-size="18px" color="#000000">
+          Dear {first_name},
+        </mj-text>
+        <mj-text font-size="16px" color="#333333">
+          This is a notice that an invoice has been generated on {invoice_date}.
+        </mj-text>
+        <mj-text font-size="16px" color="#333333">
+          Please check the attached pdf for the invoice details.
+        </mj-text>
+        <mj-text font-size="16px" color="#333333">
+          We appreciate your business and hope that you were satisfied with your purchase.
+        </mj-text>
+        <mj-text font-size="16px" color="#333333">
+          Should you have any questions or require further assistance, feel free to reach out to us.
+        </mj-text>
+        <mj-text font-size="16px" color="#333333">
+          Thank you for choosing Venue4Use.
+        </mj-text>
+        <mj-text font-size="16px" color="#333333">
+          Warm regards,
+        </mj-text>
+        <mj-text font-size="16px" color="#333333">
+          The Venue4Use Team
+        </mj-text>
+
+        <mj-divider border-color="#cccccc" />
+        <mj-text font-size="14px" color="#777777">
+          Venue4Use | <a href="https://www.venue4use.com">www.venue4use.com</a>
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

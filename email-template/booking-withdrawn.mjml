@@ -1,0 +1,39 @@
+<mjml>
+  <mj-body background-color="#f9f9f9">
+    <mj-section background-color="#ffffff" padding="20px">
+      <mj-column>
+        <mj-divider border-color="#f45e43"></mj-divider>
+
+        <mj-text font-size="20px" color="#333333" font-family="Helvetica, Arial, sans-serif" font-weight="bold"> Booking Withdrawal Notice </mj-text>
+
+        <mj-text font-size="16px" color="#555555" font-family="Helvetica, Arial, sans-serif"> Hello {venue_owner_name}, </mj-text>
+
+        <mj-text font-size="16px" color="#555555" font-family="Helvetica, Arial, sans-serif">
+          We regret to inform you that the booking request for your space, {space_name}, has been withdrawn. We apologize for any inconvenience this
+          may cause.
+        </mj-text>
+
+        <mj-text font-size="16px" color="#555555" font-family="Helvetica, Arial, sans-serif">
+          <strong>Original Booking Details:</strong>
+        </mj-text>
+        <mj-text font-size="16px" color="#555555" font-family="Helvetica, Arial, sans-serif">
+          Date: {booking_date}<br />
+          Time: {start_time} - {end_time}<br />
+          Space: {space_name}
+        </mj-text>
+
+        <mj-text font-size="16px" color="#555555" font-family="Helvetica, Arial, sans-serif">
+          If you have any questions or need further assistance, please don’t hesitate to reach out to us. We value your partnership and hope to assist
+          you with future bookings.
+        </mj-text>
+
+        <mj-divider border-color="#f45e43"></mj-divider>
+
+        <mj-text font-size="12px" color="#999999" font-family="Helvetica, Arial, sans-serif">
+          For any inquiries, feel free to contact us at
+          <a href="mailto:support@venue4use.com">support@venue4use.com</a>.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

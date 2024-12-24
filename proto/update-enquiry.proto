@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package enquiry;
+
+service UpdateEnquiryService {
+  rpc InitUpdateEnquiry (InitUpdateEnquiryRequest) returns (InitUpdateEnquiryResponse);
+}
+
+message InitUpdateEnquiryRequest {
+  string _id = 1;
+  string status = 2;
+}
+
+message InitUpdateEnquiryResponse {
+  string confirmation = 1;
+  bool acknowledged = 2;
+  string insertedId = 3;
+}
+

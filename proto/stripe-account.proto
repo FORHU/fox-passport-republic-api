@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package queue;
+
+// The QueueService service definition.
+service StripeAccountQueueService {
+  // Define the InitEnquiriesQueue RPC method
+  rpc InitStripeAccountQueue (InitStripeAccountQueueRequest) returns (InitStripeAccountQueueResponse);
+}
+
+// The request message containing no parameters for initializing the queue
+message InitStripeAccountQueueRequest {}
+
+// The response message containing a confirmation of the initialization
+message InitStripeAccountQueueResponse {
+  string confirmation = 1;
+}

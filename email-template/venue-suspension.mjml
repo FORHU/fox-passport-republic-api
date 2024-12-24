@@ -1,0 +1,50 @@
+<mjml>
+  <mj-head>
+    <mj-style> body { font-family: Arial, sans-serif; } </mj-style>
+  </mj-head>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        <mj-divider border-color="#F45E43"></mj-divider>
+
+        <mj-text font-size="20px" color="#F45E43" font-family="Helvetica" font-weight="bold"> Venue Suspension Notice </mj-text>
+
+        <mj-text font-size="16px" color="#333333"> Dear {first_name}, </mj-text>
+
+        <mj-text font-size="16px" color="#333333">
+          We regret to inform you that your venue submission/listing for {venue_name} has been suspended.
+        </mj-text>
+
+        <mj-text font-size="16px" color="#333333">
+          Please review your listing details below and address any issues to ensure compliance with our guidelines.
+        </mj-text>
+
+        <mj-text font-size="16px" color="#000000">
+          <strong>Here are the details:</strong><br />
+          <strong>Venue name:</strong> {venue_name}<br />
+          <strong>Space name:</strong> {space_name}<br />
+          <strong>Date submitted:</strong> {date_submitted}<br />
+        </mj-text>
+
+        <mj-text font-size="16px" color="#333333"> If you have any questions or need assistance, feel free to contact our support team. </mj-text>
+
+        <mj-text font-size="16px" color="#333333"> Thank you for your understanding. </mj-text>
+
+        <mj-text font-size="16px" color="#333333">
+          Best regards,<br />
+          Venue4Use
+        </mj-text>
+
+        <mj-divider border-color="#F45E43"></mj-divider>
+
+        <mj-text font-size="14px" color="#777777"> Please do not reply to this email as it is sent from an unmonitored inbox. </mj-text>
+
+        <mj-text font-size="14px" color="#777777"> Venue4Use | <a href="https://www.venue4use.com">www.venue4use.com</a> </mj-text>
+
+        <mj-text font-size="12px" color="#777777">
+          Please note: This email contains confidential information intended only for the recipient.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

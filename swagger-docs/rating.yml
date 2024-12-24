@@ -1,0 +1,198 @@
+openapi: 3.0.0
+info:
+  title: Venue4use api
+  description: API documentation for venue4use api
+  version: ${API_VERSION}
+servers:
+  - url: ${API_URL}
+paths:
+  /api/v1/rating/{space_id}:
+    get:
+      tags:
+        - Rating
+      summary: Get Space Rating
+      description: This endpoint get rating of a space.
+      parameters:
+        - name: space_id
+          in: path
+          required: true
+          description: The ID of the favorite folder to fetch details for.
+          schema:
+            type: string
+            example: "673aacd09a3d5d888f0e2203"
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+      responses:
+        "200":
+          description: Fetch Transaction Successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: FETCH_SPACE_RATING
+                  data:
+                    type: number
+        "500":
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                  description:
+                    type: string
+                    example: Server not responding
+                  code:
+                    type: string
+                    enum:
+                      - RATING_CREATION_FAILED
+    post:
+      tags:
+        - Rating
+      summary: Create Space Rating
+      description: This endpoint create rating of a space.
+      parameters:
+        - name: space_id
+          in: path
+          required: true
+          description: The ID of the favorite folder to fetch details for.
+          schema:
+            type: string
+            example: "673aacd09a3d5d888f0e2203"
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rating:
+                  type: number
+                  nullable: true
+                  description: space rating
+
+      responses:
+        "200":
+          description: Create Rating Successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: RATING_CREATED
+                  data:
+                    type: object
+                    properties:
+                      result:
+                        type: object
+                        properties:
+                          acknowledged:
+                            type: boolean
+                            example: true
+                          modifiedCount:
+                            type: integer
+                            description: Number of documents modified
+                          upsertedId:
+                            type: string
+                            nullable: true
+                            example: null
+                          upsertedCount:
+                            type: integer
+                            example: 0
+                          matchedCount:
+                            type: integer
+                            description: Number of documents matched
+        "500":
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                  description:
+                    type: string
+                    example: Server not responding
+                  code:
+                    type: string
+                    enum:
+                      - RATING_CREATION_FAILED
+                      - VALIDATION_ERROR
+  /api/v1/rating/overall:
+    get:
+      tags:
+        - Rating
+      summary: Get Overall Space Rating
+      description: This endpoint get overall rating of a space.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+      responses:
+        "200":
+          description: Fetch Transaction Successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: FETCH_SPACE_RATING
+                  result:
+                    type: number
+        "500":
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                  description:
+                    type: string
+                    example: Server not responding
+                  code:
+                    type: string
+                    enum:
+                      - RATING_CREATION_FAILED

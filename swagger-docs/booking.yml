@@ -1,0 +1,927 @@
+openapi: 3.0.0
+info:
+  title: Venue4use api
+  description: API documentation for venue4use api
+  version: ${API_VERSION}
+servers:
+  - url: ${API_URL}
+paths:
+  /api/v1/booking:
+    tags:
+      - Booking
+    get:
+      tags:
+        - Booking
+      summary: Retrieve booking data
+      description: Fetch booking data based on query parameters
+      operationId: getBooking
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+          example: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV"
+          description: JWT authorization token
+        - name: scoped-auth
+          in: header
+          required: true
+          schema:
+            type: string
+          example: "SECRETS123"
+          description: Scoped authorization key
+
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          description: Page number for pagination
+
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          description: Items per page for pagination
+
+        - name: booking_id
+          in: query
+          schema:
+            type: string
+          description: ID of the booking
+
+        - name: space_id
+          in: query
+          schema:
+            type: string
+          description: ID of the space
+
+        - name: venue_id
+          in: query
+          schema:
+            type: string
+          description: ID of the venue
+
+        - name: booked_user
+          in: query
+          schema:
+            type: string
+          description: User who is booked
+
+        - name: booker
+          in: query
+          schema:
+            type: string
+          description: Booker of the event
+
+        - name: status
+          in: query
+          schema:
+            type: string
+          description: Status of the booking
+
+        - name: from
+          in: query
+          schema:
+            type: string
+          description: Start date for the query
+
+        - name: to
+          in: query
+          schema:
+            type: string
+          description: End date for the query
+
+        - name: start_date
+          in: query
+          schema:
+            type: string
+          description: Start date of the booking
+
+        - name: end_date
+          in: query
+          schema:
+            type: string
+          description: End date of the booking
+
+        - name: event_type
+          in: query
+          schema:
+            type: string
+          description: Type of event
+
+        - name: event_duration
+          in: query
+          schema:
+            type: string
+            enum:
+              - BOOKED_PART_OF_DAY
+              - BOOKED_ALL_DAY
+              - BOOKED_MULTIPLE_DAYS
+          description: Duration of the event
+
+      responses:
+        "200":
+          description: Booking data fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BOOKING_DATA_FETCHED"
+                  data:
+                    type: object
+                    properties:
+                      total_pages:
+                        type: integer
+                        description: Total number of pages
+                      total_items:
+                        type: integer
+                        description: Total number of items
+                      current_page:
+                        type: integer
+                        description: Current page number
+                      size:
+                        type: integer
+                        description: Number of items on the current page
+                      offset:
+                        type: integer
+                        description: Offset value
+                      data:
+                        type: array
+                        items:
+                          type: object
+                        description: List of booking data items
+        "401":
+          description: Unauthorized access
+        "500":
+          description: Internal server error
+    post:
+      tags:
+        - Booking
+      summary: Create a new event
+      description: Create a event entry with specified details (NOT booking of space/venue)
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+          example: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV"
+          description: JWT authorization token
+        - name: scoped-auth
+          in: header
+          required: true
+          schema:
+            type: string
+          example: "SECRETS123"
+          description: Scoped authorization key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                booked_user:
+                  type: string
+                  nullable: true
+                  description: User who is booked
+                space:
+                  type: string
+                  nullable: true
+                  description: Space ID
+                venue:
+                  type: string
+                  nullable: true
+                  description: Venue ID
+                start_date:
+                  oneOf:
+                    - type: string
+                    - type: array
+                      items:
+                        type: string
+                  nullable: true
+                  description: Start date for the booking, as string or array of strings
+                start_time:
+                  type: string
+                  nullable: true
+                  description: Start time of the event
+                end_time:
+                  type: string
+                  nullable: true
+                  description: End time of the event
+                total_guest:
+                  type: integer
+                  nullable: true
+                  description: Total number of guests
+                total_price:
+                  type: number
+                  nullable: true
+                  description: Total price for the booking
+                status:
+                  type: string
+                  enum:
+                    - CONFIRMED
+                    - PENDING
+                    - CANCELLED
+                  nullable: true
+                  description: Status of the booking
+                event_type:
+                  type: string
+                  nullable: true
+                  description: Type of event
+                repeat_event:
+                  type: string
+                  enum:
+                    - DOES_NOT_REPEAT
+                    - DAILY
+                    - WEEKLY
+                    - MONTHLY
+                    - YEARLY
+                  nullable: true
+                  description: Repeat event frequency
+                event_duration:
+                  type: string
+                  enum:
+                    - BOOKED_PART_OF_DAY
+                    - BOOKED_ALL_DAY
+                    - BOOKED_MULTIPLE_DAYS
+                  nullable: true
+                  description: Duration of the event
+                optional_input:
+                  type: object
+                  nullable: true
+                  properties:
+                    first_name:
+                      type: string
+                      nullable: true
+                      description: First name
+                    last_name:
+                      type: string
+                      nullable: true
+                      description: Last name
+                    email:
+                      type: string
+                      format: email
+                      nullable: true
+                      description: Email address
+                proceed_alternative_opt:
+                  type: boolean
+                  description: Option to proceed with an alternative
+
+      responses:
+        "200":
+          description: Booking created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BOOKING_SUCCESSFUL"
+                  data:
+                    type: object
+                    description: Result of MongoDB InsertMany operation
+                    properties:
+                      acknowledged:
+                        type: boolean
+                      insertedIds:
+                        type: array
+                        items:
+                          type: string
+        "401":
+          description: Unauthorized access
+        "500":
+          description: Internal server error
+
+  /api/v1/booking/update-days:
+    patch:
+      tags:
+        - Booking
+      summary: Update a specific booking
+      description: Update a booking record by its ID
+      operationId: updateBookingById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID of the booking to update
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+          example: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV"
+          description: JWT authorization token
+        - name: scoped-auth
+          in: header
+          required: true
+          schema:
+            type: string
+          example: "SECRETS123"
+          description: Scoped authorization key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                booking_ids:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of booking IDs to update
+                booked_user:
+                  type: string
+                  nullable: true
+                  description: User who is booked
+                space:
+                  type: string
+                  nullable: true
+                  description: Space ID
+                venue:
+                  type: string
+                  nullable: true
+                  description: Venue ID
+                start_date:
+                  oneOf:
+                    - type: string
+                    - type: array
+                      items:
+                        type: string
+                  nullable: true
+                  description: Start date for the booking, as string or array of strings
+                start_time:
+                  type: string
+                  nullable: true
+                  description: Start time of the event
+                end_time:
+                  type: string
+                  nullable: true
+                  description: End time of the event
+                total_guest:
+                  type: integer
+                  nullable: true
+                  description: Total number of guests
+                total_price:
+                  type: number
+                  nullable: true
+                  description: Total price for the booking
+                status:
+                  type: string
+                  enum:
+                    - CONFIRMED
+                    - PENDING
+                    - CANCELLED
+                  nullable: true
+                  description: Status of the booking
+                event_type:
+                  type: string
+                  nullable: true
+                  description: Type of event
+                repeat_event:
+                  type: string
+                  enum:
+                    - DOES_NOT_REPEAT
+                    - DAILY
+                    - WEEKLY
+                    - MONTHLY
+                    - YEARLY
+                  nullable: true
+                  description: Repeat event frequency
+                event_duration:
+                  type: string
+                  enum:
+                    - BOOKED_PART_OF_DAY
+                    - BOOKED_ALL_DAY
+                    - BOOKED_MULTIPLE_DAYS
+                  nullable: true
+                  description: Duration of the event
+                optional_input:
+                  type: object
+                  nullable: true
+                  properties:
+                    first_name:
+                      type: string
+                      nullable: true
+                      description: First name
+                    last_name:
+                      type: string
+                      nullable: true
+                      description: Last name
+                    email:
+                      type: string
+                      format: email
+                      nullable: true
+                      description: Email address
+                proceed_alternative_opt:
+                  type: boolean
+                  description: Option to proceed with an alternative
+      responses:
+        "200":
+          description: Bookings updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BOOKINGS_UPDATED"
+                  data:
+                    type: object
+                    properties:
+                      acknowledged:
+                        type: boolean
+                        example: true
+                      modifiedCount:
+                        type: integer
+                        description: Total number of modified bookings
+                      upsertedId:
+                        type: string
+                        nullable: true
+                        example: null
+                      upsertedCount:
+                        type: integer
+                        example: 0
+                        description: Count of upserted documents
+                      matchedCount:
+                        type: integer
+                        description: Total number of matched bookings
+        "401":
+          description: Unauthorized access
+        "500":
+          description: Internal server error
+
+  /api/v1/booking/{id}:
+    patch:
+      tags:
+        - Booking
+      summary: Update booking days
+      description: Update the specified booking records by their IDs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The ID of the favorite folder to fetch details for.
+          schema:
+            type: string
+            example: "673aacd09a3d5d888f0e2203"
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+          example: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV"
+          description: JWT authorization token
+        - name: scoped-auth
+          in: header
+          required: true
+          schema:
+            type: string
+          example: "SECRETS123"
+          description: Scoped authorization key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                booking_ids:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of booking IDs to update
+                booked_user:
+                  type: string
+                  nullable: true
+                  description: User who is booked
+                space:
+                  type: string
+                  nullable: true
+                  description: Space ID
+                venue:
+                  type: string
+                  nullable: true
+                  description: Venue ID
+                start_date:
+                  oneOf:
+                    - type: string
+                    - type: array
+                      items:
+                        type: string
+                  nullable: true
+                  description: Start date for the booking, as string or array of strings
+                start_time:
+                  type: string
+                  nullable: true
+                  description: Start time of the event
+                end_time:
+                  type: string
+                  nullable: true
+                  description: End time of the event
+                total_guest:
+                  type: integer
+                  nullable: true
+                  description: Total number of guests
+                total_price:
+                  type: number
+                  nullable: true
+                  description: Total price for the booking
+                status:
+                  type: string
+                  enum:
+                    - CONFIRMED
+                    - PENDING
+                    - CANCELLED
+                  nullable: true
+                  description: Status of the booking
+                event_type:
+                  type: string
+                  nullable: true
+                  description: Type of event
+                repeat_event:
+                  type: string
+                  enum:
+                    - DOES_NOT_REPEAT
+                    - DAILY
+                    - WEEKLY
+                    - MONTHLY
+                    - YEARLY
+                  nullable: true
+                  description: Repeat event frequency
+                event_duration:
+                  type: string
+                  enum:
+                    - BOOKED_PART_OF_DAY
+                    - BOOKED_ALL_DAY
+                    - BOOKED_MULTIPLE_DAYS
+                  nullable: true
+                  description: Duration of the event
+                optional_input:
+                  type: object
+                  nullable: true
+                  properties:
+                    first_name:
+                      type: string
+                      nullable: true
+                      description: First name
+                    last_name:
+                      type: string
+                      nullable: true
+                      description: Last name
+                    email:
+                      type: string
+                      format: email
+                      nullable: true
+                      description: Email address
+                proceed_alternative_opt:
+                  type: boolean
+                  description: Option to proceed with an alternative
+      responses:
+        "200":
+          description: Bookings updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BOOKINGS_UPDATED"
+                  data:
+                    type: object
+                    properties:
+                      acknowledged:
+                        type: boolean
+                        example: true
+                      modifiedCount:
+                        type: integer
+                        description: Total number of modified bookings
+                      upsertedId:
+                        type: string
+                        nullable: true
+                        example: null
+                      upsertedCount:
+                        type: integer
+                        example: 0
+                        description: Count of upserted documents
+                      matchedCount:
+                        type: integer
+                        description: Total number of matched bookings
+        "401":
+          description: Unauthorized access
+        "500":
+          description: Internal server error
+  delete:
+    tags:
+      - Booking
+    summary: Delete a specific booking
+    description: Delete a booking record by its ID
+    operationId: deleteBookingById
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: ID of the booking to delete
+      - name: Authorization
+        in: header
+        required: true
+        schema:
+          type: string
+        example: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV"
+        description: JWT authorization token
+      - name: scoped-auth
+        in: header
+        required: true
+        schema:
+          type: string
+        example: "SECRETS123"
+        description: Scoped authorization key
+    responses:
+      "200":
+        description: Booking deleted successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  example: "BOOKING_DELETED"
+                data:
+                  type: object
+                  properties:
+                    acknowledged:
+                      type: boolean
+                      example: true
+                    modifiedCount:
+                      type: integer
+                      description: Total number of modified bookings
+                    upsertedId:
+                      type: string
+                      nullable: true
+                      example: null
+                    upsertedCount:
+                      type: integer
+                      example: 0
+                      description: Count of upserted documents
+                    matchedCount:
+                      type: integer
+                      description: Total number of matched bookings
+      "401":
+        description: Unauthorized access
+      "500":
+        description: Internal server error
+
+  /api/v1/booking/cancel/computation/{booking_id}:
+    get:
+      tags:
+        - Booking
+      summary: Compute cancellation details
+      description: Retrieve the refund computation for a canceled booking
+      operationId: computeCancellation
+      parameters:
+        - name: booking_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID of the booking to compute cancellation details
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+          example: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV"
+          description: JWT authorization token
+        - name: scoped-auth
+          in: header
+          required: true
+          schema:
+            type: string
+          example: "SECRETS123"
+          description: Scoped authorization key
+      responses:
+        20:
+          description: Cancellation computation retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "The venue owner canceled, full refund applies."
+                  result:
+                    type: object
+                    properties:
+                      percentage:
+                        type: number
+                        description: Refund percentage
+                      allowed:
+                        type: string
+                        description: Whether the cancellation is allowed
+                      grand_total:
+                        type: number
+                        description: Total booking amount
+                      currency:
+                        type: string
+                        description: Currency of the refund
+                      status:
+                        type: string
+                        description: Cancellation status
+                      refund_amount:
+                        type: number
+                        description: Refund amount to be issued
+        "400":
+          description: Invalid request
+        "401":
+          description: Unauthorized access
+        "404":
+          description: Booking not found
+        "500":
+          description: Internal server error
+
+  /api/v1/booking/existing-booking:
+    get:
+      tags:
+        - Booking
+      summary: Check existing booking availability
+      description: Verify if a space is available for booking on a specified date and time
+      operationId: checkExistingBooking
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+          example: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV"
+          description: JWT authorization token
+        - name: scoped-auth
+          in: header
+          required: true
+          schema:
+            type: string
+          example: "SECRETS123"
+          description: Scoped authorization key
+        - name: space
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Space ID for the booking
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Start date for the booking
+        - name: start_time
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Start time for the booking (optional)
+        - name: end_time
+          in: query
+          required: false
+          schema:
+            type: string
+          description: End time for the booking (optional)
+        - name: repeat_event
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - DOES_NOT_REPEAT
+              - DAILY
+              - WEEKLY
+              - MONTHLY
+              - YEARLY
+          description: Repeat event frequency (optional)
+      responses:
+        "200":
+          description: Space availability checked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "SPACE_IS_NOT_AVAILABLE"
+                  result:
+                    type: object
+                    properties:
+                      available:
+                        type: boolean
+                        example: false
+                        description: Indicates if the space is available for booking
+        "401":
+          description: Unauthorized access
+        "500":
+          description: Internal server error
+
+  /api/v1/booking/cancel/{booking_id}:
+    patch:
+      tags:
+        - Booking
+      summary: Cancel a specific booking
+      description: Cancel a booking by its ID and provide an optional reason and message
+      operationId: cancelBookingById
+      parameters:
+        - name: booking_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID of the booking to cancel
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+          example: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV"
+          description: JWT authorization token
+        - name: scoped-auth
+          in: header
+          required: true
+          schema:
+            type: string
+          example: "SECRETS123"
+          description: Scoped authorization key
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason_for_cancellation:
+                  type: string
+                  enum:
+                    - THE_GUEST_BOOKED_INCORRECT_TYPE
+                    - THE_BOOKING_VIOLATES_THE_RULES_OF_MY_SPACE
+                    - THE_GUEST_IS_UNRESPONSIVE
+                    - MY_SPACE_IS_NO_LONGER_AVAILABLEc
+                    - CHANGE_MY_MIND
+                    - SCHEDULING_CONFLICT
+                    - WEATHER_CONCERNS
+                    - EVENT_SCHEDULED
+                    - HEALTH_AND_SAFETY_CONCERNS
+                    - OTHER
+                  description: Reason for cancellation
+                message:
+                  type: string
+                  description: Additional message for the cancellation
+      responses:
+        "200":
+          description: Booking canceled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Booking canceled successfully"
+                  data:
+                    type: object
+                    properties:
+                      result:
+                        type: object
+                        properties:
+                          acknowledged:
+                            type: boolean
+                            example: true
+                          modifiedCount:
+                            type: integer
+                            description: Number of documents modified
+                          upsertedId:
+                            type: string
+                            nullable: true
+                            example: null
+                          upsertedCount:
+                            type: integer
+                            example: 0
+                          matchedCount:
+                            type: integer
+                            description: Number of documents matched
+
+        "401":
+          description: Unauthorized access
+        "500":
+          description: Internal server error

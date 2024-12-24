@@ -1,0 +1,26 @@
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        <mj-text font-size="20px" color="#333333" font-family="helvetica">
+          <strong>Hi {first_name},</strong>
+        </mj-text>
+
+        <mj-text font-size="16px" color="#666666" font-family="helvetica">
+          We noticed that you haven't set up your Stripe account yet. In order to receive payments, please set up your Stripe account as soon as
+          possible.
+        </mj-text>
+
+        <mj-button background-color="#F45E43" color="#ffffff" font-family="helvetica" href="https://dashboard.stripe.com/">
+          Set Up Your Stripe Account
+        </mj-button>
+
+        <mj-divider border-color="#F45E43"></mj-divider>
+
+        <mj-text font-size="14px" color="#999999" font-family="helvetica">
+          If you have any questions or need assistance, please contact our support team at support@venue4use.com.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

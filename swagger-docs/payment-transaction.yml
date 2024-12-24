@@ -1,0 +1,144 @@
+openapi: 3.0.0
+info:
+  title: Venue4use api
+  description: API documentation for venue4use api
+  version: ${API_VERSION}
+servers:
+  - url: ${API_URL}
+paths:
+  /api/v1/payment-transaction:
+    get:
+      tags:
+        - Payment Transaction
+      summary: Get Payment Transactions
+      description: This endpoint retrieves all payment transactions.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization.
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped authentication for authorization.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successfully fetched payment transactions.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: FETCH_ACCOUNT_TRANSACTION
+                    description: Status message indicating successful retrieval.
+                  data:
+                    type: object
+                    properties:
+                      payment:
+                        type: boolean
+                        description: Indicates if the transaction is a payment.
+                        example: true
+                      id:
+                        type: string
+                        description: Unique identifier for the transaction.
+                        example: "trxn_123456"
+                      client_secret:
+                        type: string
+                        description: Client secret for the transaction.
+                        example: "pi_3PkeIuRuNU3oIjnA0YHZKyX6_secret_12345"
+                      payment_id:
+                        type: string
+                        description: Unique payment identifier.
+                        example: "pi_3PkeIuRuNU3oIjnA0YHZKyX6"
+                      booking_id:
+                        type: string
+                        description: Unique booking identifier associated with the payment.
+                        example: "booking_67890"
+        "500":
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                    description: High-level error message.
+                  description:
+                    type: string
+                    example: Unable to fetch payment transactions.
+                    description: Detailed error description.
+                  code:
+                    type: string
+                    enum:
+                      - FETCH_ACCOUNT_TRANSACTION_FAILED
+                    description: Error code indicating failure in fetching transactions.
+
+  /api/v1/payment-transaction/repeat-transfer/{id}:
+    post:
+      tags:
+        - Payment Transaction
+      summary: Repeat Transfer Transaction
+      description: This endpoint repeats a transfer transaction using the provided transaction ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The ID of the payment transaction.
+          schema:
+            type: string
+            example: "673aacd09a3d5d888f0e2203"
+        - name: Authorization
+          in: header
+          required: true
+          description: JWT authorization token.
+          schema:
+            type: string
+            example: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV"
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped authorization key.
+          schema:
+            type: string
+            example: "SECRETS123"
+      responses:
+        "200":
+          description: Successfully repeated the transfer transaction.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: TRANSFER_SUCCESS
+                    description: Status message indicating successful repetition of the transaction.
+        "500":
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                    description: High-level error message.
+                  description:
+                    type: string
+                    example: Server not responding
+                    description: Detailed error description.
+                  code:
+                    type: string
+                    enum:
+                      - ERROR_IN_FUND_TRANSFER
+                    description: Error code indicating an issue with the fund transfer.

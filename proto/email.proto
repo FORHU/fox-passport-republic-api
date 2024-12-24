@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package queue;
+
+// The QueueService service definition.
+service EmailQueueService {
+  // Define the InitEmailQueue RPC method
+  rpc InitEmailQueue (InitEmailQueueRequest) returns (InitEmailQueueResponse);
+}
+
+// The request message containing the email data for initializing the queue
+message InitEmailQueueRequest {
+  string to = 1;
+  string subject = 2;
+  string html = 3;
+  string attachments = 4;
+  string cc = 5;
+}
+
+// The response message containing a confirmation of the initialization
+message InitEmailQueueResponse {
+  string confirmation = 1;
+}

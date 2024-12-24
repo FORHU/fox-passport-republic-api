@@ -1,0 +1,42 @@
+<mjml>
+  <mj-head>
+    <mj-title>Venue4Use: Confirm Your Email Address</mj-title>
+    <mj-preview>Welcome to Venue4Use! Confirm your email address to get started.</mj-preview>
+    <mj-style> body { font-family: Arial, sans-serif; } </mj-style>
+  </mj-head>
+  <mj-body>
+    <mj-section> </mj-section>
+    <mj-section padding="20px">
+      <mj-column>
+        <mj-text font-size="18px" color="#000000"> Dear {first_name}, </mj-text>
+        <mj-text font-size="16px" color="#333333"> Welcome to Venue4Use! We're excited to have you on board. </mj-text>
+        <mj-text font-size="16px" color="#333333">
+          Before we get started, we need to verify your email address. This is a quick step to ensure the security of your account and to make sure
+          that you can recover your account if you ever forget your password.
+        </mj-text>
+        <mj-button background-color="#4CAF50" color="#ffffff" href="{verification_link}"> Confirm Your Email </mj-button>
+        <mj-text font-size="16px" color="#333333">
+          This link will be active for 48 hours. If it expires, you can request a new one from our website.
+        </mj-text>
+        <mj-text font-size="16px" color="#333333"> If you did not sign up, please ignore this email. </mj-text>
+        <mj-text font-size="16px" color="#333333">
+          Thank you for joining us, and we look forward to providing you with the best experience possible!
+        </mj-text>
+        <mj-text font-size="16px" color="#333333"> Warm regards, </mj-text>
+        <mj-text font-size="16px" color="#333333"> Venue4Use </mj-text>
+        <mj-divider border-color="#cccccc" />
+        <mj-text font-size="16px" color="#333333"> Need Help? </mj-text>
+        <mj-text font-size="16px" color="#333333">
+          If you're having trouble with the verification process, please contact our support team at
+          <a href="mailto:support@venue4use.com">support@venue4use.com</a> or visit our Help Center.
+        </mj-text>
+        <mj-text font-size="14px" color="#777777"> Please do not reply to this email as it is sent from an unmonitored inbox. </mj-text>
+        <mj-divider border-color="#cccccc" />
+        <mj-text font-size="14px" color="#777777"> Venue4Use | <a href="https://www.venue4use.com">www.venue4use.com</a> </mj-text>
+        <mj-text font-size="12px" color="#777777">
+          Please note: The verification link is unique to your account and should not be shared with others.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

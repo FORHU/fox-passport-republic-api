@@ -1,0 +1,525 @@
+openapi: 3.0.0
+info:
+  title: Venue4use api
+  description: API documentation for venue4use api
+  version: ${API_VERSION}
+servers:
+  - url: ${API_URL}
+paths:
+  /api/v1/enquiries:
+    get:
+      tags:
+        - Enquiries
+      summary: Fetch enquiry details
+      description: Retrieves enquiry details based on various filter options.
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+          description: Bearer token for authorization
+        - in: header
+          name: scoped-auth
+          required: true
+          schema:
+            type: string
+          description: Additional scoped authorization token
+        - in: query
+          name: space_id
+          schema:
+            type: string
+          description: Filter by space ID
+        - in: query
+          name: venue_id
+          schema:
+            type: string
+          description: Filter by venue ID
+        - in: query
+          name: enquiry_id
+          schema:
+            type: string
+          description: Filter by enquiry ID
+        - in: query
+          name: status
+          schema:
+            type: string
+          description: Filter by enquiry status
+        - in: query
+          name: page
+          schema:
+            type: integer
+          description: Pagination - page number
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: Pagination - limit per page
+        - in: query
+          name: user_id
+          schema:
+            type: string
+          description: Filter by user ID
+        - in: query
+          name: toggle_censor
+          schema:
+            type: boolean
+          description: Toggle to apply or remove censorship
+        - in: query
+          name: toggle_current
+          schema:
+            type: boolean
+          description: Toggle to show only current enquiries
+        - in: query
+          name: search_name
+          schema:
+            type: string
+          description: Search by name
+        - in: query
+          name: event_type
+          schema:
+            type: string
+          description: Filter by event type
+        - in: query
+          name: guests
+          schema:
+            type: integer
+          description: Number of guests for the event
+        - in: query
+          name: event_date
+          schema:
+            type: string
+            format: date
+          description: Date of the event
+      responses:
+        200:
+          description: Successfully fetched booking data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BOOKING_DATA_FETCHED"
+                  data:
+                    type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                      total_pages:
+                        type: integer
+                        example: 0
+                      total_items:
+                        type: integer
+                        example: 0
+                      current_page:
+                        type: string
+                        example: "1"
+                      size:
+                        type: integer
+                        example: 10
+                      offset:
+                        type: integer
+                        example: 0
+        500:
+          description: Server error
+    post:
+      tags:
+          - Enquiries
+      summary: Create a new enquiry
+      description: Allows users to create a new enquiry for a space or venue with optional details like date, guests, catering requirements, and more.
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+          description: Bearer token for authorization
+        - in: header
+          name: scoped-auth
+          required: true
+          schema:
+            type: string
+          description: Additional scoped authorization token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                date:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      example: "2024-12-01"
+                    timestamp:
+                      type: string
+                      format: date-time
+                      example: "2024-12-01T12:00:00Z"
+                    from:
+                      type: string
+                      example: "08:30"
+                    to:
+                      type: string
+                      example: "11:00"
+                type:
+                  type: string
+                guests:
+                  type: integer
+                value:
+                  type: integer
+                space:
+                  type: string
+                  example: 670784a469bbebf81bua60jh
+                status:
+                  type: string
+                  enum:
+                    - "ACTIVE"
+                    - "NEW"
+                    - "IN_PROGRESS"
+                    - "PAYMENT_IN_PROGRESS"
+                    - "BOOKING_CONFIRMED"
+                    - "PAYMENT_FAILED"
+                    - "CUSTOM_OFFER_SENT"
+                    - "HAPPENED"
+                    - "COMMISSION_DUE"
+                    - "ARCHIVED"
+                    - "CANCELLED"
+                    - "DECLINED"
+                    - "OFFER_ACCEPTED"
+                    - "REQUESTED_FOR_CANCELLATION"
+                    - "BOOKING_REQUESTED"
+                    - "BOOKING_REQUEST_DECLINED"
+                    - "BOOKING_REQUEST_WITHDRAWN"
+                own_catering:
+                  type: boolean
+                  example: true
+                require_catering:
+                  type: boolean
+                  example: false
+                flexible_time:
+                  type: boolean
+                  example: false
+                catering_options:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: boolean
+                message:
+                  type: string
+      responses:
+        200:
+          description: Successfully created the enquiry
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "ENQUIRY_ADDED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    additionalProperties: true
+                    description: InsertOneResult<Document> (MongoDB result)
+        500:
+          description: Server error
+
+  /api/v1/enquiries/count/status:
+    get:
+      tags:
+        - Enquiries
+      summary: Fetch count of enquiries
+      description: Retrieves the count of enquiries.
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+          description: Bearer token for authorization
+        - in: header
+          name: scoped-auth
+          required: true
+          schema:
+            type: string
+          description: Additional scoped authorization token
+        - in: query
+          name: excluded_status
+          schema:
+            type: string
+          description: Status to exclude from the enquiry count
+          nullable: true
+
+      responses:
+        200:
+          description: Successfully fetched count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "COUNT_FETCHED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      TOTAL:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "ALL"
+                          count:
+                            type: integer
+                            example: 0
+        500:
+          description: Server error
+
+  /api/v1/enquiries/{id}:
+    patch:
+      tags:
+        - Enquiries
+      summary: Update the status of an enquiry
+      description: Allows users to update the status of a specific enquiry.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: The ID of the enquiry to be updated.
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+          description: Bearer token for authorization.
+        - in: header
+          name: scoped-auth
+          required: true
+          schema:
+            type: string
+          description: Additional scoped authorization token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                    - "ARCHIVED"
+                    - "DECLINED"
+                    - "OFFER_ACCEPTED"
+                    - "CANCELLED"
+                    - "NEW"
+                    - "BOOKING_REQUEST_DECLINED"
+                    - "BOOKING_REQUEST_WITHDRAWN"
+                  example: "NEW"
+      responses:
+        "200":
+          description: Successfully updated the enquiry
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "ENQUIRY_UPDATED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    additionalProperties: true
+                    description: UpdateResult<Document> (MongoDB result)
+                    example:
+                      acknowledged: true
+                      matchedCount: 1
+                      modifiedCount: 1
+                      upsertedId: null
+    get:
+      tags:
+        - Enquiries
+      summary: Get details of an enquiry
+      description: Fetch specific details of an enquiry based on query parameters.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: The ID of the enquiry to fetch.
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+          description: Bearer token for authorization.
+        - in: header
+          name: scoped-auth
+          required: true
+          schema:
+            type: string
+          description: Additional scoped authorization token.
+        - in: query
+          name: space_id
+          schema:
+            type: string
+          required: false
+          description: ID of the space, if applicable.
+        - in: query
+          name: venue_id
+          schema:
+            type: string
+          required: false
+          description: ID of the venue, if applicable.
+        - in: query
+          name: enquiry_id
+          schema:
+            type: string
+          required: false
+          description: ID of the enquiry to be retrieved.
+        - in: query
+          name: status
+          schema:
+            type: string
+          required: false
+          description: Status of the enquiry.
+        - in: query
+          name: page
+          schema:
+            type: integer
+          required: false
+          description: Page number for pagination.
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          required: false
+          description: Limit for pagination.
+        - in: query
+          name: user_id
+          schema:
+            type: string
+          required: false
+          description: User ID related to the enquiry.
+        - in: query
+          name: toggle_censor
+          schema:
+            type: boolean
+          required: false
+          description: Toggle to censor content if applicable.
+        - in: query
+          name: toggle_current
+          schema:
+            type: boolean
+          required: false
+          description: Toggle to fetch current status of enquiry.
+        - in: query
+          name: search_name
+          schema:
+            type: string
+          required: false
+          description: Search term for a name related to the enquiry.
+        - in: query
+          name: event_type
+          schema:
+            type: string
+          required: false
+          description: Type of event related to the enquiry.
+        - in: query
+          name: guests
+          schema:
+            type: integer
+          required: false
+          description: Number of guests for the event.
+        - in: query
+          name: event_date
+          schema:
+            type: string
+            format: date
+          required: false
+          description: Date of the event in YYYY-MM-DD format.
+      responses:
+        "200":
+          description: Successfully fetched enquiry details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "ENQUIRIES_FETCHED"
+                  data:
+                    type: object
+                    example: {}
+
+  /api/v1/enquiries/space-photo:
+    get:
+      tags:
+          - Enquiries
+      summary: Fetch space photo for an enquiry
+      description: Retrieve photos associated with a specific space by its ID.
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+          description: Bearer token for authorization.
+        - in: header
+          name: scoped-auth
+          required: true
+          schema:
+            type: string
+          description: Additional scoped authorization token.
+        - in: query
+          name: space_id
+          required: true
+          schema:
+            type: string
+          description: ID of the space to retrieve photos for.
+      responses:
+        "200":
+          description: Successfully fetched space photos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "ENQUIRY_PHOTO_FETCHED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        example: "66b163fdd7761597hd28e2a5"
+                      name:
+                        type: string
+                        example: "Sample"
+                      space_photos:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            _id:
+                              type: string
+                              example: "670dfb85e910746613ada434"
+                            filename:
+                              type: string
+                              example: "sample.jpeg"

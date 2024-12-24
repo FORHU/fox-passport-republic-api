@@ -1,0 +1,298 @@
+openapi: 3.0.0
+info:
+  title: Venue4use api
+  description: API documentation for venue4use api
+  version: ${API_VERSION}
+servers:
+  - url: ${API_URL}
+paths:
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login User
+      description: Authenticate a user with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - role
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: P@ssw0rd
+                role:
+                  type: string
+                  enum:
+                    - USER
+                    - VENUE_OWNER
+                    - ADMIN
+                    - VENUE_LISTER
+                  example: VENUE_OWNER
+      responses:
+        200:
+          description: Successfully logged in
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                    description: JWT access token for user authentication
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+                  refreshToken:
+                    type: string
+                    description: Token to refresh the JWT access token
+                    example: dGhpcyBpcyBhIHJlZnJlc2ggdG9rZW4
+                  status:
+                    type: string
+                    description: Login status
+                    example: success
+        400:
+          description: Bad request, invalid credentials
+        500:
+          description: Server error
+
+  /api/v1/auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: User Registration
+      description: User Registration with user details
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - role
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: P@ssw0rd
+                role:
+                  type: string
+                  enum:
+                    - USER
+                    - VENUE_OWNER
+                    - ADMIN
+                    - VENUE_LISTER
+                  example: VENUE_OWNER
+                first_name: # Optional field
+                  type: string
+                  example: John
+                last_name: # Optional field
+                  type: string
+                  example: Doe
+                phone_number: # Optional field
+                  type: string
+                  example: +1234567890
+                date_of_birth:
+                  type: string
+                  example: 1990-01-01
+                company_name:
+                  type: string
+                  example: Example Company
+                venue_name:
+                  type: string
+                  example: Example Venue
+                postal:
+                  type: string
+                  example: 12345
+                country:
+                  type: string
+                  example: "PH"
+                social_link:
+                  type: string
+                  example: https://example.com
+      responses:
+        200:
+          description: Successfully Register user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                    description: JWT access token for user authentication
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+                  refreshToken:
+                    type: string
+                    description: Token to refresh the JWT access token
+                    example: dGhpcyBpcyBhIHJlZnJlc2ggdG9rZW4
+        400:
+          description: Bad request, invalid input data
+        409:
+          description: Conflict, user with the given email already exists
+        500:
+          description: Server error
+
+  /api/v1/auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout User
+      description: Logout the user by revoking the access token
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+      responses:
+        200:
+          description: Successfully logged out
+          content:
+            application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                description: Logout status
+                example: success
+      500:
+        description: Server error
+
+  /api/v1/auth/update-password:
+    patch:
+      tags:
+        - Authentication
+      summary: Update User Password
+      description: Update the user's password
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - old_password
+                - new_password
+              properties:
+                old_password:
+                  type: string
+                  format: password
+                  example: OldP@ssw0rd
+                new_password:
+                  type: string
+                  format: password
+                  example: NewP@ssw0rd
+      responses:
+        200:
+          description: Successfully updated password
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Update status
+                    example: success
+        400:
+          description: Bad request, invalid input data
+        401:
+          description: Unauthorized, invalid old password
+        500:
+          description: Server error
+
+  /api/v1/auth/email-verification:
+    get:
+      tags:
+        - Authentication
+      summary: Email Verification
+      description: Verify the user's email
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+      responses:
+        200:
+          description: Successfully verified email
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Verification status
+                    example: success
+        400:
+          description: Bad request, invalid input data
+        401:
+          description: Unauthorized, invalid OTP
+        500:
+          description: Server error
+
+  /api/v1/auth/validate-email-otp:
+    patch:
+      tags:
+        - Authentication
+      summary: Validate OTP
+      description: Validate the OTP for email verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - otp_code
+              properties:
+                otp:
+                  type: number
+                  example: 123456
+      responses:
+        200:
+          description: Successfully validated OTP
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Validation status
+                    example: success
+        400:
+          description: Bad request, invalid input data
+        401:
+          description: Unauthorized, invalid OTP
+        500:
+          description: Server error

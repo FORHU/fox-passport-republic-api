@@ -1,0 +1,40 @@
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        <!-- Divider -->
+        <mj-divider border-color="#F45E43"></mj-divider>
+
+        <!-- Greeting -->
+        <mj-text font-size="20px" color="#F45E43" font-family="helvetica">Ownership Transfer Request</mj-text>
+
+        <!-- Invitation Message -->
+        <mj-text font-size="16px" font-family="helvetica">
+          You have been invited by venue4use admin to take ownership of the venue, <strong>{venue_name}</strong>, on Venue4Use.
+        </mj-text>
+
+        <!-- Details about Ownership Transfer -->
+        <mj-text font-size="16px" font-family="helvetica">
+          This transfer will make you the new owner with all associated rights and responsibilities for managing the venue.
+        </mj-text>
+
+        <!-- Instructions -->
+        <mj-text font-size="16px" font-family="helvetica">
+          Please note that this transfer request is valid for 3 days only. To accept the transfer and finalize the ownership change, click the button
+          below:
+        </mj-text>
+
+        <!-- Accept Ownership Transfer Link -->
+        <mj-button background-color="#F45E43" color="#ffffff" font-size="16px" href="{verification_link}"> Accept Ownership Transfer </mj-button>
+
+        <!-- Additional Information -->
+        <mj-text font-size="16px" font-family="helvetica">
+          If you do not accept this request within 3 days, the ownership will remain with the current owner.
+        </mj-text>
+
+        <!-- Closing Message -->
+        <mj-text font-size="16px" font-family="helvetica"> If you have any questions, feel free to reach out </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

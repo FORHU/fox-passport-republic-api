@@ -1,0 +1,44 @@
+<mjml>
+  <mj-head>
+    <mj-title>Venue Submission Status</mj-title>
+    <mj-attributes>
+      <mj-all font-family="helvetica, Arial, sans-serif" />
+      <mj-text font-size="16px" color="#000000" />
+      <mj-section padding="20px" />
+      <mj-column padding="20px" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#ffffff">
+    <mj-section>
+      <mj-column>
+        <mj-text font-size="20px" color="#F45E43">Space Submission Status</mj-text>
+        <mj-text font-size="16px" color="#000000">Dear {first_name},</mj-text>
+        <mj-text font-size="16px" color="#000000">I hope this email finds you well.</mj-text>
+        <mj-text font-size="16px" color="#000000"
+          >Thank you for submitting your space proposal. After careful consideration, we regret to inform you that we will not be able to move forward
+          with your space listing.</mj-text
+        >
+        <mj-text font-size="16px" color="#000000">Here are the details:</mj-text>
+        <mj-text font-size="16px" color="#000000">
+          <ul>
+            <li>Venue name: {venue_name}</li>
+            <li>Space name: {space_name}</li>
+            <li>Date submitted: {date_submitted}</li>
+          </ul>
+        </mj-text>
+        <mj-text font-size="16px" color="#000000"
+          >We appreciate your effort and interest in collaborating with us. Should there be any future opportunities, we would be pleased to consider
+          your space again.</mj-text
+        >
+        <mj-text font-size="16px" color="#000000">Thank you for your understanding.</mj-text>
+        <mj-text font-size="16px" color="#000000">Best regards,</mj-text>
+        <mj-text font-size="16px" color="#000000">Venue4Use</mj-text>
+        <mj-text font-size="16px" color="#000000"
+          >If you have any questions, feel free to reach out to our support team at
+          <a href="mailto:support@venue4use.com">support@venue4use.com</a>.</mj-text
+        >
+        <mj-divider border-color="#F45E43"></mj-divider>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

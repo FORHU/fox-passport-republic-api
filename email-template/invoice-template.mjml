@@ -1,0 +1,74 @@
+<mjml>
+  <mj-body>
+    <mj-section background-color="#8091AF" padding="0px">
+      <mj-column>
+        <mj-image src="https://web-app-main-erf9e.ondigitalocean.app/_nuxt/dp3-removebg.CfAaVNIa.webp" alt="Venue4Use Logo" width="120px"></mj-image>
+      </mj-column>
+      <mj-column>
+        <mj-text align="center" font-size="24px" font-weight="bold" color="#fff">Tax Invoice</mj-text>
+        <mj-text align="center" font-size="16px" color="#fff">Invoice # {invoice_no}</mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section>
+      <mj-column>
+        <mj-text font-size="16px">Name of Space and Address:</mj-text>
+        <mj-text>{space_name}</mj-text>
+        <mj-text>{venue_location}</mj-text>
+        <mj-text>{venue_country}</mj-text>
+        <mj-text>{venue_country} {venue_postal}</mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section background-color="#f0f0f0">
+      <mj-column>
+        <mj-text font-size="16px">Details</mj-text>
+        <mj-text>Invoice Date: {invoice_date}</mj-text>
+        <mj-text>Invoice Number: {invoice_no}</mj-text>
+        <mj-text>Reference: Venue4use Invoice - {booker_user}</mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section>
+      <mj-column>
+        <mj-table>
+          <tr>
+            <th>DESCRIPTION</th>
+            <th>QUANTITY</th>
+            <th>UNIT PRICE</th>
+            <th>GST</th>
+            <th>AMOUNT</th>
+          </tr>
+          <tr>
+            <td>Online Booking - {booker_user}, {space_name}</td>
+            <td>{quantity}</td>
+            <td>{price}</td>
+            <td>{rebate}</td>
+            <td>{grand_total}</td>
+          </tr>
+        </mj-table>
+      </mj-column>
+    </mj-section>
+    <mj-section background-color="#f0f0f0">
+      <mj-column>
+        <mj-text>Subtotal: {price}</mj-text>
+        <mj-text>Total GST: {rebate}</mj-text>
+        <mj-divider border-width="1px" border-color="#000000"></mj-divider>
+        <mj-text>Invoice Total SGD: {grand_total}</mj-text>
+        <mj-text>Total Net Payments SGD: {grand_total}</mj-text>
+        <mj-divider border-width="1px" border-color="#000000"></mj-divider>
+        <mj-text font-weight="bold">Amount Due SGD: {grand_total}</mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section>
+      <mj-column>
+        <mj-text
+          >Important: Payment methods (please disregard if a booking has been paid online via Venue4use) - Please state the Invoice Number in the
+          payment reference when paying via bank transfer - Alternatively, you can use the 'Pay Now' button in the top left corner of the page to pay
+          via debit/credit card - Please note that due to the company policy we don't accept paper cheques</mj-text
+        >
+        <mj-text
+          >A failure to pay an invoice within 14 days of the due date may result in your account being suspended and your credit history being
+          affected (Venue4Use may exercise a late payment fee, together with debt recovery cost, which is in line with 4.10.4 of our T&Cs)</mj-text
+        >
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

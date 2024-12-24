@@ -1,0 +1,32 @@
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        <!-- Divider -->
+        <mj-divider border-color="#F45E43"></mj-divider>
+
+        <!-- Greeting -->
+        <mj-text font-size="20px" color="#F45E43" font-family="helvetica">Good day!</mj-text>
+
+        <!-- Invitation Message -->
+        <mj-text font-size="16px" font-family="helvetica">The admin has invited you as a {assigned_roles} on Venue4Use.</mj-text>
+
+        <!-- Instructions -->
+        <mj-text font-size="16px" font-family="helvetica">
+          Please note that this invitation is valid for 3 days only, so be sure to sign up before it expires. Simply click the button below to get
+          started:
+        </mj-text>
+
+        <!-- Invitation Link -->
+        <mj-button background-color="#F45E43" color="#ffffff" font-size="16px" href="{verification_link}"> Accept Invitation </mj-button>
+
+        <!-- Closing Message -->
+        <mj-text font-size="16px" font-family="helvetica">If you have any questions, feel free to reach out—we're happy to help!</mj-text>
+        <mj-text font-size="16px" font-family="helvetica">Looking forward to seeing you on Venue4Use!</mj-text>
+
+        <!-- Divider -->
+        <mj-divider border-color="#F45E43"></mj-divider>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

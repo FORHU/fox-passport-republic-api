@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package booking;
+
+import "google/protobuf/timestamp.proto";
+
+// The QueueService service definition.
+service CreateBookingService {
+  // Define the InitCreateBooking RPC method
+  rpc InitCreateBooking (InitCreateBookingRequest) returns (InitCreateBookingResponse);
+}
+
+// The request message containing the booking data
+message InitCreateBookingRequest {
+  string _id = 1;
+  string booker = 2;
+  string booked_user = 3;
+  string space = 4;
+  string venue = 5;
+  string start_date = 6;
+  string end_date = 7;
+  int32 total_guest = 8;
+  double total_price = 9;
+  string status = 10;
+  string booking_reference = 11;
+  string enquiry = 12;
+  string event_type = 13;
+  string repeat_event = 14;
+  string event_duration = 15;
+  OptionalInput optional_input = 16;
+}
+
+message OptionalInput {
+  string first_name = 1;
+  string last_name = 2;
+  string email = 3;
+}
+
+message ResultData {
+  string acknowledged = 1;
+  string insertedId = 2;
+}
+
+// The response message containing a confirmation of the initialization
+message InitCreateBookingResponse {
+  string confirmation = 1;
+  ResultData results = 2;
+}

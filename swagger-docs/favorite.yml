@@ -1,0 +1,677 @@
+openapi: 3.0.0
+info:
+  title: Venue4use api
+  description: API documentation for venue4use api
+  version: ${API_VERSION}
+servers:
+  - url: ${API_URL}
+paths:
+  /api/v1/favorite:
+    post:
+      tags:
+        - Favorite
+      summary: Add a space to the favorite folder
+      description: Adds a specified space to the user's favorites folder.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                space_id:
+                  type: string
+                  description: The ID of the space to be added to favorites.
+                  example: "64d2e45f5b4c3a2b4f77a891"
+                folder_name:
+                  type: string
+                  description: The name of the folder where the favorite is added.
+                  example: "My Favorites"
+                  nullable: true
+                favorite_folder_id:
+                  type: string
+                  description: The ID of the folder where the favorite is added.
+                  example: "64d2e45f5b4c3a2b4f77a892"
+                  nullable: true
+              required:
+                - space_id
+      responses:
+        "200":
+          description: Space added to favorite successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: ADDED_SPACE_TO_FAVORITE
+                  data:
+                    type: string
+                    description: The ObjectId of the favorite entry.
+                    example: "64d2e45f5b4c3a2b4f77a894"
+        "500":
+          description: Server or data error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                  description:
+                    type: string
+                    example: Space not found
+                  code:
+                    type: string
+                    enum:
+                      - ADDING_FAVORITE_FAILED
+                      - SPACE_NOT_FOUND
+                      - USER_NOT_FOUND
+                      - SPACE_ALREADY_MARKED_AS_FAVORITE
+  /api/v1/favorite/folder:
+    get:
+      tags:
+        - Favorite
+      summary: Fetch favorite folders
+      description: Retrieves a list of favorite folders along with their associated details.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+      responses:
+        200:
+          description: Favorites successfully fetched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: FAVORITES_SUCCESSFULLY_FETCHED
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        _id:
+                          type: string
+                          description: The ID of the favorite folder entry.
+                          example: "673aacd09a3d5d888f0e2204"
+                        space:
+                          type: string
+                          description: The ID of the space marked as a favorite.
+                          example: "66790beca6ff16ea5ab27094"
+                        user:
+                          type: string
+                          description: The ID of the user who marked the space as a favorite.
+                          example: "670629677a186e825e012380"
+                        marked_as_favorite:
+                          type: boolean
+                          description: Indicates if the space is marked as a favorite.
+                          example: true
+                        createdAt:
+                          type: string
+                          format: date-time
+                          description: The date and time when the favorite was created.
+                          example: "2024-11-18T02:56:16.512Z"
+                        favorite_folder:
+                          type: string
+                          description: The ID of the folder where the favorite resides.
+                          example: "673aacd09a3d5d888f0e2203"
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                  description:
+                    type: string
+                    example: Server not responding
+                  code:
+                    type: string
+                    enum:
+                      - FETCHED_FAILED
+
+  /api/v1/favorite/folder/{id}:
+    get:
+      tags:
+        - Favorite
+      summary: Fetch favorite folder details
+      description: Retrieves paginated details of a specific favorite folder by its ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The ID of the favorite folder to fetch details for.
+          schema:
+            type: string
+            example: "673aacd09a3d5d888f0e2203"
+
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+
+        - name: page
+          in: query
+          required: false
+          description: The page number for pagination.
+          schema:
+            type: integer
+            example: 1
+
+        - name: limit
+          in: query
+          required: false
+          description: The number of records to return per page.
+          schema:
+            type: integer
+            example: 10
+
+      responses:
+        "200":
+          description: Favorite folder details successfully fetched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: FAVORITES_SUCCESSFULLY_FETCHED
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        _id:
+                          type: string
+                          description: The ID of the favorite entry.
+                          example: "673aacd09a3d5d888f0e2204"
+                        marked_as_favorite:
+                          type: boolean
+                          description: Indicates if the space is marked as a favorite.
+                          example: true
+                        favorite_folder:
+                          type: string
+                          description: The ID of the folder containing the favorite.
+                          example: "673aacd09a3d5d888f0e2203"
+                        space:
+                          type: object
+                          description: Details of the space marked as favorite.
+                          example:
+                            name: "Modern Apartment"
+                            location: "Downtown"
+                            createdAt: "2024-11-18T02:56:16.512Z"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                  description:
+                    type: string
+                    example: Server not responding
+                  code:
+                    type: string
+                    enum:
+                      - FETCHED_FAILED
+                      - VALIDATION_ERROR
+
+  /api/v1/favorite/group-favorite:
+    get:
+      tags:
+        - Favorite
+      summary: Fetch grouped favorites
+      description: Retrieves a list of grouped favorite folder entries based on optional filters.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+
+        - name: space_id
+          in: query
+          required: false
+          description: Filter by the space ID.
+          schema:
+            type: string
+            example: "66790beca6ff16ea5ab27094"
+
+        - name: folder_name
+          in: query
+          required: false
+          description: Filter by the folder name.
+          schema:
+            type: string
+            example: "My Favorites"
+
+        - name: favorite_folder_id
+          in: query
+          required: false
+          description: Filter by the favorite folder ID.
+          schema:
+            type: string
+            example: "673aacd09a3d5d888f0e2203"
+
+        - name: page
+          in: query
+          required: false
+          description: The page number for pagination.
+          schema:
+            type: integer
+            example: 1
+
+        - name: limit
+          in: query
+          required: false
+          description: The number of records to return per page.
+          schema:
+            type: integer
+            example: 10
+
+      responses:
+        "200":
+          description: Grouped favorites successfully fetched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+                      description: Any structure representing the grouped favorites.
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                  description:
+                    type: string
+                    example: Server not responding
+                  code:
+                    type: string
+                    enum:
+                      - FETCHED_FAILED
+                      - VALIDATION_ERROR
+
+  /api/v1/favorite/{id}:
+    patch:
+      tags:
+        - Favorite
+      summary: Update favorite status
+      description: Updates the `marked_as_favorite` status for a specific favorite entry by its ID.
+      operationId: updateFavorite
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The ID of the favorite entry to update.
+          schema:
+            type: string
+            example: "673aacd09a3d5d888f0e2204"
+
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                marked_as_favorite:
+                  type: boolean
+                  description: Whether the space is marked as a favorite.
+                  example: true
+              required:
+                - marked_as_favorite
+      responses:
+        "200":
+          description: Favorite successfully updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: FAVORITE_SUCCESSFULLY_UPDATED
+                  data:
+                    type: integer
+                    description: The number of records updated.
+                    example: 1
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                  description:
+                    type: string
+                    example: Server not responding
+                  code:
+                    type: string
+                    enum:
+                      - UPDATE_FAILED
+                      - VALIDATION_ERROR
+    delete:
+      tags:
+        - Favorite
+      summary: Delete favorite folder and related favorites
+      description: Deletes a specific favorite folder and all its associated favorites.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The ID of the favorite folder to delete.
+          schema:
+            type: string
+            example: "673aacd09a3d5d888f0e2204"
+
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                marked_as_favorite:
+                  type: boolean
+                  description: Indicates if the space was marked as a favorite before deletion.
+                  example: true
+              required:
+                - marked_as_favorite
+      responses:
+        "200":
+          description: Folder and related favorites successfully deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: FOLDER_DELETED
+                  data:
+                    type: object
+                    properties:
+                      folder:
+                        type: object
+                        description: MongoDB result of the folder deletion.
+                        example:
+                          acknowledged: true
+                          deletedCount: 1
+                      favorites:
+                        type: object
+                        description: MongoDB result of the related favorites deletion.
+                        example:
+                          acknowledged: true
+                          deletedCount: 5
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                  description:
+                    type: string
+                    example: Server not responding
+                  code:
+                    type: string
+                    enum:
+                      - UPDATE_FAILED
+                      - VALIDATION_ERROR
+
+  /api/v1/favorite/view-logs:
+    get:
+      tags:
+        - Favorite
+      summary: Fetch recently view logs
+      description: Retrieves logs of recently view logs actions with optional filters like action type, date range, and pagination.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+
+        - name: action
+          in: query
+          required: false
+          description: Filter by the type of action performed.
+          schema:
+            type: string
+            example: "view"
+
+        - name: start_date
+          in: query
+          required: false
+          description: Filter by start date of the logs (inclusive).
+          schema:
+            type: string
+            format: date
+            example: "2024-11-01"
+
+        - name: end_date
+          in: query
+          required: false
+          description: Filter by end date of the logs (inclusive).
+          schema:
+            type: string
+            format: date
+            example: "2024-11-18"
+
+        - name: page
+          in: query
+          required: false
+          description: The page number for pagination.
+          schema:
+            type: integer
+            example: 1
+
+        - name: limit
+          in: query
+          required: false
+          description: The number of records to return per page.
+          schema:
+            type: integer
+            example: 10
+
+      responses:
+        "200":
+          description: Logs successfully fetched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    description: Total number of logs matching the filters.
+                    example: 0
+                  venues:
+                    type: array
+                    description: List of venues involved in the logs.
+                    items:
+                      type: object
+                      additionalProperties: true
+                  spaces:
+                    type: array
+                    description: List of spaces involved in the logs.
+                    items:
+                      type: object
+                      additionalProperties: true
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                  description:
+                    type: string
+                    example: Server not responding
+                  code:
+                    type: string
+                    enum:
+                      - FETCHED_FAILED
+                      - VALIDATION_ERROR
+
+  /api/v1/favorite/view-logs/{id}:
+    delete:
+      tags:
+        - Favorite
+      summary: Delete a specific recently view log
+      description: Deletes a specific user log entry related to favorites by its ID.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+
+        - name: id
+          in: path
+          required: true
+          description: The ID of the user log entry to delete.
+          schema:
+            type: string
+            example: "673aacd09a3d5d888f0e2204"
+      responses:
+        "200":
+          description: User log successfully deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: USER_LOG_DELETED
+                  data:
+                    type: object
+                    description: MongoDB deletion result.
+                    example:
+                      acknowledged: true
+                      deletedCount: 1
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                  description:
+                    type: string
+                    example: Server not responding
+                  code:
+                    type: string
+                    enum:
+                      - DELETE_FAILED

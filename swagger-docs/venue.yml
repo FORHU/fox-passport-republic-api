@@ -1,0 +1,842 @@
+openapi: 3.0.0
+info:
+  title: Venue4use api
+  description: API documentation for venue4use api
+  version: ${API_VERSION}
+servers:
+  - url: ${API_URL}
+paths:
+  /api/v1/venue:
+    get:
+      tags:
+        - "Venue"
+      summary: "Get Venue"
+      description: Fetch a list of venue based on various filters.
+      parameters:
+        - name: Authorization
+          in: header
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of venues per page
+          example: 10
+        - name: user_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: User ID associated with the venue
+          example: "12345"
+        - name: venue_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: ID of a specific venue to retrieve
+          example: "67062b7e7a186e825e01239a"
+        - name: keywords
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Keywords to search in venues
+          example: "event space"
+        - name: categories
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Categories for filtering venues
+          example: "conference"
+        - name: status
+          in: query
+          required: false
+          schema:
+            oneOf:
+              - type: string
+              - type: array
+                items:
+                  type: string
+                  enum:
+                    - ACTIVE
+                    - INACTIVE
+                    - PENDING
+                    - ARCHIVED
+          description: Status of the venue, can be a single status or array of statuses
+          example: "ACTIVE"
+        - name: venue_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Name of the venue for search filtering
+          example: "The Grand Hall"
+      responses:
+        200:
+          description: Venues fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "VENUE_FETCHED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: false
+                      total_pages:
+                        type: integer
+                        example: 1
+                      total_items:
+                        type: integer
+                        example: 4
+                      current_page:
+                        type: integer
+                        example: 1
+                      size:
+                        type: integer
+                        example: 1000
+                      offset:
+                        type: integer
+                        example: 0
+        500:
+          description: Server error
+    post:
+      tags:
+        - Venue
+      summary: Add a new venue
+      description: Adds a new venue with specified details.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped authorization key
+          schema:
+            type: string
+            example: SECRETS123
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Venue name
+                representation:
+                  type: string
+                  description: Type of venue representation
+                  enum:
+                    - SPACE
+                    - VENUE
+                description:
+                  type: string
+                  description: Venue description
+                address:
+                  type: object
+                  properties:
+                    street:
+                      type: string
+                    street_2:
+                      type: string
+                    city:
+                      type: string
+                    state:
+                      type: string
+                    country:
+                      type: string
+                    postal_code:
+                      type: string
+                      example: "10001"
+                    coordinates:
+                      type: object
+                      properties:
+                        latitude:
+                          type: number
+                          example: 40.712776
+                        longitude:
+                          type: number
+                          example: -74.005974
+                keywords:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                      keyword:
+                        type: string
+                      categories:
+                        type: array
+                        items:
+                          type: string
+                      type:
+                        type: string
+                        enum:
+                          - SPACE
+                          - VENUE
+                form_steps:
+                  type: number
+                  example: 3
+                status:
+                  type: string
+                  enum:
+                    - DRAFT
+                    - INPROGRESS
+                    - FOR_APPROVAL
+                  example: "DRAFT"
+                subscription:
+                  type: boolean
+                  example: true
+                subscription_status:
+                  type: boolean
+                  example: true
+                fee:
+                  type: number
+                space_number:
+                  type: number
+      responses:
+        200:
+          description: Venue added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "VENUE_ADDED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        example: "670629677a186e825e01237f"
+        500:
+          description: Server error
+    delete:
+      tags:
+        - Venue
+      summary: Delete one or multiple venues
+      description: Deletes venues by their IDs.
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+          description: Bearer token for authorization
+        - in: header
+          name: scoped-auth
+          required: true
+          schema:
+            type: string
+          description: Additional scoped authorization token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                venue_ids:
+                  oneOf:
+                    - type: array
+                      items:
+                        type: string
+                      description: Array of venue IDs
+                      example: ["5f8d0d55b54764421b7156c7", "5f8d0d55b54764421b7156c8"]
+                    - type: string
+                      description: Single venue ID
+                      example: "5f8d0d55b54764421b7156c7"
+                  nullable: true
+      responses:
+        "200":
+          description: Venues deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "VENUES SUCCESSFULLY DELETED"
+        500:
+          description: Server error
+  /api/v1/venue/{id}:
+    patch:
+      tags:
+        - Venue
+      summary: Update a venue
+      description: Updates the specified venue with provided details.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID of the venue to update
+          schema:
+            type: string
+            example: "670629677a186e825e01237f"
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped authorization key
+          schema:
+            type: string
+            example: SECRETS123
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Venue name
+                representation:
+                  type: string
+                  description: Type of venue representation
+                  enum:
+                    - APARTMENT_PENTHOUSE
+                    - AUDITORIUM
+                    - ACADEMIC_VENUE_UNIVERSITY_BUILDING
+                    - PUB_BAR
+                    - NIGHTCLUB
+                description:
+                  type: string
+                  description: Venue description
+                address:
+                  type: object
+                  properties:
+                    street:
+                      type: string
+                    street_2:
+                      type: string
+                    city:
+                      type: string
+                    state:
+                      type: string
+                    country:
+                      type: string
+                    postal_code:
+                      type: string
+                    coordinates:
+                      type: object
+                      properties:
+                        latitude:
+                          type: number
+                        longitude:
+                          type: number
+                keywords:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                      keyword:
+                        type: string
+                      categories:
+                        type: array
+                        items:
+                          type: string
+                      type:
+                        type: string
+                        enum:
+                          - SPACE
+                          - VENUE
+                foods_and_beverages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Unique identifier
+                      question:
+                        type: string
+                        description: The question text
+                      answer:
+                        type: boolean
+                        description: Boolean answer to the question
+                      type:
+                        type: string
+                        description: The type of entity (SPACE or VENUE)
+                        enum:
+                          - SPACE
+                          - VENUE
+                      options:
+                        type: array
+                        description: List of options
+                        items:
+                          type: string
+                      reference:
+                        type: string
+                        description: Reference information
+                      key:
+                        type: string
+                        description: Unique key for the entry
+                      max_capacity:
+                        type: integer
+                        description: Maximum capacity associated with the food/beverage option
+                venue_details:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Unique identifier
+                      question:
+                        type: string
+                        description: The question text
+                      answer:
+                        type: boolean
+                        description: Boolean answer to the question
+                      type:
+                        type: string
+                        description: Type of entity (SPACE or VENUE)
+                        enum:
+                          - SPACE
+                          - VENUE
+                      options:
+                        type: array
+                        description: List of possible options
+                        items:
+                          type: string
+                      reference:
+                        type: string
+                        description: Reference information for the venue detail
+                      key:
+                        type: string
+                        description: Unique key associated with the detail entry
+                      max_capacity:
+                        type: integer
+                        description: Maximum capacity associated with the detail
+                form_steps:
+                  type: number
+
+                cancellation_policy:
+                  type: object
+                  properties:
+                    description:
+                      type: string
+                      description: Description of the cancellation policy
+                      nullable: true
+                    policy:
+                      type: object
+                      properties:
+                        cancellation_range:
+                          type: string
+                          description: Predefined cancellation range type
+                          enum:
+                            - "VERY_FLEXIBLE"
+                            - "FLEXIBLE"
+                            - "STANDARD_30"
+                            - "STANDARD_60"
+                            - "CUSTOM"
+                            - "OTHER"
+                          example: "FLEXIBLE"
+                        custom:
+                          type: object
+                          description: Custom cancellation rules
+                          properties:
+                            days_at_least:
+                              type: object
+                              description: Applies when cancellation is made with at least this many days in advance
+                              properties:
+                                number_of_days:
+                                  type: integer
+                                  description: Number of days in advance for cancellation
+                                  nullable: true
+                                total_price:
+                                  type: number
+                                  description: Refundable percentage of total price
+                                  nullable: true
+                            days_less_than:
+                              type: object
+                              description: Applies when cancellation is made with less than this many days in advance
+                              properties:
+                                number_of_days:
+                                  type: integer
+                                  description: Number of days in advance for cancellation
+                                  nullable: true
+                                total_price:
+                                  type: number
+                                  description: Refundable percentage of total price
+                                  nullable: true
+                            days_less_than_but_at_least:
+                              type: array
+                              description: Applies to cancellation periods between specified days
+                              items:
+                                type: object
+                                properties:
+                                  days_less_than:
+                                    type: integer
+                                    description: Upper limit in days
+                                    nullable: true
+                                  days_at_least:
+                                    type: integer
+                                    description: Lower limit in days
+                                    nullable: true
+                                  total_price:
+                                    type: number
+                                    description: Refundable percentage of total price
+                                    nullable: true
+                        no_cancellation:
+                          type: boolean
+                          description: Indicates if cancellation is not allowed
+                      required:
+                        - cancellation_range
+                    allow_rescheduling:
+                      type: object
+                      properties:
+                        answer:
+                          type: boolean
+                          description: Indicates if rescheduling is allowed
+                        months:
+                          type: integer
+                          description: Number of months within which rescheduling is permitted
+                          nullable: true
+                age_restriction:
+                  type: object
+                  properties:
+                    answer:
+                      type: boolean
+                      description: Indicates if age restriction applies
+                      nullable: true
+                    min_age_requirement:
+                      type: integer
+                      description: Minimum age requirement for entry
+                      nullable: true
+                    enforcement_time:
+                      type: string
+                      description: Time when the age restriction is enforced (e.g., "After 8 PM")
+                      nullable: true
+                status:
+                  type: string
+                  enum:
+                    - DRAFT
+                    - INPROGRESS
+                    - FOR_APPROVAL
+                    - FOR_DELETION
+                commission:
+                  type: number
+                rebate:
+                  type: number
+                payment_method:
+                  type: string
+                  enum:
+                    - COMMISSION
+                    - SUBSCRIPTION
+      responses:
+        200:
+          description: Venue updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "VENUE_UPDATED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    example: { "acknowledged": true, "matchedCount": 1, "modifiedCount": 1 }
+        400:
+          description: Bad request - Validation error
+        401:
+          description: Unauthorized - Invalid or missing token
+        500:
+          description: Internal server error
+    delete:
+      tags:
+        - Venue
+      summary: Request for venue deletion
+      description: Mark Venue for deletion.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the venue
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+          description: Bearer token for authorization
+        - in: header
+          name: scoped-auth
+          required: true
+          schema:
+            type: string
+          description: Additional scoped authorization token
+      responses:
+        200:
+          description: Venue deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "VENUE_REQUESTED_FOR_DELETION_SUCCESSFUL"
+        500:
+          description: Internal server error
+
+  /api/v1/venue/venue-list:
+    get:
+      tags:
+        - "Venue"
+      summary: "Get Venue"
+      description: Fetch a list of venue based on various filters.
+      parameters:
+        - name: Authorization
+          in: header
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of venues per page
+          example: 10
+        - name: user_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: User ID associated with the venue
+          example: "12345"
+        - name: venue_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: ID of a specific venue to retrieve
+          example: "67062b7e7a186e825e01239a"
+        - name: keywords
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Keywords to search in venues
+          example: "event space"
+        - name: categories
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Categories for filtering venues
+          example: "conference"
+        - name: status
+          in: query
+          required: false
+          schema:
+            oneOf:
+              - type: string
+              - type: array
+                items:
+                  type: string
+                  enum:
+                    - ACTIVE
+                    - INACTIVE
+                    - PENDING
+                    - ARCHIVED
+          description: Status of the venue, can be a single status or array of statuses
+          example: "ACTIVE"
+        - name: venue_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Name of the venue for search filtering
+          example: "The Grand Hall"
+      responses:
+        200:
+          description: Venues successfully fetched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "VENUES SUCCESSFULLY FETCHED"
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        _id:
+                          type: string
+                          description: Unique identifier for the venue
+                          example: "670629677a186e825e01237f"
+                        name:
+                          type: string
+                          description: Name of the venue
+                          example: "The Grand Atriums"
+                        status:
+                          type: string
+                          description: Current status of the venue
+                          example: "DRAFT"
+        500:
+          description: Server error
+
+  /api/v1/venue-details:
+    get:
+      tags:
+        - Venue
+      summary: Retrieve detailed venue information
+      description: Fetches detailed information of venues based on specified parameters.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped authorization key
+          schema:
+            type: string
+            example: SECRETS123
+        - name: status
+          in: query
+          required: false
+          description: Status filter for the venue
+          schema:
+            type: string
+      responses:
+        200:
+          description: Venues successfully fetched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "VENUE_FETCHED_SUCCESSFULLY"
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        _id:
+                          type: string
+                          description: Unique identifier for the venue
+                          example: "670629677a186e825e01237f"
+                        name:
+                          type: string
+                          description: Name of the venue
+                          example: "The Grand Atriums"
+        500:
+          description: Server error
+
+  /api/v1/count:
+    get:
+      tags:
+        - Venue
+      summary: Fetch count of venues by status
+      description: Retrieves the count of venues based on their status.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped authorization key
+          schema:
+            type: string
+            example: SECRETS123
+      responses:
+        200:
+          description: Count fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "COUNT_FETCHED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      DRAFT:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "DRAFT"
+                          count:
+                            type: integer
+                            example: 3
+                      TOTAL:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "ALL"
+                          count:
+                            type: integer
+                            example: 3
+        500:
+          description: Server error

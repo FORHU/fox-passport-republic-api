@@ -1,0 +1,32 @@
+<mjml>
+  <mj-body background-color="#f3f3f5">
+    <mj-section background-color="#ffffff" padding="20px">
+      <mj-column>
+        <mj-text font-size="20px" color="#333333" font-family="helvetica" font-weight="bold"> Booking Cancellation Notice </mj-text>
+        <mj-divider border-color="#F45E43"></mj-divider>
+        <mj-text font-size="16px" color="#555555" font-family="helvetica"> Dear {venue_owner_name}, </mj-text>
+        <mj-text font-size="16px" color="#555555" font-family="helvetica">
+          We regret to inform you that the booking for {space_name} on {booking_date}, under the name {client_first_name} {client_last_name}, has been
+          cancelled. We apologize for any inconvenience this may cause.
+        </mj-text>
+        <mj-text font-size="16px" color="#555555" font-family="helvetica">
+          Please let us know if you have any questions or require further information.
+        </mj-text>
+        <mj-text font-size="16px" color="#555555" font-family="helvetica"> Thank you for your understanding. </mj-text>
+        <mj-text font-size="16px" color="#555555" font-family="helvetica"> Best regards,<br />Venue4Use </mj-text>
+        <mj-divider border-color="#F45E43"></mj-divider>
+        <mj-text font-size="12px" color="#999999" font-family="helvetica">
+          This message was sent to inform you of the cancellation. If you have received this in error, please contact us immediately at
+          <a href="mailto:support@venue4use.com">support@venue4use.com</a>.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section background-color="#f3f3f5" padding="20px">
+      <mj-column>
+        <mj-text font-size="12px" color="#999999" font-family="helvetica" align="center">
+          All rights reserved. If you have any questions, feel free to contact us.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

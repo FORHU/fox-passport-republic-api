@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package booking;
+
+import "google/protobuf/any.proto";
+
+service BookingService {
+  rpc GetExistingBookings(GetExistingBookingsRequest) returns (GetExistingBookingsResponse);
+}
+
+message GetExistingBookingsRequest {
+  string space_id = 1;
+  string start_date = 2;
+  string end_date = 3;
+  string booking_id = 4;
+}
+
+message OptionalInput {
+  string first_name = 1;
+  string last_name = 2;
+  string email = 3;
+}
+
+message CancelledBy {
+  string _id = 1;
+  string role = 2;
+}
+
+message GetExistingBookingsResponse {
+  string confirmation = 1;
+  bool is_existing_booking = 2;
+}

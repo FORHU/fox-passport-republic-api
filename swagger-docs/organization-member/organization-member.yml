@@ -1,0 +1,729 @@
+openapi: 3.0.0
+info:
+  title: Venue4use API
+  description: API documentation for Venue4use
+  version: ${API_VERSION}
+servers:
+  - url: ${API_URL}
+paths:
+  /api/v1/organization/team-invite:
+    post:
+      tags:
+        - Organization
+      summary: Invitation
+      description: Invite a user to be a member of the venue owner's organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - assigned_roles
+                - venues
+                - all_venues
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                assigned_roles:
+                  type: number
+                  enum:
+                    - 1
+                    - 2
+                    - 3
+                    - 4
+                  example: 1
+                venues:
+                  type: array
+                  items:
+                    type: string
+                    example: "67203c3b4f835fc9e1ed6ced"
+                  description: List of venue IDs to assign to the invited user.
+                all_venues:
+                  type: boolean
+                  example: false
+                  description: If true, grants the user access to all venues.
+      responses:
+        200:
+          description: Invitation sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Invitation sent successfully."
+        400:
+          description: Bad Request (Invalid or missing parameters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid or missing parameters."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        404:
+          description: Not Found (Invitation token not found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "Invitation token not found."
+        500:
+          description: Internal Server Error (Unexpected server error)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/organization/accepted-invite/{token}:
+    post:
+      tags:
+        - Organization
+      summary: Accept Venue Owner Invitation
+      description: User accepts the invitation sent by venue owner
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+        - name: scoped-auth
+          in: header
+          required: true
+          description: scoped-auth for authorization
+          schema:
+            type: string
+            example: "Sample123"
+        - name: token
+          in: query
+          required: true
+          description: token with invited user data
+          schema:
+            type: string
+            example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - first_name
+                - last_name
+                - phone_number
+                - password
+              properties:
+                first_name:
+                  type: string
+                  description: User's first name
+                  example: "John"
+                last_name:
+                  type: string
+                  description: User's last name
+                  example: "Doe"
+                phone_number:
+                  type: string
+                  description: User's phone number
+                  example: "+1234567890"
+                password:
+                  type: string
+                  description: User's password for account setup
+                  example: "securePassword123"
+      responses:
+        200:
+          description: Invitation accepted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "ALL_FIELDS_SATISFIED"
+                  data:
+                    type: boolean
+                    example: true
+        400:
+          description: Bad Request (Invalid or missing parameters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid or missing parameters."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        404:
+          description: Not Found (Invitation token not found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "Invitation token not found."
+        500:
+          description: Internal Server Error (Unexpected server error)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/organization:
+    get:
+      tags:
+        - Organization
+      summary: Fetch Organization Members
+      description: Fetch organization members based on various filters, including status, assigned roles, search terms, and venues.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization.
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped authorization token.
+          schema:
+            type: string
+            example: Sample123
+        - name: inviter_user_id
+          in: query
+          required: false
+          description: Filter by the ID of the user who invited the member.
+          schema:
+            type: string
+            example: "60d21b7067d0d8992e610c85"
+        - name: venues
+          in: query
+          required: false
+          description: Filter by venue IDs.
+          schema:
+            type: array
+            items:
+              type: string
+            example: ["venue1", "venue2"]
+        - name: status
+          in: query
+          required: false
+          description: Filter by member status.
+          schema:
+            type: string
+            example: "ACCEPTED"
+        - name: assigned_roles
+          in: query
+          required: false
+          description: Comma-separated list of assigned role IDs.
+          schema:
+            type: string
+            example: "1,2,3"
+        - name: search
+          in: query
+          required: false
+          description: Search by name, phone number, or email.
+          schema:
+            type: string
+            example: "Jane Doe"
+        - name: page
+          in: query
+          required: false
+          description: Page number for pagination (default is 1).
+          schema:
+            type: integer
+            example: 1
+        - name: limit
+          in: query
+          required: false
+          description: Number of results per page (default is 10).
+          schema:
+            type: integer
+            example: 10
+      responses:
+        200:
+          description: A list of venue owner members fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "TEAM_MEMBERS_FETCHED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            _id:
+                              type: string
+                              example: "6736fdc134eeb1dcc80b7487"
+                            organization:
+                              type: string
+                              example: "67062cb67a186e825e0123a5"
+                            assigned_roles:
+                              type: array
+                              items:
+                                type: integer
+                              example: [2]
+                            inviter_user_id:
+                              type: string
+                              example: "67062cb67a186e825e0123a7"
+                            status:
+                              type: string
+                              example: "ACCEPTED"
+                            all_venues:
+                              type: boolean
+                              example: false
+                            createdAt:
+                              type: string
+                              format: date-time
+                              example: "2024-11-15T07:52:33.964Z"
+                            updatedAt:
+                              type: string
+                              format: date-time
+                              example: "2024-11-15T07:54:42.786Z"
+                            invited_user:
+                              type: object
+                              properties:
+                                _id:
+                                  type: string
+                                  example: "6736fdc134eeb1dcc80b7486"
+                                first_name:
+                                  type: string
+                                  example: "Ron"
+                                last_name:
+                                  type: string
+                                  example: "Grimes"
+                                phone_number:
+                                  type: string
+                                  example: "+63123456789"
+                                email:
+                                  type: string
+                                  example: "vexomiyanou-6600@yopmail.com"
+                                role:
+                                  type: string
+                                  example: "VENUE_LISTER"
+                                status:
+                                  type: string
+                                  example: "ACTIVE"
+                                organization:
+                                  type: string
+                                  example: "67062cb67a186e825e0123a5"
+                            venues:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  _id:
+                                    type: string
+                                    example: "672318e407799ae0fb85d2ee"
+                                  name:
+                                    type: string
+                                    example: "Dave the Diver"
+                            suspension_time:
+                              type: string
+                              nullable: true
+                              example: null
+        400:
+          description: Bad Request (Invalid or missing parameters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid or missing parameters."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        404:
+          description: Not Found (Invitation token not found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "Invitation token not found."
+        500:
+          description: Internal Server Error (Unexpected server error)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/organization/{id_delete}:
+    delete:
+      tags:
+        - Organization
+      summary: Delete Organization Member
+      description: Marks a venue owner member as deleted by their ID (using updateOne).
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: id
+          in: path
+          required: true
+          description: ID of the venue owner member to delete
+          schema:
+            type: string
+            example: 672dc173db2583353ebc32ae
+      responses:
+        200:
+          description: Venue owner member marked as deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "SUCCESSFULLY_DELETED_TEAM_MEMBER"
+                  data:
+                    type: object
+                    properties:
+                      acknowledged:
+                        type: boolean
+                        example: true
+                      modifiedCount:
+                        type: integer
+                        example: 1
+                      upsertedId:
+                        type: string
+                        nullable: true
+                        example: null
+                      upsertedCount:
+                        type: integer
+                        example: 0
+                      matchedCount:
+                        type: integer
+                        example: 1
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/organization/{id_update}:
+    patch:
+      tags:
+        - Organization
+      summary: Update Venue Owner Member
+      description: Update venue owner members based on status, assigned roles, and optional search filters.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: id
+          in: path
+          required: true
+          description: ID of the venue owner member to update
+          schema:
+            type: string
+            example: 672dc173db2583353ebc32ae
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assigned_roles:
+                  type: number
+                  description: Designated role for the member
+                  example: 1
+                all_venues:
+                  type: boolean
+                  description: Indicates whether the member has access to all venues
+                  example: false
+                venues:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of Venue IDs for the member
+                  example: ["672dc1d8db2583353ebc32b3", "672dc1d8db2583353ebc32b4"]
+                suspension_time:
+                  type: string
+                  enum:
+                    - "1"
+                    - "6"
+                    - "12"
+                    - "24"
+                    - "UNTIL_UNSUSPENDED"
+                    - "REMOVE_SUSPENSION"
+      responses:
+        200:
+          description: Venue owner member updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "TEAM_MEMBER_SUCCESSFULLY_UPDATED"
+                  data:
+                    type: object
+                    properties:
+                      acknowledged:
+                        type: boolean
+                        example: true
+                      modifiedCount:
+                        type: integer
+                        example: 1
+                      upsertedId:
+                        type: string
+                        nullable: true
+                        example: null
+                      upsertedCount:
+                        type: integer
+                        example: 0
+                      matchedCount:
+                        type: integer
+                        example: 1
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."

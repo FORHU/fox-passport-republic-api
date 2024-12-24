@@ -1,0 +1,59 @@
+<mjml>
+  <mj-head>
+    <mj-style> body { font-family: Arial, sans-serif; } </mj-style>
+  </mj-head>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        <mj-text font-size="24px" font-weight="bold" color="#F45E43" align="center"> Venue4Use: Booking Confirmed </mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section padding="20px">
+      <mj-column>
+        <mj-divider border-color="#F45E43" />
+        <mj-text font-size="18px" color="#000000"> Dear {first_name}, </mj-text>
+        <mj-text font-size="16px" color="#333333">
+          We are thrilled to let you know that your event has been successfully booked at {space_name}! Here are the details of your upcoming event:
+        </mj-text>
+
+        <mj-text font-size="16px" color="#000000"> Event Details: </mj-text>
+
+        <mj-text font-size="16px" color="#000000"> Organizer: {last_name}, {first_name} </mj-text>
+
+        <mj-text font-size="16px" color="#000000"> Event Type: {event_type} </mj-text>
+
+        <mj-text font-size="16px" color="#000000"> Date: {event_date} </mj-text>
+
+        <mj-text font-size="16px" color="#000000"> Start Time: {start_time_event} </mj-text>
+
+        <mj-text font-size="16px" color="#000000"> End Time: {end_time_event} </mj-text>
+
+        <mj-text font-size="16px" color="#000000"> Number of Guests: {number_of_guests} </mj-text>
+
+        <mj-text font-size="16px" color="#000000"> Venue Address: {street} {city} {state} {country} {postal_code} </mj-text>
+
+        <mj-text font-size="16px" color="#000000"> Booking Reference: {booking_reference} </mj-text>
+
+        <mj-text font-size="16px" color="#000000">
+          Please review all the details to ensure everything is correct. If you need to make any changes or have special requirements, feel free to
+          reach out to us.
+        </mj-text>
+
+        <mj-text font-size="16px" color="#000000">
+          Remember to mark your calendar for {event_date}, and we can't wait to host your event. If you have any questions or need further assistance,
+          please email us at <a href="mailto:support@venue4use.com">support@venue4use.com</a>.
+        </mj-text>
+
+        <mj-text font-size="16px" color="#000000"> Thank you for choosing {venue_name}. We're committed to making your event memorable! </mj-text>
+
+        <mj-text font-size="16px" color="#333333"> Warm regards, </mj-text>
+        <mj-text font-size="16px" color="#333333"> Venue4Use</mj-text>
+        <mj-divider border-color="#F45E43" />
+
+        <mj-text font-size="14px" color="#777777"> Please do not reply to this email as it is sent from an unmonitored inbox. </mj-text>
+        <mj-divider border-color="#F45E43" />
+        <mj-text font-size="14px" color="#777777"> Venue4Use | <a href="https://www.venue4use.com">www.venue4use.com</a> </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

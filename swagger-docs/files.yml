@@ -1,0 +1,109 @@
+openapi: 3.0.0
+info:
+  title: Venue4use api
+  description: API documentation for venue4use api
+  version: ${API_VERSION}
+servers:
+  - url: ${API_URL}
+paths:
+  /api/v1/files:
+    post:
+      tags:
+        - Files
+      summary: Upload a file
+      description: This endpoint allows users to upload a file to the server.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization.
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped authentication header.
+          schema:
+            type: string
+      requestBody:
+        description: File to be uploaded.
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The file to upload.
+      responses:
+        "200":
+          description: File uploaded successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: UPLOADED_FILE_SUCCESSFULLY
+                    description: Status message indicating the file was uploaded successfully.
+                  data:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        format: ObjectId
+                        description: Unique identifier for the file.
+                      filename:
+                        type: string
+                        description: The name of the uploaded file.
+                      contentType:
+                        type: string
+                        description: The MIME type of the file.
+                      size:
+                        type: number
+                        description: The size of the file in bytes.
+                      path:
+                        type: string
+                        description: The storage path of the uploaded file.
+                      origin:
+                        type: string
+                        description: The origin of the file (optional).
+                      description:
+                        type: string
+                        description: A description of the file (optional).
+                      uploadedBy:
+                        type: string
+                        format: ObjectId
+                        description: The ID of the user who uploaded the file.
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: The timestamp when the file was created.
+                      updatedAt:
+                        type: string
+                        format: date-time
+                        description: The timestamp when the file was last updated.
+        "500":
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                    description: High-level error message.
+                  description:
+                    type: string
+                    example: Server not responding
+                    description: Detailed error description.
+                  code:
+                    type: string
+                    enum:
+                      - ERROR_UPLOAD_FILE_FAILED
+                    description: Specific error codes indicating the upload failure.

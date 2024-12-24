@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package booking;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+service BookingService {
+  rpc GetBookings(GetBookingsRequest) returns (GetBookingsResponse);
+}
+
+message GetBookingsRequest {
+  string booking_id = 1;
+  string space_id = 2;
+  string venue_id = 3;
+  string booked_user = 4;
+  string booker = 5;
+  string from = 6;
+  string to = 7;
+  string start_date = 8;
+  string status = 9;
+  int32 page = 10;
+  int32 limit = 11;
+  string event_duration = 12;
+  string event_type = 13;
+}
+
+message Booking {
+  string _id = 1;
+  string space_id = 2;
+  string space_name = 3;
+  string venue_id = 4;
+  string venue_name = 5;
+  string booker_user_first_name = 6;
+  string booker_user_last_name = 7;
+  string booker_user_email = 8;
+  string enquiry = 9;
+  string booking_reference = 10;
+  string event_type = 11;
+  OptionalInput optional_input = 12;
+  string start_date = 13;
+  string end_date = 14;
+  int32 total_guest = 15;
+  double total_price = 16;
+  string status = 17;
+  bool repeat_event = 18;
+  int32 event_duration = 19;
+  string created_at = 20;
+  string updated_at = 21;
+  string deleted_at = 22;
+  string deleted_by = 23;
+  string cancelled_at = 24;
+  CancelledBy cancelled_by = 25;
+}
+
+message OptionalInput {
+  string first_name = 1;
+  string last_name = 2;
+  string email = 3;
+}
+
+message CancelledBy {
+  string _id = 1;
+  string role = 2;
+}
+
+message GetBookingsResponse {
+  repeated Booking bookings = 1;
+  int32 count = 2;
+}

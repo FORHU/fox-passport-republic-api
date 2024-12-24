@@ -1,0 +1,33 @@
+<mjml>
+  <mj-body background-color="#f3f3f5">
+    <mj-section background-color="#ffffff" padding="20px">
+      <mj-column>
+        <mj-text font-size="20px" color="#333333" font-family="helvetica" font-weight="bold"> Booking Request Declined </mj-text>
+        <mj-divider border-color="#F45E43"></mj-divider>
+        <mj-text font-size="16px" color="#555555" font-family="helvetica"> Dear {client_name}, </mj-text>
+        <mj-text font-size="16px" color="#555555" font-family="helvetica">
+          We regret to inform you that your booking request for {space_name} on {booking_date} has been declined by the venue owner. We understand
+          this may be disappointing and apologize for any inconvenience.
+        </mj-text>
+        <mj-text font-size="16px" color="#555555" font-family="helvetica">
+          If you would like to explore alternative dates or venues, please feel free to reach out to us. We are here to assist you in finding the
+          perfect space for your needs.
+        </mj-text>
+        <mj-text font-size="16px" color="#555555" font-family="helvetica">
+          Thank you for considering Venue4Use, and we hope to assist you in the future.
+        </mj-text>
+        <mj-text font-size="16px" color="#555555" font-family="helvetica"> Best regards,<br />Venue4Use </mj-text>
+        <mj-divider border-color="#F45E43"></mj-divider>
+        <mj-text font-size="16px" color="#000000" font-family="helvetica">
+          If you have any questions, feel free to contact us at <a href="mailto:support@venue4use.com">support@venue4use.com</a>.
+        </mj-text>
+        <mj-text font-size="12px" color="#999999" font-family="helvetica"> This is an automated message. </mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section background-color="#f3f3f5" padding="20px">
+      <mj-column>
+        <mj-text font-size="12px" color="#999999" font-family="helvetica" align="center"> ©Venue4Use. All rights reserved. </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

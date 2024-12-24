@@ -1,0 +1,140 @@
+syntax = "proto3";
+
+package enquiry;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+service EnquiryService {
+  rpc InitGetEnquiry(GetEnquiryRequest) returns (GetEnquiryResponse);
+}
+
+message GetEnquiryRequest {
+  string space_id = 1;
+  string search_name = 2;
+  string event_type = 3;
+  int32 guests = 4;
+  string event_date = 5;
+  string venue_id = 6;
+  string enquiry_id = 7;
+  string status = 8;
+  bool togglePastCurrent = 9;
+  bool censorPhoneNumber = 10;
+  userData user = 11;
+  int32 offset = 12;
+  int32 limitNumber = 13;
+  string inbox_id = 14;
+}
+
+message Inbox {
+  string _id = 1;
+  string room_id = 2;
+  string sender = 3;
+  string receiver = 4;
+  string createdAt = 5;
+  string updatedAt = 6;
+  string deletedAt = 7;
+}
+
+message Enquiry {
+  string _id = 1;
+  Date date = 2;
+  string type = 3;
+  int32 guests = 4;
+  int32 value = 5;
+  bool own_catering = 6;
+  bool require_catering = 7;
+  bool flexible_time = 8;
+  repeated CateringOption catering_options = 9;
+  string status = 10;
+  string createdAt = 11;
+  string updatedAt = 12;
+  string deletedAt = 13;
+  CancelledBy cancelledBy = 14;
+  Space space = 15;
+  Venue venue = 16;
+  userData user = 17;
+  LatestMessage latest_message = 18;
+  Inbox inbox = 19;
+}
+
+message Date {
+  string date = 1;
+  string from = 2;
+  string to = 3;
+  TimestampRange timestamp = 4;
+}
+
+message TimestampRange {
+  google.protobuf.Timestamp start_date_time = 1;
+  google.protobuf.Timestamp end_date_time = 2;
+}
+
+message CateringOption {
+  string name = 1;
+  bool value = 2;
+}
+
+message Space {
+  string _id = 1;
+  string name = 2;
+  string description = 3;
+  string type = 4;
+  string representation = 5;
+  repeated SpacePhoto space_photo = 6;
+  Capacity guest_capacity = 7;
+}
+
+message SpacePhoto {
+  string _id = 1;
+  string filename = 2;
+  string contentType = 3;
+  int32 size = 4;
+  string path = 5;
+}
+
+message Capacity {
+  int32 minimum = 1;
+  int32 maximum = 2;
+}
+
+message Venue {
+  string _id = 1;
+  string name = 2;
+  string description = 3;
+  Address address = 4;
+}
+
+message Address {
+  string street = 1;
+  string city = 2;
+  string state = 3;
+  string country = 4;
+  string postal_code = 5;
+}
+
+message LatestMessage {
+  string _id = 1;
+  string content = 2;
+  google.protobuf.Timestamp createdAt = 3;
+}
+
+message CancelledBy {
+  string _id = 1;
+  string role = 2;
+  string first_name = 3;
+  string last_name = 4;
+}
+
+message GetEnquiryResponse {
+  repeated Enquiry enquiries = 1;
+  int32 count = 2;
+  string confirmation = 3;
+}
+
+message userData {
+  string _id = 1;
+  string role = 2;
+  string email = 3;
+  string organization = 4;
+}

@@ -1,0 +1,23 @@
+<mjml>
+  <mj-body>
+    <mj-section> </mj-section>
+    <mj-section padding="20px">
+      <mj-column>
+        <mj-text font-size="18px" color="#000000"> Dear {first_name}, </mj-text>
+        <mj-text font-size="16px" color="#333333">
+          I hope you're doing well. We'd like to let you know that status of your inquiry regarding {space_name} has been updated.
+        </mj-text>
+        <mj-text font-size="16px" color="#333333"> Your request, previously marked as {previous_status} is now officially {new_status}. </mj-text>
+        <mj-text font-size="16px" color="#333333">
+          We aim to resolve inquiries as quickly as possible without compromising on quality. You can expect another update from us once we have more
+          information or when your inquiry reaches the next stage within 24-48 hours.
+        </mj-text>
+        <mj-text font-size="16px" color="#333333">
+          Thank you for your patience and understanding. Should you have any further questions in the meantime, please feel free to contact us.
+        </mj-text>
+        <mj-text font-size="16px" color="#333333"> Best regards, </mj-text>
+        <mj-text font-size="16px" color="#333333"> The Venue4Use Team </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

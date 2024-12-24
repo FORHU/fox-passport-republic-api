@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package queue;
+
+service QueueService {
+  rpc InitEnquiriesQueue (InitEnquiriesQueueRequest) returns (InitEnquiriesQueueResponse);
+}
+
+message InitEnquiriesQueueRequest {}
+
+message InitEnquiriesQueueResponse {
+  string confirmation = 1;
+}

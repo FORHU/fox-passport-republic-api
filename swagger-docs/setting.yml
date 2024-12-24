@@ -1,0 +1,163 @@
+openapi: 3.0.0
+info:
+  title: Venue4use api
+  description: API documentation for venue4use api
+  version: ${API_VERSION}
+servers:
+  - url: ${API_URL}
+paths:
+  /api/v1/setting:
+    post:
+      tags:
+        - Files
+      summary: Set setting sales commission rate
+      description: This endpoint allows setting the sales commission rate.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization.
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped authentication header.
+          schema:
+            type: string
+      requestBody:
+        description: Sales commission rate to be updated.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sales_commission_rate:
+                  type: number
+                  description: The sales commission rate to set.
+                  example: 10.5
+      responses:
+        "200":
+          description: Sales commission rate successfully set.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: SALES_SETTING_CREATED
+                    description: Status message indicating the commission rate was updated.
+                  data:
+                    type: object
+                    additionalProperties: true
+                    description: MongoDB update result.
+                    example:
+                      acknowledged: true
+                      modifiedCount: 1
+                      upsertedId: null
+                      upsertedCount: 0
+                      matchedCount: 1
+        "500":
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                    description: High-level error message.
+                  description:
+                    type: string
+                    example: Server not responding
+                    description: Detailed error message.
+                  code:
+                    type: string
+                    enum:
+                      - SALES_SETTING_CREATION_FAILED
+                    description: Error code indicating failure in creating or updating the sales setting.
+  get:
+    tags:
+      - Setting
+    summary: Fetch sales commission settings
+    description: This endpoint retrieves the current sales commission settings.
+    parameters:
+      - name: Authorization
+        in: header
+        required: true
+        description: Bearer token for authorization.
+        schema:
+          type: string
+          example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+      - name: scoped-auth
+        in: header
+        required: true
+        description: Scoped authentication header.
+        schema:
+          type: string
+    responses:
+      "200":
+        description: Successfully fetched the sales commission settings.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  example: SALES_SETTING_FETCHED
+                  description: Status message indicating the settings were successfully fetched.
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        format: ObjectId
+                        description: Unique identifier for the setting.
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: Timestamp when the setting was created.
+                      deletedAt:
+                        type: string
+                        format: date-time
+                        nullable: true
+                        description: Timestamp when the setting was deleted (if applicable).
+                      deletedBy:
+                        type: string
+                        format: ObjectId
+                        nullable: true
+                        description: ID of the user who deleted the setting (if applicable).
+                      sales_commission_rate:
+                        type: number
+                        description: The current sales commission rate.
+                      updatedAt:
+                        type: string
+                        format: date-time
+                        description: Timestamp when the setting was last updated.
+      "500":
+        description: Server error.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  example: Server not responding
+                  description: High-level error message.
+                description:
+                  type: string
+                  example: Server not responding
+                  description: Detailed error description.
+                code:
+                  type: string
+                  enum:
+                    - SALES_SETTING_FETCH_FAILED
+                  description: Error code indicating failure in fetching the sales settings.

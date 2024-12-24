@@ -1,0 +1,413 @@
+openapi: 3.0.0
+info:
+  title: Venue4use api
+  description: API documentation for venue4use api
+  version: ${API_VERSION}
+servers:
+  - url: ${API_URL}
+paths:
+  /api/v1/subscription/products:
+    get:
+      tags:
+        - Subscription
+      summary: Fetch subscription products
+      description: Retrieves subscription products based on query parameters.
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          description: Bearer token for authorization.
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - in: query
+          name: _id
+          required: false
+          description: Unique identifier for the product.
+          schema:
+            type: string
+        - in: query
+          name: status
+          required: false
+          description: Status of the product.
+          schema:
+            type: string
+          example: ACTIVE
+        - in: query
+          name: country
+          required: false
+          description: Country associated with the product.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response with the list of subscription products.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: ALL_PRODUCTS_FETCHED_SUCCESSFULLY
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        _id:
+                          type: string
+                        product_name:
+                          type: string
+                        product_id:
+                          type: string
+                        status:
+                          type: string
+                          example: ACTIVE
+                        active:
+                          type: string
+                          nullable: true
+                          example: null
+                        prices:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              price_id:
+                                type: string
+                              amount:
+                                type: number
+                                format: float
+                              currency:
+                                type: string
+                              livemode:
+                                type: boolean
+                        tenant:
+                          type: string
+                          example: SG
+                        description:
+                          type: string
+                          example: product description
+                        createdAt:
+                          type: string
+                          format: date-time
+                          example: 2024-09-24T04:37:01.554Z
+                        updatedAt:
+                          type: string
+                          nullable: true
+                          example: null
+        "500":
+          description: Server error response.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                  description:
+                    type: string
+                    example: Server not responding
+                  code:
+                    type: string
+                    example: INTERNAL_SERVER_ERROR
+  /api/v1/subscription:
+    post:
+      tags:
+        - Subscription
+      summary: Create a new subscription
+      description: Creates a new subscription with the specified details.
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          description: Bearer token for authorization.
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                price_id:
+                  type: string
+                  description: The price ID of the subscription.
+                venue_id:
+                  type: string
+                  description: The venue ID associated with the subscription.
+                space_number:
+                  type: integer
+                  description: The number of spaces for the subscription.
+                  example: 10
+              required:
+                - price_id
+                - venue_id
+                - space_number
+      responses:
+        "200":
+          description: Successful subscription creation.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subscription_id:
+                    type: string
+                    description: The unique identifier for the subscription.
+                    example: sub_1Q2QUbRuNU3oIjnA6Vh
+                  client_secret:
+                    type: string
+                    description: Client secret for further operations.
+                    example: sk_test_4eC39HqLyjWDarjtT1zdp7dc
+        "400":
+          description: Validation or entity not found error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Error message describing the issue.
+                    example: Error Validation | User not found | Venue not found
+    get:
+      tags:
+        - Subscription
+      summary: Fetch venue subscription details
+      description: Retrieves subscription details based on the provided query parameters.
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          description: Bearer token for authorization.
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - in: query
+          name: venueId
+          required: false
+          description: The venue ID for the subscription.
+          schema:
+            type: string
+        - in: query
+          name: status
+          required: false
+          description: The status of the subscription.
+          schema:
+            type: string
+            example: active
+        - in: query
+          name: endDate
+          required: false
+          description: The end date of the subscription.
+          schema:
+            type: string
+            format: date
+            example: 2024-10-26
+        - in: query
+          name: subscriptionId
+          required: false
+          description: The subscription ID.
+          schema:
+            type: string
+        - in: query
+          name: _id
+          required: false
+          description: The unique identifier for the subscription.
+          schema:
+            type: string
+            format: objectid
+      responses:
+        "200":
+          description: Successful response with subscription details.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: FETCHED_VENUE_SUBSCRIPTION_SUCCESSFULLY
+                  data:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        format: objectid
+                        example: 64f241edd36fce17378f0b6c
+                      venue:
+                        type: string
+                        format: objectid
+                        example: 64f241edd36fce17378f0b6d
+                      user:
+                        type: string
+                        format: objectid
+                        example: 64f241edd36fce17378f0b6e
+                      fee:
+                        type: number
+                        format: float
+                        example: 417.65
+                      space_number:
+                        type: integer
+                        example: 1
+                      endDate:
+                        type: string
+                        format: date-time
+                        example: 2024-10-26T07:49:10.000Z
+                      subscription_id:
+                        type: string
+                        example: sub_1Q2QUbRuNU3oIjnA6Vh
+                      client_secret:
+                        type: string
+                        example: sk_test_4eC39HqLyjWDarjtT1zdp7dc
+                      status:
+                        type: string
+                        example: active
+                      createdAt:
+                        type: string
+                        format: date-time
+                        example: 2024-09-26T07:49:11.953Z
+                      updatedAt:
+                        type: string
+                        nullable: true
+                        example: null
+        "500":
+          description: Server error response.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                  description:
+                    type: string
+                    example: Server not responding
+                  code:
+                    type: string
+                    example: FAILED_TO_FETCH_VENUE_SUBSCRIPTION
+
+  /api/v1/subscription/{id}:
+    patch:
+      tags:
+        - Subscription
+      summary: Update a subscription
+      description: Updates the space number for a specific subscription.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: Unique identifier for the subscription to be updated.
+          schema:
+            type: string
+            format: objectid
+            example: 64f241edd36fce17378f0b6c
+
+        - in: header
+          name: Authorization
+          required: true
+          description: Bearer token for authorization.
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped authentication header.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                space_number:
+                  type: integer
+                  description: Updated space number for the subscription.
+                  example: 5
+              required:
+                - space_number
+      responses:
+        "200":
+          description: Successful subscription update.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: SUBSCRIPTION_UPDATED_SUCCESSFULL
+        "500":
+          description: Server error or failure to update the subscription.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                  description:
+                    type: string
+                    example: Failed to update Stripe subscription | Server not responding
+                  code:
+                    type: string
+                    example: USER_NOT_FOUND | SUBSCRIPTION_NOT_FOUND | STRIPE_SUBSCRIPTION_ERROR | UPDATE_FAILED
+
+    delete:
+      tags:
+        - Subscription
+      summary: Update a subscription
+      description: Updates the space number for a specific subscription.
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          description: Bearer token for authorization.
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - in: path
+          name: id
+          required: true
+          description: Unique identifier for the subscription to be updated.
+          schema:
+            type: string
+            format: objectid
+            example: 64f241edd36fce17378f0b6c
+      responses:
+        "200":
+          description: Successful subscription update.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: SUBSCRIPTION_UPDATED_SUCCESSFULL
+        "500":
+          description: Server error or failure to update the subscription.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                  description:
+                    type: string
+                    example: Failed to update Stripe subscription | Server not responding
+                  code:
+                    type: string
+                    example: USER_NOT_FOUND | SUBSCRIPTION_NOT_FOUND | STRIPE_SUBSCRIPTION_ERROR | UPDATE_FAILED

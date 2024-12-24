@@ -1,0 +1,570 @@
+openapi: 3.0.0
+info:
+  title: Venue4use api
+  description: API documentation for venue4use api
+  version: ${API_VERSION}
+servers:
+  - url: ${API_URL}
+paths:
+  /api/v1/payment/process-payment:
+    post:
+      tags:
+        - Payment
+      summary: Process a payment
+      description: This endpoint processes a payment for a given enquiry.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enquiry_id:
+                  type: string
+                  format: objectId
+                  description: The ID of the enquiry.
+              required:
+                - enquiry_id
+      responses:
+        "200":
+          description: Payment processed successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: PAYMENT_SUCCESSFULLY
+                  data:
+                    type: object
+                    properties:
+                      payment:
+                        type: boolean
+                        example: true
+                      id:
+                        type: string
+                      client_secret:
+                        type: string
+                      payment_id:
+                        type: string
+                      booking_id:
+                        type: string
+        "500":
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                  description:
+                    type: string
+                    example: Server not responding
+                  code:
+                    type: string
+                    enum:
+                      - VALIDATION_ERROR_MISSING_FIELDS
+                      - ENQUIRY_NOT_FOUND_FOR_CREATE_OFFER
+
+  api/v1/payment/process-payment/status:
+    post:
+      tags:
+        - Payment
+      summary: Update payment status
+      description: This endpoint updates the status of a payment for a specific booking.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization.
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped authentication header.
+          schema:
+            type: string
+      requestBody:
+        description: The payload containing details required to update the payment status.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                payment_id:
+                  type: string
+                  description: The unique identifier for the payment transaction.
+                booking_id:
+                  type: string
+                  description: The unique identifier for the associated booking.
+                status:
+                  type: string
+                  description: The new status of the payment.
+              required:
+                - payment_id
+                - booking_id
+                - status
+      responses:
+        "200":
+          description: Payment status updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: PAYMENT_STATUS
+                    description: Status message indicating the update result.
+                  data:
+                    type: object
+                    properties:
+                      payment:
+                        type: boolean
+                        example: true
+                        description: Indicates whether the payment status update was successful.
+        "500":
+          description: Server error.
+
+  /api/v1/payment/compute:
+    post:
+      tags:
+        - Payment
+      summary: Compute payment details
+      description: This endpoint calculates the payment details based on the provided booking information, including rates, duration, and fees.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization.
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped authentication header.
+          schema:
+            type: string
+      requestBody:
+        description: The payload containing booking and computation details.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                space_id:
+                  type: string
+                  description: The unique identifier for the space.
+                date:
+                  type: string
+                  description: The date of the booking (ISO format preferred).
+                time_start:
+                  type: string
+                  description: The start time of the booking (e.g., "14:00").
+                time_end:
+                  type: string
+                  description: The end time of the booking (e.g., "16:00").
+                guests:
+                  type: integer
+                  description: The number of guests for the booking.
+              required:
+                - space_id
+                - date
+                - time_start
+                - time_end
+                - guests
+      responses:
+        "200":
+          description: Payment computation was successful.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: PAYMENT_COMPUTATION
+                    description: Status message indicating the computation result.
+                  data:
+                    type: object
+                    properties:
+                      result:
+                        type: object
+                        properties:
+                          duration:
+                            type: string
+                            description: The duration of the booking (e.g., "2 hours").
+                          date:
+                            type: string
+                            description: The booking date.
+                          from:
+                            type: string
+                            description: The start time of the booking.
+                          to:
+                            type: string
+                            description: The end time of the booking.
+                          payment_computation:
+                            type: object
+                            properties:
+                              user:
+                                type: object
+                                properties:
+                                  base_rate:
+                                    type: string
+                                    description: The base rate for the user.
+                                  subtotal:
+                                    type: string
+                                    description: Subtotal for the user.
+                                  rebate:
+                                    type: number
+                                    description: Rebate applied to the user.
+                                  grand_total:
+                                    type: string
+                                    description: Grand total for the user after all calculations.
+                                  cleaning_fee:
+                                    type: number
+                                    description: Cleaning fee charged to the user.
+                              venue:
+                                type: object
+                                properties:
+                                  base_rate:
+                                    type: string
+                                    description: The base rate for the venue.
+                                  subtotal:
+                                    type: string
+                                    description: Subtotal for the venue.
+                                  commission_fee:
+                                    type: number
+                                    description: Commission fee for the venue.
+                                  grand_total:
+                                    type: string
+                                    description: Grand total for the venue after all calculations.
+                                  cleaning_fee:
+                                    type: number
+                                    description: Cleaning fee charged to the venue.
+                          guests:
+                            type: integer
+                            description: The number of guests for the booking.
+                          currency:
+                            type: string
+                            description: The currency used for the computation (e.g., "USD").
+                          computation_used:
+                            type: string
+                            description: Method or algorithm used for computation.
+                          type:
+                            type: string
+                            description: The type of computation (e.g., "hourly", "daily").
+        "500":
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                    description: High-level error message.
+                  description:
+                    type: string
+                    example: Server not responding
+                    description: Detailed error description.
+                  code:
+                    type: string
+                    enum:
+                      - VALIDATION_ERROR_MISSING_FIELDS
+                      - ENQUIRY_NOT_FOUND_FOR_CREATE_OFFER
+                    description: Specific error codes indicating the nature of the error.
+
+  /api/v1/payment/create-account:
+    post:
+      tags:
+        - Payment
+      summary: Create a payment account
+      description: This endpoint creates a payment account for a user in the specified country.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization.
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped authentication header.
+          schema:
+            type: string
+      requestBody:
+        description: The payload containing user and country details required to create the account.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                  description: The unique identifier of the user.
+                country:
+                  type: string
+                  description: The country where the account will be created.
+              required:
+                - user_id
+                - country
+      responses:
+        "200":
+          description: Payment account created successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: ACCOUNT_CREATED
+                    description: Status message indicating the account creation was successful.
+                  data:
+                    type: object
+                    properties:
+                      results:
+                        type: string
+                        description: Link or reference to the created account.
+                        example: https://payment-provider.com/account-link
+        "500":
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                    description: High-level error message.
+                  description:
+                    type: string
+                    example: Server not responding
+                    description: Detailed error message.
+                  code:
+                    type: string
+                    enum:
+                      - USER_NOT_FOUND
+                    description: Specific error codes indicating the nature of the error.
+
+  /api/v1/payment/setup-intent:
+    get:
+      tags:
+        - Payment
+      summary: Retrieve setup intent client secret
+      description: This endpoint retrieves the client secret for setting up a payment intent.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization.
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped authentication header.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successfully retrieved setup intent client secret.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  client_id:
+                    type: string
+                    description: The client secret of the setup intent.
+                    example: sk_test_4eC39HqLyjWDarjtT1zdp7dc
+        "500":
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Server not responding
+                    description: High-level error message.
+                  description:
+                    type: string
+                    example: Server not responding
+                    description: Detailed error description.
+                  code:
+                    type: string
+                    enum:
+                      - USER_NOT_FOUND
+                    description: Specific error codes indicating the nature of the error.
+
+  /api/v1/payment/get-payment-details:
+    get:
+      tags:
+        - Payment
+      summary: Retrieve payment details
+      description: This endpoint retrieves detailed information about a payment using a custom offer ID.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization.
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped authentication header.
+          schema:
+            type: string
+        - name: custom_offer_id
+          in: query
+          required: true
+          description: The unique identifier for the custom offer.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successfully retrieved payment details.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: PAYMENT_DETAILS
+                    description: Status message indicating the retrieval was successful.
+                  data:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Unique identifier for the payment.
+                      venue:
+                        type: string
+                        description: Venue ID associated with the payment.
+                      space:
+                        type: string
+                        description: Space ID associated with the payment.
+                      enquiry:
+                        type: string
+                        description: Enquiry ID associated with the payment.
+                      status:
+                        type: string
+                        description: Current status of the payment (e.g., "REFUNDED").
+                      booking:
+                        type: string
+                        description: Booking ID associated with the payment.
+                      user:
+                        type: string
+                        description: User ID associated with the payment.
+                      custom_offer:
+                        type: string
+                        description: Custom offer ID associated with the payment.
+                      payment_id:
+                        type: string
+                        description: Payment ID from the payment provider.
+                      payment_method:
+                        type: array
+                        items:
+                          type: string
+                        description: Methods used for the payment (e.g., "card").
+                      payment_amount:
+                        type: number
+                        format: float
+                        description: The payment amount.
+                      payment_currency:
+                        type: string
+                        description: Currency used for the payment.
+                      payment_object:
+                        type: string
+                        description: Payment object type (e.g., "payment_intent").
+                      payment_created:
+                        type: string
+                        format: date-time
+                        description: Timestamp when the payment was created.
+                      payment_method_id:
+                        type: string
+                        description: Identifier for the payment method.
+                      client_secret:
+                        type: string
+                        description: Client secret for the payment intent.
+                      refund_id:
+                        type: string
+                        description: Refund ID associated with the payment.
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: Timestamp when the payment record was created.
+                      updatedAt:
+                        type: string
+                        format: date-time
+                        description: Timestamp when the payment record was last updated.
+  
+  /api/v1/payment/create-login:
+    get:
+      tags:
+        - Payment
+      summary: Create a Stripe login link
+      description: This endpoint generates a Stripe login link for the user to access their Stripe dashboard.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization.
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped authentication header.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successfully generated the Stripe login link.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: true
+                    description: Stripe response object containing the login link details.
+                    example:
+                      object: "login_link"
+                      url: "https://dashboard.stripe.com/login/..."
+                      created: 1618029817

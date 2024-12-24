@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package paymentqueue;
+
+// The PaymentQueueService service definition.
+service PaymentQueueService {
+  // Define the InitPaymentQueueProcess RPC method
+  rpc InitPaymentQueueProcess (InitPaymentQueueProcessRequest) returns (InitPaymentQueueProcessResponse);
+}
+
+// The request message containing no parameters for initializing the payment queue
+message InitPaymentQueueProcessRequest {}
+
+// The response message containing a confirmation of the initialization
+message InitPaymentQueueProcessResponse {
+  string confirmation = 1;
+}

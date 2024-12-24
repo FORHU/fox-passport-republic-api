@@ -1,0 +1,51 @@
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        <mj-divider border-color="#F45E43"></mj-divider>
+
+        <mj-text font-size="20px" color="#F45E43" font-family="helvetica">Venue Approval Needed</mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica"> Dear Admin, </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica">
+          A new venue has been submitted and is awaiting your approval. Please review the details and approve or reject the space accordingly.
+        </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica">
+          <strong>Owner Details</strong><br />
+          First Name: {first_name}<br />
+          Last Name: {last_name}<br />
+          Phone Number: {phone_number}<br />
+          Email: {owner_email}
+        </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica">
+          <strong>Venue Details</strong><br />
+          Venue Name: {venue_name}<br />
+          Venue Address: {street}, {city}, {country}, {postal_code} <br />
+          Venue Description: {venue_description}
+        </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica">
+          <strong>Space Details</strong><br />
+          Space Name: {space_name}<br />
+          Space Type: {space_type}<br />
+          Space Representation: {representation}
+        </mj-text>
+
+        <mj-button href="{verification_link}" background-color="#F45E43" color="#FFFFFF" font-family="helvetica" font-size="16px">
+          Go to Admin Panel
+        </mj-button>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica">
+          Thank you,
+          <br />
+          Venue4Use
+        </mj-text>
+
+        <mj-divider border-color="#F45E43"></mj-divider>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

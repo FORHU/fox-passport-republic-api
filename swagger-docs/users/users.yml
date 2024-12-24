@@ -1,0 +1,459 @@
+openapi: 3.0.0
+info:
+  title: Venue4use API
+  description: API documentation for Venue4use
+  version: ${API_VERSION}
+servers:
+  - url: ${API_URL}
+paths:
+  /api/v1/user/{user_id_update}:
+    patch:
+      tags:
+        - Users
+      summary: Update User
+      description: Update user information (associated only to user logged in)
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: id
+          in: path
+          required: true
+          description: ID of the user to update
+          schema:
+            type: string
+            example: 672dc173db2583353ebc32ae
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name:
+                  type: string
+                  description: User's first name
+                  example: John
+                last_name:
+                  type: string
+                  description: User's last name
+                  example: Doe
+                profile_picture:
+                  type: string
+                  format: uri
+                  description: URL to the user's profile picture
+                  example: https://example.com/images/profile.jpg
+                phone_number:
+                  type: string
+                  description: User's phone number
+                  example: +1234567890
+              required:
+                - first_name
+                - last_name
+                - phone_number
+      responses:
+        200:
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "USER_UPDATED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      acknowledged:
+                        type: boolean
+                        example: true
+                      modifiedCount:
+                        type: integer
+                        example: 1
+                      upsertedId:
+                        type: string
+                        nullable: true
+                        example: null
+                      upsertedCount:
+                        type: integer
+                        example: 0
+                      matchedCount:
+                        type: integer
+                        example: 1
+                  status:
+                    type: boolean
+                    example: true
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/user/me:
+    get:
+      tags:
+        - Users
+      summary: Fetch User
+      description: Fetch user information (associated only to user logged in)
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+      responses:
+        200:
+          description: User fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "USER_FETCHED_SUCCESFULLY"
+                  data:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        example: "67062cb67a186e825e0123a7"
+                      first_name:
+                        type: string
+                        example: "User"
+                      last_name:
+                        type: string
+                        example: "TestThree"
+                      phone_number:
+                        type: string
+                        example: "+639178239272"
+                      date_of_birth:
+                        type: string
+                        format: date
+                        nullable: true
+                        example: null
+                      profile_picture:
+                        type: string
+                        format: uri
+                        nullable: true
+                        example: null
+                      origin:
+                        type: string
+                        example: "EMAIL"
+                      company_name:
+                        type: string
+                        example: "Insomnia"
+                      country:
+                        type: string
+                        example: "SG"
+                      zip_code:
+                        type: string
+                        nullable: true
+                        example: null
+                      email:
+                        type: string
+                        format: email
+                        example: "brattouffohuquoi-9784@yopmail.com"
+                      username:
+                        type: string
+                        nullable: true
+                        example: null
+                      password:
+                        type: string
+                        description: Encrypted password hash
+                        example: "63e9e9d81f5baa7df42bd2294ca63908d33fe94a888793580a7091a5ee764a14"
+                      role:
+                        type: string
+                        example: "VENUE_OWNER"
+                      status:
+                        type: string
+                        example: "ACTIVE"
+                      organization:
+                        type: string
+                        example: "67062cb67a186e825e0123a5"
+                      social_link:
+                        type: string
+                        example: "1234.com"
+                      postal:
+                        type: string
+                        example: "4011"
+                      createdAt:
+                        type: string
+                        format: date-time
+                        example: "2024-10-09T07:11:50.603Z"
+                      updatedAt:
+                        type: string
+                        format: date-time
+                        example: "2024-11-18T06:32:41.612Z"
+                      deletedAt:
+                        type: string
+                        format: date-time
+                        nullable: true
+                        example: null
+                      deletedBy:
+                        type: string
+                        nullable: true
+                        example: null
+                      otp:
+                        type: string
+                        nullable: true
+                        example: null
+                      assigned_roles:
+                        type: integer
+                        example: 1
+                      stripe_account:
+                        type: string
+                        example: "COMPLETED"
+                  status:
+                    type: boolean
+                    example: true
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/user:
+    delete:
+      tags:
+        - Users
+      summary: Delete User
+      description: Delete user account (associated only to user logged in)
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+      responses:
+        200:
+          description: User deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "DELETED_USER_SUCCESSFULLY"
+                  data:
+                    type: boolean
+                    example: true
+                  status:
+                    type: boolean
+                    example: true
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."

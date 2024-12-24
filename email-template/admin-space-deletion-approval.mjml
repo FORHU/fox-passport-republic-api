@@ -1,0 +1,31 @@
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        <mj-text font-size="20px" font-family="helvetica" color="#333333"> Space Deletion Approved </mj-text>
+
+        <mj-divider border-color="#F45E43"></mj-divider>
+
+        <mj-text font-size="16px" font-family="helvetica" color="#333333"> Dear {first_name}, </mj-text>
+
+        <mj-text font-size="16px" font-family="helvetica" color="#333333">
+          We are writing to inform you that the deletion of the space "<strong>{space_name}</strong>" has been successfully approved by the admin at
+          {date_deleted}.
+        </mj-text>
+
+        <mj-text font-size="16px" font-family="helvetica" color="#333333">
+          If you have any questions or need further assistance, feel free to reach out to our support team @support@venue4use.com
+        </mj-text>
+
+        <mj-text font-size="16px" font-family="helvetica" color="#333333"> Thank you for using our platform. </mj-text>
+
+        <mj-text font-size="16px" font-family="helvetica" color="#333333">
+          Best regards,<br />
+          Venue4Use
+        </mj-text>
+
+        <mj-divider border-color="#F45E43"></mj-divider>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

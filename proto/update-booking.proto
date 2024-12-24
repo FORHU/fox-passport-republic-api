@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package booking;
+
+import "google/protobuf/timestamp.proto";
+
+// The QueueService service definition.
+service UpdateBookingService {
+  // Define the InitUpdateBooking RPC method
+  rpc InitUpdateBooking (InitUpdateBookingRequest) returns (InitUpdateBookingResponse);
+}
+
+// The request message containing the booking data
+message InitUpdateBookingRequest {
+  string booking_id = 1;
+  UpdateData data =2;
+}
+
+message UpdateData {
+  string booker = 2;
+  string booked_user = 3;
+  string space = 4;
+  string venue = 5;
+  string start_date = 6;
+  string end_date = 7;
+  int32 total_guest = 8;
+  double total_price = 9;
+  string status = 10;
+  string booking_reference = 11;
+  string enquiry = 12;
+  string event_type = 13;
+  string repeat_event = 14;
+  string event_duration = 15;
+  OptionalInput optional_input = 16;
+  string deletedAt = 17;
+  string deletedBy = 18;
+}
+
+message OptionalInput {
+  string first_name = 1;
+  string last_name = 2;
+  string email = 3;
+}
+
+message ResultData {
+  bool acknowledged = 1;
+  int32 modifiedCount = 2;
+  int32 matchedCount = 3;
+}
+// The response message containing a confirmation of the initialization
+message InitUpdateBookingResponse {
+  string confirmation = 1;
+  ResultData results = 2;
+}

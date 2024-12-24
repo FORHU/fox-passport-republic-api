@@ -1,0 +1,47 @@
+<mjml>
+  <mj-body>
+    <!-- Header Section -->
+    <mj-section padding="20px" border-radius="8px 8px 0 0">
+      <mj-column>
+        <mj-text align="center" font-size="24px" font-weight="bold">Receipt</mj-text>
+        <mj-text align="center" font-size="18px" font-family="Arial, sans-serif" padding-top="10px">{space_name}</mj-text>
+      </mj-column>
+    </mj-section>
+
+    <!-- Main Content Section -->
+    <mj-section background-color="#ffffff" padding="20px" border-radius="0 0 8px 8px" border="1px solid #F0F0F0">
+      <mj-column>
+        <mj-text font-size="16px" font-family="Arial, sans-serif"> <strong>Receipt Date:</strong> {receipt_date} </mj-text>
+        <mj-text font-size="16px" font-family="Arial, sans-serif"> <strong>Receipt No:</strong> {receipt_no} </mj-text>
+        <mj-divider border-color="#F45E43" border-width="2px" />
+
+        <!-- Booker Details -->
+        <mj-text font-size="16px" font-family="Arial, sans-serif"> <strong>Booker:</strong> {booker_user} </mj-text>
+        <mj-text font-size="16px" font-family="Arial, sans-serif"> <strong>Email:</strong> {email} </mj-text>
+        <mj-divider border-color="#F45E43" border-width="2px" />
+
+        <!-- Venue Details -->
+        <mj-text font-size="16px" font-family="Arial, sans-serif"> <strong>Venue Location:</strong> {venue_location} </mj-text>
+        <mj-text font-size="16px" font-family="Arial, sans-serif"> <strong>Country:</strong> {venue_country} </mj-text>
+        <mj-text font-size="16px" font-family="Arial, sans-serif"> <strong>Postal Code:</strong> {venue_postal} </mj-text>
+        <mj-divider border-color="#F45E43" border-width="2px" />
+
+        <!-- Price Details -->
+        <mj-text font-size="16px" font-family="Arial, sans-serif"> <strong>Quantity:</strong> {quantity} </mj-text>
+        <mj-text font-size="16px" font-family="Arial, sans-serif"> <strong>Price:</strong> {price} </mj-text>
+        <mj-text font-size="16px" font-family="Arial, sans-serif"> <strong>Rebate:</strong> {rebate} </mj-text>
+        <mj-divider border-color="#F45E43" border-width="2px" />
+        <mj-text font-size="18px" font-weight="bold" font-family="Arial, sans-serif"> <strong>Grand Total:</strong> {grand_total} </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <!-- Footer Section -->
+    <mj-section background-color="#F45E43" padding="20px" border-radius="0 0 8px 8px">
+      <mj-column>
+        <mj-text align="center" font-size="14px" color="#ffffff" font-family="Arial, sans-serif">
+          Thank you for your booking! If you have any questions, please contact us.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

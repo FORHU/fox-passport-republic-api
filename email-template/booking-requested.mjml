@@ -1,0 +1,39 @@
+<mjml>
+  <mj-body background-color="#f9f9f9">
+    <mj-section background-color="#ffffff" padding="20px">
+      <mj-column>
+        <mj-divider border-color="#f45e43"></mj-divider>
+
+        <mj-text font-size="20px" color="#333333" font-family="Helvetica, Arial, sans-serif" font-weight="bold"> Booking Request Received </mj-text>
+
+        <mj-text font-size="16px" color="#555555" font-family="Helvetica, Arial, sans-serif"> Hello {venue_owner_name}, </mj-text>
+
+        <mj-text font-size="16px" color="#555555" font-family="Helvetica, Arial, sans-serif">
+          A new booking request has been received for your space, {space_name}. Our team will review the details and coordinate with you to confirm
+          the booking.
+        </mj-text>
+
+        <mj-text font-size="16px" color="#555555" font-family="Helvetica, Arial, sans-serif">
+          <strong>Booking Details:</strong>
+        </mj-text>
+        <mj-text font-size="16px" color="#555555" font-family="Helvetica, Arial, sans-serif">
+          Date: {booking_date}<br />
+          Time: {start_time} - {end_time}<br />
+          Space: {space_name}
+        </mj-text>
+
+        <mj-text font-size="16px" color="#555555" font-family="Helvetica, Arial, sans-serif">
+          Please let us know if there are any special preparations needed for this booking. We appreciate your partnership and look forward to hosting
+          this event successfully.
+        </mj-text>
+
+        <mj-divider border-color="#f45e43"></mj-divider>
+
+        <mj-text font-size="12px" color="#999999" font-family="Helvetica, Arial, sans-serif">
+          If you have any questions or need further assistance, feel free to contact us at
+          <a href="mailto:support@venue4use.com">support@venue4use.com</a>.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

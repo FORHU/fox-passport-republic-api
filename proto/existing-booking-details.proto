@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package booking;
+
+import "google/protobuf/any.proto";
+
+service BookingService {
+  rpc GetExistingBookingDetails(GetExistingBookingDetailsRequest) returns (GetExistingBookingDetailsResponse);
+}
+
+message BookingDetails {
+  string _id = 1;
+  string start_date = 2;
+  string end_date = 3;
+  int32 total_guest = 4;
+  double total_price = 5;
+  string status = 6;
+  string booking_reference = 7;
+  string event_type = 8;
+  string repeat_event = 9;
+  string event_duration = 10;
+  string space_id = 11;
+  string space_name = 12;
+  string venue_id = 13;
+  string venue_name = 14;
+  google.protobuf.Any optional_input = 15;
+  string enquiry = 16;
+  string created_at = 17;
+  string updated_at = 18;
+  string deleted_at = 19;
+}
+
+message GetExistingBookingDetailsRequest {
+  string space_id = 1;
+  string start_date = 2;
+  string end_date = 3;
+}
+
+message GetExistingBookingDetailsResponse {
+  repeated BookingDetails bookings = 1;
+}

@@ -1,0 +1,3772 @@
+openapi: 3.0.0
+info:
+  title: Venue4use api
+  description: API documentation for venue4use api
+  version: ${API_VERSION}
+servers:
+  - url: ${API_URL}
+paths:
+  /api/v1/admin/invitation:
+    post:
+      tags:
+        - Admin
+      summary: Invite Admin Member
+      description: Invite a user to be a member of the admin team
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - assigned_roles
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                assigned_roles:
+                  type: number
+                  enum:
+                    - 1
+                    - 2
+                    - 3
+                    - 4
+                  example: 1
+      responses:
+        200:
+          description: Invitation successfully sent to invited admin member
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: response message
+                    example: INVITATION_SENT_SUCCESSFULLY
+                  data:
+                    type: string
+                    description: token with invited user data
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        400:
+          description: Bad request, invalid credentials
+        500:
+          description: Server error
+
+  /api/v1/admin/accept/{token}:
+    post:
+      tags:
+        - Admin
+      summary: Accept Admin Invitation
+      description: User accepts the invitation sent by admin
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+        - name: scoped-auth
+          in: header
+          required: true
+          description: scoped-auth for authorization
+          schema:
+            type: string
+            example: "Sample123"
+        - name: token
+          in: query
+          required: true
+          description: token with invited user data
+          schema:
+            type: string
+            example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - first_name
+                - last_name
+                - phone_number
+                - password
+              properties:
+                first_name:
+                  type: string
+                  description: User's first name
+                  example: "John"
+                last_name:
+                  type: string
+                  description: User's last name
+                  example: "Doe"
+                phone_number:
+                  type: string
+                  description: User's phone number
+                  example: "+1234567890"
+                password:
+                  type: string
+                  description: User's password for account setup
+                  example: "securePassword123"
+      responses:
+        200:
+          description: Invitation accepted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Invitation accepted successfully."
+        400:
+          description: Bad Request (Invalid or missing parameters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid or missing parameters."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        404:
+          description: Not Found (Invitation token not found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "Invitation token not found."
+        500:
+          description: Internal Server Error (Unexpected server error)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/admin/members:
+    get:
+      tags:
+        - Admin
+      summary: Fetch Admin Members
+      description: Fetch admin members based on status, assigned roles, and optional search filters.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: status
+          in: query
+          required: false
+          description: Status filter for the admin members
+          schema:
+            type: string
+            example: "ACCEPTED"
+        - name: assigned_roles
+          in: query
+          required: false
+          description: Comma-separated list of assigned role IDs
+          schema:
+            type: string
+            example: "1,2,3"
+        - name: search
+          in: query
+          required: false
+          description: Search term for filtering members by name, phone number, or email
+          schema:
+            type: string
+            example: "Jane"
+        - name: page
+          in: query
+          required: false
+          description: Page number for pagination (default is 1)
+          schema:
+            type: integer
+            example: 1
+        - name: limit
+          in: query
+          required: false
+          description: Number of results per page (default is 10)
+          schema:
+            type: integer
+            example: 10
+      responses:
+        200:
+          description: Successful retrieval of admin members
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Response message
+                    example: ADMIN_MEMBERS_FETCHED_SUCCESSFULLY
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        _id:
+                          type: string
+                          example: "6715e3a07835548ddf606667"
+                        admin:
+                          type: string
+                          example: "6715ae62efdafa7706e50f1d"
+                        invited_user:
+                          type: object
+                          properties:
+                            _id:
+                              type: string
+                              example: "6715e3a07835548ddf606666"
+                            first_name:
+                              type: string
+                              example: "Jane"
+                            last_name:
+                              type: string
+                              example: "Admin"
+                            phone_number:
+                              type: string
+                              example: "+6554564677"
+                            date_of_birth:
+                              type: string
+                              nullable: true
+                              example: null
+                            profile_picture:
+                              type: string
+                              nullable: true
+                              example: null
+                            origin:
+                              type: string
+                              example: "EMAIL"
+                            company_name:
+                              type: string
+                              nullable: true
+                              example: null
+                            country:
+                              type: string
+                              example: "SG"
+                            zip_code:
+                              type: string
+                              nullable: true
+                              example: null
+                            email:
+                              type: string
+                              format: email
+                              example: "vouddeuprevoppo-6077@yopmail.com"
+                            username:
+                              type: string
+                              nullable: true
+                              example: null
+                            password:
+                              type: string
+                              example: "hashedpassword"
+                            role:
+                              type: string
+                              example: "ADMIN"
+                            status:
+                              type: string
+                              example: "ACTIVE"
+                            organization:
+                              type: string
+                              nullable: true
+                              example: null
+                            social_link:
+                              type: string
+                              example: ""
+                            postal:
+                              type: string
+                              nullable: true
+                              example: null
+                            createdAt:
+                              type: string
+                              format: date-time
+                              example: "2024-10-21T05:16:16.764Z"
+                            updatedAt:
+                              type: string
+                              format: date-time
+                              example: "2024-10-21T05:17:14.015Z"
+                            deletedAt:
+                              type: string
+                              nullable: true
+                              format: date-time
+                              example: null
+                            deletedBy:
+                              type: string
+                              nullable: true
+                              example: null
+                        acl:
+                          type: string
+                          nullable: true
+                          example: null
+                        status:
+                          type: string
+                          example: "ACCEPTED"
+                        suspension_time:
+                          type: string
+                          nullable: true
+                          format: date-time
+                          example: null
+                        createdAt:
+                          type: string
+                          format: date-time
+                          example: "2024-10-21T05:16:16.785Z"
+                        updatedAt:
+                          type: string
+                          format: date-time
+                          example: "2024-11-08T08:19:15.973Z"
+                        deletedAt:
+                          type: string
+                          nullable: true
+                          format: date-time
+                          example: null
+                        deletedBy:
+                          type: string
+                          nullable: true
+                          example: null
+                        venues:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              _id:
+                                type: string
+                                example: "672dc1d8db2583353ebc32b3"
+                              user:
+                                type: string
+                                example: "672dc173db2583353ebc32af"
+                              name:
+                                type: string
+                                example: "hello"
+                              representation:
+                                type: string
+                                nullable: true
+                                example: null
+                              description:
+                                type: string
+                                example: "test test test..."
+                              address:
+                                type: object
+                                properties:
+                                  street:
+                                    type: string
+                                    example: "Jardine Davies Building"
+                                  city:
+                                    type: string
+                                    example: "Makati City"
+                                  state:
+                                    type: string
+                                    example: "Metro Manila"
+                                  country:
+                                    type: string
+                                    example: "PH"
+                                  postal_code:
+                                    type: string
+                                    example: "4011"
+                                  coordinates:
+                                    type: object
+                                    properties:
+                                      latitude:
+                                        type: number
+                                        format: float
+                                        example: 14.558997
+                                      longitude:
+                                        type: number
+                                        format: float
+                                        example: 121.010539
+                              keywords:
+                                type: array
+                                items:
+                                  type: string
+                                example: ["672044384f835fc9e1ed6dfc", "67203c3b4f835fc9e1ed6ced"]
+                              cancellation_policy:
+                                type: string
+                                nullable: true
+                                example: null
+                              status:
+                                type: string
+                                example: "DRAFT"
+                              foods_and_beverages:
+                                type: array
+                                items:
+                                  type: string
+                                example: []
+                              form_steps:
+                                type: number
+                                example: 3
+                              organization:
+                                type: string
+                                example: "672dc173db2583353ebc32ae"
+                              age_restriction:
+                                type: string
+                                nullable: true
+                                example: null
+                              commission:
+                                type: number
+                                format: float
+                                example: 0.15
+                              rebate:
+                                type: string
+                                nullable: true
+                                example: null
+                              payment_method:
+                                type: string
+                                nullable: true
+                                example: null
+                              is_extracted:
+                                type: boolean
+                                example: false
+                              createdAt:
+                                type: string
+                                format: date-time
+                                example: "2024-11-08T07:46:32.214Z"
+                              updatedAt:
+                                type: string
+                                format: date-time
+                                example: "2024-11-08T08:24:43.280Z"
+                              deletedAt:
+                                type: string
+                                nullable: true
+                                format: date-time
+                                example: null
+                              deletedBy:
+                                type: string
+                                nullable: true
+                                example: null
+                              updatedBy:
+                                type: string
+                                nullable: true
+                                example: null
+                        assigned_roles:
+                          type: array
+                          items:
+                            type: number
+                          example: [2]
+        400:
+          description: Bad request, invalid parameters
+        500:
+          description: Server error
+
+  /api/v1/admin/member/{id_update}:
+    patch:
+      tags:
+        - Admin
+      summary: Update Admin Member
+      description: Update admin members based on status, assigned roles, and optional search filters.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: id
+          in: path
+          required: true
+          description: ID of the admin member to update
+          schema:
+            type: string
+            example: 672dc173db2583353ebc32ae
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assigned_roles:
+                  type: number
+                  description: Designated role for the invited member
+                  example: 1
+                venues:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of Venue IDs for the invited member
+                  example: ["672dc1d8db2583353ebc32b3", "672dc1d8db2583353ebc32b4"]
+                suspension_time:
+                  type: string
+                  enum:
+                    - "1"
+                    - "6"
+                    - "12"
+                    - "24"
+                    - "UNTIL_UNSUSPENDED"
+                    - "REMOVE_SUSPENSION"
+      responses:
+        200:
+          description: Admin member updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "ADMIN_MEMBER_UPDATED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      acknowledged:
+                        type: boolean
+                        example: true
+                      modifiedCount:
+                        type: integer
+                        example: 1
+                      upsertedId:
+                        type: string
+                        nullable: true
+                        example: null
+                      upsertedCount:
+                        type: integer
+                        example: 0
+                      matchedCount:
+                        type: integer
+                        example: 1
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/admin/member/{_id_delete}:
+    delete:
+      tags:
+        - Admin
+      summary: Delete Admin Member
+      description: Marks an admin member as deleted by their ID (using updateOne).
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: id
+          in: path
+          required: true
+          description: ID of the admin member to delete
+          schema:
+            type: string
+            example: 672dc173db2583353ebc32ae
+      responses:
+        200:
+          description: Admin member marked as deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "ADMIN_MEMBER_MARKED_AS_DELETED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      acknowledged:
+                        type: boolean
+                        example: true
+                      modifiedCount:
+                        type: integer
+                        example: 1
+                      upsertedId:
+                        type: string
+                        nullable: true
+                        example: null
+                      upsertedCount:
+                        type: integer
+                        example: 0
+                      matchedCount:
+                        type: integer
+                        example: 1
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/admin/venue/transfer-ownership/invite/{venueId}:
+    post:
+      tags:
+        - Admin
+      summary: Transfer Venue Ownership
+      description: Transfers ownership of a venue to a designated venue owner.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: venueId
+          in: path
+          required: true
+          description: ID of the venue to be transferred
+          schema:
+            type: string
+            example: 672dc173db2583353ebc32ae
+      responses:
+        200:
+          description: Admin member is sent an email regarding venue to be transferred
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INVITATION_SENT_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                        description: "JWT token containing information about the invited user and venue details"
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/admin/venue/transfer-ownership/accept/{token}:
+    post:
+      tags:
+        - Admin
+      summary: Accepting Venue Ownership
+      description: Transferred venue is accepted by the venue owner by clicking the link
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: token
+          in: path
+          required: true
+          description: JWT token containing the data of the venue and partial information of the venue owner
+          schema:
+            type: string
+            example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+      responses:
+        200:
+          description: Successful transfer of venue to venue owner
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "TRANSFER_SUCCESS"
+                  data:
+                    type: object
+                    description: "An empty object for consistency in response structure"
+                    example: {}
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/admin/sales:
+    get:
+      tags:
+        - Admin
+      summary: Fetch Sales Transaction
+      description: Get documents regarding sales assigned transactions.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: page
+          in: query
+          required: false
+          description: Page number for pagination (default is 1)
+          schema:
+            type: integer
+            example: 1
+        - name: limit
+          in: query
+          required: false
+          description: Number of results per page (default is 10)
+          schema:
+            type: integer
+            example: 10
+      responses:
+        200:
+          description: Sales transaction details fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "SALES_TRANSACTION_FETCHED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            _id:
+                              type: string
+                              description: "Unique identifier for the sales transaction"
+                              example: "67286cd68e9bc0aae8d68dda"
+                            user:
+                              type: object
+                              properties:
+                                _id:
+                                  type: string
+                                  example: "671609d690d792f61eb4da16"
+                                first_name:
+                                  type: string
+                                  example: "Max"
+                                last_name:
+                                  type: string
+                                  example: "Member"
+                                email:
+                                  type: string
+                                  example: "hiveppazoutau-2581@yopmail.com"
+                                phone_number:
+                                  type: string
+                                  example: "+6512323232"
+                            createdAt:
+                              type: string
+                              format: date-time
+                              example: "2024-11-04T06:42:30.687Z"
+                            status:
+                              type: string
+                              example: "transferred_ownership"
+                            updatedAt:
+                              type: string
+                              format: date-time
+                              example: "2024-11-04T06:43:13.425Z"
+                            remarks:
+                              type: string
+                              example: "transferred_ownership"
+                            venue:
+                              type: object
+                              properties:
+                                _id:
+                                  type: string
+                                  example: "671f3006bde0f3009960e9bf"
+                                name:
+                                  type: string
+                                  example: "Kingdom of Lothric"
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/admin/space:
+    get:
+      tags:
+        - Admin
+      summary: Fetch Space
+      description: Retrieve space documents for admin
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: status
+          in: query
+          required: false
+          description: Status filter for the admin members. Can be a comma-separated list of statuses.
+          schema:
+            type: string
+            example: "ACCEPTED,PENDING"
+        - name: page
+          in: query
+          required: false
+          description: Page number for pagination (default is 1)
+          schema:
+            type: integer
+            example: 1
+        - name: limit
+          in: query
+          required: false
+          description: Number of results per page (default is 10)
+          schema:
+            type: integer
+            example: 10
+      responses:
+        200:
+          description: Successfully fetched all spaces
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "ALL_SPACES_FETCHED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            _id:
+                              type: string
+                              example: "66790beca6ff16ea5ab27094"
+                            venue:
+                              type: string
+                              example: "66790b66a6ff16ea5ab2707d"
+                            user:
+                              type: string
+                              example: "6673ab0e0cc17bd59d504851"
+                            status:
+                              type: string
+                              example: "PUBLISHED"
+                            name:
+                              type: string
+                              example: "Swimming Pool Area"
+                            type:
+                              type: string
+                              example: "Swimming Pool"
+                            representation:
+                              type: string
+                              example: "SHARED_SPACE"
+                            description:
+                              type: string
+                              example: "Imagine a tranquil oasis nestled within a lush tropical resort, where the sparkling swimming pool beckons guests to unwind and refresh..."
+                            space_photo:
+                              type: array
+                              items:
+                                type: string
+                              example: ["66790c2ca6ff16ea5ab270bb", "66790c2ca6ff16ea5ab270bd"]
+                            venue_photo:
+                              type: array
+                              items:
+                                type: string
+                              example: ["66790c46a6ff16ea5ab270c3"]
+                            guest_capacity:
+                              type: object
+                              properties:
+                                minimum:
+                                  type: integer
+                                  example: 5
+                                maximum:
+                                  type: integer
+                                  example: 20
+                                floorspace:
+                                  type: object
+                                  properties:
+                                    value:
+                                      type: integer
+                                      example: 30
+                                    unit:
+                                      type: string
+                                      example: "SQM"
+                            features:
+                              type: array
+                              items:
+                                type: string
+                              example: ["66790c7da6ff16ea5ab270ce", "66790c7da6ff16ea5ab270cf"]
+                            pricing:
+                              type: string
+                              example: "66790d10a6ff16ea5ab270ec"
+                            form_steps:
+                              type: integer
+                              example: 1
+                            createdAt:
+                              type: string
+                              format: date-time
+                              example: "2024-06-24T06:02:20.543Z"
+                            updatedAt:
+                              type: string
+                              format: date-time
+                              example: "2024-10-09T04:49:38.997Z"
+                            deletedAt:
+                              type: string
+                              nullable: true
+                              format: date-time
+                              example: null
+                            deletedBy:
+                              type: string
+                              nullable: true
+                              example: null
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/admin/space/{id_to_update}:
+    patch:
+      tags:
+        - Admin
+      summary: Update Space
+      description: Admin updates the status of the space
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: id
+          in: path
+          required: true
+          description: ID of the space to be updated
+          schema:
+            type: string
+            example: 672dc173db2583353ebc32ae
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  description: New status for the space
+                  enum:
+                  - "DELETED"
+                  - "DRAFT"
+                  - "FOR_APPROVAL"
+                  - "FOR_DELETION"
+                  - "FOR_TRANSACTION_CLOSING"
+                  - "INPROGRESS"
+                  - "OWNER_DECLINED"
+                  - "OWNER_REQUEST_DELETION"
+                  - "PENDING"
+                  - "PUBLISHED"
+                  - "REJECTED"
+                  - "REQUIRES_CONSENT"
+                  - "SUSPENDED"
+                  example: "PUBLISHED"
+      responses:
+        200:
+          description: Space successfully updated by the admin
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "SPACE_UPDATED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      acknowledged:
+                        type: boolean
+                        example: true
+                      modifiedCount:
+                        type: integer
+                        example: 1
+                      upsertedId:
+                        type: string
+                        nullable: true
+                        example: null
+                      upsertedCount:
+                        type: integer
+                        example: 0
+                      matchedCount:
+                        type: integer
+                        example: 1
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/admin/space/{id_to_delete}:
+    delete:
+      tags:
+        - Admin
+      summary: Update Space
+      description: Admin updates the status of the space to deleted
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: id
+          in: path
+          required: true
+          description: ID of the space to be deleted
+          schema:
+            type: string
+            example: 672dc173db2583353ebc32ae
+      responses:
+        200:
+          description: Space successfully deleted by the admin
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "SPACE_DELETED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      acknowledged:
+                        type: boolean
+                        example: true
+                      modifiedCount:
+                        type: integer
+                        example: 1
+                      upsertedId:
+                        type: string
+                        nullable: true
+                        example: null
+                      upsertedCount:
+                        type: integer
+                        example: 0
+                      matchedCount:
+                        type: integer
+                        example: 1
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/admin/space/count:
+    get:
+      tags:
+        - Admin
+      summary: Fetch Space
+      description: Retrieve space documents count for admin
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+      responses:
+        200:
+          description: Successfully fetched all spaces count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "COUNT_FETCHED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      DRAFT:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "DRAFT"
+                          count:
+                            type: integer
+                            example: 54
+                      PUBLISHED:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "PUBLISHED"
+                          count:
+                            type: integer
+                            example: 43
+                      REJECTED:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "REJECTED"
+                          count:
+                            type: integer
+                            example: 5
+                      INPROGRESS:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "INPROGRESS"
+                          count:
+                            type: integer
+                            example: 12
+                      OWNER_REQUEST_DELETION:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "OWNER_REQUEST_DELETION"
+                          count:
+                            type: integer
+                            example: 2
+                      OWNER_DECLINED:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "OWNER_DECLINED"
+                          count:
+                            type: integer
+                            example: 4
+                      FOR_DELETION:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "FOR_DELETION"
+                          count:
+                            type: integer
+                            example: 11
+                      FOR_APPROVAL:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "FOR_APPROVAL"
+                          count:
+                            type: integer
+                            example: 42
+                      FOR_TRANSACTION_CLOSING:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "FOR_TRANSACTION_CLOSING"
+                          count:
+                            type: integer
+                            example: 3
+                      SUSPENDED:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "SUSPENDED"
+                          count:
+                            type: integer
+                            example: 5
+                      REQUIRES_CONSENT:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "REQUIRES_CONSENT"
+                          count:
+                            type: integer
+                            example: 10
+                      DELETED:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "DELETED"
+                          count:
+                            type: integer
+                            example: 40
+                      PENDING:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "PENDING"
+                          count:
+                            type: integer
+                            example: 3007
+                      TOTAL:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "ALL"
+                          count:
+                            type: integer
+                            example: 3238
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/admin/venue:
+    get:
+      tags:
+        - Admin
+      summary: Fetch Venues
+      description: Retrieve venue documents for admin
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: status
+          in: query
+          required: false
+          description: Status filter for the admin members. Can be a comma-separated list of statuses.
+          schema:
+            type: string
+            example: "ACCEPTED,PENDING"
+        - name: venue_name
+          in: query
+          required: false
+          description: Case insensitive search filter for venue name.
+          schema:
+            type: string
+            example: "lab rental district"
+        - name: page
+          in: query
+          required: false
+          description: Page number for pagination (default is 1)
+          schema:
+            type: integer
+            example: 1
+        - name: limit
+          in: query
+          required: false
+          description: Number of results per page (default is 10)
+          schema:
+            type: integer
+            example: 10
+      responses:
+        200:
+          description: Successfully fetched all venues
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "ALL_VENUES_FETCHED_SUCCESSFULLY"
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        _id:
+                          type: string
+                          example: "67341865e746b4d9f6402743"
+                        venue_photos:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              _id:
+                                type: string
+                                example: "673418e0e746b4d9f640274a"
+                              filename:
+                                type: string
+                                example: "forests-trees-swamp-rays-of-light-ob-1920x1080.jpg"
+                              contentType:
+                                type: string
+                                example: "image/jpeg"
+                              size:
+                                type: integer
+                                example: 1157788
+                              path:
+                                type: string
+                                example: "https://venue-4-use-staging.sgp1.cdn.digitaloceanspaces.com/files/1731467488906-df8ee0ac-d846-4cd5-9e34-f91a02e1edd3.jpg"
+                              origin:
+                                type: string
+                                example: "DO"
+                              description:
+                                type: string
+                                example: "space"
+                              uploadedBy:
+                                type: string
+                                example: "673418e0e746b4d9f6402749"
+                              createdAt:
+                                type: string
+                                format: date-time
+                                example: "2024-11-13T03:11:28.994Z"
+                              updatedAt:
+                                type: string
+                                format: date-time
+                                example: null
+                        name:
+                          type: string
+                          example: "Ragnarok"
+                        description:
+                          type: string
+                          example: "this is a test venue for transfer. this is a test venue for transfer. ..."
+                        address:
+                          type: object
+                          properties:
+                            street:
+                              type: string
+                              example: "Jardine Davies Building"
+                            city:
+                              type: string
+                              example: "Makati City"
+                            state:
+                              type: string
+                              example: "Metro Manila"
+                            country:
+                              type: string
+                              example: "PH"
+                            postal_code:
+                              type: string
+                              example: "4011"
+                            coordinates:
+                              type: object
+                              properties:
+                                latitude:
+                                  type: number
+                                  example: 14.558997
+                                longitude:
+                                  type: number
+                                  example: 121.010539
+                        keywords:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              _id:
+                                type: string
+                                example: "672044384f835fc9e1ed6df7"
+                              keyword:
+                                type: string
+                                example: "Apartment/Penthouse"
+                              categories:
+                                type: array
+                                items:
+                                  type: string
+                                  example: "Popular"
+                              type:
+                                type: string
+                                example: "VENUE"
+                              status:
+                                type: string
+                                example: "old"
+                        status:
+                          type: string
+                          example: "DRAFT"
+                        foods_and_beverages:
+                          type: array
+                          items: {}
+                        venue_details:
+                          type: array
+                          items: {}
+                        organization:
+                          type: string
+                          example: "672db062518fc981b440f44e"
+                        age_restriction:
+                          type: string
+                          example: null
+                        form_steps:
+                          type: integer
+                          example: 3
+                        commission:
+                          type: number
+                          format: float
+                          example: 0.15
+                        rebate:
+                          type: string
+                          example: null
+                        payment_method:
+                          type: string
+                          example: null
+                        spaces:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              _id:
+                                type: string
+                                example: "673418b8e746b4d9f6402747"
+                              venue:
+                                type: string
+                                example: "67341865e746b4d9f6402743"
+                              user:
+                                type: string
+                                example: "672db035518fc981b440f44c"
+                              status:
+                                type: string
+                                example: "DRAFT"
+                              name:
+                                type: string
+                                example: "Ragnarok"
+                              type:
+                                type: string
+                                example: "Art Studio in a Recording Studio"
+                              representation:
+                                type: string
+                                example: "PRIVATE_OUTDOOR_SPACE"
+                              description:
+                                type: string
+                                example: "This is a test space for transfer."
+                              space_photo:
+                                type: array
+                                items:
+                                  type: string
+                                  example: "673418e0e746b4d9f640274a"
+                              venue_photo:
+                                type: array
+                                items:
+                                  type: string
+                              capacity_layout:
+                                type: array
+                                items:
+                                  type: string
+                                  example: "673418fee746b4d9f6402752"
+                              guest_capacity:
+                                type: object
+                                properties:
+                                  minimum:
+                                    type: integer
+                                    example: 97
+                                  maximum:
+                                    type: integer
+                                    example: 200
+                                  floorspace:
+                                    type: object
+                                    properties:
+                                      value:
+                                        type: integer
+                                        example: 1000
+                                      unit:
+                                        type: string
+                                        example: "SQM"
+                              floor_plan:
+                                type: array
+                                items:
+                                  type: string
+                              features:
+                                type: array
+                                items:
+                                  type: string
+                                  example: "6734196fe746b4d9f640275b"
+                              keywords:
+                                type: array
+                                items:
+                                  type: string
+                                  example: "6720432b4f835fc9e1ed6de9"
+                              pricing:
+                                type: string
+                                example: "67341996e746b4d9f6402773"
+                              form_steps:
+                                type: integer
+                                example: 6
+                              is_extracted:
+                                type: boolean
+                                example: false
+                              createdAt:
+                                type: string
+                                format: date-time
+                                example: "2024-11-13T03:10:48.057Z"
+                              updatedAt:
+                                type: string
+                                format: date-time
+                                example: "2024-11-14T01:43:48.825Z"
+                              deletedAt:
+                                type: string
+                                format: date-time
+                                nullable: true
+                                example: null
+                              deletedBy:
+                                type: string
+                                nullable: true
+                                example: null
+                        createdAt:
+                          type: string
+                          format: date-time
+                          example: "2024-11-13T03:09:25.569Z"
+                        updatedAt:
+                          type: string
+                          format: date-time
+                          example: "2024-11-14T01:43:51.842Z"
+                        deletedAt:
+                          type: string
+                          nullable: true
+                          example: null
+                        deletedBy:
+                          type: string
+                          nullable: true
+                          example: null
+                        cancellation_policy:
+                          type: string
+                          example: "672db062518fc981b440f476"
+                        user:
+                          type: object
+                          properties:
+                            _id:
+                              type: string
+                              example: "672db035518fc981b440f44c"
+                            first_name:
+                              type: string
+                              example: "Gerald"
+                            last_name:
+                              type: string
+                              example: "Bins"
+                            phone_number:
+                              type: string
+                              example: "635-861-0087"
+                            date_of_birth:
+                              type: string
+                              nullable: true
+                              example: null
+                            profile_picture:
+                              type: string
+                              nullable: true
+                              example: null
+                            origin:
+                              type: string
+                              example: "EMAIL"
+                              company_name:
+                              type: string
+                              nullable: true
+                              example: null
+                            country:
+                              type: string
+                              example: "PH"
+                            zip_code:
+                              type: string
+                              nullable: true
+                              example: null
+                            email:
+                              type: string
+                              example: "mibekatreso-2886@yopmail.com"
+                            username:
+                              type: string
+                              nullable: true
+                              example: null
+                            password:
+                              type: string
+                              example: "7ad846f9058dad09f440a8a40256f9ccd92f8979ab1abb4d0ec8d1afb3187fdc"
+                            role:
+                              type: string
+                              example: "VENUE_OWNER"
+                            status:
+                              type: string
+                              example: "ACTIVE"
+                            otp:
+                              type: string
+                              nullable: true
+                              example: null
+                            organization:
+                              type: string
+                              example: "672db062518fc981b440f44e"
+                            social_link:
+                              type: string
+                              example: ""
+                            postal:
+                              type: string
+                              nullable: true
+                              example: null
+                            createdAt:
+                              type: string
+                              format: date-time
+                              example: "2024-11-08T06:31:17.196Z"
+                            updatedAt:
+                              type: string
+                              format: date-time
+                              example: "2024-11-14T01:43:48.819Z"
+                            deletedAt:
+                              type: string
+                              nullable: true
+                              example: null
+                            deletedBy:
+                              type: string
+                              nullable: true
+                              example: null
+                        latestDate:
+                          type: string
+                          format: date-time
+                          example: "2024-11-14T01:43:51.842Z"
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/admin/venue/count:
+    get:
+      tags:
+        - Admin
+      summary: Fetch venue count
+      description: Retrieve venue documents count for admin
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+      responses:
+        200:
+          description: Successfully fetched all venues count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "COUNT_FETCHED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      DRAFT:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "DRAFT"
+                          count:
+                            type: integer
+                            example: 54
+                      PUBLISHED:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "PUBLISHED"
+                          count:
+                            type: integer
+                            example: 43
+                      REJECTED:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "REJECTED"
+                          count:
+                            type: integer
+                            example: 5
+                      INPROGRESS:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "INPROGRESS"
+                          count:
+                            type: integer
+                            example: 12
+                      OWNER_REQUEST_DELETION:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "OWNER_REQUEST_DELETION"
+                          count:
+                            type: integer
+                            example: 2
+                      OWNER_DECLINED:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "OWNER_DECLINED"
+                          count:
+                            type: integer
+                            example: 4
+                      FOR_DELETION:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "FOR_DELETION"
+                          count:
+                            type: integer
+                            example: 11
+                      FOR_APPROVAL:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "FOR_APPROVAL"
+                          count:
+                            type: integer
+                            example: 42
+                      FOR_TRANSACTION_CLOSING:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "FOR_TRANSACTION_CLOSING"
+                          count:
+                            type: integer
+                            example: 3
+                      SUSPENDED:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "SUSPENDED"
+                          count:
+                            type: integer
+                            example: 5
+                      REQUIRES_CONSENT:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "REQUIRES_CONSENT"
+                          count:
+                            type: integer
+                            example: 10
+                      DELETED:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "DELETED"
+                          count:
+                            type: integer
+                            example: 40
+                      PENDING:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "PENDING"
+                          count:
+                            type: integer
+                            example: 3007
+                      TOTAL:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "ALL"
+                          count:
+                            type: integer
+                            example: 3238
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  
+  /api/v1/admin/venue/count:
+    get:
+      tags:
+        - Admin
+      summary: Fetch venue count
+      description: Retrieve venue documents count for admin
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+      responses:
+        200:
+          description: Successfully fetched all venues count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "COUNT_FETCHED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      DRAFT:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "DRAFT"
+                          count:
+                            type: integer
+                            example: 54
+                      PUBLISHED:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "PUBLISHED"
+                          count:
+                            type: integer
+                            example: 43
+                      REJECTED:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "REJECTED"
+                          count:
+                            type: integer
+                            example: 5
+                      INPROGRESS:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "INPROGRESS"
+                          count:
+                            type: integer
+                            example: 12
+                      OWNER_REQUEST_DELETION:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "OWNER_REQUEST_DELETION"
+                          count:
+                            type: integer
+                            example: 2
+                      OWNER_DECLINED:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "OWNER_DECLINED"
+                          count:
+                            type: integer
+                            example: 4
+                      FOR_DELETION:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "FOR_DELETION"
+                          count:
+                            type: integer
+                            example: 11
+                      FOR_APPROVAL:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "FOR_APPROVAL"
+                          count:
+                            type: integer
+                            example: 42
+                      FOR_TRANSACTION_CLOSING:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "FOR_TRANSACTION_CLOSING"
+                          count:
+                            type: integer
+                            example: 3
+                      SUSPENDED:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "SUSPENDED"
+                          count:
+                            type: integer
+                            example: 5
+                      REQUIRES_CONSENT:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "REQUIRES_CONSENT"
+                          count:
+                            type: integer
+                            example: 10
+                      DELETED:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "DELETED"
+                          count:
+                            type: integer
+                            example: 40
+                      PENDING:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "PENDING"
+                          count:
+                            type: integer
+                            example: 3007
+                      TOTAL:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "ALL"
+                          count:
+                            type: integer
+                            example: 3238
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/admin/venue/{id_to_update}:
+    patch:
+      tags:
+        - Admin
+      summary: Update Venue
+      description: Admin updates the status of the venue
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: id
+          in: path
+          required: true
+          description: ID of the venue to be updated
+          schema:
+            type: string
+            example: 672dc173db2583353ebc32ae
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  description: New status for the space
+                  enum:
+                    - "DELETED"
+                    - "DRAFT"
+                    - "FOR_APPROVAL"
+                    - "FOR_DELETION"
+                    - "FOR_TRANSACTION_CLOSING"
+                    - "INPROGRESS"
+                    - "OWNER_DECLINED"
+                    - "OWNER_REQUEST_DELETION"
+                    - "PENDING"
+                    - "PUBLISHED"
+                    - "REJECTED"
+                    - "REQUIRES_CONSENT"
+                    - "SUSPENDED"
+                    - "SPACE_FOR_DELETION"
+                    - "REQUEST_TRANSFER_SENT"
+                  example: "PUBLISHED"
+      responses:
+        200:
+          description: Space successfully updated by the admin
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "SPACE_UPDATED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      acknowledged:
+                        type: boolean
+                        example: true
+                      modifiedCount:
+                        type: integer
+                        example: 1
+                      upsertedId:
+                        type: string
+                        nullable: true
+                        example: null
+                      upsertedCount:
+                        type: integer
+                        example: 0
+                      matchedCount:
+                        type: integer
+                        example: 1
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/admin/venue/{id_to_delete}:
+    delete:
+      tags:
+        - Admin
+      summary: Update venue
+      description: Admin updates the status of the venue to deleted
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: Scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: id
+          in: path
+          required: true
+          description: ID of the venue to be deleted
+          schema:
+            type: string
+            example: 672dc173db2583353ebc32ae
+      responses:
+        200:
+          description: Venue successfully deleted by the admin
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "VENUE_DELETED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      acknowledged:
+                        type: boolean
+                        example: true
+                      modifiedCount:
+                        type: integer
+                        example: 1
+                      upsertedId:
+                        type: string
+                        nullable: true
+                        example: null
+                      upsertedCount:
+                        type: integer
+                        example: 0
+                      matchedCount:
+                        type: integer
+                        example: 1
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."
+
+  /api/v1/admin/enquiries:
+    get:
+      tags:
+        - Admin
+      summary: Fetch All Relative Enquiries
+      description: Fetch enquiries aligned with filter or query provided
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authorization
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - name: scoped-auth
+          in: header
+          required: true
+          description: scoped-auth for authorization
+          schema:
+            type: string
+            example: Sample123
+        - name: space_id
+          in: query
+          required: false
+          description: ID of the space to filter enquiries by
+          schema:
+            type: string
+        - name: venue_id
+          in: query
+          required: false
+          description: ID of the venue to filter enquiries by
+          schema:
+            type: string
+        - name: venues
+          in: query
+          required: false
+          description: List of venue IDs to filter enquiries by
+          schema:
+            type: array
+            items:
+              type: string
+            example: ["609e1234567890abcdef1234", "609e1234567890abcdef5678"]
+        - name: enquiry_id
+          in: query
+          required: false
+          description: ID of a specific enquiry to retrieve
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          description: Status of the enquiry (can be a comma-separated list)
+          schema:
+            type: string
+            example: "PENDING,CONFIRMED"
+        - name: toggle_censor
+          in: query
+          required: false
+          description: Toggle to censor sensitive information (phone numbers)
+          schema:
+            type: string
+            enum: ["true", "false"]
+            example: "true"
+        - name: toggle_current
+          in: query
+          required: false
+          description: Toggle to show only current or past enquiries
+          schema:
+            type: string
+            enum: ["true", "false"]
+            example: "true"
+        - name: search_name
+          in: query
+          required: false
+          description: Search by user or venue name
+          schema:
+            type: string
+            example: "John Doe"
+        - name: event_type
+          in: query
+          required: false
+          description: Type of event for the enquiry
+          schema:
+            type: string
+            example: "Wedding"
+        - name: guests
+          in: query
+          required: false
+          description: Number of guests for the event
+          schema:
+            type: integer
+            example: 150
+        - name: event_date
+          in: query
+          required: false
+          description: Date of the event
+          schema:
+            type: string
+            format: date
+            example: "2024-12-25"
+      responses:
+        200:
+          description: Successful retrieval of all enquiries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "ALL_ENQUIRIES_FETCHED_SUCCESSFULLY"
+                  data:
+                    type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            _id:
+                              type: string
+                              example: "6731cdda2babd94fd1077032"
+                            date:
+                              type: object
+                              properties:
+                                date:
+                                  type: string
+                                  example: "14/11/2024"
+                                from:
+                                  type: string
+                                  example: "06:00"
+                                to:
+                                  type: string
+                                  example: "17:00"
+                                timestamp:
+                                  type: object
+                                  properties:
+                                    start_date_time:
+                                      type: string
+                                      format: date-time
+                                      example: "2024-11-14T06:00:00.000Z"
+                                    end_date_time:
+                                      type: string
+                                      format: date-time
+                                      example: "2024-11-14T17:00:00.000Z"
+                            type:
+                              type: string
+                              example: "18th Birthday Party"
+                            guests:
+                              type: integer
+                              example: 34
+                            value:
+                              type: integer
+                              example: 0
+                            own_catering:
+                              type: boolean
+                              example: false
+                            require_catering:
+                              type: boolean
+                              example: false
+                            flexible_time:
+                              type: boolean
+                              example: true
+                            catering_options:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  name:
+                                    type: string
+                                    example: "Breakfast"
+                                  value:
+                                    type: boolean
+                                    example: false
+                            status:
+                              type: string
+                              example: "BOOKING_CONFIRMED"
+                            createdAt:
+                              type: string
+                              format: date-time
+                              example: "2024-11-11T09:26:50.634Z"
+                            updatedAt:
+                              type: string
+                              format: date-time
+                              nullable: true
+                              example: null
+                            deletedAt:
+                              type: string
+                              format: date-time
+                              nullable: true
+                              example: null
+                            deletedBy:
+                              type: string
+                              nullable: true
+                              example: null
+                            space:
+                              type: object
+                              description: Details of the space related to the enquiry
+                              properties:
+                                _id:
+                                  type: string
+                                  description: The unique identifier of the space
+                                  example: "60d20f44b8f1bc001f2fc4d0"
+                                venue:
+                                  type: string
+                                  description: The unique identifier of the venue associated with the space
+                                  example: "60d20f44b8f1bc001f2fc4d1"
+                                user:
+                                  type: string
+                                  description: The unique identifier of the user associated with the space
+                                  example: "60d20f44b8f1bc001f2fc4d2"
+                                status:
+                                  type: string
+                                  description: The status of the space (e.g., "PUBLISHED")
+                                  example: "PUBLISHED"
+                                name:
+                                  type: string
+                                  description: The name of the space
+                                  example: "Art Studio"
+                                type:
+                                  type: string
+                                  description: The type of the space (e.g., "Art Studio")
+                                  example: "Art Studio"
+                                representation:
+                                  type: string
+                                  description: The representation of the space (e.g., "SHARED_SPACE")
+                                  example: "SHARED_SPACE"
+                                description:
+                                  type: string
+                                  description: A detailed description of the space
+                                  example: "A large art studio ideal for workshops and exhibitions."
+                                space_photo:
+                                  type: array
+                                  description: A list of space-related photos
+                                  items:
+                                    type: object
+                                    properties:
+                                      _id:
+                                        type: string
+                                        description: The unique identifier of the photo
+                                        example: "673180b0196ebd2bb9a5b445"
+                                      filename:
+                                        type: string
+                                        description: The filename of the photo
+                                        example: "art_studio_1.jpg"
+                                      contentType:
+                                        type: string
+                                        description: The content type of the photo
+                                        example: "image/jpeg"
+                                      size:
+                                        type: integer
+                                        description: The size of the photo in bytes
+                                        example: 204800
+                                      path:
+                                        type: string
+                                        description: The URL path to the photo
+                                        example: "/uploads/photos/art_studio_1.jpg"
+                                      origin:
+                                        type: string
+                                        description: The origin of the photo (e.g., "DO")
+                                        example: "DO"
+                                      description:
+                                        type: string
+                                        description: A description of the photo
+                                        example: "A view of the studio space with plenty of natural light."
+                                      createdAt:
+                                        type: string
+                                        format: date-time
+                                        description: The creation date and time of the photo
+                                        example: "2024-11-15T10:00:00Z"
+                                      updatedAt:
+                                        type: string
+                                        format: date-time
+                                        description: The last update date and time of the photo
+                                        example: "2024-11-15T12:00:00Z"
+                                venue_photo:
+                                  type: array
+                                  description: A list of venue-related photos
+                                  items:
+                                    type: object
+                                    properties:
+                                      _id:
+                                        type: string
+                                        description: The unique identifier of the photo
+                                        example: "673180b0196ebd2bb9a5b446"
+                                      filename:
+                                        type: string
+                                        description: The filename of the photo
+                                        example: "venue_1.jpg"
+                                      contentType:
+                                        type: string
+                                        description: The content type of the photo
+                                        example: "image/jpeg"
+                                      size:
+                                        type: integer
+                                        description: The size of the photo in bytes
+                                        example: 102400
+                                      path:
+                                        type: string
+                                        description: The URL path to the photo
+                                        example: "/uploads/photos/venue_1.jpg"
+                                      origin:
+                                        type: string
+                                        description: The origin of the photo (e.g., "DO")
+                                        example: "DO"
+                                      description:
+                                        type: string
+                                        description: A description of the photo
+                                        example: "The main entrance to the venue."
+                                      createdAt:
+                                        type: string
+                                        format: date-time
+                                        description: The creation date and time of the photo
+                                        example: "2024-11-15T10:00:00Z"
+                                      updatedAt:
+                                        type: string
+                                        format: date-time
+                                        description: The last update date and time of the photo
+                                        example: "2024-11-15T12:00:00Z"
+                                      capacity_layout:
+                                        type: array
+                                        items:
+                                          type: string
+                                        description: List of layout IDs associated with the space capacity
+                                      guest_capacity:
+                                        type: object
+                                        properties:
+                                          minimum:
+                                            type: integer
+                                            description: Minimum guest capacity
+                                            example: 100
+                                          maximum:
+                                            type: integer
+                                            description: Maximum guest capacity
+                                            example: 200
+                                          floorspace:
+                                            type: object
+                                            properties:
+                                              value:
+                                                type: integer
+                                                description: Floorspace value
+                                                  example: 500
+                                              unit:
+                                                type: string
+                                                description: Unit of measurement (e.g., "SQM")
+                                                example: "SQM"
+                                floor_plan:
+                                  type: array
+                                  items:
+                                    type: string
+                                    description: List of floor plan IDs for the space
+                                    example: "673180b0196ebd2bb9a5b446"
+                                features:
+                                  type: array
+                                  items:
+                                    type: string
+                                    description: List of feature IDs for the space
+                                    example: "673180b0196ebd2bb9a5b446"
+                                keywords:
+                                  type: array
+                                  items:
+                                    type: string
+                                    description: List of keyword IDs for the space
+                                    example: "673180b0196ebd2bb9a99203"
+                                pricing:
+                                  type: string
+                                  description: The unique identifier of the pricing for the space
+                                  example: "673180b0196ebd2bb9a5b446"
+                                form_steps:
+                                  type: integer
+                                  description: The number of steps the space has proceeded with it's details
+                                  example: 3
+                                is_extracted:
+                                  type: boolean
+                                  description: A flag to wether it was extracted or not
+                                  example: false
+                                createdAt:
+                                  type: string
+                                  format: date-time
+                                  description: The creation date and time
+                                  example: "2024-11-15T10:00:00Z"
+                                updatedAt:
+                                  type: string
+                                  format: date-time
+                                  description: The last update date and time
+                                  example: "2024-11-15T12:00:00Z"
+                            venue:
+                              type: object
+                              properties:
+                                _id:
+                                  type: string
+                                  example: "67317e19196ebd2bb9a5b412"
+                                user:
+                                  type: object
+                                  properties:
+                                    _id:
+                                      type: string
+                                      example: "67317143196ebd2bb9a5b3b1"
+                                    first_name:
+                                      type: string
+                                      example: "Me Saw"
+                                    last_name:
+                                      type: string
+                                      example: "Who"
+                                    email:
+                                      type: string
+                                      example: "tammeuyoubeli-8583@yopmail.com"
+                                    role:
+                                      type: string
+                                      example: "VENUE_OWNER"
+                                    phone_number:
+                                      type: string
+                                      example: "+639123456789"
+                                name:
+                                  type: string
+                                  example: "Elden Ring Malenia"
+                                description:
+                                  type: string
+                                  example: "This is a test venue. And she has never known defeat."
+                                address:
+                                  type: object
+                                  properties:
+                                    street:
+                                      type: string
+                                      example: "Jardine Davies Building"
+                                    city:
+                                      type: string
+                                      example: "Makati City"
+                                    state:
+                                      type: string
+                                      example: "Metro Manila"
+                                    country:
+                                      type: string
+                                      example: "PH"
+                                    postal_code:
+                                      type: string
+                                      example: "4011"
+                                    coordinates:
+                                      type: object
+                                      properties:
+                                        latitude:
+                                          type: number
+                                          format: float
+                                          example: 14.558997
+                                        longitude:
+                                          type: number
+                                          format: float
+                                          example: 121.010539
+                                keywords:
+                                  type: array
+                                  items:
+                                    type: string
+                                  example:
+                                    - "672044384f835fc9e1ed6df9"
+                                    - "67203c3b4f835fc9e1ed6ced"
+                                cancellation_policy:
+                                  type: string
+                                  example: "6731803a196ebd2bb9a5b426"
+                                status:
+                                  type: string
+                                  example: "PUBLISHED"
+                                foods_and_beverages:
+                                  type: array
+                                  items:
+                                    type: string
+                                  example:
+                                    - "6731800b196ebd2bb9a5b414"
+                                    - "6731800b196ebd2bb9a5b415"
+                                form_steps:
+                                  type: integer
+                                  example: 7
+                                organization:
+                                  type: string
+                                  example: "67317143196ebd2bb9a5b3af"
+                                age_restriction:
+                                  type: object
+                                  properties:
+                                    answer:
+                                      type: boolean
+                                      example: true
+                                    min_age_requirement:
+                                      type: integer
+                                      example: 2
+                                    enforcement_time:
+                                      type: string
+                                      example: "The whole day"
+                                commission:
+                                  type: number
+                                  format: float
+                                  example: 0.12
+                                rebate:
+                                  type: number
+                                  format: float
+                                  example: 0.0112
+                                payment_method:
+                                  type: string
+                                  example: null
+                                is_extracted:
+                                  type: boolean
+                                  example: false
+                                createdAt:
+                                  type: string
+                                  format: date-time
+                                  example: "2024-11-11T03:46:33.254Z"
+                                updatedAt:
+                                  type: string
+                                  format: date-time
+                                  example: "2024-11-11T05:12:10.676Z"
+                                deletedAt:
+                                  type: string
+                                  format: date-time
+                                  example: null
+                                deletedBy:
+                                  type: string
+                                  example: null
+                                updatedBy:
+                                  type: string
+                                  example: null
+                                venue_details:
+                                  type: array
+                                  items:
+                                    type: string
+                                  example:
+                                    - "67318027196ebd2bb9a5b41f"
+                                    - "67318027196ebd2bb9a5b420"
+                            inbox:
+                              type: object
+                              properties:
+                                _id:
+                                  type: string
+                                  example: "6731cdda2babd94fd107702f"
+                                room_id:
+                                  type: string
+                                  example: "425341135f2e935ea43356cbfd180623"
+                                sender:
+                                  type: string
+                                  example: "670e0ce4b89f8698de16aa49"
+                                receiver:
+                                  type: string
+                                  example: null
+                                createdAt:
+                                  type: string
+                                  format: date-time
+                                  example: "2024-11-11T09:26:50.608Z"
+                            user:
+                              type: object
+                              properties:
+                                _id:
+                                  type: string
+                                  example: "670e0ce4b89f8698de16aa49"
+                                first_name:
+                                  type: string
+                                  example: "Kevin"
+                                last_name:
+                                  type: string
+                                  example: "Dragneel"
+                                email:
+                                  type: string
+                                  example: "toxinerape-7042@yopmail.com"
+                            latest_message:
+                              type: object
+                              properties:
+                                _id:
+                                  type: string
+                                  example: "6731cdee2babd94fd107703e"
+                                inbox:
+                                  type: string
+                                  example: "6731cdda2babd94fd107702f"
+                                room_id:
+                                  type: string
+                                  example: "425341135f2e935ea43356cbfd180623"
+                                sender:
+                                  type: string
+                                  example: "670e0ce4b89f8698de16aa49"
+                                receiver:
+                                  type: string
+                                  example: null
+                                content:
+                                  type: string
+                                  example: null
+                                generated_content:
+                                  type: object
+                                  properties:
+                                    payment_computation:
+                                      type: object
+                                      properties:
+                                        venue_computation:
+                                          type: object
+                                          properties:
+                                            subtotal:
+                                              type: string
+                                              example: "2200.00"
+                                            cleaning_fee:
+                                              type: number
+                                              example: 0
+                                            commission_fee:
+                                              type: number
+                                              example: 0.15
+                                            grand_total:
+                                              type: string
+                                              example: "1870.00"
+                                        user_computation:
+                                          type: object
+                                          properties:
+                                            subtotal:
+                                              type: string
+                                              example: "2200.00"
+                                            cleaning_fee:
+                                              type: number
+                                              example: 0
+                                            rebate:
+                                              type: number
+                                              example: 0
+                                            grand_total:
+                                              type: string
+                                              example: "2200.00"
+                                    message:
+                                      type: string
+                                      example: "null"
+                                    guests:
+                                      type: integer
+                                      example: 34
+                                    event_date:
+                                      type: string
+                                      example: "14/11/2024"
+                                    timeFrom:
+                                      type: string
+                                      example: "06:00"
+                                    timeTo:
+                                      type: string
+                                      example: "17:00"
+                                    event_type:
+                                      type: string
+                                      example: "18th Birthday Party"
+                                    space_name:
+                                      type: string
+                                      example: "Sword of Miquella"
+                                    venue_name:
+                                      type: string
+                                      example: "Elden Ring Malenia"
+                                    currency:
+                                      type: string
+                                      example: "PHP"
+                                key:
+                                  type: string
+                                  example: "BOOKING_CONFIRMED"
+                                attachments:
+                                  type: string
+                                  example: null
+                                admin_generated:
+                                  type: boolean
+                                  example: true
+                                createdAt:
+                                  type: string
+                                  format: date-time
+                                  example: "2024-11-11T09:27:10.259Z"
+                            cancelledBy:
+                              type: object
+                              example: {}
+        400:
+          description: Bad Request (Invalid or missing parameters or fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "BAD_REQUEST"
+                  error:
+                    type: string
+                    example: "Invalid ID or malformed request body."
+        401:
+          description: Unauthorized (Invalid or missing authentication token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  error:
+                    type: string
+                    example: "Missing or invalid authorization token."
+        403:
+          description: Forbidden (The user does not have permission to access this resource)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FORBIDDEN"
+                  error:
+                    type: string
+                    example: "You do not have permission to access this resource."
+        404:
+          description: Not Found (The requested resource could not be found)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NOT_FOUND"
+                  error:
+                    type: string
+                    example: "The requested resource does not exist."
+        500:
+          description: Internal Server Error (An unexpected error occurred on the server)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  error:
+                    type: string
+                    example: "An unexpected error occurred on the server."

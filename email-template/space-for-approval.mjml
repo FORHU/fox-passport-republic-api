@@ -1,0 +1,32 @@
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        <mj-divider border-color="#F45E43"></mj-divider>
+
+        <mj-text font-size="20px" color="#F45E43" font-family="helvetica"> Venue4Use: Space Approval Notification </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica"> Dear {first_name}, </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica">
+          Thank you for submitting your space. Please be informed that your submission is currently pending approval by our website admin.
+        </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica"> Here are the details of your venue: </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica">
+          <strong>Venue name:</strong> {venue_name} <br />
+          <strong>Space name:</strong> {space_name} <br />
+          <strong>Date submitted:</strong> {date_submitted}
+        </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica"> We will notify you once the review process is complete. </mj-text>
+
+        <mj-text font-size="16px" color="#000000" font-family="helvetica">
+          Best regards, <br />
+          Venue4Use
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

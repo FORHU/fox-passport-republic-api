@@ -1,0 +1,35 @@
+<mjml>
+  <mj-head>
+    <mj-title>Venue4Use: Your Verification Code</mj-title>
+    <mj-preview>Your verification code for Venue4Use account access</mj-preview>
+    <mj-style> body { font-family: Arial, sans-serif; } </mj-style>
+  </mj-head>
+  <mj-body>
+    <mj-section> </mj-section>
+    <mj-section padding="20px">
+      <mj-column>
+        <mj-text font-size="18px" color="#000000">Dear {first_name},</mj-text>
+        <mj-text font-size="16px" color="#333333">
+          You've requested a verification code for your Venue4Use account. Please use the code below to complete your verification:
+        </mj-text>
+        <mj-text font-size="32px" color="#4CAF50" align="center" font-weight="bold" padding="20px"> {otp_code} </mj-text>
+        <mj-text font-size="16px" color="#333333">
+          This code will expire in 10 minutes. If you didn't request this code, please ignore this email or contact our support team immediately.
+        </mj-text>
+        <mj-text font-size="16px" color="#333333"> For security reasons, please do not share this code with anyone. </mj-text>
+        <mj-divider border-color="#cccccc" />
+        <mj-text font-size="16px" color="#333333">Need Help?</mj-text>
+        <mj-text font-size="16px" color="#333333">
+          If you're having trouble with the verification process, please contact our support team at
+          <a href="mailto:support@venue4use.com">support@venue4use.com</a> or visit our Help Center.
+        </mj-text>
+        <mj-text font-size="14px" color="#777777"> Please do not reply to this email as it is sent from an unmonitored inbox. </mj-text>
+        <mj-divider border-color="#cccccc" />
+        <mj-text font-size="14px" color="#777777"> Venue4Use | <a href="https://www.venue4use.com">www.venue4use.com</a> </mj-text>
+        <mj-text font-size="12px" color="#777777">
+          This email contains a time-sensitive verification code. Please do not share it with anyone.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
