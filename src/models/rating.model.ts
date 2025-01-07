@@ -13,7 +13,8 @@ export interface TRating {
   user?: ObjectId;
   space?: ObjectId;
   rating: number;
-  comments?: string;
+  publicNote?: string;
+  privateNote?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -25,7 +26,8 @@ export class MRating implements Partial<TRating> {
   user?: ObjectId;
   space?: ObjectId;
   rating: number;
-  comments?: string;
+  publicNote?: string;
+  privateNote?: string;
   createdAt?: Date;
   updatedAt?: Date;
 
@@ -34,7 +36,8 @@ export class MRating implements Partial<TRating> {
     user = new ObjectId(),
     space = new ObjectId(),
     rating = 0,
-    comments,
+    publicNote,
+    privateNote,
     createdAt = new Date(),
     updatedAt = new Date(),
   }: Partial<TRating> = {}) {
@@ -42,7 +45,8 @@ export class MRating implements Partial<TRating> {
     this.user = user;
     this.space = space;
     this.rating = rating;
-    this.comments = comments;
+    this.publicNote = publicNote;
+    this.privateNote = privateNote;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }
