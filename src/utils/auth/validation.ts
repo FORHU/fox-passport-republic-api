@@ -8,14 +8,14 @@ export const validateRegistrationSchema = (data: any) => {
     password: Joi.string().escapeHTML().min(6).required(),
     role: Joi.string().escapeHTML().optional(),
     phone_number: Joi.string().escapeHTML().allow("").required(),
-    date_of_birth: Joi.string().escapeHTML().allow("").optional(),
-    first_name: Joi.string().escapeHTML().allow("").optional(),
-    last_name: Joi.string().escapeHTML().allow("").optional(),
-    company_name: Joi.string().escapeHTML().allow("").optional(),
-    venue_name: Joi.string().escapeHTML().allow("").optional(),
-    postal: Joi.string().escapeHTML().allow("").optional(),
-    country: Joi.string().escapeHTML().allow("").optional(),
-    social_link: Joi.string().escapeHTML().allow("").optional(),
+    date_of_birth: Joi.string().escapeHTML().allow(null, "").optional(),
+    first_name: Joi.string().escapeHTML().allow(null, "").optional(),
+    last_name: Joi.string().escapeHTML().allow(null, "").optional(),
+    company_name: Joi.string().escapeHTML().allow(null, "").optional(),
+    venue_name: Joi.string().escapeHTML().allow(null, "").optional(),
+    postal: Joi.string().escapeHTML().allow(null, "").optional(),
+    country: Joi.string().escapeHTML().allow(null, "").optional(),
+    social_link: Joi.string().escapeHTML().allow(null, "").optional(),
   });
   return schema.validate(data);
 };
