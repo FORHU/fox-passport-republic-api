@@ -15,13 +15,13 @@ const authenticateTokenAndStatus = async (req: Request, res: Response, next: Nex
     // Check if user exists and status is active
     const userData = await AuthSvc.getAuthUsers({ device_id });
     if (!userData || userData.status !== "ACTIVE") {
-      return res.status(403).json({ message: "User not found or status is inactive" });
+      return res.status(401).json({ message: "User not found or status is inactive" });
     }
 
     req.user = user;
     next();
   } catch (error) {
-    return res.status(403).json({ message: "Invalid token" });
+    return res.status(401).json({ message: "Invalid token" });
   }
 };
 
