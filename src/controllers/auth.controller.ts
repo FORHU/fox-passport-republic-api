@@ -319,22 +319,27 @@ export default class AuthCtrl {
 
     const { error } = validateRefreshTokenSchema(req.body);
     if (error) {
-      return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
+      return handleErrorResponse(res, error, { code: "VALIDATION_ERROR", status_code: 400 });
     }
 
-    if (error) {
-      return handleErrorResponse(res, error, {
-        code: "ERROR_REFRESH_TOKEN_VALIDATION",
-        status_code: 400,
-      });
-    }
     try {
       const result = await AuthSvc.refreshToken(refreshToken);
       return handleResponse(res, result, "ACCESS_TOKEN_REFRESHED");
-    } catch (error) {
-      return handleErrorResponse(res, error, {
-        code: "ERROR_REFRESH_ACCESS_TOKEN",
-      });
+    } catch (err) {
+      const error = err.message;
+      const status_code = MESSAGE_CODE[error as keyof typeof MESSAGE_CODE].status_code;
+      const error_message = MESSAGE_CODE[error as keyof typeof MESSAGE_CODE].message;
+      return handleErrorResponse(
+        res,
+        error,
+        {
+          code: error_message || "ERROR_REFRESH_ACCESS_TOKEN",
+          status_code,
+        },
+        MESSAGE_CODE[error as keyof typeof MESSAGE_CODE].status_code,
+        MESSAGE_CODE[error as keyof typeof MESSAGE_CODE].message,
+        MESSAGE_CODE[error as keyof typeof MESSAGE_CODE].description,
+      );
     }
   }
 

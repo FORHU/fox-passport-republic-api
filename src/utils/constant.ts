@@ -40,6 +40,12 @@ export const MESSAGE_CODE = {
     description: "User already exists through Google",
     status_code: 403,
   },
+  "1005": {
+    code: 1005,
+    message: "Refresh Token expired",
+    description: "Refresh Token expired. Please login again",
+    status_code: 403,
+  },
   "2001": {
     code: 2001,
     message: "Venue not found",

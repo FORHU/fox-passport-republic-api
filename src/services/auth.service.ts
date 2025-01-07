@@ -311,7 +311,7 @@ export default class AuthSvc {
   static async refreshToken(refresh_token: string) {
     const token = verifyToken(refresh_token, REFRESH_TOKEN_SECRET);
     if (!token) {
-      throw new Error("Invalid token");
+      throw new Error("1005");
     }
 
     const user: any = await UserRepo.getUser({ _id: new ObjectId(token._id) });
