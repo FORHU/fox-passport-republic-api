@@ -34,27 +34,22 @@ export default class RatingCtrl {
 
   static async createRating(req: Request, res: Response) {
     try {
-      const { rating } = req.body;
+      const { rating, publicNote, privateNote } = req.body;
       const userId = req?.user?._id as string;
       const spaceId = req.params.space_id as string;
 
-      // Validate request body
       const { error } = validateCreateRatingSchema(req.body);
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
 
-      // Create ObjectId instances
       const space = new ObjectId(spaceId);
       const user = new ObjectId(userId);
 
-      // Call the service to create a rating
-      const result = await RatingSvc.upsertRating({ user, space }, { user, space, rating });
+      const result = await RatingSvc.upsertRating({ user, space }, { user, space, rating, publicNote, privateNote });
 
-      // Handle successful response
       return handleResponse(res, result, "RATING_CREATED");
     } catch (error) {
-      // Handle error response
       return handleErrorResponse(res, error, { code: "RATING_CREATION_FAILED" });
     }
   }
