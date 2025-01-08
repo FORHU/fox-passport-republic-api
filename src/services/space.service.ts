@@ -243,12 +243,12 @@ export default class SpaceSvc {
     if (userRole !== "ADMIN" && [space_status.REQUIRES_CONSENT, space_status.PENDING].includes(status)) {
       throw new Error("Only ADMIN can set the status to PENDING or REQUIRES_CONSENT.");
     }
-    if (name !== null && name !== undefined && name !== "") {
-      const space_name = await this.getSpace({ name: name });
-      if (space_name && String(space_name?._id) !== String(spaceId)) {
-        throw new Error("Space name already exists");
-      }
-    }
+    // if (name !== null && name !== undefined && name !== "") {
+    //   const space_name = await this.getSpace({ name: name });
+    //   if (space_name && String(space_name?._id) !== String(spaceId)) {
+    //     throw new Error("Space name already exists");
+    //   }
+    // }
 
     space.space_photo = space_photo;
     space.venue_photo = venue_photo;
