@@ -31,9 +31,10 @@ export default class RatingRepo {
   static async getRatingAverage(query: any) {
     try {
       const collection = this.collection();
-      const result = await collection.aggregate([{ $match: query }, { $group: { _id: "$space", averageRating: { $avg: "$rating" } } }]).toArray();
-      const averageRating = result[0]?.averageRating ? parseFloat(result[0].averageRating.toFixed(2)) : 0;
-      return averageRating;
+      const results = await collection
+        .aggregate([{ $match: query }, { $group: { _id: "$space", totalRating: { $sum: "$rating" }, averageRating: { $avg: "$rating" } } }])
+        .toArray();
+      return results[0];
     } catch (error) {
       throw error;
     }
