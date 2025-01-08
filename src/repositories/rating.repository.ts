@@ -12,7 +12,16 @@ export default class RatingRepo {
   static async upsertRating(query: any, data: TRating) {
     try {
       const collection = this.collection();
-      return await collection.updateOne(query, { $set: data }, { upsert: true });
+      const now = new Date();
+
+      return await collection.updateOne(
+        query,
+        {
+          $set: { ...data, updatedAt: now },
+          $setOnInsert: { createdAt: now },
+        },
+        { upsert: true },
+      );
     } catch (error) {
       throw error;
     }
