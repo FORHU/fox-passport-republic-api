@@ -63,13 +63,13 @@ export const validateGetSpacesSchema = (data: any) => {
 
 export const validateCreateSpaceSchema = (data: any) => {
   const schema = Joi.object({
-    name: Joi.string().escapeHTML().optional(),
+    name: Joi.string().escapeHTML().optional().allow(null, ""),
     venue_id: Joi.string().escapeHTML().optional(),
-    type: Joi.string().escapeHTML().optional(),
-    representation: Joi.string().escapeHTML().optional(),
-    description: Joi.string().escapeHTML().optional(),
-    form_steps: Joi.string().escapeHTML().optional(),
-    status: Joi.string().escapeHTML().allow(space_status.DRAFT, space_status.INPROGRESS, space_status.FOR_APPROVAL).optional(),
+    type: Joi.string().escapeHTML().optional().allow(null, ""),
+    representation: Joi.string().escapeHTML().optional().allow(null, ""),
+    description: Joi.string().escapeHTML().optional().allow(null, ""),
+    form_steps: Joi.string().escapeHTML().optional().allow(null, ""),
+    status: Joi.string().escapeHTML().allow(space_status.DRAFT, space_status.INPROGRESS, space_status.FOR_APPROVAL).optional().allow(null, ""),
   });
 
   return schema.validate(data);
