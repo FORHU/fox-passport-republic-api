@@ -1,4 +1,6 @@
 /* eslint-disable no-useless-catch */
+import { Filter } from "mongodb";
+
 import { TRating } from "../models/rating.model";
 import { getDB } from "../utils/mongo";
 
@@ -10,19 +12,22 @@ export default class RatingRepo {
   static async upsertRating(query: any, data: TRating) {
     try {
       const collection = this.collection();
-      const result = await collection.updateOne(query, { $set: data }, { upsert: true });
-      return result;
+      return await collection.updateOne(query, { $set: data }, { upsert: true });
     } catch (error) {
       throw error;
     }
   }
 
-  static async getRating(query: any) {
+  static async getRatingDetails(query: Filter<TRating>) {
+    const collection = this.collection();
+    return await collection.find(query).toArray();
+  }
+
+  static async getRating(query: Filter<TRating>) {
     try {
       const collection = this.collection();
       const result = await collection.aggregate([{ $match: query }, { $group: { _id: "$space", averageRating: { $avg: "$rating" } } }]).toArray();
-      const averageRating = result[0]?.averageRating ? parseFloat(result[0].averageRating.toFixed(2)) : 0;
-      return averageRating;
+      return result[0]?.averageRating ? parseFloat(result[0].averageRating.toFixed(2)) : 0;
     } catch (error) {
       throw error;
     }

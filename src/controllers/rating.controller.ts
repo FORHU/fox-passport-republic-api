@@ -6,6 +6,16 @@ import { validateCreateRatingSchema } from "../utils/rating/validation";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
 
 export default class RatingCtrl {
+  static async getSpaceRatings(req: Request, res: Response) {
+    try {
+      const space_id = req.params.space_id as string;
+      const result = await RatingSvc.getSpaceRatings(space_id);
+      handleResponse(res, result, "FETCH_SPACE_RATINGS");
+    } catch (error) {
+      handleErrorResponse(res, error, { code: "RATING_CREATION_FAILED" });
+    }
+  }
+
   static async getOverAllRating(req: Request, res: Response) {
     try {
       const space_id = req.params.space_id as string;
