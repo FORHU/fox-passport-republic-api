@@ -34,7 +34,7 @@ export default class RatingRepo {
       const results = await collection
         .aggregate([{ $match: query }, { $group: { _id: "$space", totalRating: { $sum: "$rating" }, averageRating: { $avg: "$rating" } } }])
         .toArray();
-      return results[0];
+      return results[0] || { totalRating: 0, averageRating: 0 };
     } catch (error) {
       throw error;
     }
