@@ -6,7 +6,7 @@ import { validateGetCancellationPolicySchema } from "../utils/cancellation-polic
 export default class CancellationPolicySvc {
   static async createOrUpdateCancellationPolicy(data: TCancellationPolicy) {
     try {
-      const [existingCancellationPolicy] = await CancellationPolicyRepo.getCancellationPolicy({ venue_id: data.venue_id });
+      const [existingCancellationPolicy] = await CancellationPolicyRepo.getCancellationPolicy({ venue_id: String(data.venue_id) });
 
       if (!existingCancellationPolicy) {
         data["createdAt"] = new Date();
