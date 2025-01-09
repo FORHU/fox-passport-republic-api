@@ -5,17 +5,9 @@ import { TRating } from "../models/rating.model";
 import RatingRepo from "../repositories/rating.repository";
 
 export default class RatingSvc {
-  static async getSpaceRatings(space_id: string){
-    try {
-      return await RatingRepo.getRatingDetails({ space: new ObjectId(space_id) });
-    } catch (error) {
-      throw error;
-    }
-  }
-
   static async getOverAllRating(space_id: string) {
     try {
-      return await RatingRepo.getRatingAverage({ space: new ObjectId(space_id) });
+      return await RatingRepo.getOverallRatings({ space: new ObjectId(space_id) });
     } catch (error) {
       throw error;
     }
@@ -23,7 +15,7 @@ export default class RatingSvc {
 
   static async getRating(query: any) {
     try {
-      return await RatingRepo.getRating(query);
+      return await RatingRepo.getOverallRatings(query);
     } catch (error) {
       throw error;
     }
