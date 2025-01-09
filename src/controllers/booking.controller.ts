@@ -272,7 +272,7 @@ export default class BookingCtrl {
       }
       const [existingBooking] = booking;
 
-      const [cancellation_policy] = await CancellationPolicySvc.getCancellationPolicy({ venue_id: existingBooking.venue_id });
+      const [cancellation_policy] = await CancellationPolicySvc.getCancellationPolicy({ venue_id: String(existingBooking.venue_id) });
       if (!cancellation_policy) {
         return handleErrorResponse(res, "CANCELLATION_POLICY_NOT_FOUND", { code: "CANCELLATION_POLICY_NOT_FOUND" });
       }
