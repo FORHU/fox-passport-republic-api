@@ -27,6 +27,7 @@ import todoRoutes from "./todo.route";
 import userRoutes from "./user.route";
 import AuthV2Routes from "./v2-routes/auth.routes";
 import venueRoutes from "./venue.route";
+import spaceV2Routes from "./v2-routes/space.route";
 
 const router = express.Router();
 
@@ -57,6 +58,7 @@ router.use("/v1/rating", ratingRoutes);
 router.use("/v1/subscription", subscriptionRoutes);
 router.use("/v1/setting", salesSettingRoutes);
 router.use("/v2/auth", AuthV2Routes);
+router.use("/v2/space", spaceV2Routes)
 
 router.get("/v1/healthcheck", (_, res) => {
   res.json({

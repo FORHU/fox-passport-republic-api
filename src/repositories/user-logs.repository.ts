@@ -1,3 +1,5 @@
+import { Filter } from "mongodb";
+
 import { MUserLogs, TUserLogs } from "../models/user-logs.model";
 import { getDB } from "../utils/mongo";
 
@@ -220,5 +222,227 @@ export default class TodoRepo {
         },
       ])
       .toArray();
+  }
+
+  static async handleGetMostPopularSpaces(query: Filter<any>, skip: number, limit: number) {
+    const { venue, space, user_id, ...baseQuery } = query;
+    const pipeline: any[] = [
+      {
+        $match: baseQuery,
+      },
+      {
+        $group: {
+          _id: "$details.space",
+          totalViews: { $sum: "$count" },
+        },
+      },
+      {
+        $sort: { totalViews: -1 },
+      },
+      {
+        $lookup: {
+          from: "spaces",
+          localField: "_id",
+          foreignField: "_id",
+          as: "spaceDetails",
+        },
+      },
+      {
+        $unwind: "$spaceDetails",
+      },
+      {
+        $lookup: {
+          from: "files",
+          localField: "spaceDetails.space_photo",
+          foreignField: "_id",
+          as: "space_photos",
+        },
+      },
+      {
+        $lookup: {
+          from: "pricing",
+          localField: "spaceDetails.pricing",
+          foreignField: "_id",
+          as: "pricing",
+        },
+      },
+      {
+        $unwind: "$pricing",
+      },
+      {
+        $lookup: {
+          from: "questions",
+          localField: "spaceDetails.capacity_layout",
+          foreignField: "_id",
+          as: "capacity_layout",
+        },
+      },
+    ];
+
+    if (space?.status) {
+      pipeline.push({
+        $match: {
+          "spaceDetails.status": space?.status,
+        },
+      });
+    }
+
+    pipeline.push(
+      {
+        $lookup: {
+          from: "venues",
+          localField: "spaceDetails.venue",
+          foreignField: "_id",
+          as: "venueDetails",
+        },
+      },
+      {
+        $unwind: "$venueDetails",
+      },
+    );
+
+    if (venue?.address?.country) {
+      pipeline.push({
+        $match: {
+          "venueDetails.address.country": venue?.address?.country,
+        },
+      });
+    }
+
+    pipeline.push({
+      $lookup: {
+        from: "favorites",
+        let: { spaceId: "$spaceDetails._id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [{ $eq: ["$spaceDetails", "$$spaceId"] }, { $eq: ["$marked_as_favorite", true] }, { $eq: ["$user", user_id] }],
+              },
+            },
+          },
+        ],
+        as: "marked_as_favorite",
+      },
+    });
+
+    pipeline.push({
+      $project: {
+        _id: "$_id",
+        name: "$spaceDetails.name",
+        description: "$spaceDetails.description",
+        space_photos: {
+          $map: {
+            input: "$space_photos",
+            as: "photo",
+            in: { _id: "$$photo._id", path: "$$photo.path" },
+          },
+        },
+        venue: {
+          _id: "$venueDetails._id",
+          name: "$venueDetails.name",
+        },
+        pricing: 1,
+        capacity_layout: "$capacity_layout",
+        marked_as_favorite: {
+          $cond: {
+            if: { $isArray: "$marked_as_favorite" },
+            then: {
+              _id: { $arrayElemAt: ["$marked_as_favorite._id", 0] },
+              isFavorite: { $cond: { if: { $gt: [{ $size: "$marked_as_favorite" }, 0] }, then: true, else: false } },
+            },
+            else: {
+              _id: null,
+              isFavorite: false,
+            },
+          },
+        },
+        total_views: "$totalViews",
+      },
+    });
+
+    pipeline.push(
+      {
+        $skip: skip,
+      },
+      {
+        $limit: limit,
+      },
+    );
+
+    return this.collection().aggregate(pipeline).toArray();
+  }
+
+  static async countGetMostPopularSpaces(query: Filter<TUserLogs>) {
+    // eslint-disable-next-line no-unused-vars
+    const { venue, space, user_id, ...baseQuery } = query;
+    const pipeline: any[] = [
+      {
+        $match: baseQuery,
+      },
+      {
+        $group: {
+          _id: "$details.space",
+        },
+      },
+    ];
+
+    pipeline.push(
+      {
+        $lookup: {
+          from: "spaces",
+          localField: "_id",
+          foreignField: "_id",
+          as: "spaceDetails",
+        },
+      },
+      {
+        $unwind: {
+          path: "$spaceDetails",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+    );
+
+    if (space?.status) {
+      pipeline.push({
+        $match: {
+          "spaceDetails.status": space?.status,
+        },
+      });
+    }
+
+    pipeline.push(
+      {
+        $lookup: {
+          from: "venues",
+          localField: "spaceDetails.venue",
+          foreignField: "_id",
+          as: "venueDetails",
+        },
+      },
+      {
+        $unwind: {
+          path: "$venueDetails",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+    );
+
+    if (venue?.address?.country) {
+      pipeline.push({
+        $match: {
+          "venueDetails.address.country": venue?.address?.country,
+        },
+      });
+    }
+
+    // Add the count stage
+    pipeline.push({
+      $count: "totalCount",
+    });
+
+    const result = await this.collection().aggregate(pipeline).toArray();
+    return result[0]?.totalCount || 0;
   }
 }

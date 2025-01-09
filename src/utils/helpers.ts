@@ -51,7 +51,7 @@ export type PricingData = {
   currency?: string;
   hire_fee?: HireFee;
   custom_price?: CustomPrice;
-
+  cleaning_fee?: number;
   space_id?: string;
 };
 
@@ -418,4 +418,73 @@ export const getSummarizedPricing = async (pricingData: PricingData[]) => {
   });
 
   return results;
+};
+
+export const getOneSummarizedPricing = (pricingData: PricingData) => {
+  const { custom_price, selected_pricing, space_id, currency, hire_fee } = pricingData;
+
+  let pricing = [];
+
+  if (selected_pricing === "HIRE_FEE") {
+    const groupedDays: { days: string[]; timeRange: string; rate: { perHour: string; perDay: string } }[] = [];
+    let currentGroup: { days: string[]; timeRange: string; rate: { perHour: string; perDay: string } } | null = null;
+
+    hire_fee.days.forEach((day: any, index: number) => {
+      const timeRange = `${day.slots.start} - ${day.slots.end}`;
+      const rate = {
+        perHour: day.hourlyCheckBox ? `${day.slots.rate}${currency}` : "Not available",
+        perDay: day.fullRateCheckkBox ? `${day.full_day_rate}${currency}` : "Not available",
+      };
+
+      if (
+        currentGroup &&
+        currentGroup.timeRange === timeRange &&
+        currentGroup.rate.perHour === rate.perHour &&
+        currentGroup.rate.perDay === rate.perDay
+      ) {
+        currentGroup.days.push(day.name);
+      } else {
+        if (currentGroup) groupedDays.push(currentGroup);
+        currentGroup = { days: [day.name], timeRange, rate };
+      }
+
+      if (index === hire_fee.days.length - 1 && currentGroup) groupedDays.push(currentGroup);
+    });
+
+    pricing = groupedDays.map((group) => {
+      const dayRange =
+        group.days.length > 1 ? `${group.days[0].toUpperCase()}-${group.days[group.days.length - 1].toUpperCase()}` : group.days[0].toUpperCase();
+
+      return {
+        days: dayRange,
+        time: group.timeRange,
+        rate: {
+          perHour: group.rate.perHour,
+          perDay: group.rate.perDay,
+        },
+      };
+    });
+  } else if (selected_pricing === "CUSTOM_PRICE") {
+    pricing = custom_price.prices.map((price) => {
+      const timeRange = `${price.time.from} - ${price.time.to}`;
+      const rateValue = `${price.price}${currency}`;
+      const minimumSpend = price.minimum_spend ? `${price.minimum_spend}${currency}` : "Not available";
+
+      return {
+        days: groupConsecutiveDays(price.weekdays),
+        time: timeRange,
+        rate: {
+          priceType: price.type,
+          priceRate: rateValue,
+          minimumSpend,
+        },
+      };
+    });
+  }
+
+  return {
+    space_id,
+    pricing,
+    selected_pricing,
+  };
 };
