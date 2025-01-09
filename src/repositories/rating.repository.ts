@@ -27,25 +27,10 @@ export default class RatingRepo {
     }
   }
 
-  static async getRatingDetails(query: Filter<TRating>) {
-    const collection = this.collection();
-    return await collection.find(query).toArray();
-  }
-
-  static async getRating(query: Filter<TRating>) {
+  static async getOverallRatings(query: Filter<TRating>) {
     try {
       const collection = this.collection();
-      const result = await collection.aggregate([{ $match: query }, { $group: { _id: "$space", averageRating: { $avg: "$rating" } } }]).toArray();
-      return result[0]?.averageRating ? parseFloat(result[0].averageRating.toFixed(2)) : 0;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  static async getRatingAverage(query: any) {
-    try {
-      const collection = this.collection();
-      const results = await collection
+      const result = await collection
         .aggregate([
           { $match: query },
           {
@@ -54,12 +39,19 @@ export default class RatingRepo {
               totalRatings: { $sum: "$rating" },
               averageRating: { $avg: "$rating" },
               totalReviews: { $sum: 1 },
+              details: { $push: "$$ROOT" },
             },
           },
         ])
         .toArray();
 
-      return results[0] || { totalRatings: 0, averageRating: 0, totalReviews: 0 };
+      return result.map((item) => ({
+        space: item._id,
+        averageRating: parseFloat(item.averageRating.toFixed(2)),
+        totalRatings: parseFloat(item.totalRatings.toFixed(2)),
+        totalReviews: parseFloat(item.totalReviews.toFixed(2)),
+        details: item.details,
+      }));
     } catch (error) {
       throw error;
     }

@@ -5,9 +5,13 @@ import RatingCtrl from "../controllers/rating.controller";
 import authenticateToken from "../middleware/authenticate-token.middleware";
 import sessionMiddleware from "../middleware/valid-session.middleware";
 
-router.get("/space/:space_id", RatingCtrl.getSpaceRatings);
+//getting rating for a space by a user
 router.get("/:space_id", [authenticateToken, sessionMiddleware], RatingCtrl.getRating);
-router.get("/overall/:space_id", [authenticateToken, sessionMiddleware], RatingCtrl.getOverAllRating);
+
+//getting overall rating for a space
+router.get("/overall/:space_id", RatingCtrl.getOverAllRating);
+
+//creating and updating a rating for a space
 router.post("/:space_id", [authenticateToken, sessionMiddleware], RatingCtrl.createRating);
 
 export default router;
