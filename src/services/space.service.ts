@@ -4,10 +4,12 @@ import { ObjectId } from "mongodb";
 import { CC_SUPPORT_EMAIL, SUPPORT_EMAIL, VENUE_4_USE_URI } from "../config";
 import { formatDate } from "../models/enquiries.model";
 import { space_status, TSpace } from "../models/space.model";
+import PricingRepo from "../repositories/pricing.repository";
 import SpaceRepo from "../repositories/space.repository";
+import UserLogsRepo from "../repositories/user-logs.repository";
 import { PaginationType, RequestWithParamsAndUser } from "../types/common";
 import { processBookingsAndPricing } from "../utils/bookings/bookingUtils";
-import { getSummarizedPricing, hashSearch, parseDate, sendTemplatedEmail, PricingData } from "../utils/helpers";
+import { getSummarizedPricing, getOneSummarizedPricing, hashSearch, parseDate, PricingData, sendTemplatedEmail } from "../utils/helpers";
 import { parseQuestion } from "../utils/question/utils";
 import RedisUtil from "../utils/redis.util";
 import { constructQuery } from "../utils/space/helpers";
@@ -17,9 +19,10 @@ import QuestionSvc from "./questions.service";
 import UserSvc from "./user.service";
 import UserLogsSvc from "./user-logs.service";
 import VenueSvc from "./venue.service";
-import PricingRepo from "../repositories/pricing.repository";
+import { TMostPopular } from "../types/space";
 
 const PREFIX = "spaces";
+const PREFIX_USER_LOGS = "user_logs";
 
 export default class SpaceSvc {
   static async getPaginatedSpaces({ query, skip, limit, user_id, mark_as_favorite, startDate, endDate }: PaginationType) {
@@ -113,7 +116,7 @@ export default class SpaceSvc {
         ...(endDateTime ? { endDate: endDateTime } : {}),
       };
 
-      let list = null;
+      const list = null;
       const hashSpacePayload = hashSearch({ spacesPayload, description: "getPaginatedSpacesWithPricing" });
       const cacheSpacePayload = await RedisUtil.getCache(hashSpacePayload, PREFIX);
 
@@ -465,7 +468,7 @@ export default class SpaceSvc {
     const pageNumber = parseInt(skip.toString());
     const limitNumber = parseInt(limit.toString());
     const offset = (pageNumber - 1) * limitNumber;
-
+    //joel
     let list_count = null;
     const hashCountSpace = hashSearch(query);
     const cacheCountSpace = await RedisUtil.getCache(hashCountSpace, PREFIX);
@@ -517,7 +520,7 @@ export default class SpaceSvc {
       pricing_summary: pricingMap.get(space._id.toString()) || null,
     }));
     // {Section end}
-    const result = {
+    const result: any = {
       data: updatedList,
       total_pages: Math.ceil(list_count / limitNumber) || 0,
       total_items: list_count,
@@ -526,6 +529,71 @@ export default class SpaceSvc {
       offset,
     };
     return result;
+  }
+
+  static async handleGetMostPopularSpaces(params: TMostPopular) {
+    const { page = 1, limit = 20, country, status, user_id } = params;
+    const query: any = {
+      action: "VIEW_SPACE",
+      space: {
+        status,
+      },
+      venue: {
+        address: {
+          country,
+        },
+      },
+      user_id: new ObjectId(user_id),
+    };
+
+    const pageNumber = Number(page);
+    const limitNumber = Number(limit);
+    const skip = (pageNumber - 1) * limitNumber;
+
+    // checker of redis of count of spaces
+    let list_count = null;
+    const hashCountSpace = hashSearch(query);
+    const cacheCountSpace = await RedisUtil.getCache(hashCountSpace, PREFIX_USER_LOGS);
+    if (!cacheCountSpace) {
+      list_count = await UserLogsRepo.countGetMostPopularSpaces({ query });
+      await RedisUtil.saveCache({ key: hashCountSpace, data: JSON.stringify(list_count), prefix: PREFIX_USER_LOGS });
+    } else {
+      list_count = JSON.parse(cacheCountSpace);
+    }
+
+    // checker of redis of lists of spaces
+    let lists = null;
+    const hashSpaceList = hashSearch({ query, pageNumber, limitNumber });
+    const cacheSpaceList = await RedisUtil.getCache(hashSpaceList, PREFIX_USER_LOGS);
+    if (!cacheSpaceList) {
+      lists = await UserLogsRepo.handleGetMostPopularSpaces(query, skip, limitNumber);
+      await RedisUtil.saveCache({ key: hashSpaceList, data: JSON.stringify(lists), prefix: PREFIX_USER_LOGS });
+    } else {
+      lists = JSON.parse(cacheSpaceList);
+    }
+
+    const updatedLists = lists.map((item: any) => {
+      return {
+        ...item,
+        pricing: getOneSummarizedPricing({
+          space_id: item?.pricing?.space_id.toString(),
+          selected_pricing: item?.pricing?.selected_pricing || null,
+          currency: item?.pricing?.currency || "USD",
+          hire_fee: item?.pricing?.hire_fee || [],
+          custom_price: item?.pricing?.custom_price || [],
+          cleaning_fee: item?.pricing?.cleaning_fee || 0,
+        }),
+      };
+    });
+
+    return {
+      data: updatedLists,
+      total_pages: Math.ceil(list_count / limitNumber) || 0,
+      total_items: list_count,
+      current_page: pageNumber,
+      size: limitNumber,
+      offset: skip,
+    };
   }
 
   static async getRecentlyListedSpaces({ params, user }: RequestWithParamsAndUser) {
