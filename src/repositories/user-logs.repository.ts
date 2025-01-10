@@ -203,7 +203,7 @@ export default class TodoRepo {
     return this.collection().updateOne(query, { $set: update }, { upsert: true });
   }
 
-  static async countUserLogs(query: any) {
+  static async countUserLogs(query: Filter<any>) {
     return this.collection()
       .aggregate([
         { $match: query },
@@ -341,6 +341,7 @@ export default class TodoRepo {
         venue: {
           _id: "$venueDetails._id",
           name: "$venueDetails.name",
+          address: "$venueDetails.address",
         },
         pricing: 1,
         capacity_layout: "$capacity_layout",
