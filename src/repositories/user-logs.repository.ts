@@ -241,6 +241,14 @@ export default class TodoRepo {
       },
       {
         $lookup: {
+          from: "ratings",
+          localField: "_id",
+          foreignField: "space",
+          as: "ratings",
+        },
+      },
+      {
+        $lookup: {
           from: "spaces",
           localField: "_id",
           foreignField: "_id",
@@ -357,6 +365,17 @@ export default class TodoRepo {
               isFavorite: false,
             },
           },
+        },
+        rating: {
+          totalRating: { $sum: "$ratings.rating" },
+          averageRating: {
+            $cond: {
+              if: { $eq: [{ $size: "$ratings" }, 0] },
+              then: 0,
+              else: { $avg: "$ratings.rating" },
+            },
+          },
+          totalReviews: { $size: "$ratings" },
         },
         total_views: "$totalViews",
       },
