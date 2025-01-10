@@ -575,7 +575,7 @@ export default class SpaceSvc {
     const updatedLists = lists.map((item: any) => {
       return {
         ...item,
-        pricing: getOneSummarizedPricing({
+        pricing_summary: getOneSummarizedPricing({
           space_id: item?.pricing?.space_id.toString(),
           selected_pricing: item?.pricing?.selected_pricing || null,
           currency: item?.pricing?.currency || "USD",
