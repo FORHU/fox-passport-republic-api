@@ -666,7 +666,7 @@ export default class SpaceSvc {
       query,
       skip: offset,
       limit: limitNumber,
-      user_id: user ? new ObjectId(user._id) : null,
+      user_id: user ? new ObjectId(user._id as string) : null,
       mark_as_favorite,
       ...(startDateTime ? { startDate: startDateTime } : {}),
       ...(endDateTime ? { endDate: endDateTime } : {}),
