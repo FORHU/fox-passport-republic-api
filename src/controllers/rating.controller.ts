@@ -4,6 +4,7 @@ import { ObjectId } from "mongodb";
 import RatingSvc from "../services/rating.service";
 import { validateCreateRatingSchema } from "../utils/rating/validation";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
+import { status_rating } from "../models/rating.model";
 
 export default class RatingCtrl {
   static async getOverAllRating(req: Request, res: Response) {
@@ -46,7 +47,7 @@ export default class RatingCtrl {
       const space = new ObjectId(spaceId);
       const user = new ObjectId(userId);
 
-      const result = await RatingSvc.upsertRating({ user, space }, { user, space, rating, publicNote, privateNote });
+      const result = await RatingSvc.upsertRating({ user, space }, { user, space, rating, publicNote, privateNote, status: status_rating.PENDING });
 
       return handleResponse(res, result, "RATING_CREATED");
     } catch (error) {

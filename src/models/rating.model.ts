@@ -8,11 +8,18 @@ export enum space_rating {
   "EXCELLENT" = "EXCELLENT",
 }
 
+export enum status_rating {
+  "APPROVED" = "APPROVED",
+  "PENDING" = "PENDING",
+  "REJECTED" = "REJECTED",
+}
+
 export interface TRating {
   _id?: ObjectId;
   user?: ObjectId;
   space?: ObjectId;
   rating: number;
+  status?: status_rating;
   publicNote?: string;
   privateNote?: string;
   createdAt?: Date;
@@ -26,6 +33,7 @@ export class MRating implements Partial<TRating> {
   user?: ObjectId;
   space?: ObjectId;
   rating: number;
+  status?: status_rating;
   publicNote?: string;
   privateNote?: string;
   createdAt?: Date;
@@ -36,6 +44,7 @@ export class MRating implements Partial<TRating> {
     user = new ObjectId(),
     space = new ObjectId(),
     rating = 0,
+    status = status_rating.PENDING,
     publicNote,
     privateNote,
     createdAt = new Date(),
@@ -45,6 +54,7 @@ export class MRating implements Partial<TRating> {
     this.user = user;
     this.space = space;
     this.rating = rating;
+    this.status = status;
     this.publicNote = publicNote;
     this.privateNote = privateNote;
     this.createdAt = createdAt;
