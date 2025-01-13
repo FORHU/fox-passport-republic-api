@@ -4,10 +4,11 @@ import AuthCtrl from "../controllers/auth.controller";
 import authenticateToken from "../middleware/authenticate-token.middleware";
 import suspensionMiddleware from "../middleware/suspension.middleware";
 import tenantMiddleware from "../middleware/tenant.middleware";
+import tenantValidationMiddleware from "../middleware/tenant-validation.middleware";
 import sessionMiddleware from "../middleware/valid-session.middleware";
 const router = express.Router();
 
-router.post("/login", [suspensionMiddleware], AuthCtrl.loginViaEmail);
+router.post("/login", [tenantMiddleware, tenantValidationMiddleware, suspensionMiddleware], AuthCtrl.loginViaEmail);
 router.post("/registration", [tenantMiddleware], AuthCtrl.registrationViaEmail);
 router.post("/logout", [sessionMiddleware, authenticateToken], AuthCtrl.logout);
 router.get("/google", AuthCtrl.generateGoogleAuthUrl);
