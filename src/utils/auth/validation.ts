@@ -1,6 +1,5 @@
-import { customJoi as Joi } from "../customJoi";
-
 import { user_role } from "../../models/user.model";
+import { customJoi as Joi } from "../customJoi";
 
 export const validateRegistrationSchema = (data: any) => {
   const schema = Joi.object({
@@ -16,6 +15,7 @@ export const validateRegistrationSchema = (data: any) => {
     postal: Joi.string().escapeHTML().allow(null, "").optional(),
     country: Joi.string().escapeHTML().allow(null, "").optional(),
     social_link: Joi.string().escapeHTML().allow(null, "").optional(),
+    tenant: Joi.string().escapeHTML().allow("TH").optional(),
   });
   return schema.validate(data);
 };
