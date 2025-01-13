@@ -28,4 +28,12 @@ export default class RatingSvc {
       throw error;
     }
   }
+
+  static async updateRating(query: any, data: any) {
+    try {
+      return await RatingRepo.updateRating(query, data);
+    } catch (error) {
+      throw error;
+    }
+  }
 }
