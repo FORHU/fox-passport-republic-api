@@ -12,6 +12,7 @@ import BookingSvc from "../services/booking.service";
 import EnquirySvc from "../services/enquiries.service";
 import FileSrvc from "../services/file.service";
 import KeywordSvc from "../services/keyword.service";
+import RatingSvc from "../services/rating.service";
 import SpaceSvc from "../services/space.service";
 import StripeProductSvc from "../services/stripe-product.service";
 import UserSvc from "../services/user.service";
@@ -31,6 +32,7 @@ import { initFileQueue } from "../utils/queues/files/file-migration.queue";
 import { initQuestionQueue } from "../utils/queues/question/delete-question.queue";
 import { initUserRolesQueue } from "../utils/queues/user/migrate-user.queue";
 import { initAddVenueQueue } from "../utils/queues/venue/add-venue.queue";
+import { validateUpdateRatingSchema } from "../utils/rating/validation";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
 
 const storage = multer.memoryStorage();
@@ -504,5 +506,15 @@ export default class AdminCtrl {
     } catch (error) {
       return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
     }
+  }
+
+  static async updateRating(req: Request, res: Response) {
+    const { error } = validateUpdateRatingSchema(req.body);
+    if (error) {
+      return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
+    }
+    const ratingId = new ObjectId(req.params.rating_id);
+    const results = await RatingSvc.updateRating({ _id: ratingId }, req.body);
+    return handleResponse(res, results, "RATING_UPDATED_SUCCESSFULLY");
   }
 }

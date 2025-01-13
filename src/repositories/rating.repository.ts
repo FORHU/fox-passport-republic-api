@@ -56,4 +56,9 @@ export default class RatingRepo {
       throw error;
     }
   }
+
+  static async updateRating(query: Filter<TRating>, data: TRating) {
+    const collection = this.collection();
+    return await collection.updateOne(query, { $set: data });
+  }
 }

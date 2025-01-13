@@ -62,4 +62,7 @@ router.post("/upload-excel", [...ADMIN_MIDDLEWARE], AdminCtrl.uploadExcelFile);
 
 router.post("/migrate-user-roles", AdminCtrl.migrateUserRoles);
 
+//rating
+router.patch("/rating/:rating_id", AdminCtrl.updateRating);
+
 export default router;
