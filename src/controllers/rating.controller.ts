@@ -26,7 +26,7 @@ export default class RatingCtrl {
       // Create ObjectId instances
       const space = new ObjectId(spaceId);
       const user = new ObjectId(userId);
-      const result = await RatingSvc.getRating({ space, user });
+      const result = await RatingSvc.getRating({ space, user, status: status_rating.APPROVED });
       handleResponse(res, result, "FETCH_SPACE_RATING");
     } catch (error) {
       handleErrorResponse(res, error, { code: "RATING_CREATION_FAILED" });
