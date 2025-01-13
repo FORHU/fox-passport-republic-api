@@ -1,13 +1,13 @@
 /* eslint-disable no-useless-catch */
 import { ObjectId } from "mongodb";
 
-import { TRating } from "../models/rating.model";
+import { TRating, status_rating } from "../models/rating.model";
 import RatingRepo from "../repositories/rating.repository";
 
 export default class RatingSvc {
   static async getOverAllRating(space_id: string) {
     try {
-      return await RatingRepo.getOverallRatings({ space: new ObjectId(space_id) });
+      return await RatingRepo.getOverallRatings({ space: new ObjectId(space_id), status: status_rating.APPROVED });
     } catch (error) {
       throw error;
     }
