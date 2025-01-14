@@ -22,8 +22,6 @@ const TenantMiddleware = (req: Request, res: Response, next: NextFunction) => {
     }
   }
 
-  console.log(refererHostname);
-
   const country = Object.keys(TENANT_MAPPING).find((key) => refererHostname.includes(key));
 
   // Get expected tenant code from mapping
