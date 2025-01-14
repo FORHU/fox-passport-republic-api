@@ -7,7 +7,7 @@ const TenantValidationMiddleware = async (req: Request, res: Response, next: Nex
 
   const tenantCode = req.tenant.code;
 
-  const query = req.user ? { email: req.user.email, tenant: tenantCode } : { email: req.body, tenant: tenantCode };
+  const query = req.user ? { email: req.user.email, tenant: tenantCode } : { email: req.body.email, tenant: tenantCode };
 
   const user = await UserSvc.getUser(query);
 
