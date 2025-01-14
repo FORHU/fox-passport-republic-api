@@ -33,8 +33,29 @@ export default class AuthCtrl {
    */
 
   static async registrationViaEmail(req: Request, res: Response) {
-    const { email, password, role, phone_number, date_of_birth, first_name, last_name, company_name, venue_name, postal, country, social_link } =
-      req.body;
+    if (req.tenant) {
+      req.body.tenant = req?.tenant?.code;
+    }
+
+    const {
+      email,
+      password,
+      role,
+      phone_number,
+      date_of_birth,
+      first_name,
+      last_name,
+      company_name,
+      venue_name,
+      postal,
+      country,
+      social_link,
+      tenant,
+    } = req.body;
+
+    console.log({
+      body: req.body,
+    })
 
     const { error } = validateRegistrationSchema(req.body);
     if (error) {
@@ -92,6 +113,7 @@ export default class AuthCtrl {
       const { accessToken, refreshToken }: any = await AuthSvc.registration(
         {
           _id: userId,
+          ...(tenant && { tenant }),
           email,
           password,
           role,

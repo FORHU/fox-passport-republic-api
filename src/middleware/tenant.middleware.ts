@@ -43,8 +43,7 @@ const TenantMiddleware = (req: Request, res: Response, next: NextFunction) => {
 
     // 2. Check if domain is allowed
     if (refererHostname) {
-      const isAllowedDomain = tenantConfig.allowed_domains.some((domain) => refererHostname.includes(domain));
-
+      const isAllowedDomain = tenantConfig.allowed_domains.some((domain: string) => refererHostname.includes(domain));
       if (!isAllowedDomain) {
         return res.status(403).json({
           error: "Domain not allowed for this tenant",
