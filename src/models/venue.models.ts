@@ -76,6 +76,7 @@ export type TVenue = {
   rebate?: number;
   payment_method?: PaymentMethod;
   is_extracted?: boolean;
+  tenant?: string;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;
@@ -115,6 +116,7 @@ export class MVenue implements Partial<TVenue> {
   rebate?: number;
   payment_method?: PaymentMethod;
   is_extracted?: boolean;
+  tenant?: string;
   createdAt: Date;
   updatedAt?: Date;
   deletedAt?: Date;
@@ -142,6 +144,7 @@ export class MVenue implements Partial<TVenue> {
       payment_method,
       createdAt = new Date(),
       is_extracted = false,
+      tenant,
       updatedAt,
       deletedAt,
       deletedBy,
@@ -166,6 +169,7 @@ export class MVenue implements Partial<TVenue> {
     this.rebate = rebate;
     this.payment_method = payment_method;
     this.is_extracted = is_extracted;
+    this.tenant = tenant;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
     this.deletedAt = deletedAt;

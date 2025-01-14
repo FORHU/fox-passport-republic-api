@@ -62,11 +62,17 @@ export default class VenueCtrl {
 
   static async createVenue(req: Request, res: Response) {
     const { error } = validateCreateVenueSchema(req.body);
+    const tenantCode = req?.tenant?.code
+
+    if (tenantCode) {
+      req.body.tenant = tenantCode;
+    }
+
     if (error) {
       return handleErrorResponse(res, error, { code: "VALIDATION_ERROR_MISSING_FIELDS" });
     }
     try {
-      const user = await UserSvc.getUser({ _id: new ObjectId(req.user._id) });
+      const user = await UserSvc.getUser({ _id: new ObjectId(req.user._id as string) });
       if (!user) {
         return handleErrorResponse(res, { error }, { code: "INVALID_USER" });
       }

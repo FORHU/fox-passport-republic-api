@@ -225,10 +225,11 @@ export default class TodoRepo {
   }
 
   static async handleGetMostPopularSpaces(query: Filter<any>, skip: number, limit: number) {
-    const { venue, space, user_id, ...baseQuery } = query;
+    const { space, venue, user_id, ...cleanedQuery } = query;
+
     const pipeline: any[] = [
       {
-        $match: baseQuery,
+        $match: cleanedQuery,
       },
       {
         $group: {
@@ -263,7 +264,7 @@ export default class TodoRepo {
           from: "files",
           localField: "spaceDetails.space_photo",
           foreignField: "_id",
-          as: "space_photos",
+          as: "space_photo",
         },
       },
       {
@@ -339,9 +340,9 @@ export default class TodoRepo {
         _id: "$_id",
         name: "$spaceDetails.name",
         description: "$spaceDetails.description",
-        space_photos: {
+        space_photo: {
           $map: {
-            input: "$space_photos",
+            input: "$space_photo",
             as: "photo",
             in: { _id: "$$photo._id", path: "$$photo.path" },
           },
@@ -394,11 +395,14 @@ export default class TodoRepo {
   }
 
   static async countGetMostPopularSpaces(query: Filter<TUserLogs>) {
-    // eslint-disable-next-line no-unused-vars
-    const { venue, space, user_id, ...baseQuery } = query;
+    const {
+      // eslint-disable-next-line no-unused-vars
+      query: { venue, space, user_id, ...cleanedQuery },
+    } = query;
+
     const pipeline: any[] = [
       {
-        $match: baseQuery,
+        $match: cleanedQuery,
       },
       {
         $group: {

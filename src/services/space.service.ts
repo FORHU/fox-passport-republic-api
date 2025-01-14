@@ -533,6 +533,7 @@ export default class SpaceSvc {
 
   static async handleGetMostPopularSpaces(params: TMostPopular) {
     const { page = 1, limit = 20, country, status, user_id } = params;
+
     const query: any = {
       action: "VIEW_SPACE",
       space: {
@@ -543,7 +544,7 @@ export default class SpaceSvc {
           country,
         },
       },
-      user_id: new ObjectId(user_id),
+      ...(user_id && { user_id: new ObjectId(user_id) }),
     };
 
     const pageNumber = Number(page);
