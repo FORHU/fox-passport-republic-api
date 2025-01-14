@@ -206,7 +206,7 @@ export default class VenueSvc {
     }
   }
   static async processVenueCreation(user: any, payload: any) {
-    const { name, keywords, description, representation, form_steps = 1, status = venue_status.DRAFT, payment_method } = payload;
+    const { name, keywords, description, representation, form_steps = 1, status = venue_status.DRAFT, payment_method, tenant } = payload;
 
     const country = user?.country || "SG";
     const user_role = user?.role;
@@ -246,6 +246,7 @@ export default class VenueSvc {
       ...(country_commission && { commission: country_commission }),
       ...(country_rebate && { rebate: country_rebate }),
       payment_method,
+      ...(tenant && { tenant }),
     };
     return VenueRepo.createVenue(venueData);
   }
