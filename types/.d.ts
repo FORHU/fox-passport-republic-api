@@ -3,5 +3,6 @@ declare namespace Express {
     user?: any;
     venues?:any;
     roles?:any[]
+    tenant?:any;
   }
 }

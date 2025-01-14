@@ -102,3 +102,19 @@ export const ADMIN_ROLES = {
   3: "MEMBER",
   4: "SUPER_ADMIN",
 };
+
+export const TENANT_MAPPING = {
+  thailand: "TH",
+};
+
+export const TENANT_CONFIGS = {
+  TH: {
+    name: "Thailand",
+    allowed_domains: ["localhost:3000", "thailand.venue4use.com"],
+    require_referer: true,
+    require_tenant: true,
+    strict_mode: true,
+    country: "TH",
+    currency: "THB",
+  },
+}
