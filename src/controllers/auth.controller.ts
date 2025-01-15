@@ -53,10 +53,6 @@ export default class AuthCtrl {
       tenant,
     } = req.body;
 
-    console.log({
-      body: req.body,
-    })
-
     const { error } = validateRegistrationSchema(req.body);
     if (error) {
       return handleErrorResponse(res, error, {
