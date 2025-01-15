@@ -488,3 +488,7 @@ export const getOneSummarizedPricing = (pricingData: PricingData) => {
     selected_pricing,
   };
 };
+
+export const stringToArray = (str: string | undefined, defaultValues: string[] = []): string[] => {
+  return (str?.split(",") ?? defaultValues).map((item) => item.trim());
+};
