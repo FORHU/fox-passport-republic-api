@@ -1,3 +1,6 @@
+import { TENANT_ALLOW_REFERER } from "../config";
+import { stringToArray } from "./helpers";
+
 type CountryCodes = {
   [key: string]: string;
 };
@@ -109,12 +112,12 @@ export const TENANT_MAPPING = {
 
 export const TENANT_CONFIGS = {
   TH: {
-    name: "Thailand",
-    allowed_domains: ["localhost:3000", "thailand.venue4use.com"],
+    name: "Gogoji",
+    allowed_domains: stringToArray(TENANT_ALLOW_REFERER),
     require_referer: true,
     require_tenant: true,
     strict_mode: true,
     country: "TH",
     currency: "THB",
   },
-}
+};

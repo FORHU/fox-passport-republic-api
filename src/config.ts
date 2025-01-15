@@ -60,3 +60,5 @@ export const AWS_REGION_AWS = process.env.AWS_REGION_AWS as string;
 export const AWS_S3_BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME as string;
 
 export const API_URL = (process.env.API_URL as string) || "http://localhost:3001";
+
+export const TENANT_ALLOW_REFERER = (process.env.TENANT_ALLOW_REFERER as string) || "localhost";

@@ -344,7 +344,7 @@ export default class TodoRepo {
           $map: {
             input: "$space_photo",
             as: "photo",
-            in: { _id: "$$photo._id", path: "$$photo.path" },
+            in: { _id: "$$photo._id", path: "$$photo.path", contentType: "$$photo.contentType", filename: "$$photo.filename" },
           },
         },
         venue: {
