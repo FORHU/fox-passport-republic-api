@@ -81,6 +81,9 @@ export default class AdminCtrl {
       }
 
       req.query["venues"] = req["venues"];
+      if (req?.tenant) {
+        req.query["tenant_code"] = req.tenant.code;
+      }
 
       const result = await AdminSvc.getAllVenues(req.query);
 

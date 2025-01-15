@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import { user_role } from "../../models/user.model";
 
 export const constructVenueQuery = (params: any, user: any, venues?: any) => {
-  const { user_id, venue_id, keywords, categories, status, venue_name } = params;
+  const { user_id, venue_id, keywords, categories, status, venue_name, tenant_code } = params;
   const query: any = {};
 
   if (venue_name) {
@@ -17,11 +17,11 @@ export const constructVenueQuery = (params: any, user: any, venues?: any) => {
   }
 
   if (user_id) {
-    query.user = new ObjectId(user_id);
+    query.user = new ObjectId(user_id as string);
   }
 
   if (venue_id) {
-    query._id = new ObjectId(venue_id);
+    query._id = new ObjectId(venue_id as string);
   }
 
   if (keywords) {
@@ -49,10 +49,16 @@ export const constructVenueQuery = (params: any, user: any, venues?: any) => {
 
   if (venues) {
     if (Array.isArray(venues)) {
-      query._id = { $in: venues.map((id: string) => new ObjectId(id)) };
+      query._id = { $in: venues.map((id: string) => new ObjectId(id as string)) };
     } else if (typeof venues === "object") {
       Object.assign(query, venues);
     }
+  }
+
+  if (tenant_code) {
+    query["address"] = {
+      country: tenant_code,
+    };
   }
 
   return query;

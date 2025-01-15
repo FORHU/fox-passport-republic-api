@@ -58,7 +58,7 @@ router.use("/v1/rating", ratingRoutes);
 router.use("/v1/subscription", subscriptionRoutes);
 router.use("/v1/setting", salesSettingRoutes);
 router.use("/v2/auth", AuthV2Routes);
-router.use("/v2/space", spaceV2Routes)
+router.use("/v2/space", spaceV2Routes);
 
 router.get("/v1/healthcheck", (_, res) => {
   res.json({

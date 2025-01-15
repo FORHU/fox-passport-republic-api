@@ -4,9 +4,13 @@ import AdminCtrl from "../controllers/admin.controller";
 import AdminMemberCtrl from "../controllers/admin-members.contoller";
 import authenticateToken from "../middleware/authenticate-token.middleware";
 import rolesMiddleware from "../middleware/roles.middleware";
+import tenantMiddleware from "../middleware/tenant.middleware";
+import tenantValidationMiddleware from "../middleware/tenant-validation.middleware";
 import sessionMiddleware from "../middleware/valid-session.middleware";
 
 const ADMIN_MIDDLEWARE = [sessionMiddleware, authenticateToken, rolesMiddleware];
+
+const TENANT_MIDDLEWARE = [tenantMiddleware, tenantValidationMiddleware];
 
 const router = express.Router();
 
@@ -17,7 +21,7 @@ router.patch("/space/:space_id", [...ADMIN_MIDDLEWARE], AdminCtrl.updateSpace);
 router.delete("/space/:space_id", [...ADMIN_MIDDLEWARE], AdminCtrl.deleteSpace);
 
 // venue routes
-router.get("/venue", [...ADMIN_MIDDLEWARE], AdminCtrl.getAllVenues);
+router.get("/venue", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminCtrl.getAllVenues);
 router.get("/venue/count", [...ADMIN_MIDDLEWARE], AdminCtrl.countAdminVenue);
 router.patch("/venue/:venue_id", [...ADMIN_MIDDLEWARE], AdminCtrl.updateVenue);
 router.delete("/venue/:venue_id", [...ADMIN_MIDDLEWARE], AdminCtrl.deleteVenue);

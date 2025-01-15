@@ -439,7 +439,7 @@ export default class VenueSvc {
       list = JSON.parse(cacheList);
     }
 
-    const result = {
+    return {
       data: list,
       total_pages: Math.ceil(list_count / limitNumber) || 0,
       total_items: list_count,
@@ -447,6 +447,5 @@ export default class VenueSvc {
       size: limitNumber,
       offset,
     };
-    return result;
   }
 }
