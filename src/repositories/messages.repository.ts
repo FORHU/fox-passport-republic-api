@@ -32,6 +32,14 @@ export default class InboxRepo {
         },
       },
       {
+        $lookup: {
+          from: "files",
+          localField: "sender.profile_picture",
+          foreignField: "_id",
+          as: "profile_picture",
+        },
+      },
+      {
         $match: query,
       },
       {
@@ -43,7 +51,7 @@ export default class InboxRepo {
             _id: "$sender._id",
             first_name: "$sender.first_name",
             last_name: "$sender.last_name",
-            profile_picture: "$sender.profile_picture",
+            profile_picture: { $arrayElemAt: ["$profile_picture.path", 0] },
           },
           content: 1,
           generated_content: 1,
