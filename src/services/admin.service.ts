@@ -129,9 +129,16 @@ export default class AdminSvc {
 
   static async getAllVenues(payload: any) {
     try {
-      const { status, venue_name, venues, page = 1, limit = 20 } = payload;
+      const { status, venue_name, venues, page = 1, limit = 20, tenant_code } = payload;
 
       const query: any = {};
+
+      if (tenant_code) {
+        query["address"] = {
+          country: tenant_code,
+        };
+      }
+
       if (status) {
         if (!status.includes("ALL")) {
           query.status = { $in: status };
@@ -180,7 +187,7 @@ export default class AdminSvc {
         list = JSON.parse(cacheSpaceList);
       }
 
-      const result = {
+      return {
         data: list,
         total_pages: Math.ceil(list_count / limitNumber) || 0,
         total_items: list_count,
@@ -188,7 +195,6 @@ export default class AdminSvc {
         size: limitNumber,
         offset,
       };
-      return result;
     } catch (error) {
       throw error;
     }

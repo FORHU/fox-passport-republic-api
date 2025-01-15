@@ -13,7 +13,7 @@ const groupTenantMiddleware = [tenantMiddleware, tenantValidationMiddleware];
 
 const router = express.Router();
 
-router.get("/", [sessionMiddleware, authenticateToken, teamRolesOrganizationMiddleware], VenueCtrl.getVenues);
+router.get("/", [sessionMiddleware, authenticateToken, teamRolesOrganizationMiddleware, ...groupTenantMiddleware], VenueCtrl.getVenues);
 router.get("/venue-list", [sessionMiddleware, authenticateToken, teamRolesOrganizationMiddleware], VenueCtrl.getVenueNameIdAndStatus);
 router.get("/venue-details", [sessionMiddleware, authenticateToken], VenueCtrl.getVenueDetails);
 router.get("/count", [sessionMiddleware, authenticateToken], VenueCtrl.countVenue);
