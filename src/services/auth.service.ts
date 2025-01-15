@@ -7,6 +7,7 @@ import { AuthStatus, TUpdateAuth } from "../models/auth.model";
 import { hashPassword, MUser, TUser, user_role, user_status } from "../models/user.model";
 import AuthRepo from "../repositories/auth.repository";
 import UserRepo from "../repositories/user.repository";
+import AdminMembersRepo from "../repositories/admin-members.repository";
 import { DevicePayload } from "../types/admin";
 import { generateAccessToken, generateRefreshToken, generateVerificationToken, verifyToken } from "../utils/auth";
 import { USER_ROLES } from "../utils/constant";
@@ -32,7 +33,7 @@ export default class AuthSvc {
       email: user.email,
     };
 
-    if (!is_invited) {
+    if (user.role !== user_role.ADMIN && !is_invited) {
       const verification_link = `${VENUE_4_USE_URI}/verify-email/${generateVerificationToken(tokenPayload)}?role=${userData?.role}`;
       const subject = "Venue4Use: Confirm Your Email Address";
       const filePath = path.join(process.cwd(), `email-template/email-verification.html`);
@@ -66,6 +67,15 @@ export default class AuthSvc {
       }),
       ...device_payload,
     });
+
+    if (user.role === user_role.ADMIN) {
+      await AdminMembersRepo.createAdminMember({
+        admin: user?._id,
+        status: "ACTIVE",
+        assigned_roles: 1,
+        venues: [],
+      });
+    }
 
     return {
       user_id: user._id,

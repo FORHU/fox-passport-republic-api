@@ -15,7 +15,7 @@ export type TAdminMembers = {
   assigned_roles?: number; // assigned_role of member
   acl?: any[];
   status?: string;
-  venues: ObjectId[];
+  venues?: ObjectId[];
   suspension_time?: Date | string;
   createdAt?: Date;
   updatedAt?: Date;
