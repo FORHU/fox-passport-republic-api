@@ -43,8 +43,7 @@ export default class SpaceSvc {
 
   static async processedSpacePagination({ params, user }: RequestWithParamsAndUser) {
     try {
-      const { page = 1, limit = 20, mark_as_favorite, start_date, start_time, end_time } = params as any;
-
+      const { page = 1, limit = 20, mark_as_favorite, start_date, start_time, end_time, tenant_code } = params as any;
       let dayOfWeek: any;
       let filteredSpaces: any;
 
@@ -532,7 +531,7 @@ export default class SpaceSvc {
   }
 
   static async handleGetMostPopularSpaces(params: TMostPopular) {
-    const { page = 1, limit = 20, country, status, user_id } = params;
+    const { page = 1, limit = 20, country, status, user_id, tenant_code } = params;
 
     const query: any = {
       action: "VIEW_SPACE",
@@ -540,9 +539,7 @@ export default class SpaceSvc {
         status,
       },
       venue: {
-        address: {
-          country,
-        },
+        ...(tenant_code ? { tenant: tenant_code } : { address: { country } }),
       },
       ...(user_id && { user_id: new ObjectId(user_id) }),
     };
