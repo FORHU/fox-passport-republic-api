@@ -134,9 +134,7 @@ export default class AdminSvc {
       const query: any = {};
 
       if (tenant_code) {
-        query["address"] = {
-          country: tenant_code,
-        };
+        query["tenant"] = tenant_code;
       }
 
       if (status) {
