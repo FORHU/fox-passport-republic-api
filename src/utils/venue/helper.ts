@@ -56,9 +56,7 @@ export const constructVenueQuery = (params: any, user: any, venues?: any) => {
   }
 
   if (tenant_code) {
-    query["address"] = {
-      country: tenant_code,
-    };
+    query["tenant"] = tenant_code;
   }
 
   return query;

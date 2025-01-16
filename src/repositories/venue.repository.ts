@@ -170,34 +170,34 @@ export default class VenueRepo {
           "space_photos.createdAt": 1,
         },
       },
-      {
-        $group: {
-          _id: "$_id",
-          venue_photos: { $push: "$venue_photos" },
-          space_photos: { $push: "$space_photos" },
-          name: { $first: "$name" },
-          representation: { $first: "$representation" },
-          description: { $first: "$description" },
-          address: { $first: "$address" },
-          keywords: { $first: "$matched_keywords" },
-          status: { $first: "$status" },
-          cancellation_policy: { $first: "$cancellation_policy" },
-          foods_and_beverages: { $first: "$foods_and_beverages" },
-          venue_details: { $first: "$venue_details" },
-          user: { $first: "$user" },
-          organization: { $first: "$organization" },
-          age_restriction: { $first: "$age_restriction" },
-          form_steps: { $first: "$form_steps" },
-          commission: { $first: "$commission" },
-          rebate: { $first: "$rebate" },
-          payment_method: { $first: "$payment_method" },
-          spaces: { $push: "$spaces" },
-          createdAt: { $first: "$createdAt" },
-          updatedAt: { $first: "$updatedAt" },
-          deletedAt: { $first: "$deletedAt" },
-          deletedBy: { $first: "$deletedBy" },
-        },
-      },
+      // {
+      //   $group: {
+      //     _id: "$_id",
+      //     venue_photos: { $push: "$venue_photos" },
+      //     space_photos: { $push: "$space_photos" },
+      //     name: { $first: "$name" },
+      //     representation: { $first: "$representation" },
+      //     description: { $first: "$description" },
+      //     address: { $first: "$address" },
+      //     keywords: { $first: "$matched_keywords" },
+      //     status: { $first: "$status" },
+      //     cancellation_policy: { $first: "$cancellation_policy" },
+      //     foods_and_beverages: { $first: "$foods_and_beverages" },
+      //     venue_details: { $first: "$venue_details" },
+      //     user: { $first: "$user" },
+      //     organization: { $first: "$organization" },
+      //     age_restriction: { $first: "$age_restriction" },
+      //     form_steps: { $first: "$form_steps" },
+      //     commission: { $first: "$commission" },
+      //     rebate: { $first: "$rebate" },
+      //     payment_method: { $first: "$payment_method" },
+      //     spaces: { $push: "$spaces" },
+      //     createdAt: { $first: "$createdAt" },
+      //     updatedAt: { $first: "$updatedAt" },
+      //     deletedAt: { $first: "$deletedAt" },
+      //     deletedBy: { $first: "$deletedBy" },
+      //   },
+      // },
     );
 
     pipeline.push(
@@ -248,8 +248,7 @@ export default class VenueRepo {
 
     pipeline.push({ $sort: { latestDate: -1 } });
     pipeline.push({ $skip: skip }, { $limit: limit });
-    const result = await this.collection().aggregate(pipeline).toArray();
-    return result;
+    return await this.collection().aggregate(pipeline).toArray();
   }
 
   static async countVenues(query: any) {
