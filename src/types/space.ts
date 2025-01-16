@@ -4,4 +4,5 @@ export interface TMostPopular {
   country: string;
   status: string;
   user_id?: string;
+  tenant_code?: string;
 }

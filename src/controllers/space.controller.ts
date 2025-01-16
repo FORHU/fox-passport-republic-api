@@ -31,6 +31,9 @@ export default class SpaceCtrl {
     const params = req.query;
     const user = req?.user;
     try {
+      if (req?.tenant) {
+        req.query.tenant_code = req?.tenant?.code;
+      }
       const result = await SpaceSvc.processedSpacePagination({
         params,
         user,
@@ -156,6 +159,7 @@ export default class SpaceCtrl {
       page,
       status,
     });
+
     if (error) return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
 
     const payload = {
@@ -164,6 +168,7 @@ export default class SpaceCtrl {
       country: location as string,
       status: status as string,
       ...(user_id && { user_id }),
+      ...(req.tenant && { tenant_code: req.tenant.code }),
     };
 
     const results = await SpaceSvc.handleGetMostPopularSpaces(payload);
@@ -180,6 +185,10 @@ export default class SpaceCtrl {
 
     const { error } = validateGetSpacesSchema(req.query);
     if (error) return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
+
+    if (req?.tenant) {
+      req.query.tenant_code = req?.tenant?.code
+    }
 
     const params = req.query;
     try {

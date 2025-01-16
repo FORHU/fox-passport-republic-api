@@ -37,6 +37,7 @@ export const constructQuery = (params: any, startTime?: any, endTime?: any, filt
     parking_and_accommodation,
     open_days,
     start_date,
+    tenant_code,
   } = params;
   const query: any = {};
   const date = dayjs(start_date);
@@ -62,8 +63,15 @@ export const constructQuery = (params: any, startTime?: any, endTime?: any, filt
     query._id = { $in: mostPopularIds.map((item: any) => new ObjectId(item._id)) };
   }
 
-  if (location) {
-    const locationArray = location.split(",").map((location: any) => location.trim());
+  // if (location) {
+  //   const locationArray = location.split(",").map((location: any) => location.trim());
+  //   query["venue.address.country"] = { $in: locationArray };
+  // }
+
+  if (tenant_code) {
+    query["venue.tenant"] = tenant_code;
+  } else if (location) {
+    const locationArray = location.split(",").map((loc: any) => loc.trim());
     query["venue.address.country"] = { $in: locationArray };
   }
 

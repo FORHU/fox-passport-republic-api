@@ -7,15 +7,18 @@ import teamRolesOrganizationMiddleware from "../middleware/team-organization.mid
 import teamRolesOrganizationPermissionMiddleware from "../middleware/team-organization-permission.middleware";
 import userLogsMiddleware from "../middleware/user-logs.middleware";
 import sessionMiddleware from "../middleware/valid-session.middleware";
+import tenantMiddleware from "../middleware/tenant.middleware";
+import tenantValidationMiddleware from "../middleware/tenant-validation.middleware";
 
 const teamOrganizationMiddleware = [teamRolesOrganizationMiddleware, teamRolesOrganizationPermissionMiddleware];
+const groupTenantMiddleware = [tenantMiddleware, tenantValidationMiddleware];
 
 const router = express.Router();
 
-router.get("/", [optionalAuthMiddleware, userLogsMiddleware], SpaceCtrl.getSpaces);
+router.get("/", [optionalAuthMiddleware, userLogsMiddleware, ...groupTenantMiddleware], SpaceCtrl.getSpaces);
 router.get("/count/:id", [sessionMiddleware, authenticateToken], SpaceCtrl.countSpace);
 router.get("/most-popular", [optionalAuthMiddleware, userLogsMiddleware], SpaceCtrl.getMostPopularSpaces);
-router.get("/recently-listed", [optionalAuthMiddleware, userLogsMiddleware], SpaceCtrl.getRecentlyListedSpaces);
+router.get("/recently-listed", [optionalAuthMiddleware, userLogsMiddleware, ...groupTenantMiddleware], SpaceCtrl.getRecentlyListedSpaces);
 router.get("/subscribed", [optionalAuthMiddleware, userLogsMiddleware], SpaceCtrl.getSpaceList);
 router.get("/space-list", [optionalAuthMiddleware, userLogsMiddleware], SpaceCtrl.getSpaceNameIdAndStatus);
 router.post("/", [sessionMiddleware, authenticateToken, userLogsMiddleware, ...teamOrganizationMiddleware], SpaceCtrl.createSpaces);

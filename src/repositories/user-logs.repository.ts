@@ -226,7 +226,6 @@ export default class TodoRepo {
 
   static async handleGetMostPopularSpaces(query: Filter<any>, skip: number, limit: number) {
     const { space, venue, user_id, ...cleanedQuery } = query;
-
     const pipeline: any[] = [
       {
         $match: cleanedQuery,
@@ -314,6 +313,14 @@ export default class TodoRepo {
       pipeline.push({
         $match: {
           "venueDetails.address.country": venue?.address?.country,
+        },
+      });
+    }
+
+    if (venue?.tenant) {
+      pipeline.push({
+        $match: {
+          "venueDetails.tenant": venue?.tenant,
         },
       });
     }
@@ -457,6 +464,14 @@ export default class TodoRepo {
       pipeline.push({
         $match: {
           "venueDetails.address.country": venue?.address?.country,
+        },
+      });
+    }
+
+    if (venue?.tenant) {
+      pipeline.push({
+        $match: {
+          "venueDetails.tenant": venue?.tenant,
         },
       });
     }
