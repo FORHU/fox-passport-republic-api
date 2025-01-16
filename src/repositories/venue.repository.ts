@@ -65,7 +65,9 @@ export default class VenueRepo {
 
   static async getPaginatedVenues(query: any, skip: number, limit: number) {
     const pipeline = [];
-
+    pipeline.push({
+      $match: query,
+    });
     pipeline.push(
       {
         $lookup: {
@@ -200,45 +202,40 @@ export default class VenueRepo {
       },
     );
 
-    pipeline.push(
-      {
-        $match: query,
-      },
-      {
-        $project: {
-          _id: 1,
-          name: 1,
-          representation: 1,
-          description: 1,
-          address: 1,
-          form_steps: 1,
-          keywords: 1,
-          cancellation_policy: {
-            $cond: {
-              if: { $gt: [{ $size: "$cancellation_policy" }, 0] },
-              then: { $arrayElemAt: ["$cancellation_policy", 0] },
-              else: null,
-            },
+    pipeline.push({
+      $project: {
+        _id: 1,
+        name: 1,
+        representation: 1,
+        description: 1,
+        address: 1,
+        form_steps: 1,
+        keywords: 1,
+        cancellation_policy: {
+          $cond: {
+            if: { $gt: [{ $size: "$cancellation_policy" }, 0] },
+            then: { $arrayElemAt: ["$cancellation_policy", 0] },
+            else: null,
           },
-          venue_photos: 1,
-          space_photos: 1,
-          user: { $arrayElemAt: ["$user", 0] },
-          foods_and_beverages: 1,
-          venue_details: 1,
-          organization: 1,
-          age_restriction: 1,
-          commission: 1,
-          rebate: 1,
-          createdAt: 1,
-          updatedAt: 1,
-          deletedAt: 1,
-          deletedBy: 1,
-          status: 1,
-          payment_method: 1,
-          spaces: 1,
         },
+        venue_photos: 1,
+        space_photos: 1,
+        user: { $arrayElemAt: ["$user", 0] },
+        foods_and_beverages: 1,
+        venue_details: 1,
+        organization: 1,
+        age_restriction: 1,
+        commission: 1,
+        rebate: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        deletedAt: 1,
+        deletedBy: 1,
+        status: 1,
+        payment_method: 1,
+        spaces: 1,
       },
-    );
+    });
 
     pipeline.push({
       $addFields: {
