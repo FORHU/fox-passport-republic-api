@@ -25,7 +25,8 @@ function enquiryStatus(status: any): boolean {
 }
 
 export const constructEnquiryQuery = (params: any) => {
-  const { space_id, venue_id, venues, enquiry_id, status, toggle_censor, toggle_current, search_name, event_type, guests, event_date } = params;
+  const { space_id, venue_id, venues, enquiry_id, status, toggle_censor, toggle_current, search_name, event_type, guests, event_date, tenant_code } =
+    params;
 
   const query: any = {};
 
@@ -98,6 +99,10 @@ export const constructEnquiryQuery = (params: any) => {
     if (!statusStrings.includes("ALL")) {
       query.status = { $in: statusArray };
     }
+  }
+
+  if (tenant_code) {
+    query["venue.tenant"] = tenant_code;
   }
 
   query["deletedAt"] = { $eq: null };
