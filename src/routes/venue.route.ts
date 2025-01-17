@@ -8,21 +8,21 @@ import tenantMiddleware from "../middleware/tenant.middleware";
 import tenantValidationMiddleware from "../middleware/tenant-validation.middleware";
 import sessionMiddleware from "../middleware/valid-session.middleware";
 
+const defaultMiddleware = [sessionMiddleware, authenticateToken];
 const teamOrganizationMiddleware = [teamRolesOrganizationMiddleware, teamRolesOrganizationPermissionMiddleware];
 const groupTenantMiddleware = [tenantMiddleware, tenantValidationMiddleware];
 
 const router = express.Router();
 
-router.get("/", [sessionMiddleware, authenticateToken, teamRolesOrganizationMiddleware, ...groupTenantMiddleware], VenueCtrl.getVenues);
-router.get("/venue-list", [sessionMiddleware, authenticateToken, teamRolesOrganizationMiddleware], VenueCtrl.getVenueNameIdAndStatus);
-router.get("/venue-details", [sessionMiddleware, authenticateToken], VenueCtrl.getVenueDetails);
-router.get("/count", [sessionMiddleware, authenticateToken], VenueCtrl.countVenue);
-router.post("/", [sessionMiddleware, authenticateToken, ...teamOrganizationMiddleware, ...groupTenantMiddleware], VenueCtrl.createVenue);
-router.patch("/:venue_id", [sessionMiddleware, authenticateToken, ...teamOrganizationMiddleware], VenueCtrl.updateVenue);
-router.delete("/", [sessionMiddleware, authenticateToken, ...teamOrganizationMiddleware], VenueCtrl.deleteMultipleVenues);
-router.delete("/:id", [sessionMiddleware, authenticateToken, ...teamOrganizationMiddleware], VenueCtrl.deleteVenue);
+router.get("/", [...defaultMiddleware, teamRolesOrganizationMiddleware, tenantMiddleware], VenueCtrl.getVenues);
+router.get("/venue-list", [...defaultMiddleware, teamRolesOrganizationMiddleware, tenantMiddleware], VenueCtrl.getVenueNameIdAndStatus);
+router.get("/venue-details", [...defaultMiddleware, tenantMiddleware], VenueCtrl.getVenueDetails);
+router.get("/count", [...defaultMiddleware, tenantMiddleware], VenueCtrl.countVenue);
+router.post("/", [...defaultMiddleware, ...teamOrganizationMiddleware, ...groupTenantMiddleware], VenueCtrl.createVenue);
+router.patch("/:venue_id", [...defaultMiddleware, ...teamOrganizationMiddleware], VenueCtrl.updateVenue);
+router.delete("/", [...defaultMiddleware, ...teamOrganizationMiddleware], VenueCtrl.deleteMultipleVenues);
+router.delete("/:id", [...defaultMiddleware, ...teamOrganizationMiddleware], VenueCtrl.deleteVenue);
 
-// router.post("/transfer-ownership/accept/:token", [sessionMiddleware, authenticateToken], VenueCtrl.transferOwnershipAccept);
 router.post("/transfer-ownership/accept/:token", VenueCtrl.transferOwnershipAccept);
 router.post("/transfer-ownership/accept/existing/:token", VenueCtrl.transferOwnershipAcceptExisting);
 
