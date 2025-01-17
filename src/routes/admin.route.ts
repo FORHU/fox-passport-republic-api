@@ -56,7 +56,7 @@ router.post("/venue/transfer-ownership/invite/:venueId", [...ADMIN_MIDDLEWARE], 
 router.post("/venue/transfer-ownership/invite/resend/:venueId", [...ADMIN_MIDDLEWARE], AdminCtrl.transferOwnershipResend);
 
 //ADMIN SALES
-router.get("/sales", [...ADMIN_MIDDLEWARE], AdminMemberCtrl.getSalesTransaction);
+router.get("/sales", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminMemberCtrl.getSalesTransaction);
 
 //upload exel files
 

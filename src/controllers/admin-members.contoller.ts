@@ -228,8 +228,12 @@ export default class AdminMemberCtrl {
       const skip = (page - 1) * limit;
 
       if (ADMIN_ROLES[req["admin_role"]] === "SALES") {
-        query = { user: new ObjectId(req.user._id) };
+        query = { user: new ObjectId(req.user._id as string) };
         query.status = "transferred_ownership";
+      }
+
+      if (req.tenant) {
+        query["venue.tenant"] = req.tenant?.code;
       }
 
       const totalCount = await SaleTransactionSvc.countSalesTransaction(query);

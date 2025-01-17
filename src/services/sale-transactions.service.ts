@@ -1,4 +1,4 @@
-import { ObjectId } from "mongodb";
+import { Filter,ObjectId } from "mongodb";
 
 import { TSaleTransactions, TUpdateSaleTransactions } from "../models/sale-transactions.model";
 import SaleTransRepo from "../repositories/sale-transactions.repository";
@@ -21,7 +21,7 @@ export default class SaleTransactionSvc {
     for (const venueId of venuesToDelete) {
       await SaleTransRepo.deleteAssignedVenue({
         user: salesId,
-        venue: new ObjectId(venueId),
+        venue: new ObjectId(venueId as string),
         status: "pending",
       });
     }
@@ -37,7 +37,7 @@ export default class SaleTransactionSvc {
     return SaleTransRepo.countSalesTransaction(query);
   }
 
-  static async getSalesTransactions(query: TSaleTransactions, skip: number, limit: number) {
+  static async getSalesTransactions(query: Filter<TSaleTransactions>, skip: number, limit: number) {
     return SaleTransRepo.getSalesTransactions(query, skip, limit);
   }
 }
