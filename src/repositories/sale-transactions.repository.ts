@@ -1,4 +1,4 @@
-import { AnyBulkWriteOperation } from "mongodb";
+import { AnyBulkWriteOperation, Filter } from "mongodb";
 
 import { MSaleTransactions, TSaleTransactions, TUpdateSaleTransactions } from "../models/sale-transactions.model";
 import { getDB } from "../utils/mongo";
@@ -12,10 +12,18 @@ export default class SaleTransactionRepo {
     return this.collection().insertOne(new MSaleTransactions(data));
   }
 
-  static async getSalesTransactions(data: TSaleTransactions, skip: number, limit: number) {
+  static async getSalesTransactions(data: Filter<TSaleTransactions>, skip: number, limit: number) {
     const pipeline = [
       {
-        $match: data,
+        $lookup: {
+          from: "venues",
+          localField: "venue",
+          foreignField: "_id",
+          as: "venue",
+        },
+      },
+      {
+        $unwind: "$venue",
       },
       {
         $lookup: {
@@ -26,10 +34,10 @@ export default class SaleTransactionRepo {
         },
       },
       {
-        $unwind: {
-          path: "$userDetails",
-          preserveNullAndEmptyArrays: true,
-        },
+        $unwind: "$userDetails",
+      },
+      {
+        $match: data,
       },
       {
         $project: {
@@ -41,44 +49,15 @@ export default class SaleTransactionRepo {
             email: "$userDetails.email",
             phone_number: "$userDetails.phone_number",
           },
-          venue: "$venue",
-          remarks: 1,
-          createdAt: 1,
-          status: 1,
-          updatedAt: 1,
-        },
-      },
-      {
-        $lookup: {
-          from: "venues",
-          localField: "venue",
-          foreignField: "_id",
-          as: "venueDetails",
-        },
-      },
-      {
-        $unwind: {
-          path: "$venueDetails",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-      {
-        $project: {
-          _id: 1,
-          user: 1,
-          venue: { _id: "$venueDetails._id", name: "$venueDetails.name" },
+          venue: { _id: "$venue._id", name: "$venue.name", tenant: { $ifNull: ["$venue.tenant", null] } },
           createdAt: 1,
           status: 1,
           remarks: 1,
           updatedAt: 1,
         },
       },
-      {
-        $skip: skip,
-      },
-      {
-        $limit: limit,
-      },
+      { $skip: skip },
+      { $limit: limit },
     ];
 
     const result = await this.collection().aggregate(pipeline).toArray();
@@ -86,7 +65,29 @@ export default class SaleTransactionRepo {
   }
 
   static async countSalesTransaction(query: TSaleTransactions) {
-    return this.collection().countDocuments(query);
+    const result = await this.collection()
+      .aggregate([
+        {
+          $lookup: {
+            from: "venues",
+            localField: "venue",
+            foreignField: "_id",
+            as: "venue",
+          },
+        },
+        {
+          $unwind: "$venue",
+        },
+        {
+          $match: query,
+        },
+        {
+          $count: "totalCount",
+        },
+      ])
+      .toArray();
+
+    return result.length > 0 ? result[0].totalCount : 0;
   }
 
   static async getUnpaginatedSalesTransactions(query: TSaleTransactions) {
