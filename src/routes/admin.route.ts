@@ -27,7 +27,7 @@ router.patch("/venue/:venue_id", [...ADMIN_MIDDLEWARE], AdminCtrl.updateVenue);
 router.delete("/venue/:venue_id", [...ADMIN_MIDDLEWARE], AdminCtrl.deleteVenue);
 
 //enquiries routes
-router.get("/enquiries", [...ADMIN_MIDDLEWARE], AdminCtrl.getEnquries);
+router.get("/enquiries", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminCtrl.getEnquries);
 
 //admin patch organization member
 router.patch("/organization-member", [...ADMIN_MIDDLEWARE], AdminCtrl.updateOrganizationMember);

@@ -282,9 +282,10 @@ export default class AdminCtrl {
       }
 
       const userData = await UserSvc.getUser({ _id: new ObjectId(req?.user?._id) });
-
       req.query["venues"] = req["venues"];
-
+      if (req.tenant) {
+        req.query["tenant_code"] = req.tenant.code;
+      }
       const params = req.query;
       const query = constructEnquiryQuery(params);
 
