@@ -80,6 +80,7 @@ export default class AuthCtrl {
             organization: organizationId,
             commission,
             rebate,
+            ...(tenant && { tenant }),
           }),
           await OrganizationSvc.createOrganization({
             _id: organizationId,
