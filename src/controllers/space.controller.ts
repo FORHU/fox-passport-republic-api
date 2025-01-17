@@ -191,6 +191,9 @@ export default class SpaceCtrl {
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
+      if (req?.tenant) {
+        req.query.tenant_code = req?.tenant?.code;
+      }
       const params = req.query;
       const user = req.user;
       const space = await SpaceSvc.getSpaceNameIdAndStatus({ params, user });

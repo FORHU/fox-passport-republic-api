@@ -18,7 +18,7 @@ router.get("/count/:id", [sessionMiddleware, authenticateToken, tenantMiddleware
 router.get("/most-popular", [optionalAuthMiddleware, userLogsMiddleware, tenantMiddleware], SpaceCtrl.getMostPopularSpaces);
 router.get("/recently-listed", [optionalAuthMiddleware, userLogsMiddleware, tenantMiddleware], SpaceCtrl.getRecentlyListedSpaces);
 router.get("/subscribed", [optionalAuthMiddleware, userLogsMiddleware], SpaceCtrl.getSpaceList);
-router.get("/space-list", [optionalAuthMiddleware, userLogsMiddleware], SpaceCtrl.getSpaceNameIdAndStatus);
+router.get("/space-list", [optionalAuthMiddleware, userLogsMiddleware, tenantMiddleware], SpaceCtrl.getSpaceNameIdAndStatus);
 router.post("/", [sessionMiddleware, authenticateToken, userLogsMiddleware, ...teamOrganizationMiddleware], SpaceCtrl.createSpaces);
 router.post("/coordinates", SpaceCtrl.getCoordinates);
 router.patch("/:id", [sessionMiddleware, authenticateToken, userLogsMiddleware, ...teamOrganizationMiddleware], SpaceCtrl.updateSpaces);

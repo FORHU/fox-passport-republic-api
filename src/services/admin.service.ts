@@ -258,9 +258,9 @@ export default class AdminSvc {
     }
   }
 
-  static async getAllSpaces(_id: ObjectId, pageNumber: number, limitNumber: number) {
+  static async getAllSpaces(query: any, pageNumber: number, limitNumber: number) {
     try {
-      return AdminRepo.getAllSpaces(_id, pageNumber, limitNumber);
+      return AdminRepo.getAllSpaces(query, pageNumber, limitNumber);
     } catch (error) {
       throw error;
     }

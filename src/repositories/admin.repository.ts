@@ -309,16 +309,47 @@ export default class AdminRepo {
   static async getAllSpaces(query: any, pageNumber: number, limitNumber: number) {
     try {
       const skip = (pageNumber - 1) * limitNumber;
-      const data = await this.spacesCollection().find(query).skip(skip).limit(limitNumber).toArray();
-      const total_documents = await this.spacesCollection().countDocuments(query);
+      const data = await this.spacesCollection()
+        .aggregate([
+          {
+            $lookup: {
+              from: "venues",
+              localField: "venue",
+              foreignField: "_id",
+              as: "venue",
+            },
+          },
+          { $unwind: "$venue" },
+          { $match: query },
+          { $skip: skip },
+          { $limit: limitNumber },
+        ])
+        .toArray();
+
+      const total_documents = await this.spacesCollection()
+        .aggregate([
+          {
+            $lookup: {
+              from: "venues",
+              localField: "venue",
+              foreignField: "_id",
+              as: "venue",
+            },
+          },
+          { $unwind: "$venue" },
+          { $match: query },
+          { $count: "total" },
+        ])
+        .toArray();
+
       const limit = limitNumber;
 
       return {
         data,
         limit,
-        total_documents,
+        total_documents: total_documents[0].total || 0,
         current_page: pageNumber,
-        total_pages: Math.ceil(total_documents / limitNumber),
+        total_pages: Math.ceil(total_documents[0].total / limitNumber),
       };
     } catch (error) {
       throw error;
@@ -328,7 +359,28 @@ export default class AdminRepo {
   static async countAdminSpace(query = {}) {
     try {
       const countByStatusArray = await this.spacesCollection()
-        .aggregate([{ $match: query }, { $group: { _id: "$status", count: { $sum: 1 } } }])
+        .aggregate([
+          {
+            $lookup: {
+              from: "venues",
+              localField: "venue",
+              foreignField: "_id",
+              as: "venue",
+            },
+          },
+          {
+            $unwind: "$venue",
+          },
+          {
+            $match: query,
+          },
+          {
+            $group: {
+              _id: "$status",
+              count: { $sum: 1 },
+            },
+          },
+        ])
         .toArray();
 
       const totalCount = countByStatusArray.reduce((total, statusCount) => total + statusCount.count, 0);

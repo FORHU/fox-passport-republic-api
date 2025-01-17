@@ -15,14 +15,14 @@ const TENANT_MIDDLEWARE = [tenantMiddleware, tenantValidationMiddleware];
 const router = express.Router();
 
 // spaces routes
-router.get("/space", [...ADMIN_MIDDLEWARE], AdminCtrl.getAllSpaces);
-router.get("/space/count", [...ADMIN_MIDDLEWARE], AdminCtrl.countAdminSpace);
+router.get("/space", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminCtrl.getAllSpaces);
+router.get("/space/count", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminCtrl.countAdminSpace);
 router.patch("/space/:space_id", [...ADMIN_MIDDLEWARE], AdminCtrl.updateSpace);
 router.delete("/space/:space_id", [...ADMIN_MIDDLEWARE], AdminCtrl.deleteSpace);
 
 // venue routes
 router.get("/venue", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminCtrl.getAllVenues);
-router.get("/venue/count", [...ADMIN_MIDDLEWARE], AdminCtrl.countAdminVenue);
+router.get("/venue/count", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminCtrl.countAdminVenue);
 router.patch("/venue/:venue_id", [...ADMIN_MIDDLEWARE], AdminCtrl.updateVenue);
 router.delete("/venue/:venue_id", [...ADMIN_MIDDLEWARE], AdminCtrl.deleteVenue);
 
