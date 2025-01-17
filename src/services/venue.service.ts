@@ -380,7 +380,7 @@ export default class VenueSvc {
   }
 
   static async processCountAdminVenues(params: any, user: any) {
-    const { excluded_status } = params;
+    const { excluded_status, tenant_code } = params;
     const query: any = {};
 
     if ([USER_ROLES.VENUE_LISTER, USER_ROLES.VENUE_OWNER].includes(user.role)) {
@@ -393,6 +393,10 @@ export default class VenueSvc {
       if (excludedStatuses.length > 0) {
         query.status = { $nin: excludedStatuses };
       }
+    }
+
+    if (tenant_code) {
+      query["tenant"] = tenant_code;
     }
 
     query["deletedAt"] = { $eq: null };

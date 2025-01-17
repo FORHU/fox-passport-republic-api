@@ -56,6 +56,11 @@ export default class VenueCtrl {
       if (!user) {
         return handleErrorResponse(res, {}, { code: "INVALID_USER" });
       }
+
+      if (req?.tenant) {
+        req.query["tenant_code"] = req.tenant.code;
+      }
+
       const params = req.query;
       const result = await VenueSvc.processCountAdminVenues(params, user);
 
@@ -257,6 +262,10 @@ export default class VenueCtrl {
         query.organization = venues.organization;
       }
 
+      if (req?.tenant) {
+        query.tenant = req?.tenant?.code;
+      }
+
       const result = await VenueSvc.getVenueNameIdAndStatus(query);
       return handleResponse(res, result, "VENUES SUCCESSFULLY FETCHED");
     } catch (error) {
@@ -266,7 +275,7 @@ export default class VenueCtrl {
 
   static async getVenueDetails(req: Request, res: Response) {
     try {
-      const userId = new ObjectId(req.user._id);
+      const userId = new ObjectId(req.user._id as string);
       const { status } = req.query as any;
       const query: any = {};
 
@@ -279,6 +288,10 @@ export default class VenueCtrl {
 
       if ([user_role.VENUE_LISTER, user_role.VENUE_OWNER].includes(user?.role)) {
         query.organization = user?.organization;
+      }
+
+      if (req?.tenant) {
+        query.tenant = req?.tenant?.code;
       }
 
       query.deletedAt = null;
