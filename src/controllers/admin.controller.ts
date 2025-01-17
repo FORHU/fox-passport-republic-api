@@ -135,7 +135,11 @@ export default class AdminCtrl {
 
       if (req["venues"] !== "ALL") {
         const venueIds = req["venues"].map((venue: string) => new ObjectId(venue));
-        query.venue = { $in: venueIds };
+        query["venue._id"] = { $in: venueIds };
+      }
+
+      if (req?.tenant) {
+        query["venue.tenant"] = req?.tenant?.code;
       }
 
       const pageNumber = parseInt(page as string);
@@ -154,7 +158,11 @@ export default class AdminCtrl {
 
       if (req["venues"] !== "ALL") {
         const venueIds = req["venues"].map((venue: string) => new ObjectId(venue));
-        query.venue = { $in: venueIds };
+        query["venue._id"] = { $in: venueIds };
+      }
+
+      if (req.tenant) {
+        query["venue.tenant"] = req.tenant.code;
       }
 
       const result = await AdminSvc.countAdminSpace(query);
@@ -180,6 +188,10 @@ export default class AdminCtrl {
       if (req["venues"] !== "ALL") {
         const venueIds = req["venues"].map((venue: string) => new ObjectId(venue));
         query._id = { $in: venueIds };
+      }
+
+      if (req.tenant) {
+        query["tenant"] = req.tenant.code;
       }
 
       const result = await AdminSvc.countAdminVenue(query);

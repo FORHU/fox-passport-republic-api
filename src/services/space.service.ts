@@ -720,7 +720,7 @@ export default class SpaceSvc {
 
   static async getSpaceNameIdAndStatus(payload: RequestWithParamsAndUser) {
     const { params, user } = payload;
-    const { venue_id, status } = params;
+    const { venue_id, status, tenant_code } = params;
     const userRole = user.role;
     const query: any = {};
     let statusArray: any;
@@ -729,6 +729,10 @@ export default class SpaceSvc {
 
     if (venue_id) {
       query.venue = new ObjectId(venue_id);
+    }
+
+    if (tenant_code) {
+      query["venue.tenant"] = tenant_code;
     }
 
     if (statusArray) {

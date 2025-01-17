@@ -939,6 +939,20 @@ export default class SpaceRepository {
       .aggregate([
         {
           $lookup: {
+            from: "venues",
+            localField: "venue",
+            foreignField: "_id",
+            as: "venue",
+          },
+        },
+        {
+          $unwind: {
+            path: "$venue",
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $lookup: {
             from: "users",
             localField: "user",
             foreignField: "_id",
