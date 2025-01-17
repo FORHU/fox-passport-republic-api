@@ -151,31 +151,6 @@ export default class SpaceCtrl {
     return handleResponse(res, result, "MOST_POPULAR_SPACES");
   }
 
-  static async handleGetMostPopularSpaces(req: Request, res: Response) {
-    const { limit = 12, page = 1, location = "SG", status = "PUBLISHED" } = req.query;
-    const user_id = req?.user?._id;
-    const { error } = validateGetSpacesSchema({
-      limit,
-      page,
-      status,
-    });
-
-    if (error) return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
-
-    const payload = {
-      limit: parseInt(limit as string),
-      page: parseInt(page as string),
-      country: location as string,
-      status: status as string,
-      ...(user_id && { user_id }),
-      ...(req.tenant && { tenant_code: req.tenant.code }),
-    };
-
-    const results = await SpaceSvc.handleGetMostPopularSpaces(payload);
-
-    return handleResponse(res, results, "MOST_POPULAR_SPACES");
-  }
-
   static async getRecentlyListedSpaces(req: Request, res: Response) {
     const { status } = req.query as any;
 
@@ -187,7 +162,7 @@ export default class SpaceCtrl {
     if (error) return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
 
     if (req?.tenant) {
-      req.query.tenant_code = req?.tenant?.code
+      req.query.tenant_code = req?.tenant?.code;
     }
 
     const params = req.query;

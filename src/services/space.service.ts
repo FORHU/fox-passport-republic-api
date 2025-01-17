@@ -115,7 +115,7 @@ export default class SpaceSvc {
         ...(endDateTime ? { endDate: endDateTime } : {}),
       };
 
-      const list = null;
+      let list = null;
       const hashSpacePayload = hashSearch({ spacesPayload, description: "getPaginatedSpacesWithPricing" });
       const cacheSpacePayload = await RedisUtil.getCache(hashSpacePayload, PREFIX);
 
