@@ -455,3 +455,25 @@ export const constructQuery = (params: any, startTime?: any, endTime?: any, filt
 
   return query;
 };
+
+export const constructQueryV2 = (params) => {
+  const { status } = params;
+  let query: any = {};
+  if (status) {
+    let statusArray: string[];
+
+    if (Array.isArray(status)) {
+      statusArray = status;
+    } else if (typeof status === "string") {
+      statusArray = status.split(",").map((s: string) => s.trim());
+    } else {
+      statusArray = [];
+    }
+
+    if (!statusArray.includes("ALL")) {
+      query.status = { $in: statusArray };
+    }
+  }
+
+  return query;
+};
