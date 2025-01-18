@@ -457,8 +457,40 @@ export const constructQuery = (params: any, startTime?: any, endTime?: any, filt
 };
 
 export const constructQueryV2 = (params) => {
-  const { status } = params;
+  const { status, keywords, location, tenant_code, total_guest, capacity_layout, foods_and_beverages, menu_offer, facilities, allow_events } = params;
+
   let query: any = {};
+
+  const addOrCondition = (key: string, values: string) => {
+    const valueArray = values.split(",").map((value) => value.trim());
+
+    query["$and"] = query["$and"] || [];
+    query["$and"].push({
+      [key]: {
+        $all: valueArray.map((question) => ({
+          $elemMatch: {
+            question: question,
+            answer: true,
+          },
+        })),
+      },
+    });
+  };
+
+  const addMenuOfferCondition = (query: any, key: string, values: string) => {
+    const valueArray = values.split(",").map((value) => value.trim());
+
+    query["$and"] = query["$and"] || [];
+    query["$and"].push({
+      [key]: {
+        $elemMatch: {
+          question: "The venue offers in-house catering services",
+          $and: [{ options: { $all: valueArray } }, { answer: true }],
+        },
+      },
+    });
+  };
+
   if (status) {
     let statusArray: string[];
 
@@ -474,6 +506,43 @@ export const constructQueryV2 = (params) => {
       query.status = { $in: statusArray };
     }
   }
+
+  if (keywords) {
+    query["keywords.keyword"] = { $in: createRegexPatterns(keywords) };
+  }
+
+  if (tenant_code) {
+    query["venue.tenant"] = tenant_code;
+  } else if (location) {
+    const locationArray = location.split(",").map((loc: any) => loc.trim());
+    query["venue.address.country"] = { $in: locationArray };
+  }
+
+  if (total_guest && !capacity_layout) {
+    query["guest_capacity.maximum"] = { $gte: parseInt(total_guest) };
+  }
+
+  if (capacity_layout && total_guest) {
+    query["capacity_layout"] = {
+      $elemMatch: {
+        question: capacity_layout,
+        answer: true,
+        max_capacity: { $gte: Number(total_guest) || 0 },
+      },
+    };
+  }
+
+  if (foods_and_beverages) {
+    addOrCondition("venue.foods_and_beverages", foods_and_beverages);
+  }
+
+  if (menu_offer) {
+    addMenuOfferCondition(query, "venue.foods_and_beverages", menu_offer);
+  }
+
+  if (facilities) addOrCondition("features", facilities);
+
+  if (allow_events) addOrCondition("features", allow_events);
 
   return query;
 };

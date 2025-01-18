@@ -1,13 +1,18 @@
 import { getDB } from "../../utils/mongo";
+import { createPaginationStages, createMatchStages } from "../../utils/pipelines/common.pipelines";
 import {
+  CAPACITY_LAYOUT_LOOKUP,
+  FEATURES_LOOKUP,
+  FLOOR_PLAN_LOOKUP,
+  GET_SPACES_PROJECT,
+  KEYWORDS_LOOKUP,
+  SPACE_PHOTO_LOOKUP,
   USER_LOOKUP,
   USER_UNWIND,
   VENUE_LOOKUP,
+  VENUE_PHOTO_LOOKUP,
   VENUE_UNWIND,
-  SPACE_PHOTO_LOOKUP,
-  GET_SPACES_PROJECT,
-  createPaginationStages,
-} from "../../utils/db-constant/space.constant";
+} from "../../utils/pipelines/space.pipelines";
 
 export default class SpaceRepository {
   static collection() {
@@ -17,15 +22,18 @@ export default class SpaceRepository {
   static getSpaces(query: any, limit: number, skip: number) {
     return this.collection()
       .aggregate([
-        {
-          $match: query,
-        },
         USER_LOOKUP,
         USER_UNWIND,
         VENUE_LOOKUP,
         VENUE_UNWIND,
+        KEYWORDS_LOOKUP,
         SPACE_PHOTO_LOOKUP,
+        VENUE_PHOTO_LOOKUP,
+        CAPACITY_LAYOUT_LOOKUP,
         GET_SPACES_PROJECT,
+        FEATURES_LOOKUP,
+        FLOOR_PLAN_LOOKUP,
+        ...createMatchStages(query),
         ...createPaginationStages(skip, limit),
       ])
       .toArray();
