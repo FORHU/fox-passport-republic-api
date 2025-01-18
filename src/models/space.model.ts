@@ -15,6 +15,7 @@ export enum unit_area {
 }
 
 export enum space_status {
+  ALL = "ALL",
   DELETED = "DELETED",
   DRAFT = "DRAFT",
   FOR_APPROVAL = "FOR_APPROVAL",

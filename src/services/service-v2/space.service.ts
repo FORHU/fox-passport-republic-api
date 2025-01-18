@@ -1,16 +1,21 @@
 import { ObjectId } from "mongodb";
 
 import UserLogsV2Repo from "../../repositories/repository-v2/user-logs.repository";
+import SpaceV2Repo from "../../repositories/repository-v2/space.repository";
 import { TMostPopular } from "../../types/space";
 import { getOneSummarizedPricing, hashSearch } from "../../utils/helpers";
 import RedisUtil from "../../utils/redis.util";
+import { constructQueryV2 } from "../../utils/space/helpers";
 
 // const PREFIX = "spaces";
 const PREFIX_USER_LOGS = "user_logs";
 
 export default class SpaceSvc {
   static async handleGetSpaces(params: any) {
-    return params;
+    const { page = 1, limit = 10 } = params;
+    const skip = (page - 1) * limit;
+    const query = constructQueryV2(params);
+    return SpaceV2Repo.getSpaces(query, limit, skip);
   }
 
   static async handleGetMostPopularSpaces(params: TMostPopular) {
