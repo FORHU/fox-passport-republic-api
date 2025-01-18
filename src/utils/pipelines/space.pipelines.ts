@@ -33,25 +33,60 @@ export const SPACE_PHOTO_LOOKUP = {
   },
 };
 
-export const createPaginationStages = (skip: number, limit: number) => [
-  {
-    $skip: skip,
+export const VENUE_PHOTO_LOOKUP = {
+  $lookup: {
+    from: "files",
+    localField: "venue_photo",
+    foreignField: "_id",
+    as: "venue_photo",
   },
-  {
-    $limit: limit,
+};
+
+export const FLOOR_PLAN_LOOKUP = {
+  $lookup: {
+    from: "files",
+    localField: "floor_plan",
+    foreignField: "_id",
+    as: "floor_plan",
   },
-  {
-    $sort: {
-      created_at: -1,
-    },
+};
+
+export const CAPACITY_LAYOUT_LOOKUP = {
+  $lookup: {
+    from: "questions",
+    localField: "capacity_layout",
+    foreignField: "_id",
+    as: "capacity_layout",
   },
-];
+};
+
+export const FEATURES_LOOKUP = {
+  $lookup: {
+    from: "features",
+    localField: "features",
+    foreignField: "_id",
+    as: "features",
+  },
+};
+
+export const KEYWORDS_LOOKUP = {
+  $lookup: {
+    from: "keywords",
+    localField: "keywords",
+    foreignField: "_id",
+    as: "keywords",
+  },
+};
 
 export const GET_SPACES_PROJECT = {
   $project: {
     _id: 1,
     name: 1,
     status: 1,
+    keywords: {
+      _id: 1,
+      keyword: 1,
+    },
     user: {
       _id: 1,
       first_name: 1,
