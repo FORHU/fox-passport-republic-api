@@ -18,6 +18,11 @@ export default class SpaceSvc {
     return SpaceV2Repo.getSpaces(query, limit, skip);
   }
 
+  static async handleGetSpace(spaceId: string) {
+    const space_id = new ObjectId(spaceId);
+    return SpaceV2Repo.getSpace({ _id: space_id });
+  }
+
   static async handleGetMostPopularSpaces(params: TMostPopular) {
     const { page = 1, limit = 20, country, status, user_id, tenant_code } = params;
 
