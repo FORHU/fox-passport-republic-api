@@ -22,6 +22,12 @@ export default class SpaceCtrl {
     return handleResponse(res, results, "GET_SPACES");
   }
 
+  static async getSpace(req: Request, res: Response) {
+    const spaceId = req.params.id;
+    const results = await SpaceSvcV2.handleGetSpace(spaceId);
+    return handleResponse(res, results, "GET_SPACES");
+  }
+
   static async getMostPopularSpaces(req: Request, res: Response) {
     const { limit = 12, page = 1, location = "SG", status = "PUBLISHED" } = req.query;
     const user_id = req?.user?._id;

@@ -1,4 +1,6 @@
 import { getDB } from "../../utils/mongo";
+import { Filter } from "mongodb";
+import { TSpace } from "../../models/space.model";
 import { createPaginationStages, createMatchStages } from "../../utils/pipelines/common.pipelines";
 import {
   CAPACITY_LAYOUT_LOOKUP,
@@ -37,5 +39,9 @@ export default class SpaceRepository {
         ...createPaginationStages(skip, limit),
       ])
       .toArray();
+  }
+
+  static getSpace(query: Filter<TSpace>) {
+    return this.collection().findOne(query);
   }
 }

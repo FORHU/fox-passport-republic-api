@@ -7,6 +7,7 @@ import userLogsMiddleware from "../../middleware/user-logs.middleware";
 const router = express.Router();
 
 router.get("/", [optionalAuthMiddleware, userLogsMiddleware, tenantMiddleware], SpaceCtrlV2.getSpaces);
+router.get("/:id", [optionalAuthMiddleware, userLogsMiddleware, tenantMiddleware], SpaceCtrlV2.getSpace);
 router.get("/most-popular", [optionalAuthMiddleware, userLogsMiddleware, tenantMiddleware], SpaceCtrlV2.getMostPopularSpaces);
 
 export default router;
