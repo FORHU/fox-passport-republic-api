@@ -1,13 +1,12 @@
 import { ObjectId } from "mongodb";
 
-import UserLogsV2Repo from "../../repositories/repository-v2/user-logs.repository";
 import SpaceV2Repo from "../../repositories/repository-v2/space.repository";
+import UserLogsV2Repo from "../../repositories/repository-v2/user-logs.repository";
 import { TMostPopular } from "../../types/space";
+import { getCacheOrFetch } from "../../utils/cache.util";
 import { getOneSummarizedPricing, hashSearch } from "../../utils/helpers";
-import RedisUtil from "../../utils/redis.util";
 import { constructQueryV2 } from "../../utils/space/helpers";
 
-// const PREFIX = "spaces";
 const PREFIX_USER_LOGS = "user_logs";
 
 export default class SpaceSvc {
@@ -41,28 +40,13 @@ export default class SpaceSvc {
     const limitNumber = Number(limit);
     const skip = (pageNumber - 1) * limitNumber;
 
-    // checker of redis of count of spaces
-    let list_count = null;
-    const hashCountSpace = hashSearch(query);
-    const cacheCountSpace = await RedisUtil.getCache(hashCountSpace, PREFIX_USER_LOGS);
-    if (!cacheCountSpace) {
-      list_count = await UserLogsV2Repo.countGetMostPopularSpaces({ query });
-      await RedisUtil.saveCache({ key: hashCountSpace, data: JSON.stringify(list_count), prefix: PREFIX_USER_LOGS });
-    } else {
-      list_count = JSON.parse(cacheCountSpace);
-    }
+    const list_count = await getCacheOrFetch(hashSearch({ query, description: "countGetMostPopularSpaces" }), PREFIX_USER_LOGS, () =>
+      UserLogsV2Repo.countGetMostPopularSpaces({ query }),
+    );
 
-    // checker of redis of lists of spaces
-    let lists = null;
-    const hashSpaceList = hashSearch({ query, pageNumber, limitNumber });
-    const cacheSpaceList = await RedisUtil.getCache(hashSpaceList, PREFIX_USER_LOGS);
-
-    if (!cacheSpaceList) {
-      lists = await UserLogsV2Repo.handleGetMostPopularSpaces(query, skip, limitNumber);
-      await RedisUtil.saveCache({ key: hashSpaceList, data: JSON.stringify(lists), prefix: PREFIX_USER_LOGS });
-    } else {
-      lists = JSON.parse(cacheSpaceList);
-    }
+    const lists = await getCacheOrFetch(hashSearch({ query, description: "getMostPopularSpaces" }), PREFIX_USER_LOGS, () =>
+      UserLogsV2Repo.handleGetMostPopularSpaces(query, skip, limitNumber),
+    );
 
     const updatedLists = lists.map((item: any) => {
       return {
