@@ -1,3 +1,5 @@
+import { TSpaceProjectPload } from "../../types/space";
+
 export const USER_LOOKUP = {
   $lookup: {
     from: "users",
@@ -78,6 +80,15 @@ export const KEYWORDS_LOOKUP = {
   },
 };
 
+export const GET_SPACES_RATING = {
+  $lookup: {
+    from: "ratings",
+    localField: "_id",
+    foreignField: "space",
+    as: "ratings",
+  },
+};
+
 export const GET_SPACES_PROJECT = {
   $project: {
     _id: 1,
@@ -107,3 +118,33 @@ export const GET_SPACES_PROJECT = {
     },
   },
 };
+
+export const createSpacesProject = ({
+  _id,
+  status,
+  space_details_name,
+  space_details_description,
+  space_photo,
+  venue,
+  pricing,
+  capacity_layout,
+  marked_as_favorite,
+  rating,
+  total_views,
+}: TSpaceProjectPload) => [
+  {
+    $project: {
+      ...(_id && { _id }),
+      ...(status && { status }),
+      ...(space_details_name && { name: space_details_name }),
+      ...(space_details_description && { description: space_details_description }),
+      ...(space_photo && { space_photo }),
+      ...(venue && { venue }),
+      ...(pricing && { pricing }),
+      ...(capacity_layout && { capacity_layout }),
+      ...(marked_as_favorite && { marked_as_favorite }),
+      ...(rating && { rating }),
+      ...(total_views && { total_views }),
+    },
+  },
+];

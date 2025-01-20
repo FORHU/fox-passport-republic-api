@@ -56,6 +56,7 @@ export default class SpaceSvc {
     let lists = null;
     const hashSpaceList = hashSearch({ query, pageNumber, limitNumber });
     const cacheSpaceList = await RedisUtil.getCache(hashSpaceList, PREFIX_USER_LOGS);
+
     if (!cacheSpaceList) {
       lists = await UserLogsV2Repo.handleGetMostPopularSpaces(query, skip, limitNumber);
       await RedisUtil.saveCache({ key: hashSpaceList, data: JSON.stringify(lists), prefix: PREFIX_USER_LOGS });
