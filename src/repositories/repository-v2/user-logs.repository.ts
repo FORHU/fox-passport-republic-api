@@ -2,6 +2,7 @@ import { Filter } from "mongodb";
 
 import { TUserLogs } from "../../models/user-logs.model";
 import { getDB } from "../../utils/mongo";
+import { createSpacesProject } from "../../utils/pipelines/space.pipelines";
 
 export default class UserLogsV2Repo {
   static collection() {
@@ -126,52 +127,52 @@ export default class UserLogsV2Repo {
       },
     });
 
-    pipeline.push({
-      $project: {
-        _id: "$_id",
-        name: "$spaceDetails.name",
-        description: "$spaceDetails.description",
-        space_photo: {
-          $map: {
-            input: "$space_photo",
-            as: "photo",
-            in: { _id: "$$photo._id", path: "$$photo.path", contentType: "$$photo.contentType", filename: "$$photo.filename" },
-          },
+    const projectPayload = {
+      _id: 1,
+      space_details_name: "$spaceDetails.name",
+      space_details_description: "$spaceDetails.description",
+      space_photo: {
+        $map: {
+          input: "$space_photo",
+          as: "photo",
+          in: { _id: "$$photo._id", path: "$$photo.path", contentType: "$$photo.contentType", filename: "$$photo.filename" },
         },
-        venue: {
-          _id: "$venueDetails._id",
-          name: "$venueDetails.name",
-          address: "$venueDetails.address",
-        },
-        pricing: 1,
-        capacity_layout: "$capacity_layout",
-        marked_as_favorite: {
-          $cond: {
-            if: { $isArray: "$marked_as_favorite" },
-            then: {
-              _id: { $arrayElemAt: ["$marked_as_favorite._id", 0] },
-              isFavorite: { $cond: { if: { $gt: [{ $size: "$marked_as_favorite" }, 0] }, then: true, else: false } },
-            },
-            else: {
-              _id: null,
-              isFavorite: false,
-            },
-          },
-        },
-        rating: {
-          totalRating: { $sum: "$ratings.rating" },
-          averageRating: {
-            $cond: {
-              if: { $eq: [{ $size: "$ratings" }, 0] },
-              then: 0,
-              else: { $avg: "$ratings.rating" },
-            },
-          },
-          totalReviews: { $size: "$ratings" },
-        },
-        total_views: "$totalViews",
       },
-    });
+      venue: {
+        _id: "$venueDetails._id",
+        name: "$venueDetails.name",
+        address: "$venueDetails.address",
+      },
+      pricing: 1,
+      capacity_layout: "$capacity_layout",
+      marked_as_favorite: {
+        $cond: {
+          if: { $isArray: "$marked_as_favorite" },
+          then: {
+            _id: { $arrayElemAt: ["$marked_as_favorite._id", 0] },
+            isFavorite: { $cond: { if: { $gt: [{ $size: "$marked_as_favorite" }, 0] }, then: true, else: false } },
+          },
+          else: {
+            _id: null,
+            isFavorite: false,
+          },
+        },
+      },
+      rating: {
+        totalRating: { $sum: "$ratings.rating" },
+        averageRating: {
+          $cond: {
+            if: { $eq: [{ $size: "$ratings" }, 0] },
+            then: 0,
+            else: { $avg: "$ratings.rating" },
+          },
+        },
+        totalReviews: { $size: "$ratings" },
+      },
+      total_views: "$totalViews",
+    };
+
+    pipeline.push(...createSpacesProject(projectPayload));
 
     pipeline.push(
       {

@@ -6,3 +6,17 @@ export interface TMostPopular {
   user_id?: string;
   tenant_code?: string;
 }
+
+export interface TSpaceProjectPload {
+  _id?: any;
+  status?: any;
+  space_details_name?: any;
+  space_details_description?: any;
+  space_photo?: any;
+  venue?: any;
+  pricing?: any;
+  capacity_layout?: any;
+  marked_as_favorite?: any;
+  rating?: any;
+  total_views?: any;
+}

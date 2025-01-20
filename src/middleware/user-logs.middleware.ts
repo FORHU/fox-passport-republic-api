@@ -56,7 +56,7 @@ const userLogsMiddleware = async (req: Request, res: Response, next: NextFunctio
     };
 
     const query = {
-      user: new ObjectId(req.user._id),
+      user: new ObjectId(req.user._id as string),
       details,
       action,
     };
