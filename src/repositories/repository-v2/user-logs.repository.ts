@@ -182,7 +182,12 @@ export default class UserLogsV2Repo {
       },
     );
 
-    return this.collection().aggregate(pipeline).toArray();
+    try {
+      return this.collection().aggregate(pipeline).toArray();
+    } catch (error) {
+      console.error(error);
+      return [];
+    }
   }
 
   static async countGetMostPopularSpaces(query: Filter<TUserLogs>) {
