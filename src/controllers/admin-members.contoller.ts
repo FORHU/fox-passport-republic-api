@@ -99,6 +99,10 @@ export default class AdminMemberCtrl {
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
 
+    if (req.tenant) {
+      query["invited_user.tenant"] = req.tenant.code;
+    }
+
     if (status) {
       query.status = status as string;
     }
