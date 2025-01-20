@@ -10,10 +10,13 @@ import AdminMembersRepo from "../repositories/admin-members.repository";
 import AuthRepo from "../repositories/auth.repository";
 import VenueRepo from "../repositories/venue.repository";
 import { generateVerificationToken } from "../utils/auth";
-import { sendTemplatedEmail } from "../utils/helpers";
+import { getCacheOrFetch } from "../utils/cache.util";
+import { hashSearch, sendTemplatedEmail } from "../utils/helpers";
 import CountrySettingSvc from "./country-setting.service";
 import KeywordSvc from "./keyword.service";
 import UserSvc from "./user.service";
+
+const PREFIX = "ADMIN_MEMBERS";
 
 export default class AdminMemberSvc {
   static async updateAdminMember(userDetails: TUser) {
@@ -70,9 +73,14 @@ export default class AdminMemberSvc {
   }
 
   static async getAdminMembers(query: any, skip: number, limit: number) {
-    const total_items = await AdminMembersRepo.countAdminMembers(query);
+    const total_items = await getCacheOrFetch(hashSearch({ query, description: "countGetAdminMembers" }), PREFIX, () =>
+      AdminMembersRepo.countAdminMembers(query),
+    );
     const total_pages = Math.ceil(total_items / limit);
-    const data = await AdminMembersRepo.getAdminMembers(query, skip, limit);
+    const data = await getCacheOrFetch(hashSearch({ query, description: "getAdminMembers", skip, limit }), PREFIX, () =>
+      AdminMembersRepo.getAdminMembers(query, skip, limit),
+    );
+
     return {
       data,
       total_items,
