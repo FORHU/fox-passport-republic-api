@@ -39,17 +39,19 @@ export default class SpaceCtrl {
 
     if (error) return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
 
-    const payload = {
-      limit: parseInt(limit as string),
-      page: parseInt(page as string),
-      country: location as string,
-      status: status as string,
-      ...(user_id && { user_id }),
-      ...(req.tenant && { tenant_code: req.tenant.code }),
-    };
-
-    const results = await SpaceSvcV2.handleGetMostPopularSpaces(payload);
-
-    return handleResponse(res, results, "MOST_POPULAR_SPACES");
+    try {
+      const payload = {
+        limit: parseInt(limit as string),
+        page: parseInt(page as string),
+        country: location as string,
+        status: status as string,
+        ...(user_id && { user_id }),
+        ...(req.tenant && { tenant_code: req.tenant.code }),
+      };
+      const results = await SpaceSvcV2.handleGetMostPopularSpaces(payload);
+      return handleResponse(res, results, "MOST_POPULAR_SPACES");
+    } catch (error) {
+      return handleErrorResponse(res, error, { code: "GET_MOST_POPULAR_SPACES_FAILED" });
+    }
   }
 }
