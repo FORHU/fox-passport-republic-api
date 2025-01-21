@@ -46,7 +46,7 @@ router.delete("/delete-questions", [...ADMIN_MIDDLEWARE], AdminCtrl.deleteUnused
 
 //ADMIN TEAM MEMBER MANAGEMENT
 router.get("/members", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminMemberCtrl.getAdminMembers);
-router.post("/invitation", [...ADMIN_MIDDLEWARE], AdminMemberCtrl.inviteAdminMember);
+router.post("/invitation", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminMemberCtrl.inviteAdminMember);
 router.post("/accept/:token", AdminMemberCtrl.acceptInvitationAdminMember);
 router.patch("/member/:id", [...ADMIN_MIDDLEWARE], AdminMemberCtrl.updateAdminMemberbyId);
 router.delete("/member/:id", [...ADMIN_MIDDLEWARE], AdminMemberCtrl.deleteAdminMemberbyId);

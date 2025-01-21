@@ -1,7 +1,7 @@
 import dayjs from "dayjs";
 import { ObjectId } from "mongodb";
 
-import { VENUE_4_USE_URI } from "../config";
+import { VENUE_4_USE_URI, GOGOJI_URI } from "../config";
 import { AdminMemberRoles, TAdminMembers } from "../models/admin-members.model";
 import { AuthStatus } from "../models/auth.model";
 import { hashPassword, TUser, user_status } from "../models/user.model";
@@ -46,7 +46,7 @@ export default class AdminMemberSvc {
     return result;
   }
 
-  static async inviteAdminMember(data: any, adminMemberData: any) {
+  static async inviteAdminMember(data: any, adminMemberData: any, tenant: any) {
     await AdminMemberSvc.handleCreateAdminMember(adminMemberData);
     const token = generateVerificationToken(data, "3d");
 
@@ -58,11 +58,11 @@ export default class AdminMemberSvc {
           : data.assigned_roles === AdminMemberRoles.SALES
             ? "Sales"
             : "Unknown Role";
-
+    const verificationUrl = tenant ? GOGOJI_URI : VENUE_4_USE_URI;
     sendTemplatedEmail({
       subject: "Venue4Use: Admin Invitation",
       email_data: {
-        verification_link: `${VENUE_4_USE_URI}/${data?.country}/signup/complete-profile/${token}?email=${data?.email}&admin_invite=true`,
+        verification_link: `${verificationUrl}/${data?.country}/signup/complete-profile/${token}?email=${data?.email}&admin_invite=true`,
         assigned_roles: roleString,
         email: data.email,
       },
