@@ -32,15 +32,15 @@ export default class OrganizationMemberCtrl {
 
   static async teamMemberInvitation(req: Request, res: Response) {
     try {
-      const userId = new ObjectId(req?.user?._id);
+      const userId = new ObjectId(req?.user?._id as string);
       const country = req?.query?.country || "SG";
-
+      const tenant = req?.tenant?.code;
       const { error } = validateUpdateTeamMemberSchema(req.body);
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
 
-      const result = await OrganizationMemberSvc.processTeamMemberInvitation(req.body, userId, country);
+      const result = await OrganizationMemberSvc.processTeamMemberInvitation(req.body, userId, country, tenant);
 
       return handleResponse(res, result, "ALL_FIELDS_SATISFIED");
     } catch (error) {

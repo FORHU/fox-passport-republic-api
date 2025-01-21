@@ -2,7 +2,7 @@
 
 import { ObjectId } from "mongodb";
 
-import { VENUE_4_USE_URI } from "../config";
+import { GOGOJI_URI, VENUE_4_USE_URI } from "../config";
 import { StatusType, TOrganizationMember, TUpdateOrganizationMember } from "../models/organization-member.model";
 import { hashPassword, user_role, user_status } from "../models/user.model";
 import OrganizationMemberRepo from "../repositories/organization-member.repository";
@@ -55,7 +55,7 @@ export default class OrganizationMemberSvc {
       throw error;
     }
   }
-  static async processTeamMemberInvitation(payload: any, userId: ObjectId, country: any) {
+  static async processTeamMemberInvitation(payload: any, userId: ObjectId, country: any, tenant?: any) {
     const { email, venues, assigned_roles, all_venues = false } = payload;
 
     let owner_venues: any[] = [];
@@ -91,6 +91,7 @@ export default class OrganizationMemberSvc {
         organization: user_details.organization,
         status: user_status.PENDING,
         country: user_details.country,
+        ...(tenant && { tenant }),
       });
     }
 
@@ -104,12 +105,12 @@ export default class OrganizationMemberSvc {
       all_venues: all_venues,
     };
 
-    const result = await this.teamMemberInvitation(user_details, data);
+    const result = await this.teamMemberInvitation(user_details, data, tenant);
 
     return result;
   }
 
-  static async teamMemberInvitation(userData: any, data: any) {
+  static async teamMemberInvitation(userData: any, data: any, tenant?:any) {
     try {
       const payload = {
         _id: new ObjectId(),
@@ -132,7 +133,9 @@ export default class OrganizationMemberSvc {
         country: data.country.toUpperCase(),
       };
 
-      const verification_link = `${VENUE_4_USE_URI}/${data.country}/signup/complete-profile/${generateVerificationToken(emailTokenPayload, "3d")}?email=${data?.email}`;
+      const verificationUrl = tenant ? GOGOJI_URI : `${VENUE_4_USE_URI}/${data?.country}`;
+      const verification_link = `${verificationUrl}/signup/complete-profile/${generateVerificationToken(emailTokenPayload, "3d")}?email=${data?.email}`;
+
       const venueOwnerName = `${userData?.first_name || "Venue"} ${userData?.last_name || "Owner"}`;
       const invitedName = `${data?.first_name || "Member"} ${data?.last_name || ""}`;
 
