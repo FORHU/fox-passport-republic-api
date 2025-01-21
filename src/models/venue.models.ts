@@ -23,6 +23,7 @@ export enum venue_representation {
 }
 
 export enum venue_status {
+  ALL = "ALL",
   OWNER_DECLINED = "OWNER_DECLINED",
   DELETED = "DELETED",
   DRAFT = "DRAFT",

@@ -7,7 +7,7 @@ export interface TMostPopular {
   tenant_code?: string;
 }
 
-export interface TSpaceProjectPload {
+export interface TSpaceProjectPayload {
   _id?: any;
   status?: any;
   space_details_name?: any;
@@ -19,4 +19,6 @@ export interface TSpaceProjectPload {
   marked_as_favorite?: any;
   rating?: any;
   total_views?: any;
+  keywords?: any;
+  bookings?: any;
 }

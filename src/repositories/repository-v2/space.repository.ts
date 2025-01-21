@@ -4,6 +4,7 @@ import { TSpace } from "../../models/space.model";
 import { getDB } from "../../utils/mongo";
 import { createMatchStages, createPaginationStages } from "../../utils/pipelines/common.pipelines";
 import {
+  BOOKING_LOOKUP,
   CAPACITY_LAYOUT_LOOKUP,
   createSpacesProject,
   FEATURES_LOOKUP,
@@ -24,6 +25,7 @@ export default class SpaceRepository {
   }
 
   static getSpaces(query: any, limit: number, skip: number) {
+    console.log(query)
     const spaceProjectPayload = {
       _id: 1,
       space_details_name: 1,
@@ -63,26 +65,35 @@ export default class SpaceRepository {
         totalReviews: { $size: "$ratings" },
       },
       total_views: "$totalViews",
+      keywords: {
+        _id: 1,
+        keyword: 1,
+        categories: 1,
+      },
+      bookings: 1,
     };
 
-    return this.collection()
-      .aggregate([
-        USER_LOOKUP,
-        USER_UNWIND,
-        VENUE_LOOKUP,
-        VENUE_UNWIND,
-        KEYWORDS_LOOKUP,
-        SPACE_PHOTO_LOOKUP,
-        VENUE_PHOTO_LOOKUP,
-        CAPACITY_LAYOUT_LOOKUP,
-        FEATURES_LOOKUP,
-        FLOOR_PLAN_LOOKUP,
-        GET_SPACES_RATING,
-        ...createSpacesProject(spaceProjectPayload),
-        ...createMatchStages(query),
-        ...createPaginationStages(skip, limit),
-      ])
-      .toArray();
+    const pipeline = [
+      USER_LOOKUP,
+      USER_UNWIND,
+      VENUE_LOOKUP,
+      VENUE_UNWIND,
+      KEYWORDS_LOOKUP,
+      SPACE_PHOTO_LOOKUP,
+      VENUE_PHOTO_LOOKUP,
+      CAPACITY_LAYOUT_LOOKUP,
+      FEATURES_LOOKUP,
+      FLOOR_PLAN_LOOKUP,
+      GET_SPACES_RATING,
+      BOOKING_LOOKUP,
+      ...createMatchStages(query),
+      ...createSpacesProject(spaceProjectPayload),
+      ...createPaginationStages(skip, limit),
+    ];
+
+    //console.log({ pipeline: JSON.stringify(pipeline) });
+
+    return this.collection().aggregate(pipeline).toArray();
   }
 
   static getSpace(query: Filter<TSpace>) {

@@ -12,9 +12,10 @@ const PREFIX_USER_LOGS = "user_logs";
 export default class SpaceSvc {
   static async handleGetSpaces(params: any) {
     const { page = 1, limit = 10 } = params;
-    const skip = (page - 1) * limit;
+    const limitNumber = Number(limit);
+    const skip = (page - 1) * limitNumber;
     const query = constructQueryV2(params);
-    return SpaceV2Repo.getSpaces(query, limit, skip);
+    return SpaceV2Repo.getSpaces(query, limitNumber, skip);
   }
 
   static async handleGetSpace(spaceId: string) {
