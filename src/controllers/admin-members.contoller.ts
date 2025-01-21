@@ -66,6 +66,7 @@ export default class AdminMemberCtrl {
         email,
         role: user_role.ADMIN,
         status: user_status.PENDING,
+        ...(tenant && { tenant }),
       });
 
       const data = {
@@ -74,7 +75,6 @@ export default class AdminMemberCtrl {
         email,
         assigned_roles,
         country,
-        ...(tenant && { tenant }),
         createdAt: new Date(),
       };
 
