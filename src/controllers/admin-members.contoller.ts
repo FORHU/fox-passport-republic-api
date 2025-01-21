@@ -74,6 +74,7 @@ export default class AdminMemberCtrl {
         email,
         assigned_roles,
         country,
+        ...(tenant && { tenant }),
         createdAt: new Date(),
       };
 
