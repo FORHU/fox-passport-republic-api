@@ -724,11 +724,11 @@ export default class SpaceSvc {
     const userRole = user.role;
     const query: any = {};
     let statusArray: any;
-    const userDetails = await UserSvc.getUser({ _id: new ObjectId(user._id) });
+    const userDetails = await UserSvc.getUser({ _id: new ObjectId(user._id as string) });
     const organization = userDetails.organization;
 
     if (venue_id) {
-      query.venue = new ObjectId(venue_id);
+      query["venue._id"] = new ObjectId(venue_id as string);
     }
 
     if (tenant_code) {
@@ -742,6 +742,8 @@ export default class SpaceSvc {
     if (userRole !== "ADMIN") {
       query["user.organization"] = organization;
     }
+
+    console.log(query)
 
     let results = null;
 
