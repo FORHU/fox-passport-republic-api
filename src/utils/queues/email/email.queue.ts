@@ -26,7 +26,7 @@ sendEmailQueue.process(async (job: any) => {
     });
 
     await sendEmail({ to, subject, text, html, attachments, cc });
-    await sendEmailLogs(job.data);
+    // await sendEmailLogs(job.data);
 
     logger.log({
       level: "info",
@@ -49,6 +49,7 @@ export const addEmailJob = async (data: any) => {
     const jobId = buffer.toString("hex");
     const repeatableJobs = await sendEmailQueue.getRepeatableJobs();
     const jobExists = repeatableJobs.some((job) => job.id === jobId);
+    console.log("ahahahaha")
 
     if (!jobExists) {
       logger.log({

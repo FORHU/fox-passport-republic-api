@@ -50,7 +50,8 @@ export default class AdminMemberCtrl {
     try {
       const { email, assigned_roles } = req.body;
       const country = req?.query?.country || "SG";
-      const user = new ObjectId(req.user._id);
+      const tenant = req?.tenant?.code;
+      const user = new ObjectId(req.user._id as string);
       const { error } = validateAdminMemberSchema(req.body);
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
@@ -85,7 +86,7 @@ export default class AdminMemberCtrl {
         createdAt: new Date(),
       };
 
-      const result = await AdminMemberSvc.inviteAdminMember(data, adminMemberData);
+      const result = await AdminMemberSvc.inviteAdminMember(data, adminMemberData, tenant);
       return handleResponse(res, result, "INVITATION_SENT_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "INVITATION_SENDING_FAILED" });

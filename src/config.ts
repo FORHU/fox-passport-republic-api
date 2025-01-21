@@ -37,6 +37,7 @@ export const CDN_ENDPOINT = process.env.CDN_ENDPOINT as string;
 export const BUCKET_PROTOCOL = (process.env.BUCKET_PROTOCOL as string) || "https://";
 export const SERVER_ROOT_URI = process.env.SERVER_ROOT_URI as string;
 export const VENUE_4_USE_URI = process.env.VENUE_4_USE_URI as string;
+export const GOGOJI_URI = process.env.GOGOJI_URI as string as string;
 export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY as string;
 export const PLATFORM_FEE = process.env.PLATFORM_FEE as string;
 export const COMMISION_FEE = process.env.COMMISION_FEE as string;
@@ -61,4 +62,4 @@ export const AWS_S3_BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME as string;
 
 export const API_URL = (process.env.API_URL as string) || "http://localhost:3001";
 
-export const TENANT_ALLOW_REFERER = (process.env.TENANT_ALLOW_REFERER as string) || "localhost";
+export const TENANT_ALLOW_REFERER = (process.env.TENANT_ALLOW_REFERER as string) || "localhost, thailand.venue4use.com";

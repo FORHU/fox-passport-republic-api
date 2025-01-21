@@ -2,7 +2,7 @@ import fs from "fs";
 import { ObjectId } from "mongodb";
 import path from "path";
 
-import { REFRESH_TOKEN_SECRET, VENUE_4_USE_URI } from "../config";
+import { REFRESH_TOKEN_SECRET, VENUE_4_USE_URI, GOGOJI_URI } from "../config";
 import { AuthStatus, TUpdateAuth } from "../models/auth.model";
 import { hashPassword, MUser, TUser, user_role, user_status } from "../models/user.model";
 import AuthRepo from "../repositories/auth.repository";
@@ -34,13 +34,14 @@ export default class AuthSvc {
     };
 
     if (user.role !== user_role.ADMIN && !is_invited) {
-      const verification_link = `${VENUE_4_USE_URI}/verify-email/${generateVerificationToken(tokenPayload)}?role=${userData?.role}`;
+      const verificationUrl = userData.tenant ? GOGOJI_URI : VENUE_4_USE_URI;
+      const verification_link = `${verificationUrl}/verify-email/${generateVerificationToken(tokenPayload)}?role=${userData?.role}`;
       const subject = "Venue4Use: Confirm Your Email Address";
       const filePath = path.join(process.cwd(), `email-template/email-verification.html`);
       const content = fs.readFileSync(filePath, "utf8");
       const html = content.replace("{first_name}", user.first_name).replace("{verification_link}", verification_link);
 
-      handleSendEmail({
+      await handleSendEmail({
         to: user.email,
         subject,
         html,
