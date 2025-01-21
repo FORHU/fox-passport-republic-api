@@ -14,6 +14,7 @@ import UserSvc from "../services/user.service";
 import VenueSvc from "../services/venue.service";
 import { sendTemplatedEmail } from "../utils/helpers";
 import { logger } from "../utils/logger";
+import { LookupFields } from "../types/common";
 interface AuthenticatedSocket extends Socket {
   user?: any;
 }
@@ -53,8 +54,15 @@ export default (io: Server) => {
         message: `PAYLOAD_SEND_MESSAGE_TO_ROOM: ${JSON.stringify(data)}`,
       });
       if (socket.user) {
-        const sender = await UserSvc.getUser({ _id: new ObjectId(socket.user._id) });
-        const attachmentIds = attachments.map((attachment_id: any) => new ObjectId(attachment_id));
+        const lookups: LookupFields[] = [
+          {
+            collection_name: "files",
+            field_name: "profile_picture",
+            unwind: true,
+          },
+        ];
+        const sender = await UserSvc.getUser({ _id: new ObjectId(socket.user._id as string) }, lookups);
+        const attachmentIds = attachments.map((attachment_id: any) => new ObjectId(attachment_id as string));
         const attachmentFiles = await FileSvc.getFiles(attachmentIds);
 
         logger.log({
