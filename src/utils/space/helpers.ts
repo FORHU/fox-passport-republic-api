@@ -457,9 +457,21 @@ export const constructQuery = (params: any, startTime?: any, endTime?: any, filt
 };
 
 export const constructQueryV2 = (params) => {
-  const { status, keywords, location, tenant_code, total_guest, capacity_layout, foods_and_beverages, menu_offer, facilities, allow_events } = params;
+  const {
+    status,
+    keywords,
+    location,
+    tenant_code,
+    total_guest,
+    capacity_layout,
+    foods_and_beverages,
+    menu_offer,
+    facilities,
+    allow_events,
+    start_date,
+  } = params;
 
-  let query: any = {};
+  const query: any = {};
 
   const addOrCondition = (key: string, values: string) => {
     const valueArray = values.split(",").map((value) => value.trim());
@@ -508,7 +520,7 @@ export const constructQueryV2 = (params) => {
   }
 
   if (keywords) {
-    query["keywords.keyword"] = { $in: createRegexPatterns(keywords) };
+    query["keywords.keyword"] = keywords;
   }
 
   if (tenant_code) {
@@ -543,6 +555,17 @@ export const constructQueryV2 = (params) => {
   if (facilities) addOrCondition("features", facilities);
 
   if (allow_events) addOrCondition("features", allow_events);
+
+  if (start_date) {
+    const newStartDate = dayjs(start_date).startOf("day").toDate();
+    const newEndDate = dayjs(start_date).endOf("day").toDate();
+
+    console.log({ newStartDate, newEndDate });
+    query["bookings.start_date"] = {
+      $gte: newStartDate,
+      $lte: newEndDate,
+    };
+  }
 
   return query;
 };

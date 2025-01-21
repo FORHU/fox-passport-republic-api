@@ -1,4 +1,5 @@
-import { TSpaceProjectPload } from "../../types/space";
+// eslint-disable-next-line import/named
+import { TSpaceProjectPayload } from "../../types/space";
 
 export const USER_LOOKUP = {
   $lookup: {
@@ -89,33 +90,12 @@ export const GET_SPACES_RATING = {
   },
 };
 
-export const GET_SPACES_PROJECT = {
-  $project: {
-    _id: 1,
-    name: 1,
-    status: 1,
-    keywords: {
-      _id: 1,
-      keyword: 1,
-    },
-    user: {
-      _id: 1,
-      first_name: 1,
-      last_name: 1,
-      organization: 1,
-    },
-    venue: {
-      _id: 1,
-      name: 1,
-      address: 1,
-      tenant: 1,
-    },
-    space_photo: {
-      _id: 1,
-      path: 1,
-      contentType: 1,
-      filename: 1,
-    },
+export const BOOKING_LOOKUP = {
+  $lookup: {
+    from: "bookings",
+    localField: "_id",
+    foreignField: "space",
+    as: "bookings",
   },
 };
 
@@ -131,7 +111,9 @@ export const createSpacesProject = ({
   marked_as_favorite,
   rating,
   total_views,
-}: TSpaceProjectPload) => [
+  keywords,
+  bookings,
+}: TSpaceProjectPayload) => [
   {
     $project: {
       ...(_id && { _id }),
@@ -145,6 +127,8 @@ export const createSpacesProject = ({
       ...(marked_as_favorite && { marked_as_favorite }),
       ...(rating && { rating }),
       ...(total_views && { total_views }),
+      ...(keywords && { keywords }),
+      ...(bookings && { bookings }),
     },
   },
 ];

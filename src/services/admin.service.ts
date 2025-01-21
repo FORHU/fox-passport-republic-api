@@ -49,7 +49,7 @@ export default class AdminSvc {
         throw new Error("No venue data found.");
       }
 
-      if (status === "FOR_APPROVAL") {
+      if (["FOR_APPROVAL", "PUBLISHED"].includes(status)) {
         return await AdminRepo.updateVenue(data, status);
       }
 
