@@ -1,5 +1,8 @@
 import { MStripeAccount, TStripeAccount } from "../models/stripe-account.model";
 import { getDB } from "../utils/mongo";
+import RedisUtil from "../utils/redis.util";
+
+const PREFIX_USER = "user";
 
 export default class TodoRepo {
   static collection() {
@@ -15,10 +18,12 @@ export default class TodoRepo {
   }
 
   static async updateAccount(query: any, data: any) {
+    await RedisUtil.invalidateByPrefix(PREFIX_USER);
     return this.collection().updateOne(query, { $set: data });
   }
 
   static async deleteAccount(query: any) {
+    await RedisUtil.invalidateByPrefix(PREFIX_USER);
     return this.collection().deleteOne(query);
   }
 }

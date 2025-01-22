@@ -89,12 +89,12 @@ export default class PaymentCtrl {
   static async createAccount(req: Request, res: Response) {
     const { user_id } = req.body;
 
-    const user = await UserSvc.getUser({ _id: new ObjectId(user_id) });
+    const user = await UserSvc.getUser({ _id: new ObjectId(user_id as string) });
     if (!user) {
       return res.status(404).json({ error: "USER_NOT_FOUND" });
     }
 
-    const userStripeAccount: any = await StripeAccountSvc.getAccount({ user: new ObjectId(user_id) });
+    const userStripeAccount: any = await StripeAccountSvc.getAccount({ user: new ObjectId(user_id as string) });
     if (userStripeAccount && userStripeAccount.status === account_status.COMPLETED) {
       return handleResponse(res, {}, "ACCOUNT_EXISTS");
     }
