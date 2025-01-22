@@ -74,7 +74,7 @@ export default class AuthCtrl {
 
   static async getUser(req: Request, res: Response) {
     try {
-      const query = { _id: new ObjectId(req?.user?._id) };
+      const query = { _id: new ObjectId(req?.user?._id as string) };
    
       const result = await UserSvc.getUserInfo(query);
       return handleResponse(res, result, "USER_FETCHED_SUCCESFULLY");
