@@ -1,3 +1,5 @@
+import { ObjectId } from "mongodb";
+
 import { TFile } from "../models/file.model";
 import FileRepo from "../repositories/files.repository";
 
@@ -8,6 +10,10 @@ export default class BookingSvc {
 
   static getFiles(ids: any) {
     return FileRepo.getFiles(ids);
+  }
+
+  static getFileById(id: string) {
+    return FileRepo.getFileById(new ObjectId(id));
   }
 
   static getFilesLocation(query: any, offset: number, limit: number) {

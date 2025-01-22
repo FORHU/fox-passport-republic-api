@@ -1,6 +1,6 @@
 import { GetObjectCommand, ObjectCannedACL, PutObjectCommand, S3 as AWSS3 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
-import { Express } from "express";
+import https from "https";
 import { Readable } from "stream";
 import { v4 as uuidv4 } from "uuid";
 
@@ -36,6 +36,7 @@ const awsS3 = new AWSS3({
   },
 });
 
+// eslint-disable-next-line no-undef
 const uploadFileToS3 = async (fileData: Express.Multer.File) => {
   try {
     // Generate a unique filename using a UUID and the current timestamp
@@ -119,4 +120,17 @@ const copyFile = async (key: string) => {
   }
 };
 
-export { copyFile, uploadFileToS3, uploadPdfFileTos3 };
+const downloadFiletoS3 = (fileUrl: string) => {
+  return new Promise((resolve, reject) => {
+    https
+      .get(fileUrl, (response) => {
+        if (response.statusCode !== 200) {
+          reject(new Error(`Failed to download file, status code: ${response.statusCode}`));
+        }
+        resolve(response);
+      })
+      .on("error", reject);
+  });
+};
+
+export { copyFile, downloadFiletoS3, uploadFileToS3, uploadPdfFileTos3 };

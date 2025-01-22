@@ -1,9 +1,15 @@
+import { ObjectId } from "mongodb";
+
 import { MFile, TFile } from "../models/file.model";
 import { getDB } from "../utils/mongo";
 
 export default class KeywordRepo {
   static collection() {
     return getDB().collection("files");
+  }
+
+  static async getFileById(id: ObjectId) {
+    return await this.collection().findOne({ _id: id });
   }
 
   static async createFiles(data: TFile) {
