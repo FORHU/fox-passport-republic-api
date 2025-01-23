@@ -25,7 +25,7 @@ export const validateUpdateTeamMemberSchema = (data: any) => {
     country: Joi.string().escapeHTML().optional().allow(null, ""),
     all_venues: Joi.boolean().optional().allow(null, ""),
     email: Joi.string().escapeHTML().email().optional().allow(null, ""),
-    venues: Joi.array().items(Joi.string().escapeHTML().required()).min(1),
+    venues: Joi.array().items(Joi.string().escapeHTML().optional().allow(null, "")).optional().allow(null, ""),
     assigned_roles: Joi.array()
       .items(Joi.number().valid(...Object.values(OrgRoles)))
       .optional()

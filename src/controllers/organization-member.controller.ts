@@ -113,9 +113,8 @@ export default class OrganizationMemberCtrl {
 
   static async updateOrganizationMember(req: Request, res: Response) {
     try {
-      const _id = new ObjectId(req.params.id);
-      const userId = new ObjectId(req.user._id);
-      const { venues, assigned_roles, all_venues, suspension_time } = req.body;
+      const _id = new ObjectId(req.params.id as string);
+      const { venues = [], assigned_roles, all_venues, suspension_time } = req.body;
       const { error } = validateUpdateTeamMemberSchema(req.body);
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
@@ -126,18 +125,7 @@ export default class OrganizationMemberCtrl {
         return handleErrorResponse(res, {}, { code: "TEAM_MEMBER_NOT_FOUND" });
       }
 
-      let owner_venues: any[] = [];
-
-      if (all_venues) {
-        const fetchedVenues = await VenueSvc.getVenue({ user: userId, status: "PUBLISHED" });
-        if (fetchedVenues.length === 0) {
-          return handleErrorResponse(res, {}, { code: "NO_VENUES_FOUND" });
-        } else {
-          owner_venues = [];
-        }
-      } else if (venues && venues.length > 0) {
-        owner_venues = venues.map((venueId: string) => new ObjectId(venueId));
-      }
+      const owner_venues: any[] = venues.map((venueId: string) => new ObjectId(venueId));
 
       let suspensionTime: Date | string | null = null;
 
