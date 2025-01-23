@@ -7,11 +7,21 @@ const TenantValidationMiddleware = async (req: Request, res: Response, next: Nex
 
   const tenantCode = req.tenant.code;
 
-  const query = req.user ? { email: req.user.email, tenant: tenantCode } : { email: req.body.email, tenant: tenantCode };
+  const email = req.user ? req.user.email : req.body.email;
+
+  const query = { email };
+
+  // const query = req.user ? { email: req.user.email, tenant: tenantCode } : { email: req.body.email, tenant: tenantCode };
 
   const user = await UserSvc.getUser(query);
-
   if (!user) {
+    return res.status(404).json({
+      error: "User not found",
+      message: "Account not found or has been deleted. Please contact support if you think this is an error"
+    });
+  }
+
+  if (user.tenant !== tenantCode) {
     return res.status(401).json({
       error: "Unauthorized",
       message: "Access denied. You do not have permission to access this user because they belong to a different tenant.",
