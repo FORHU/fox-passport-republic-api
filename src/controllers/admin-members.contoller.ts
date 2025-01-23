@@ -194,15 +194,15 @@ export default class AdminMemberCtrl {
   }
 
   static async deleteAdminMemberbyId(req: Request, res: Response) {
-    const _id = new ObjectId(req.params.id);
-    const user = new ObjectId(req.user._id);
+    const _id = new ObjectId(req.params.id as string);
+    const user = new ObjectId(req.user._id as string);
 
     const updatedData = {
       deletedAt: new Date(),
       deletedBy: user,
       status: "DELETED",
     };
-
+   
     const result = await AdminMemberSvc.deleteAdminMemberById(_id, updatedData);
     return handleResponse(res, result, "ADMIN_MEMBER_DELETED_SUCCESSFULLY");
   }

@@ -2,6 +2,9 @@ import { ObjectId } from "mongodb";
 
 import { MAdminMembers, TAdminMembers } from "../models/admin-members.model";
 import { getDB } from "../utils/mongo";
+import RedisUtil from "../utils/redis.util";
+
+const PREFIX = "ADMIN_MEMBERS";
 
 export default class AdminMembersRepo {
   static collection() {
@@ -76,7 +79,7 @@ export default class AdminMembersRepo {
     return data;
   }
 
-  static async getAdminMember(query) {
+  static async getAdminMember(query: any) {
     return this.collection().findOne(query);
   }
 
@@ -112,19 +115,12 @@ export default class AdminMembersRepo {
   }
 
   static async updateAdminMemberById(_id: ObjectId, updatedData: Partial<TAdminMembers>) {
+    await RedisUtil.invalidateByPrefix(PREFIX);
     return await this.collection().updateOne({ _id }, { $set: updatedData });
   }
 
   static async deleteAdminMemberById(_id: ObjectId, updatedData: Partial<TAdminMembers>) {
+    await RedisUtil.invalidateByPrefix(PREFIX);
     return await this.collection().updateOne({ _id }, { $set: updatedData });
-  }
-
-  static async pullVenue(adminMemberId: ObjectId, venueId: ObjectId) {
-    try {
-      const result = await this.collection().updateOne({ _id: adminMemberId }, { $pull: { venues: venueId } } as unknown as Partial<TAdminMembers>);
-      return result;
-    } catch (error) {
-      throw error;
-    }
   }
 }
