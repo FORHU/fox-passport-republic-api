@@ -37,7 +37,7 @@ const awsS3 = new AWSS3({
 });
 
 // eslint-disable-next-line no-undef
-const uploadFileToS3 = async (fileData: Express.Multer.File) => {
+const uploadFileToS3 = async (fileData: any) => {
   try {
     // Generate a unique filename using a UUID and the current timestamp
     const timestamp = Date.now();
