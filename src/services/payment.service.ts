@@ -486,7 +486,7 @@ export default class PaymentSvc {
     return { payment: true };
   }
 
-  static async createAccount(payload: any, userStripeAccount: any, user: any) {
+  static async createAccount(payload: any, userStripeAccount: any, user: any, tenant?: string) {
     const { user_id, country = "SG" } = payload;
 
     if (userStripeAccount && userStripeAccount.stripe_account_id && userStripeAccount.status === account_status.PENDING) {
@@ -497,7 +497,7 @@ export default class PaymentSvc {
       }
     }
 
-    const results: any = await createAccount({ country, email: user?.email });
+    const results: any = await createAccount({ country, email: user?.email, tenant });
 
     const stripeAccountId = new ObjectId();
 

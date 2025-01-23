@@ -98,7 +98,9 @@ export default class PaymentCtrl {
     if (userStripeAccount && userStripeAccount.status === account_status.COMPLETED) {
       return handleResponse(res, {}, "ACCOUNT_EXISTS");
     }
-    const results = await PaymentSvc.createAccount(req.body, userStripeAccount, user);
+
+    const tenant = req?.tenant?.code;
+    const results = await PaymentSvc.createAccount(req.body, userStripeAccount, user, tenant);
 
     return handleResponse(res, { results: results.accountLink }, "ACCOUNT_CREATED");
   }

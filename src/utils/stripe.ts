@@ -3,8 +3,8 @@
 /* eslint-disable indent */
 import Stripe from "stripe";
 
-import { SITEURL, STRIPE_SECRET_KEY, STRIPE_WEBOOK_SECRET_ACCOUNT, STRIPE_WEBOOK_SECRET_ACCOUNT_CONNECTED } from "../config";
-import { logger } from "../utils/logger";
+import { GOGOJI_URI, SITEURL, STRIPE_SECRET_KEY, STRIPE_WEBOOK_SECRET_ACCOUNT, STRIPE_WEBOOK_SECRET_ACCOUNT_CONNECTED } from "../config";
+import { logger } from "./logger";
 
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
@@ -63,7 +63,7 @@ export const updateCustomer = async ({ payment_method_id, customer_id }: { payme
   }
 };
 
-export const createAccount = async ({ country, email }: { country: string; email: string }) => {
+export const createAccount = async ({ country, email, tenant }: { country: string; email: string; tenant?: string }) => {
   const account = await stripe.accounts.create({
     type: "express",
     country,
@@ -80,8 +80,8 @@ export const createAccount = async ({ country, email }: { country: string; email
 
   const accountLink = await stripe.accountLinks.create({
     account: account.id,
-    refresh_url: SITEURL,
-    return_url: SITEURL,
+    refresh_url: tenant ? GOGOJI_URI : SITEURL,
+    return_url: tenant ? GOGOJI_URI : SITEURL,
     type: "account_onboarding",
   });
 
