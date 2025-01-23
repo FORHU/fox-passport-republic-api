@@ -79,6 +79,7 @@ export default class UserRepo {
           deletedBy: 1,
           venue_name: 1,
           assigned_roles: 1,
+          tenant: 1,
           user_roles: 1,
           stripe_account: "$stripe_account.status",
         },
