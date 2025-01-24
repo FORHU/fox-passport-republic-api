@@ -13,7 +13,7 @@ import { initVenueOwnerMemberQueue } from "../suspension/venue-owner-member.queu
 
 export const startCronJob = async () => {
   try {
-    const job = new CronJob("0 0 * * *", async () => {
+    const job = new CronJob("0 11 * * *", async () => {
       console.log("Running the scheduled task...");
       try {
         if (IS_QUEUE_MICROSERVICES) {
