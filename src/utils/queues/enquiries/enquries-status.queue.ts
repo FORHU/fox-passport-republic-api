@@ -33,8 +33,9 @@ const enqueueJobs = async (query: any, newStatus: string) => {
       level: "info",
       message: "[Enquiry status]: Add each batch to the queue",
     });
-    await enquiryQueue.add("process_enquiries", { query, newStatus, offset, limit }, { jobId: `batch-${jobId}`, attempts: 3 });
+    enquiryQueue.add("process_enquiries", { query, newStatus, offset, limit }, { jobId: `batch-${jobId}`, attempts: 3 });
   }
+  return true;
 };
 
 // Queue processor
@@ -73,8 +74,7 @@ enquiryQueue.process("process_enquiries", async (job: any, done: any) => {
 // Initialize and schedule the enquiry jobs
 export const initEnquiriesQueue = async () => {
   try {
-    await enqueueJobs(confirmedQuery, "HAPPENED");
-    await enqueueJobs(cancelledQuery, "ARCHIVED");
+    await Promise.allSettled([enqueueJobs(confirmedQuery, "HAPPENED"), enqueueJobs(cancelledQuery, "ARCHIVED")]);
     logger.log({
       level: "info",
       message: "[Enquiry status] update processing jobs scheduled.",

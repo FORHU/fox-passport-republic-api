@@ -49,7 +49,6 @@ export const addEmailJob = async (data: any) => {
     const jobId = buffer.toString("hex");
     const repeatableJobs = await sendEmailQueue.getRepeatableJobs();
     const jobExists = repeatableJobs.some((job) => job.id === jobId);
-    console.log("ahahahaha")
 
     if (!jobExists) {
       logger.log({

@@ -2,7 +2,6 @@ import { CronJob } from "cron";
 
 import { EMAIL_STRIPE_NOTIFICATION, IS_QUEUE_MICROSERVICES } from "../../../config";
 import { logger } from "../../../utils/logger";
-import { handleInitEnquiriesQueue } from "../../v2/microservices/queue/enquiry";
 import { handleInitPaymentQueueProcess } from "../../v2/microservices/queue/payment";
 import { handleInitStripeAccountQueue } from "../../v2/microservices/queue/stripe-account";
 import { initEnquiriesQueue } from "../enquiries/enquries-status.queue";
@@ -13,12 +12,9 @@ import { initVenueOwnerMemberQueue } from "../suspension/venue-owner-member.queu
 
 export const startCronJob = async () => {
   try {
-    const job = new CronJob("0 11 * * *", async () => {
+    const job = new CronJob("30 11 * * *", async () => {
       console.log("Running the scheduled task...");
       try {
-        if (IS_QUEUE_MICROSERVICES) {
-          return await handleInitEnquiriesQueue();
-        }
         await initEnquiriesQueue();
       } catch (error) {
         logger.log({
