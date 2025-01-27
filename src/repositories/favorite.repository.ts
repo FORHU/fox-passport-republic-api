@@ -4,6 +4,9 @@ import { ObjectId } from "mongodb";
 import { TFavorite, TUpdateFavorite } from "../models/favorite.model";
 import { PaginationType } from "../types/common";
 import { getDB } from "../utils/mongo";
+import RedisUtil from "../utils/redis.util";
+
+const PREFIX = "spaces";
 
 export default class FavoriteRepo {
   static collection() {
@@ -35,6 +38,7 @@ export default class FavoriteRepo {
     try {
       const collection = this.collection();
       const result = await collection.insertOne(data);
+      await RedisUtil.invalidateByPrefix(PREFIX);
       return result.insertedId;
     } catch (error) {
       throw error;
@@ -48,7 +52,7 @@ export default class FavoriteRepo {
 
       const updateData = { $set: { marked_as_favorite, updatedAt: new Date() } };
       const result = await collection.updateOne({ _id: new ObjectId(id) }, updateData);
-
+      await RedisUtil.invalidateByPrefix(PREFIX);
       return result.modifiedCount;
     } catch (error) {
       throw error;
@@ -61,6 +65,7 @@ export default class FavoriteRepo {
       const query = {
         _id: new ObjectId(id),
       };
+      await RedisUtil.invalidateByPrefix(PREFIX);
       return collection.updateOne(query, {
         $set: data,
       });
@@ -265,6 +270,7 @@ export default class FavoriteRepo {
   }
 
   static async deleteFavorite(query: any) {
+    await RedisUtil.invalidateByPrefix(PREFIX);
     return this.collection().deleteMany(query);
   }
 }

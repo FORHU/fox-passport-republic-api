@@ -25,7 +25,7 @@ export default class FavoriteCtrl {
   static async createFavorite(req: Request, res: Response) {
     try {
       const { space_id } = req.body;
-      const userId = new ObjectId(req?.user?._id);
+      const userId = new ObjectId(req?.user?._id as string);
 
       const { error } = validateCreateFavoriteSchema(req.body);
       if (error) {
