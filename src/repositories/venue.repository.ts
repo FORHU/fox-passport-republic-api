@@ -280,6 +280,14 @@ export default class VenueRepo {
     }
   }
 
+  static async handleGetVenues(query: any, limit: number, offset: number) {
+    return this.collection().find(query).skip(offset).limit(limit).toArray();
+  }
+
+  static async handleCountVenues(query: any) {
+    return this.collection().countDocuments(query);
+  }
+
   static async updateVenue(venueId: ObjectId, data: Partial<TVenue>) {
     data.updatedAt = new Date();
     const result = await this.collection().updateOne({ _id: venueId }, { $set: data });

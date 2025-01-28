@@ -40,7 +40,7 @@ router.post("/product", [...ADMIN_MIDDLEWARE], AdminCtrl.createProduct);
 
 //migrate files from s3 bucket to digital ocean space
 router.patch("/migrate-files", [...ADMIN_MIDDLEWARE], AdminCtrl.migrateFiles);
-router.patch("/migrate-user-tenant", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminCtrl.tenantMigration);
+router.patch("/migrate-tenant", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminCtrl.tenantMigration);
 
 // remove unused questions
 router.delete("/delete-questions", [...ADMIN_MIDDLEWARE], AdminCtrl.deleteUnusedQuestions);

@@ -28,6 +28,7 @@ import { venueOwnerTeamMemberQueue } from "./utils/queues/suspension/venue-owner
 import { useRolesQueue } from "./utils/queues/user/migrate-user.queue";
 import { addVenueQueue } from "./utils/queues/venue/add-venue.queue";
 import { userTenantQueue } from "./utils/queues/tenant/user.tenant.queue";
+import { venueTenantQueue } from "./utils/queues/tenant/venue.tenant.queue";
 
 // Initialize Express app
 const app = express();
@@ -48,6 +49,7 @@ createBullBoard({
     new BullAdapter(addVenueQueue),
     new BullAdapter(useRolesQueue),
     new BullAdapter(userTenantQueue),
+    new BullAdapter(venueTenantQueue),
   ],
   serverAdapter,
 });
