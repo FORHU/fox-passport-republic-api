@@ -32,6 +32,7 @@ import { initFileQueue } from "../utils/queues/files/file-migration.queue";
 import { initQuestionQueue } from "../utils/queues/question/delete-question.queue";
 import { initUserRolesQueue } from "../utils/queues/user/migrate-user.queue";
 import { initAddVenueQueue } from "../utils/queues/venue/add-venue.queue";
+import { initTenantUserQueue } from "../utils/queues/tenant/user.tenant.queue";
 import { validateUpdateRatingSchema } from "../utils/rating/validation";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
 
@@ -394,6 +395,15 @@ export default class AdminCtrl {
   static async migrateFiles(req: Request, res: Response) {
     initFileQueue();
     return handleResponse(res, {}, "FILES_MIGRATED_SUCCESSFULLY");
+  }
+
+  static async tenantMigration(req: Request, res: Response) {
+    try {
+      initTenantUserQueue(req.tenant.code);
+      return handleResponse(res, {}, "TENANT_MIGRATED_SUCCESSFULLY");
+    } catch (error) {
+      return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
+    }
   }
 
   static async deleteUnusedQuestions(req: Request, res: Response) {

@@ -23,6 +23,14 @@ export default class UserRepo {
     return userInstance;
   }
 
+  static async countUsers(query: any) {
+    return this.collection().countDocuments(query);
+  }
+
+  static async handleGetUsers({ query, limit, offset }: { query: any; limit: number; offset: number }) {
+    return await this.collection().find(query).limit(limit).skip(offset).toArray();
+  }
+
   static async getUser(query: any, lookupsFields?: LookupFields[]) {
     try {
       const pipeline: any[] = [{ $match: query }];
