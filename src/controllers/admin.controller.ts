@@ -35,6 +35,7 @@ import { initAddVenueQueue } from "../utils/queues/venue/add-venue.queue";
 import { initTenantUserQueue } from "../utils/queues/tenant/user.tenant.queue";
 import { validateUpdateRatingSchema } from "../utils/rating/validation";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
+import { initTenantVenueQueue } from "../utils/queues/tenant/venue.tenant.queue";
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -399,7 +400,7 @@ export default class AdminCtrl {
 
   static async tenantMigration(req: Request, res: Response) {
     try {
-      initTenantUserQueue(req.tenant.code);
+      Promise.all([initTenantUserQueue(req?.tenant?.code), initTenantVenueQueue(req?.tenant?.code)]);
       return handleResponse(res, {}, "TENANT_MIGRATED_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });

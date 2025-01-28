@@ -131,6 +131,10 @@ export default class VenueSvc {
     };
   }
 
+  static async handleUpdateVenue(venue_id: ObjectId, data: any) {
+    return await VenueRepo.updateVenue(venue_id, data);
+  }
+
   static async deleteVenues(venueIds: ObjectId[]) {
     await SpaceRepository.deleteSpaces({ venue: { $in: venueIds } });
     return VenueRepo.deleteVenues(venueIds);
@@ -375,10 +379,6 @@ export default class VenueSvc {
     return await this.updateVenue(venue_id, venueUpdateData);
   }
 
-  static async handleUpdateVenue(venue_id: ObjectId, data: any) {
-    return await VenueRepo.updateVenue(venue_id, data);
-  }
-
   static async processCountAdminVenues(params: any, user: any) {
     const { excluded_status, tenant_code } = params;
     const query: any = {};
@@ -451,5 +451,13 @@ export default class VenueSvc {
       size: limitNumber,
       offset,
     };
+  }
+
+  static async handleCountVenues(query: any) {
+    return VenueRepo.countVenues(query);
+  }
+
+  static async handleGetVenues(query: any, limit: number, offset: number) {
+    return VenueRepo.handleGetVenues(query, limit, offset);
   }
 }
