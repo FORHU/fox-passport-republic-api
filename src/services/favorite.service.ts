@@ -32,11 +32,11 @@ export default class FavoriteSvc {
       }
 
       const data = {
-        space: new ObjectId(space_id),
+        space: new ObjectId(space_id as string),
         user: userId,
         marked_as_favorite: true,
         createdAt: new Date(),
-        favorite_folder: favorite_folder_id ? new ObjectId(favorite_folder_id) : favFolderId,
+        favorite_folder: favorite_folder_id ? new ObjectId(favorite_folder_id as string) : favFolderId,
       };
       const insertedId = await FavoriteRepo.createFavorite(data);
       return insertedId;
