@@ -7,6 +7,7 @@ import { getDB } from "../utils/mongo";
 import RedisUtil from "../utils/redis.util";
 
 const PREFIX = "spaces";
+const PREFIX_USER_LOGS = "user_logs";
 
 export default class FavoriteRepo {
   static collection() {
@@ -39,6 +40,7 @@ export default class FavoriteRepo {
       const collection = this.collection();
       const result = await collection.insertOne(data);
       await RedisUtil.invalidateByPrefix(PREFIX);
+      await RedisUtil.invalidateByPrefix(PREFIX_USER_LOGS);
       return result.insertedId;
     } catch (error) {
       throw error;
@@ -53,6 +55,7 @@ export default class FavoriteRepo {
       const updateData = { $set: { marked_as_favorite, updatedAt: new Date() } };
       const result = await collection.updateOne({ _id: new ObjectId(id) }, updateData);
       await RedisUtil.invalidateByPrefix(PREFIX);
+      await RedisUtil.invalidateByPrefix(PREFIX_USER_LOGS);
       return result.modifiedCount;
     } catch (error) {
       throw error;
@@ -66,6 +69,7 @@ export default class FavoriteRepo {
         _id: new ObjectId(id),
       };
       await RedisUtil.invalidateByPrefix(PREFIX);
+      await RedisUtil.invalidateByPrefix(PREFIX_USER_LOGS);
       return collection.updateOne(query, {
         $set: data,
       });
