@@ -118,7 +118,7 @@ export default class UserLogsV2Repo {
           {
             $match: {
               $expr: {
-                $and: [{ $eq: ["$spaceDetails", "$$spaceId"] }, { $eq: ["$marked_as_favorite", true] }, { $eq: ["$user", user_id] }],
+                $and: [{ $eq: ["$space", "$$spaceId"] }, { $eq: ["$marked_as_favorite", true] }, { $eq: ["$user", user_id] }],
               },
             },
           },
@@ -170,6 +170,7 @@ export default class UserLogsV2Repo {
         totalReviews: { $size: "$ratings" },
       },
       total_views: "$totalViews",
+      status: "$spaceDetails.status",
     };
 
     pipeline.push(...createSpacesProject(projectPayload));
