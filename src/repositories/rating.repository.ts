@@ -34,6 +34,15 @@ export default class RatingRepo {
         .aggregate([
           { $match: query },
           {
+            $lookup: {
+              from: "users",
+              localField: "user",
+              foreignField: "_id",
+              as: "user",
+            },
+          },
+          { $unwind: "$user" },
+          {
             $group: {
               _id: "$space",
               totalRatings: { $sum: "$rating" },
