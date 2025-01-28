@@ -1,4 +1,4 @@
-import { TENANT_ALLOW_REFERER } from "../config";
+import { TENANT_ALLOW_REFERER, VENUE4USE_ALLOW_REFERER } from "../config";
 import { stringToArray } from "./helpers";
 
 type CountryCodes = {
@@ -108,9 +108,17 @@ export const ADMIN_ROLES = {
 
 export const TENANT_MAPPING = {
   thailand: "TH",
+  venue4use: "VENUE4USE",
 };
 
 export const TENANT_CONFIGS = {
+  VENUE4USE: {
+    name: "VENUE4USE",
+    allowed_domains: stringToArray(VENUE4USE_ALLOW_REFERER),
+    require_referer: true,
+    require_tenant: true,
+    strict_mode: true,
+  },
   TH: {
     name: "Gogoji",
     allowed_domains: stringToArray(TENANT_ALLOW_REFERER),
