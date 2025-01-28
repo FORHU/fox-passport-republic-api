@@ -10,10 +10,11 @@ import { DEBUG_EMAIL, isDev, SUPPORT_EMAIL } from "../config";
 import { OrgRoles } from "../models/organization-member.model";
 import SpaceSvc from "../services/space.service";
 import VenueSvc from "../services/venue.service";
-import { logger } from "../utils/logger";
+import { QueryParams } from "../types/common";
+import { CustomPrice, HireFee } from "../types/pricing";
 import { COUNTRY, CURRENCY_RATES } from "./constant";
 import { handleSendEmail } from "./email.utils";
-import { CustomPrice, HireFee } from "../types/pricing";
+import { logger } from "./logger";
 
 dayjs.extend(customParseFormat);
 
@@ -491,4 +492,21 @@ export const getOneSummarizedPricing = (pricingData: PricingData) => {
 
 export const stringToArray = (str: string | undefined, defaultValues: string[] = []): string[] => {
   return (str?.split(",") ?? defaultValues).map((item) => item.trim());
+};
+
+export const tenantBuildQuery = ({ status, tenant_code, tenant, country, supportedCountries, user_id }: QueryParams): any => {
+  return {
+    action: "VIEW_SPACE",
+    space: {
+      status,
+    },
+    venue: {
+      ...(tenant?.config?.country
+        ? { address: { country: tenant.config.country } }
+        : country && supportedCountries.includes(country)
+          ? { address: { country } }
+          : { tenant: tenant_code }),
+    },
+    ...(user_id && { user_id }),
+  };
 };

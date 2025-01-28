@@ -4,7 +4,7 @@ import SpaceV2Repo from "../../repositories/repository-v2/space.repository";
 import UserLogsV2Repo from "../../repositories/repository-v2/user-logs.repository";
 import { TMostPopular } from "../../types/space";
 import { getCacheOrFetch } from "../../utils/cache.util";
-import { getOneSummarizedPricing, hashSearch } from "../../utils/helpers";
+import { getOneSummarizedPricing, hashSearch, tenantBuildQuery } from "../../utils/helpers";
 import { constructQueryV2 } from "../../utils/space/helpers";
 
 const PREFIX_USER_LOGS = "user_logs";
@@ -24,18 +24,18 @@ export default class SpaceSvc {
   }
 
   static async handleGetMostPopularSpaces(params: TMostPopular) {
-    const { page = 1, limit = 20, country, status, user_id, tenant_code } = params;
+    const { page = 1, limit = 20, country, status, user_id, tenant_code, tenant } = params;
 
-    const query: any = {
-      action: "VIEW_SPACE",
-      space: {
-        status,
-      },
-      venue: {
-        ...(tenant_code ? { tenant: tenant_code } : { address: { country } }),
-      },
+    const supportedCountries = tenant?.config?.SUPPORTED_COUNTRIES || [];
+    
+    const query = tenantBuildQuery({
+      status,
+      tenant_code,
+      tenant,
+      country,
+      supportedCountries: supportedCountries,
       ...(user_id && { user_id: new ObjectId(user_id) }),
-    };
+    });
 
     const pageNumber = Number(page);
     const limitNumber = Number(limit);

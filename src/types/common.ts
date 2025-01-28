@@ -45,3 +45,17 @@ export interface LookupFields {
   unwind: boolean;
   add_fields?: any;
 }
+
+interface TenantConfig {
+  country?: string;
+  SUPPORTED_COUNTRIES: string[];
+}
+
+export interface QueryParams {
+  status: string;
+  tenant_code: string;
+  tenant: { config?: TenantConfig };
+  country?: string;
+  supportedCountries: string[];
+  user_id?: ObjectId;
+}
