@@ -17,6 +17,14 @@ export default class UserSvc {
     }
   }
 
+  static async countUsers(query: any) {
+    return UserRepo.countUsers(query);
+  }
+
+  static async handleGetUsers(query: any, limit: number, offset: number) {
+    return UserRepo.handleGetUsers({ query, limit, offset });
+  }
+
   static async updateUser(query: any, updatedUserData: TUser) {
     return UserRepo.updateUser(query, updatedUserData);
   }
