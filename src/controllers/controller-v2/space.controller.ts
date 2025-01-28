@@ -46,7 +46,8 @@ export default class SpaceCtrl {
         country: location as string,
         status: status as string,
         ...(user_id && { user_id }),
-        ...(req.tenant && { tenant_code: req.tenant.code }),
+        ...(req.tenant && { tenant: req.tenant }),
+        ...(req.tenant.code && { tenant_code: req.tenant.code }),
       };
       const results = await SpaceSvcV2.handleGetMostPopularSpaces(payload);
       return handleResponse(res, results, "MOST_POPULAR_SPACES");
