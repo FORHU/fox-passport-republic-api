@@ -2,7 +2,7 @@ import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import { ObjectId } from "mongodb";
 
-import { verifyObjectId } from "../helpers";
+import { verifyObjectId, tenantBuildQuery } from "../helpers";
 dayjs.extend(customParseFormat);
 
 export const createRegexPatterns = (input: string) => {
@@ -38,8 +38,9 @@ export const constructQuery = (params: any, startTime?: any, endTime?: any, filt
     open_days,
     start_date,
     tenant_code,
+    tenant,
   } = params;
-  const query: any = {};
+  let query: any = {};
   const date = dayjs(start_date);
   const dayOfWeek = date.format("dddd").toUpperCase();
 
@@ -63,17 +64,16 @@ export const constructQuery = (params: any, startTime?: any, endTime?: any, filt
     query._id = { $in: mostPopularIds.map((item: any) => new ObjectId(item._id)) };
   }
 
-  // if (location) {
-  //   const locationArray = location.split(",").map((location: any) => location.trim());
-  //   query["venue.address.country"] = { $in: locationArray };
-  // }
+  const supportedCountries = tenant?.config?.SUPPORTED_COUNTRIES || [];
+  const tenantQuery = tenantBuildQuery({
+    tenant,
+    tenant_code,
+    ...(location && { country: location }),
+    supportedCountries: supportedCountries,
+  });
 
-  if (tenant_code) {
-    query["venue.tenant"] = tenant_code;
-  } else if (location) {
-    const locationArray = location.split(",").map((loc: any) => loc.trim());
-    query["venue.address.country"] = { $in: locationArray };
-  }
+  if (location) query["venue.address.country"] = tenantQuery?.venue?.address?.country;
+  else query["venue.tenant"] = tenant_code;
 
   if (filteredSpaces || space_id) {
     const conditions: any = {};
@@ -452,7 +452,7 @@ export const constructQuery = (params: any, startTime?: any, endTime?: any, filt
   if (representationArray.length > 0) {
     query["representation"] = { $in: representationArray };
   }
-
+  
   return query;
 };
 
