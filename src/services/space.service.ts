@@ -43,7 +43,8 @@ export default class SpaceSvc {
 
   static async processedSpacePagination({ params, user }: RequestWithParamsAndUser) {
     try {
-      const { page = 1, limit = 20, mark_as_favorite, start_date, start_time, end_time, tenant_code } = params as any;
+      const { page = 1, limit = 20, mark_as_favorite, start_date, start_time, end_time } = params as any;
+
       let dayOfWeek: any;
       let filteredSpaces: any;
 
@@ -89,7 +90,7 @@ export default class SpaceSvc {
       let list_count = 0;
       const countPayload = {
         query,
-        user_id: user ? new ObjectId(user._id) : null,
+        user_id: user ? new ObjectId(user._id as string) : null,
         mark_as_favorite,
         ...(startDateTime ? { startDate: startDateTime } : {}),
         ...(endDateTime ? { endDate: endDateTime } : {}),
@@ -109,7 +110,7 @@ export default class SpaceSvc {
         query,
         skip: offset,
         limit: limitNumber,
-        user_id: user ? new ObjectId(user._id) : null,
+        user_id: user ? new ObjectId(user._id as string) : null,
         mark_as_favorite,
         ...(startDateTime ? { startDate: startDateTime } : {}),
         ...(endDateTime ? { endDate: endDateTime } : {}),
@@ -742,8 +743,6 @@ export default class SpaceSvc {
     if (userRole !== "ADMIN") {
       query["user.organization"] = organization;
     }
-
-    console.log(query)
 
     let results = null;
 

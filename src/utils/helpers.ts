@@ -494,12 +494,10 @@ export const stringToArray = (str: string | undefined, defaultValues: string[] =
   return (str?.split(",") ?? defaultValues).map((item) => item.trim());
 };
 
-export const tenantBuildQuery = ({ status, tenant_code, tenant, country, supportedCountries, user_id }: QueryParams): any => {
+export const tenantBuildQuery = ({ status, tenant_code, tenant, country, supportedCountries, user_id, action }: QueryParams): any => {
   return {
-    action: "VIEW_SPACE",
-    space: {
-      status,
-    },
+    ...(action && { action }),
+    ...(status && { space: status }),
     venue: {
       ...(tenant?.config?.country
         ? { address: { country: tenant.config.country } }

@@ -52,10 +52,11 @@ interface TenantConfig {
 }
 
 export interface QueryParams {
-  status: string;
-  tenant_code: string;
-  tenant: { config?: TenantConfig };
+  status?: string;
+  tenant_code?: string;
+  tenant?: { config?: TenantConfig };
   country?: string;
-  supportedCountries: string[];
+  supportedCountries?: string[];
   user_id?: ObjectId;
+  action?: string;
 }

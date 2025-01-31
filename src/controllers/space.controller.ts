@@ -33,6 +33,7 @@ export default class SpaceCtrl {
     try {
       if (req?.tenant) {
         req.query.tenant_code = req?.tenant?.code;
+        req.query.tenant = req?.tenant;
       }
       const result = await SpaceSvc.processedSpacePagination({
         params,

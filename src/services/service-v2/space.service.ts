@@ -27,8 +27,9 @@ export default class SpaceSvc {
     const { page = 1, limit = 20, country, status, user_id, tenant_code, tenant } = params;
 
     const supportedCountries = tenant?.config?.SUPPORTED_COUNTRIES || [];
-    
+
     const query = tenantBuildQuery({
+      action: "VIEW_SPACE",
       status,
       tenant_code,
       tenant,
