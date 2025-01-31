@@ -1,4 +1,11 @@
-import { TENANT_ALLOW_REFERER, VENUE4USE_ALLOW_REFERER, VENUE_4_USE_URI, GOGOJI_URI } from "../config";
+import {
+  GOGOJI_URI,
+  TENANT_ALLOW_REFERER,
+  TENANT_GOGOJI_API_KEY,
+  TENANT_VENUE4USE_API_KEY,
+  VENUE_4_USE_URI,
+  VENUE4USE_ALLOW_REFERER,
+} from "../config";
 import { stringToArray } from "./helpers";
 
 type CountryCodes = {
@@ -120,6 +127,7 @@ export const TENANT_CONFIGS = {
     strict_mode: true,
     SITE_URL: VENUE_4_USE_URI,
     SUPPORTED_COUNTRIES: ["SG", "MY", "PH"],
+    X_API_KEYS: stringToArray(TENANT_VENUE4USE_API_KEY),
   },
   TH: {
     name: "Gogoji",
@@ -131,5 +139,6 @@ export const TENANT_CONFIGS = {
     currency: "THB",
     SITE_URL: GOGOJI_URI,
     SUPPORTED_COUNTRIES: ["TH"],
+    X_API_KEYS: stringToArray(TENANT_GOGOJI_API_KEY),
   },
 };
