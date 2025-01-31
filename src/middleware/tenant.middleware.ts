@@ -4,6 +4,7 @@ import { TENANT_CONFIGS, TENANT_MAPPING } from "../utils/constant";
 
 const TenantMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const tenantHeader: string = (req.headers["x-tenant"] as string) || (req.headers["tenant"] as string);
+  const apiKey: string | undefined = req.headers["x-api-key"] as string;
   const referer = req.headers.referer;
 
   let refererHostname = "";
@@ -23,25 +24,34 @@ const TenantMiddleware = (req: Request, res: Response, next: NextFunction) => {
   }
 
   const country = Object.keys(TENANT_MAPPING).find((key) => refererHostname.includes(key));
-
-  // Get expected tenant code from mapping
   const expectedTenant = country ? TENANT_MAPPING[country] : null;
-
-  // Get tenant configuration
   const tenantConfig = tenantHeader ? TENANT_CONFIGS[tenantHeader] : null;
 
-  // Validation checks
   if (tenantConfig) {
-    // 1. Check if referer is required
+    // ✅ Allow if valid API key is provided
+    if (apiKey && tenantConfig.X_API_KEYS?.includes(apiKey)) {
+      req.tenant = {
+        code: tenantHeader,
+        config: tenantConfig,
+        referer: refererHostname,
+        country: country,
+        apiKeyUsed: true,
+      };
+      return next();
+    }
+
+    // 🛑 Require referer if no valid API key is provided
     if (tenantConfig.require_referer && !referer) {
       return res.status(400).json({
-        error: "Referer header is required",
+        error: "Referer header or valid API key is required",
       });
     }
 
-    // 2. Check if domain is allowed
+    // 🔄 Check if referer domain is allowed
     if (refererHostname) {
-      const isAllowedDomain = tenantConfig.allowed_domains.some((domain: string) => refererHostname.includes(domain));
+      const isAllowedDomain = tenantConfig.allowed_domains.some((domain: string) =>
+        refererHostname.includes(domain)
+      );
       if (!isAllowedDomain) {
         return res.status(403).json({
           error: "Domain not allowed for this tenant",
@@ -50,20 +60,21 @@ const TenantMiddleware = (req: Request, res: Response, next: NextFunction) => {
       }
     }
 
-    // 3. Check if tenant matches the expected tenant from referer
+    // 🔄 Check if referer matches expected tenant
     if (expectedTenant && expectedTenant !== tenantHeader) {
       return res.status(403).json({
         error: "Tenant mismatch with referer",
       });
     }
+
     req.tenant = {
       code: tenantHeader,
       config: tenantConfig,
       referer: refererHostname,
       country: country,
+      apiKeyUsed: false,
     };
   } else if (tenantHeader) {
-    // Tenant header provided but no config found
     return res.status(400).json({
       error: "Invalid tenant",
     });

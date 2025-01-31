@@ -63,4 +63,6 @@ export const AWS_S3_BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME as string;
 export const API_URL = (process.env.API_URL as string) || "http://localhost:3001";
 
 export const TENANT_ALLOW_REFERER = (process.env.TENANT_ALLOW_REFERER as string) || "localhost, thailand.venue4use.com";
-export const VENUE4USE_ALLOW_REFERER = (process.env.VENUE4USE_ALLOW_REFERER as string) || "localhost, venue4use.com, venue4use.ondevenvironment.com";
+export const VENUE4USE_ALLOW_REFERER = process.env.VENUE4USE_ALLOW_REFERER as string;
+export const TENANT_VENUE4USE_API_KEY = process.env.TENANT_VENUE4USE_API_KEY as string;
+export const TENANT_GOGOJI_API_KEY = process.env.TENANT_GOGOJI_API_KEY as string;
