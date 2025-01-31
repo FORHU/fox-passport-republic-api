@@ -34,7 +34,7 @@ export default class AuthCtrl {
 
   static async registrationViaEmail(req: Request, res: Response) {
     if (req.tenant) {
-      req.body.tenant = req?.tenant?.code;
+      req.body.tenant = req?.tenant;
     }
 
     const {
@@ -80,7 +80,7 @@ export default class AuthCtrl {
             organization: organizationId,
             commission,
             rebate,
-            ...(tenant && { tenant }),
+            ...(tenant && { tenant: tenant?.code }),
           }),
           await OrganizationSvc.createOrganization({
             _id: organizationId,
@@ -110,7 +110,7 @@ export default class AuthCtrl {
       const { accessToken, refreshToken }: any = await AuthSvc.registration(
         {
           _id: userId,
-          ...(tenant && { tenant }),
+          ...(tenant && { tenant: tenant?.code }),
           email,
           password,
           role,
@@ -129,6 +129,7 @@ export default class AuthCtrl {
         },
         false,
         device_payload,
+        tenant,
       );
 
       const response: ResponseType = {

@@ -58,7 +58,7 @@ export default class AdminMemberSvc {
           : data.assigned_roles === AdminMemberRoles.SALES
             ? "Sales"
             : "Unknown Role";
-    const verificationUrl = tenant ? GOGOJI_URI : `${VENUE_4_USE_URI}/${data?.country}`;
+    const verificationUrl = tenant?.config.site_url;
     sendTemplatedEmail({
       subject: "Venue4Use: Admin Invitation",
       email_data: {
