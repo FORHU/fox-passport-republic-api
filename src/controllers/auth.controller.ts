@@ -151,9 +151,8 @@ export default class AuthCtrl {
 
   static async sendEmailVerification(req: Request, res: Response) {
     const userId = req?.user?._id as string;
-
     try {
-      await AuthSvc.sendEmailVerification(userId);
+      await AuthSvc.sendEmailVerification(userId, req?.tenant);
       return handleResponse(res, {}, "EMAIL_VERIFICATION");
     } catch (error) {
       return handleErrorResponse(res, error, {
@@ -389,9 +388,9 @@ export default class AuthCtrl {
         return handleErrorResponse(res, 400, { code: "EMAIL_DOES_NOT_EXIST_OR_HAS_BEEN_DELETED" });
       }
 
-      await AuthSvc.accountRecovery(email);
+      await AuthSvc.accountRecovery(email, req?.tenant);
 
-      return handleResponse(res, {}, "EMAI_RECOVERY_LINK_SENT");
+      return handleResponse(res, {}, "EMAIL_RECOVERY_LINK_SENT");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
     }
@@ -403,7 +402,7 @@ export default class AuthCtrl {
       if (!token) {
         handleErrorResponse(res, 400, { code: "INVALID_TOKEN" });
       }
-      const result = await AuthSvc.passwordReset(token);
+      const result = await AuthSvc.passwordReset(token, req?.tenant);
 
       if (result) {
         return handleResponse(res, result, `PASSWORD_RESET_SUCCESFUL`);

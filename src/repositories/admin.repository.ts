@@ -277,6 +277,7 @@ export default class AdminRepo {
             pricing: 1,
             status: 1,
             form_steps: 1,
+            userData: 1,
             booking: 1,
             createdAt: 1,
             updatedAt: 1,

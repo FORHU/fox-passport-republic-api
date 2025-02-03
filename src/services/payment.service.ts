@@ -30,7 +30,7 @@ import {
 import BookingSvc from "./booking.service";
 import CounterSvc from "./counter.service";
 import CountrySettingSvc from "./country-setting.service";
-import CustomeOfferSvc from "./custom-offer.service";
+import CustomOfferSvc from "./custom-offer.service";
 import EnquirySvc from "./enquiries.service";
 import SpaceSvc from "./space.service";
 import StripeAccountSvc from "./stripe-account.service";
@@ -94,8 +94,8 @@ export default class PaymentSvc {
         break;
     }
   }
-  static async processPayment(enquiry_id: string, user: any, enquiry: any) {
-    const venue_owner = new ObjectId(user._id);
+  static async processPayment(enquiry_id: string, user: any, enquiry: any, tenant?: any) {
+    const venue_owner = new ObjectId(user._id as string);
 
     const mongoClient = useMongoClient();
     const session = mongoClient.startSession();
@@ -107,7 +107,7 @@ export default class PaymentSvc {
     await session.withTransaction(async () => {
       const enquiryId = new ObjectId(enquiry_id);
 
-      const [customOfferData]: any = await CustomeOfferSvc.getCustomOffer({ inbox: enquiry.inbox._id });
+      const [customOfferData]: any = await CustomOfferSvc.getCustomOffer({ inbox: enquiry.inbox._id });
       const paymentIntent: any = await handlePayment({
         amount: convertDollarsToCents(customOfferData.user_computation.grand_total),
         currency: customOfferData.currency || "SGD",
@@ -120,7 +120,7 @@ export default class PaymentSvc {
         venue: enquiry.venue._id,
         space: enquiry.space._id,
         enquiry: enquiry._id,
-        user: new ObjectId(user._id),
+        user: new ObjectId(user._id as string),
         payment_id: paymentIntent.id,
         payment_method: paymentIntent.payment_method_types,
         payment_amount: convertCentsToDollars(paymentIntent?.amount),
@@ -176,7 +176,7 @@ export default class PaymentSvc {
         PaymentSvc.createPayment(payment),
         BookingSvc.createBooking(bookingData),
         EnquirySvc.updateEnquiry({ _id: enquiryId }, { status: enquiry_status.PAYMENT_IN_PROGRESS }),
-        CustomeOfferSvc.updateCustomOffer(customOfferData?._id, { status: offer_status.PAYMENT_IN_PROGRESS, booking: bookingData._id }, null),
+        CustomOfferSvc.updateCustomOffer(customOfferData?._id, { status: offer_status.PAYMENT_IN_PROGRESS, booking: bookingData._id }, null, tenant),
         initReceiptQueueProcess({
           receipt_no: receiptNo,
           user: enquiry.user,
@@ -321,7 +321,7 @@ export default class PaymentSvc {
     return results;
   }
 
-  static async processPaymentStatus(payload: any) {
+  static async processPaymentStatus(payload: any, tenant?: any) {
     const { payment_id, booking_id, status } = payload;
 
     let booking;
@@ -342,7 +342,7 @@ export default class PaymentSvc {
       [enquiryData] = await EnquirySvc.getEnquiries({ _id: new ObjectId(enquiry_id) }, 0, 1);
     }
 
-    const [custom_offer] = await CustomeOfferSvc.getCustomOffer({ enquiry_id: enquiryData._id });
+    const [custom_offer] = await CustomOfferSvc.getCustomOffer({ enquiry_id: enquiryData._id });
 
     const mongoClient = useMongoClient();
     const session = mongoClient.startSession();
@@ -455,6 +455,9 @@ export default class PaymentSvc {
             email: enquiryData.user.email.replace(/_/g, " "),
           },
           template_name: "booking-confirmed.html",
+          support_email: tenant?.config?.support_email,
+          email_credentials: tenant?.config?.email_credentials,
+          tenant: tenant?.config?.name,
         }),
         initReceiptQueueProcess({
           receipt_no: receiptNo,
@@ -468,7 +471,7 @@ export default class PaymentSvc {
           { status: update_status === "PAID" ? enquiry_status.BOOKING_CONFIRMED : enquiry_status.PAYMENT_FAILED },
         ),
         PaymentSvc.updatePayment(paymentQuery, { status: update_status, updatedAt: new Date() }),
-        CustomeOfferSvc.updateCustomOffer(
+        CustomOfferSvc.updateCustomOffer(
           payment?.custom_offer,
           {
             status: update_status === "PAID" ? offer_status.BOOKING_CONFIRMED : offer_status.PAYMENT_FAILED,

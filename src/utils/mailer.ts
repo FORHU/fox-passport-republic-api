@@ -1,7 +1,5 @@
 import { createTransport } from "nodemailer";
 
-import { MAILER_EMAIL, MAILER_PASSWORD, MAILER_TRANSPORT_HOST, MAILER_TRANSPORT_PORT, MAILER_TRANSPORT_SECURE, SUPPORT_EMAIL } from "../config";
-
 export async function sendEmail({
   to,
   cc,
@@ -9,6 +7,9 @@ export async function sendEmail({
   text,
   html,
   attachments,
+  tenant,
+  email_credentials,
+  support_email,
 }: {
   to: string;
   cc?: string;
@@ -16,15 +17,20 @@ export async function sendEmail({
   text?: string;
   html?: string;
   attachments?: Array<any>;
+  tenant?: string;
+  email_credentials?: {
+    host: string;
+    port: number;
+    secure: boolean;
+    auth: {
+      user: string;
+      pass: string;
+    };
+  };
+  support_email?: string;
 }): Promise<string> {
   const transporter = createTransport({
-    host: MAILER_TRANSPORT_HOST,
-    port: MAILER_TRANSPORT_PORT,
-    secure: MAILER_TRANSPORT_SECURE,
-    auth: {
-      user: MAILER_EMAIL,
-      pass: MAILER_PASSWORD,
-    },
+    ...email_credentials,
     tls: {
       rejectUnauthorized: false,
     },
@@ -34,7 +40,7 @@ export async function sendEmail({
   const ccEmails = cc ? cc.split(",").map((email) => email.trim()) : [];
 
   const mailOptions: any = {
-    from: `Venue4use <${SUPPORT_EMAIL}>`,
+    from: `${tenant} <${support_email}>`,
     to: toEmails.join(", "),
     cc: ccEmails.length > 0 ? ccEmails.join(", ") : undefined,
     subject,

@@ -2,7 +2,7 @@ import { randomBytes } from "crypto";
 import { ObjectId } from "mongodb";
 
 import { InvoiceStatus } from "../../../models/invoice.model";
-import CustomeOfferSvc from "../../../services/custom-offer.service";
+import CustomOfferSvc from "../../../services/custom-offer.service";
 import InvoiceSvc from "../../../services/invoice.service";
 import { uploadPdfFileTos3 } from "../../aws";
 import {
@@ -67,7 +67,7 @@ invoiceQueue.process("process_invoices", async (job: any) => {
   if (uploadFiles) {
     await Promise.allSettled([
       await InvoiceSvc.updateInvoice({ _id: invoice._id }, { invoice_url: uploadFiles.Location, invoice_data: email_data }),
-      await CustomeOfferSvc.updateCustomOffer(new ObjectId(offer._id), { invoice: invoice._id }, null),
+      await CustomOfferSvc.updateCustomOffer(new ObjectId(offer._id), { invoice: invoice._id }, null),
     ]);
     fileAttachments.push({
       filename: `${invoice.invoice_no}.pdf`,

@@ -1,7 +1,6 @@
 import dayjs from "dayjs";
 import { ObjectId } from "mongodb";
 
-import { VENUE_4_USE_URI, GOGOJI_URI } from "../config";
 import { AdminMemberRoles, TAdminMembers } from "../models/admin-members.model";
 import { AuthStatus } from "../models/auth.model";
 import { hashPassword, TUser, user_status } from "../models/user.model";
@@ -34,16 +33,14 @@ export default class AdminMemberSvc {
     };
 
     await UserSvc.updateUser({ _id: userId }, userData);
-    const result = await AdminMembersRepo.updateAdminMemberById(adminUser._id, {
+    return await AdminMembersRepo.updateAdminMemberById(adminUser._id, {
       status: "ACCEPTED",
       updatedAt: new Date(),
     });
-    return result;
   }
 
   static async handleCreateAdminMember(data: any) {
-    const result = await AdminMembersRepo.createAdminMember(data);
-    return result;
+    return await AdminMembersRepo.createAdminMember(data);
   }
 
   static async inviteAdminMember(data: any, adminMemberData: any, tenant: any) {
@@ -60,13 +57,16 @@ export default class AdminMemberSvc {
             : "Unknown Role";
     const verificationUrl = tenant?.config.site_url;
     sendTemplatedEmail({
-      subject: "Venue4Use: Admin Invitation",
+      subject: `${tenant?.config?.name}: Admin Invitation`,
       email_data: {
         verification_link: `${verificationUrl}/signup/complete-profile/${token}?email=${data?.email}&admin_invite=true`,
         assigned_roles: roleString,
         email: data.email,
       },
       template_name: "admin-invite.html",
+      support_email: tenant?.config?.support_email,
+      email_credentials: tenant?.config?.email_credentials,
+      tenant: tenant?.config?.name,
     });
 
     return token;
@@ -95,8 +95,7 @@ export default class AdminMemberSvc {
   }
 
   static async handleGetAdminMembers(query: any, page: number, limit: number) {
-    const data = await AdminMembersRepo.getAdminMembers(query, page, limit);
-    return data;
+    return await AdminMembersRepo.getAdminMembers(query, page, limit);
   }
 
   static async getAllAdminMembers(query: any) {

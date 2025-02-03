@@ -41,10 +41,13 @@ export default class AuthSvc {
       const content = fs.readFileSync(filePath, "utf8");
       const html = content.replace("{first_name}", user.first_name).replace("{verification_link}", verification_link);
 
-      await handleSendEmail({
+      handleSendEmail({
         to: user.email,
         subject,
         html,
+        support_email: tenant?.config?.support_email,
+        email_credentials: tenant?.config?.email_credentials,
+        tenant: tenant?.config?.name,
       });
     }
 
@@ -86,7 +89,7 @@ export default class AuthSvc {
     };
   }
 
-  static async sendEmailVerification(userId: string) {
+  static async sendEmailVerification(userId: string, tenant: any) {
     const query = { _id: new ObjectId(userId), status: "PENDING" };
     const user = await UserRepo.getUser(query);
 
@@ -119,6 +122,9 @@ export default class AuthSvc {
       to: user.email,
       subject,
       html,
+      support_email: tenant?.config?.support_email,
+      email_credentials: tenant?.config?.email_credentials,
+      tenant: tenant?.config?.name,
     });
 
     await UserRepo.updateUser(query, payload);
@@ -374,9 +380,9 @@ export default class AuthSvc {
     }
   }
 
-  static async passwordReset(token: string) {
+  static async passwordReset(token: string, tenant: any) {
     const decodedToken = await verifyToken(token);
-    const user_id = new ObjectId(decodedToken._id);
+    const user_id = new ObjectId(decodedToken._id as string);
     const userEmail = decodedToken.email;
     const userFirstName = decodedToken.first_name;
     const result = await UserRepo.passwordReset(user_id);
@@ -390,6 +396,9 @@ export default class AuthSvc {
       to: userEmail,
       subject,
       html,
+      support_email: tenant?.config?.support_email,
+      email_credentials: tenant?.config?.email_credentials,
+      tenant: tenant?.config?.name,
     });
 
     return result;
@@ -414,7 +423,7 @@ export default class AuthSvc {
     }
   }
 
-  static async accountRecovery(email: string) {
+  static async accountRecovery(email: string, tenant: any) {
     const user: any = await UserRepo.getUser({ email });
 
     const userDetail = {
@@ -424,16 +433,18 @@ export default class AuthSvc {
       last_name: user.last_name,
     };
 
-    const verification_link = `${VENUE_4_USE_URI}/forgot-password/password-reset/${generateVerificationToken(userDetail)}`;
+    const verification_link = `${tenant?.config?.site_url}/forgot-password/password-reset/${generateVerificationToken(userDetail)}`;
     const subject = "Venue4Use: Account Recovery";
     const filePath = path.join(process.cwd(), `email-template/account-recovery.html`);
     const content = fs.readFileSync(filePath, "utf8");
     const html = content.replace("{first_name}", user?.first_name).replace("{verification_link}", verification_link);
-
     handleSendEmail({
       to: email,
       subject,
       html,
+      support_email: tenant?.config?.support_email,
+      email_credentials: tenant?.config?.email_credentials,
+      tenant: tenant?.config?.name,
     });
   }
 

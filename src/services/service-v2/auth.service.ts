@@ -5,7 +5,7 @@ import path from "path";
 import { VENUE_4_USE_URI } from "../../config";
 import { AuthStatus } from "../../models/auth.model";
 import { OrgRoles, StatusType } from "../../models/organization-member.model";
-import { MUser, TUser, user_role, user_status } from "../../models/user.model";
+import { TUser, user_role, user_status } from "../../models/user.model";
 import { MUserRoles } from "../../models/user-roles.model";
 import AuthRepo from "../../repositories/auth.repository";
 import UserRepo from "../../repositories/user.repository";
@@ -21,7 +21,7 @@ import OrganizationMemberSvc from "../organization-member.service";
 import UserRolesSvc from "../user-roles.service";
 import VenueSvc from "../venue.service";
 import UserSvc from "../user.service";
-import { validateLoginSchema, validateRoleSchema } from "../../utils/auth/validation";
+import { validateRoleSchema } from "../../utils/auth/validation";
 
 export default class AuthSvc {
   static async registration(payload: any, device_payload?: DevicePayload) {
