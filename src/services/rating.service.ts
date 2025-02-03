@@ -1,10 +1,23 @@
 /* eslint-disable no-useless-catch */
 import { ObjectId } from "mongodb";
 
-import { TRating, status_rating } from "../models/rating.model";
+import { status_rating, TRating } from "../models/rating.model";
 import RatingRepo from "../repositories/rating.repository";
 
 export default class RatingSvc {
+  static async getRatings(query: any, limit: number, skip: number) {
+    try {
+      const list_count = await RatingRepo.countRatings(query);
+      const lists = await RatingRepo.getRatings(query, limit, skip);
+      return {
+        total: list_count,
+        data: lists,
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
   static async getOverAllRating(space_id: string) {
     try {
       return await RatingRepo.getOverallRatings({ space: new ObjectId(space_id), status: status_rating.APPROVED });

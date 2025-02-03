@@ -69,5 +69,6 @@ router.post("/migrate-user-roles", AdminCtrl.migrateUserRoles);
 
 //rating
 router.patch("/rating/:rating_id", AdminCtrl.updateRating);
+router.get("/ratings", [...ADMIN_MIDDLEWARE], AdminCtrl.getRatings);
 
 export default router;

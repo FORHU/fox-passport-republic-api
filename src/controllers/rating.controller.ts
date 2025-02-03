@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 
+import { status_rating } from "../models/rating.model";
 import RatingSvc from "../services/rating.service";
 import { validateCreateRatingSchema } from "../utils/rating/validation";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
-import { status_rating } from "../models/rating.model";
 
 export default class RatingCtrl {
   static async getOverAllRating(req: Request, res: Response) {
@@ -26,7 +26,7 @@ export default class RatingCtrl {
       // Create ObjectId instances
       const space = new ObjectId(spaceId);
       const user = new ObjectId(userId);
-      const result = await RatingSvc.getRating({ space, user, status: status_rating.APPROVED });
+      const result = await RatingSvc.getRating({ space, user });
       handleResponse(res, result, "FETCH_SPACE_RATING");
     } catch (error) {
       handleErrorResponse(res, error, { code: "RATING_CREATION_FAILED" });
