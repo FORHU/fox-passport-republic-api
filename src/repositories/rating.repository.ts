@@ -9,6 +9,39 @@ export default class RatingRepo {
     return getDB().collection("ratings");
   }
 
+  static async countRatings(query: Filter<TRating>) {
+    try {
+      const collection = this.collection();
+      return await collection.countDocuments(query);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async getRatings(query: Filter<TRating>, limit: number, skip: number) {
+    try {
+      const collection = this.collection();
+      const pipeline = [
+        { $match: query },
+        {
+          $lookup: {
+            from: "users",
+            localField: "user",
+            foreignField: "_id",
+            as: "user",
+          },
+        },
+        { $unwind: "$user" },
+        { $sort: { createdAt: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+      ];
+      return collection.aggregate(pipeline).toArray();
+    } catch (error) {
+      throw error;
+    }
+  }
+
   static async upsertRating(query: any, data: TRating) {
     try {
       const collection = this.collection();

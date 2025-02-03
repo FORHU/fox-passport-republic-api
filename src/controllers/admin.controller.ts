@@ -12,11 +12,11 @@ import BookingSvc from "../services/booking.service";
 import EnquirySvc from "../services/enquiries.service";
 import FileSrvc from "../services/file.service";
 import KeywordSvc from "../services/keyword.service";
-import RatingSvc from "../services/rating.service";
 import SpaceSvc from "../services/space.service";
 import StripeProductSvc from "../services/stripe-product.service";
 import UserSvc from "../services/user.service";
 import VenueSvc from "../services/venue.service";
+import RatingSvc from "../services/rating.service";
 import { constructEnquiryQuery, parseWorkbook, validateSheetsData } from "../utils/admin/helpers";
 import {
   validateGetSpaceSchema,
@@ -26,16 +26,16 @@ import {
   validateVenueTransfer,
 } from "../utils/admin/validation";
 import { uploadFileToS3 } from "../utils/aws";
-import { validateCreateProduct, validateGetEnquiriesSchema } from "../utils/enquiries/validation";
+import { validateCreateProduct, validateGetEnquiriesSchema, validateGetRatingSchema } from "../utils/enquiries/validation";
 import { calculatePagination } from "../utils/helpers";
 import { initFileQueue } from "../utils/queues/files/file-migration.queue";
 import { initQuestionQueue } from "../utils/queues/question/delete-question.queue";
+import { initTenantUserQueue } from "../utils/queues/tenant/user.tenant.queue";
+import { initTenantVenueQueue } from "../utils/queues/tenant/venue.tenant.queue";
 import { initUserRolesQueue } from "../utils/queues/user/migrate-user.queue";
 import { initAddVenueQueue } from "../utils/queues/venue/add-venue.queue";
-import { initTenantUserQueue } from "../utils/queues/tenant/user.tenant.queue";
 import { validateUpdateRatingSchema } from "../utils/rating/validation";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
-import { initTenantVenueQueue } from "../utils/queues/tenant/venue.tenant.queue";
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -205,7 +205,7 @@ export default class AdminCtrl {
 
   static async deleteVenue(req: Request, res: Response) {
     try {
-      const user_id = new ObjectId(req.user._id);
+      const user_id = new ObjectId(req.user._id as string);
       const venue_id = new ObjectId(req.params.venue_id);
       const query = {
         venue: venue_id,
@@ -543,5 +543,30 @@ export default class AdminCtrl {
     const ratingId = new ObjectId(req.params.rating_id);
     const results = await RatingSvc.updateRating({ _id: ratingId }, req.body);
     return handleResponse(res, results, "RATING_UPDATED_SUCCESSFULLY");
+  }
+
+  static async getRatings(req: Request, res: Response) {
+    const { page = 1, limit = 20 } = req.query as any;
+
+    const pageNumber = parseInt(page.toString());
+    const limitNumber = parseInt(limit.toString());
+    const offset = (pageNumber - 1) * limitNumber;
+
+    const { error } = validateGetRatingSchema(req.query);
+    if (error) {
+      return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
+    }
+    const results: { data: any; total: number } = await RatingSvc.getRatings({}, limitNumber, offset);
+
+    const response = {
+      data: results?.data,
+      total_pages: Math.ceil(results?.total / limitNumber) || 0,
+      total_items: results?.total,
+      current_page: pageNumber,
+      size: limitNumber,
+      offset: offset,
+    };
+
+    return handleResponse(res, response, "RATING_FETCH_SUCCESSFULLY");
   }
 }

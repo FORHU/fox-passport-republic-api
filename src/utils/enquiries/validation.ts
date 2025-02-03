@@ -59,6 +59,14 @@ export const validateGetEnquiriesSchema = (data: any) => {
   return schema.validate(data);
 };
 
+export const validateGetRatingSchema = (data: any) => {
+  const schema = Joi.object({
+    page: Joi.number().allow(null, ""),
+    limit: Joi.number().allow(null, ""),
+  });
+  return schema.validate(data);
+};
+
 export const validateUpdateEnquiriesSchema = (data: any) => {
   const schema = Joi.object({
     status: Joi.string()
