@@ -2,12 +2,12 @@ import fs from "fs";
 import { ObjectId } from "mongodb";
 import path from "path";
 
-import { REFRESH_TOKEN_SECRET, VENUE_4_USE_URI, GOGOJI_URI } from "../config";
+import { REFRESH_TOKEN_SECRET, VENUE_4_USE_URI } from "../config";
 import { AuthStatus, TUpdateAuth } from "../models/auth.model";
 import { hashPassword, MUser, TUser, user_role, user_status } from "../models/user.model";
+import AdminMembersRepo from "../repositories/admin-members.repository";
 import AuthRepo from "../repositories/auth.repository";
 import UserRepo from "../repositories/user.repository";
-import AdminMembersRepo from "../repositories/admin-members.repository";
 import { DevicePayload } from "../types/admin";
 import { generateAccessToken, generateRefreshToken, generateVerificationToken, verifyToken } from "../utils/auth";
 import { USER_ROLES } from "../utils/constant";
@@ -16,7 +16,7 @@ import { generateOTP } from "../utils/helpers";
 import UserSvc from "./user.service";
 
 export default class AuthSvc {
-  static async registration(userData: TUser, is_invited?: boolean, device_payload?: DevicePayload) {
+  static async registration(userData: TUser, is_invited?: boolean, device_payload?: DevicePayload, tenant?: any) {
     const email = userData.email ?? "";
     const existingUser = await UserRepo.getUser({ email: { $regex: new RegExp(`^${email}$`, "i") } });
     if (existingUser) {
@@ -34,7 +34,7 @@ export default class AuthSvc {
     };
 
     if (user.role !== user_role.ADMIN && !is_invited) {
-      const verificationUrl = userData.tenant ? GOGOJI_URI : VENUE_4_USE_URI;
+      const verificationUrl = tenant?.config?.site_url;
       const verification_link = `${verificationUrl}/verify-email/${generateVerificationToken(tokenPayload)}?role=${userData?.role}`;
       const subject = "Venue4Use: Confirm Your Email Address";
       const filePath = path.join(process.cwd(), `email-template/email-verification.html`);

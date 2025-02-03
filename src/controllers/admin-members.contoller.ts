@@ -50,7 +50,7 @@ export default class AdminMemberCtrl {
     try {
       const { email, assigned_roles } = req.body;
       const country = req?.query?.country || "SG";
-      const tenant = req?.tenant?.code;
+      const tenant = req?.tenant;
       const user = new ObjectId(req.user._id as string);
       const { error } = validateAdminMemberSchema(req.body);
       if (error) {
@@ -66,7 +66,7 @@ export default class AdminMemberCtrl {
         email,
         role: user_role.ADMIN,
         status: user_status.PENDING,
-        ...(tenant && { tenant }),
+        ...(tenant && { tenant: tenant?.code }),
       });
 
       const data = {
@@ -80,7 +80,7 @@ export default class AdminMemberCtrl {
 
       const adminMemberData = {
         _id: new ObjectId(),
-        admin: new ObjectId(req?.user?._id),
+        admin: new ObjectId(req?.user?._id as string),
         invited_user: new ObjectId(userData?._id),
         assigned_roles: Number(data.assigned_roles),
         status: "PENDING",

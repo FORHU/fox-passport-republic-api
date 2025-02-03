@@ -34,7 +34,7 @@ export default class OrganizationMemberCtrl {
     try {
       const userId = new ObjectId(req?.user?._id as string);
       const country = req?.query?.country || "SG";
-      const tenant = req?.tenant?.code;
+      const tenant = req?.tenant;
       const { error } = validateUpdateTeamMemberSchema(req.body);
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });

@@ -99,7 +99,7 @@ export default class PaymentCtrl {
       return handleResponse(res, {}, "ACCOUNT_EXISTS");
     }
 
-    const tenant = req?.tenant?.code;
+    const tenant = req?.tenant;
     const results = await PaymentSvc.createAccount(req.body, userStripeAccount, user, tenant);
 
     return handleResponse(res, { results: results.accountLink }, "ACCOUNT_CREATED");

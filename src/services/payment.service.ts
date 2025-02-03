@@ -486,12 +486,12 @@ export default class PaymentSvc {
     return { payment: true };
   }
 
-  static async createAccount(payload: any, userStripeAccount: any, user: any, tenant?: string) {
+  static async createAccount(payload: any, userStripeAccount: any, user: any, tenant?: any) {
     const { user_id, country = "SG" } = payload;
 
     if (userStripeAccount && userStripeAccount.stripe_account_id && userStripeAccount.status === account_status.PENDING) {
-      const retrivedAccount: any = await retriveAccount(userStripeAccount.stripe_account_id);
-      if (retrivedAccount) {
+      const retrievedAccount: any = await retriveAccount(userStripeAccount.stripe_account_id, tenant);
+      if (retrievedAccount) {
         await StripeAccountSvc.deleteAccount({ _id: userStripeAccount._id });
         await deleteAccount(userStripeAccount?.stripe_account_id);
       }
@@ -503,14 +503,17 @@ export default class PaymentSvc {
 
     await StripeAccountSvc.createAccount({
       _id: stripeAccountId,
-      user: new ObjectId(user_id),
+      user: new ObjectId(user_id as string),
       stripe_account_id: results.account_id,
     });
 
     //patch the stripe account transaction stripe_acccount fields when newly onboarding
-    const existingAccountTransaction = await StripeAccountTransactionSvc.getAccount({ venue_owner: new ObjectId(user_id) });
+    const existingAccountTransaction = await StripeAccountTransactionSvc.getAccount({ venue_owner: new ObjectId(user_id as string) });
     if (existingAccountTransaction) {
-      await StripeAccountTransactionSvc.updateManyPaymentTransaction({ venue_owner: new ObjectId(user_id) }, { stripe_account: stripeAccountId });
+      await StripeAccountTransactionSvc.updateManyPaymentTransaction(
+        { venue_owner: new ObjectId(user_id as string) },
+        { stripe_account: stripeAccountId },
+      );
     }
     return results;
   }
