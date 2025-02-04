@@ -22,7 +22,7 @@ router.get("/space-list", [optionalAuthMiddleware, userLogsMiddleware, tenantMid
 router.post("/", [sessionMiddleware, authenticateToken, userLogsMiddleware, ...teamOrganizationMiddleware], SpaceCtrl.createSpaces);
 router.post("/coordinates", SpaceCtrl.getCoordinates);
 router.patch("/:id", [sessionMiddleware, authenticateToken, userLogsMiddleware, ...teamOrganizationMiddleware], SpaceCtrl.updateSpaces);
-router.delete("/:id", [sessionMiddleware, authenticateToken, userLogsMiddleware, ...teamOrganizationMiddleware], SpaceCtrl.markSpaceForDeletion);
+router.delete("/:id", [sessionMiddleware, authenticateToken, userLogsMiddleware, tenantMiddleware, ...teamOrganizationMiddleware], SpaceCtrl.markSpaceForDeletion);
 router.delete("/", [sessionMiddleware, authenticateToken, userLogsMiddleware, ...teamOrganizationMiddleware], SpaceCtrl.deleteMultipleSpaces);
 
 export default router;

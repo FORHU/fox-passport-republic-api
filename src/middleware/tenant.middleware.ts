@@ -66,7 +66,6 @@ const TenantMiddleware = (req: Request, res: Response, next: NextFunction) => {
         error: "Tenant mismatch with referer",
       });
     }
-
     req.tenant = {
       code: tenantHeader,
       config: tenantConfig,

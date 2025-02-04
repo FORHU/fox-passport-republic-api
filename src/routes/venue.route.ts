@@ -21,9 +21,9 @@ router.get("/count", [...defaultMiddleware, tenantMiddleware], VenueCtrl.countVe
 router.post("/", [...defaultMiddleware, ...teamOrganizationMiddleware, ...groupTenantMiddleware], VenueCtrl.createVenue);
 router.patch("/:venue_id", [...defaultMiddleware, ...teamOrganizationMiddleware], VenueCtrl.updateVenue);
 router.delete("/", [...defaultMiddleware, ...teamOrganizationMiddleware], VenueCtrl.deleteMultipleVenues);
-router.delete("/:id", [...defaultMiddleware, ...teamOrganizationMiddleware], VenueCtrl.deleteVenue);
+router.delete("/:id", [...defaultMiddleware, tenantMiddleware, ...teamOrganizationMiddleware], VenueCtrl.deleteVenue);
 
-router.post("/transfer-ownership/accept/:token", VenueCtrl.transferOwnershipAccept);
-router.post("/transfer-ownership/accept/existing/:token", VenueCtrl.transferOwnershipAcceptExisting);
+router.post("/transfer-ownership/accept/:token", tenantMiddleware, VenueCtrl.transferOwnershipAccept);
+router.post("/transfer-ownership/accept/existing/:token", tenantMiddleware, VenueCtrl.transferOwnershipAcceptExisting);
 
 export default router;

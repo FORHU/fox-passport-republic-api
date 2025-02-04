@@ -17,14 +17,14 @@ const router = express.Router();
 // spaces routes
 router.get("/space", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminCtrl.getAllSpaces);
 router.get("/space/count", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminCtrl.countAdminSpace);
-router.patch("/space/:space_id", [...ADMIN_MIDDLEWARE], AdminCtrl.updateSpace);
+router.patch("/space/:space_id", [...ADMIN_MIDDLEWARE, tenantMiddleware], AdminCtrl.updateSpace);
 router.delete("/space/:space_id", [...ADMIN_MIDDLEWARE], AdminCtrl.deleteSpace);
 
 // venue routes
 router.get("/venue", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminCtrl.getAllVenues);
 router.get("/venue/count", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminCtrl.countAdminVenue);
-router.patch("/venue/:venue_id", [...ADMIN_MIDDLEWARE], AdminCtrl.updateVenue);
-router.delete("/venue/:venue_id", [...ADMIN_MIDDLEWARE], AdminCtrl.deleteVenue);
+router.patch("/venue/:venue_id", [...ADMIN_MIDDLEWARE, tenantMiddleware], AdminCtrl.updateVenue);
+router.delete("/venue/:venue_id", [...ADMIN_MIDDLEWARE, tenantMiddleware], AdminCtrl.deleteVenue);
 
 //enquiries routes
 router.get("/enquiries", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminCtrl.getEnquries);
@@ -53,8 +53,8 @@ router.patch("/member/:id", [...ADMIN_MIDDLEWARE], AdminMemberCtrl.updateAdminMe
 router.delete("/member/:id", [...ADMIN_MIDDLEWARE], AdminMemberCtrl.deleteAdminMemberbyId);
 
 //ADMIN VENUE TRANSFER OWNERSHIP
-router.post("/venue/transfer-ownership/invite/:venueId", [...ADMIN_MIDDLEWARE], AdminCtrl.transferOwnershipRequest);
-router.post("/venue/transfer-ownership/invite/resend/:venueId", [...ADMIN_MIDDLEWARE], AdminCtrl.transferOwnershipResend);
+router.post("/venue/transfer-ownership/invite/:venueId", [...ADMIN_MIDDLEWARE, tenantMiddleware], AdminCtrl.transferOwnershipRequest);
+router.post("/venue/transfer-ownership/invite/resend/:venueId", [...ADMIN_MIDDLEWARE, tenantMiddleware], AdminCtrl.transferOwnershipResend);
 
 //ADMIN SALES
 router.get("/sales", [...ADMIN_MIDDLEWARE, ...TENANT_MIDDLEWARE], AdminMemberCtrl.getSalesTransaction);

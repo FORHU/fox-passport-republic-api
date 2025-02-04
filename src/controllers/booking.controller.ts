@@ -8,7 +8,7 @@ import { Document, ObjectId } from "mongodb";
 import { IS_BOOKING_MICROSERVICES } from "../config";
 import BookingSvc from "../services/booking.service";
 import CancellationPolicySvc from "../services/cancellation-policy.service";
-import CustomeOfferSvc from "../services/custom-offer.service";
+import CustomOfferSvc from "../services/custom-offer.service";
 import SpaceSvc from "../services/space.service";
 import {
   validateCancelBookingSchema,
@@ -158,16 +158,16 @@ export default class BookingCtrl {
         const formattedDate = formattedDates[i];
         const { start_date_time, end_date_time } = formattedDate.timestamp;
 
-        const existingBooking = await BookingSvc.existingBooking(new ObjectId(space), start_date_time, end_date_time);
+        const existingBooking = await BookingSvc.existingBooking(new ObjectId(space as string), start_date_time, end_date_time);
         if (existingBooking) {
           return handleErrorResponse(res, existingBooking, { code: "THERE_IS_ALREADY_A_BOOKING_FOR_THE_PROVIDED_DATE_RANGE" });
         }
 
         const updateData = {
-          ...(req?.user?._id && { booker: new ObjectId(req.user._id) }),
-          ...(booked_user && { booked_user: new ObjectId(booked_user) }),
-          ...(space && { space: new ObjectId(space) }),
-          ...(venue && { venue: new ObjectId(venue) }),
+          ...(req?.user?._id && { booker: new ObjectId(req.user._id as string) }),
+          ...(booked_user && { booked_user: new ObjectId(booked_user as string) }),
+          ...(space && { space: new ObjectId(space as string) }),
+          ...(venue && { venue: new ObjectId(venue as string) }),
           ...(start_date_time && { start_date: start_date_time }),
           ...(end_date_time && { end_date: end_date_time }),
           ...(total_guest !== undefined && { total_guest }),
@@ -180,7 +180,7 @@ export default class BookingCtrl {
           booking_reference: "",
         };
 
-        const updateResult = await BookingSvc.updateBooking(new ObjectId(booking_id), updateData);
+        const updateResult = await BookingSvc.updateBooking(new ObjectId(booking_id as string), updateData, req?.tenant);
         totalModifiedCount += updateResult.modifiedCount;
         totalMatchedCount += updateResult.matchedCount;
       }
@@ -245,7 +245,7 @@ export default class BookingCtrl {
         return handleErrorResponse(res, {}, { code: "BOOKING_CAN_NOT_BE_DELETED" });
       }
 
-      const result = await BookingSvc.deleteBooking(booking_id, new ObjectId(req?.user?._id));
+      const result = await BookingSvc.deleteBooking(booking_id, new ObjectId(req?.user?._id as string));
       return handleResponse(res, result, "BOOKING_DELETED");
     } catch (error) {
       logger.log({
@@ -276,7 +276,7 @@ export default class BookingCtrl {
       if (!cancellation_policy) {
         return handleErrorResponse(res, "CANCELLATION_POLICY_NOT_FOUND", { code: "CANCELLATION_POLICY_NOT_FOUND" });
       }
-      const [existingCustomOffer]: any = await CustomeOfferSvc.getCustomOffer({ "booking._id": existingBooking._id });
+      const [existingCustomOffer]: any = await CustomOfferSvc.getCustomOffer({ "booking._id": existingBooking._id });
       if (!existingBooking) {
         return handleErrorResponse(res, "CANCELLATION_POLICY_NOT_FOUND", { code: "CANCELLATION_POLICY_NOT_FOUND" });
       }
@@ -288,6 +288,7 @@ export default class BookingCtrl {
         cancellation_policy,
         existingBooking,
         existingCustomOffer,
+        req?.tenant,
       );
       // const result = await BookingSvc.updateBooking(booking_id, updatedData);
       return handleResponse(res, { result: result.result }, result.cancellationMessage);
@@ -319,7 +320,7 @@ export default class BookingCtrl {
         return handleErrorResponse(res, "CANCELLATION_POLICY_NOT_FOUND", { code: "CANCELLATION_POLICY_NOT_FOUND" });
       }
 
-      const [existingCustomOffer]: any = await CustomeOfferSvc.getCustomOffer({ "booking._id": existingBooking._id });
+      const [existingCustomOffer]: any = await CustomOfferSvc.getCustomOffer({ "booking._id": existingBooking._id });
       if (!existingBooking) {
         return handleErrorResponse(res, "CANCELLATION_POLICY_NOT_FOUND", { code: "CANCELLATION_POLICY_NOT_FOUND" });
       }

@@ -8,8 +8,9 @@ import PricingRepo from "../repositories/pricing.repository";
 import SpaceRepo from "../repositories/space.repository";
 import UserLogsRepo from "../repositories/user-logs.repository";
 import { PaginationType, RequestWithParamsAndUser } from "../types/common";
+import { TMostPopular } from "../types/space";
 import { processBookingsAndPricing } from "../utils/bookings/bookingUtils";
-import { getSummarizedPricing, getOneSummarizedPricing, hashSearch, parseDate, PricingData, sendTemplatedEmail } from "../utils/helpers";
+import { getOneSummarizedPricing, getSummarizedPricing, hashSearch, parseDate, PricingData, sendTemplatedEmail } from "../utils/helpers";
 import { parseQuestion } from "../utils/question/utils";
 import RedisUtil from "../utils/redis.util";
 import { constructQuery } from "../utils/space/helpers";
@@ -19,7 +20,6 @@ import QuestionSvc from "./questions.service";
 import UserSvc from "./user.service";
 import UserLogsSvc from "./user-logs.service";
 import VenueSvc from "./venue.service";
-import { TMostPopular } from "../types/space";
 
 const PREFIX = "spaces";
 const PREFIX_USER_LOGS = "user_logs";
@@ -116,7 +116,7 @@ export default class SpaceSvc {
         ...(endDateTime ? { endDate: endDateTime } : {}),
       };
 
-      let list = null;
+      const list = null;
       const hashSpacePayload = hashSearch({ spacesPayload, description: "getPaginatedSpacesWithPricing" });
       const cacheSpacePayload = await RedisUtil.getCache(hashSpacePayload, PREFIX);
 
@@ -221,7 +221,7 @@ export default class SpaceSvc {
     }
   }
 
-  static async processUpdateSpaces(payload: any, spaceId: ObjectId, space: any, userRole: any) {
+  static async processUpdateSpaces(payload: any, spaceId: ObjectId, space: any, userRole: any, tenant?: any) {
     const {
       status,
       name,
@@ -268,7 +268,7 @@ export default class SpaceSvc {
     const updateQuestionData = async (data: any, existingData: any[]) => {
       if (data) {
         if (existingData && existingData.length > 0) {
-          const objectIds = existingData.map((id: any) => new ObjectId(id));
+          const objectIds = existingData.map((id: any) => new ObjectId(id as string));
           await QuestionSvc.deleteQuestions(objectIds);
         }
 
@@ -277,7 +277,7 @@ export default class SpaceSvc {
         const upsertedIds = result.upsertedIds;
 
         // eslint-disable-next-line no-unused-vars
-        return Object.entries(upsertedIds).map(([key, value]) => new ObjectId(value));
+        return Object.entries(upsertedIds).map(([key, value]) => new ObjectId(value as string));
       }
     };
 
@@ -326,16 +326,15 @@ export default class SpaceSvc {
       updatedAt: updatedAt,
     };
 
-    await VenueSvc.updateVenue(space.venue, { updatedAt: updatedAt });
-    const result = await this.updateSpaces(updatedData, { _id: spaceId });
-    return result;
+    await VenueSvc.updateVenue(space.venue, { updatedAt: updatedAt }, tenant);
+    return await this.updateSpaces(updatedData, { _id: spaceId }, tenant);
   }
 
-  static async updateSpaces(payload: Partial<TSpace>, query: any) {
+  static async updateSpaces(payload: Partial<TSpace>, query: any, tenant?: any) {
     try {
       const message = null;
 
-      await this.sendEmailNotif(query, payload.status);
+      await this.sendEmailNotif(query, payload.status, tenant);
       const result = await SpaceRepo.updateSpaces(payload, query);
       return {
         result: result,
@@ -346,14 +345,14 @@ export default class SpaceSvc {
     }
   }
 
-  static async sendEmailNotif(query: any, status: string, send = true) {
+  static async sendEmailNotif(query: any, status: string, send = true, tenant?: any) {
     if (send && status && status === "FOR_APPROVAL") {
       const [spaceData] = await SpaceRepo.getPaginatedSpaces({ query: query, skip: 0, limit: 1, user_id: null });
       const dateSubmitted = new Date().toISOString();
       const date_submitted = formatDate(dateSubmitted);
 
       sendTemplatedEmail({
-        subject: "Venue4Use: Space For Approval",
+        subject: `${tenant?.config?.name}: Space For Approval`,
         email_data: {
           email: spaceData.venue.user.email,
           first_name: spaceData?.venue?.user?.first_name?.replace(/_/g, " ") || "Venue Owner",
@@ -362,10 +361,13 @@ export default class SpaceSvc {
           date_submitted: date_submitted?.replace(/_/g, " "),
         },
         template_name: "space-for-approval.html",
+        support_email: tenant?.config?.support_email,
+        email_credentials: tenant?.config?.email_credentials,
+        tenant: tenant?.config?.name,
       });
 
       sendTemplatedEmail({
-        subject: "Venue4Use: Space Approval Needed",
+        subject: `${tenant?.config?.name}: Space Approval Needed`,
         email_data: {
           // Owner Details
           verification_link: `${VENUE_4_USE_URI}/sg/venues/management/venue/${spaceData.venue._id}/spaces/${spaceData._id}`,
@@ -395,6 +397,9 @@ export default class SpaceSvc {
         },
         cc: CC_SUPPORT_EMAIL,
         template_name: "space-approval-notification.html",
+        support_email: tenant?.config?.support_email,
+        email_credentials: tenant?.config?.email_credentials,
+        tenant: tenant?.config?.name,
       });
     }
   }
@@ -645,7 +650,7 @@ export default class SpaceSvc {
     let list_count = null;
     const spaceCountPayload = {
       query,
-      user_id: user ? new ObjectId(user._id) : null,
+      user_id: user ? new ObjectId(user._id as string) : null,
       mark_as_favorite,
       ...(startDateTime ? { startDate: startDateTime } : {}),
       ...(endDateTime ? { endDate: endDateTime } : {}),
@@ -803,7 +808,7 @@ export default class SpaceSvc {
   }
 
   //not use methods
-  static async deleteSpace(query: any, data: any) {
+  static async deleteSpace(query: any, data: any, tenant?: any) {
     let message = null;
     try {
       const idQuery = Array.isArray(query._id) ? { $in: query._id } : query._id;
@@ -812,7 +817,7 @@ export default class SpaceSvc {
       const date_submitted = formatDate(dateSubmitted);
 
       sendTemplatedEmail({
-        subject: "Venue4Use: Space Deletion Requested",
+        subject: `${tenant?.config?.name}: Space Deletion Requested`,
         email_data: {
           verification_link: `${VENUE_4_USE_URI}/sg/login/admin`,
           space_name: spaceData?.name?.replace(/_/g, " ") || "",
@@ -823,7 +828,9 @@ export default class SpaceSvc {
           email: SUPPORT_EMAIL,
         },
         cc: CC_SUPPORT_EMAIL,
-        template_name: "space-deletion-request.html",
+        support_email: tenant?.config?.support_email,
+        email_credentials: tenant?.config?.email_credentials,
+        tenant: tenant?.config?.name,
       });
 
       message = `Email sent successfully to: ${SUPPORT_EMAIL}`;
@@ -847,10 +854,9 @@ export default class SpaceSvc {
     }
 
     if (query.space_id) {
-      spaceQuery._id = new ObjectId(query.space_id);
+      spaceQuery._id = new ObjectId(query.space_id as string);
     }
 
-    const result = await SpaceRepo.getCoordinates(spaceQuery);
-    return result;
+    return await SpaceRepo.getCoordinates(spaceQuery);
   }
 }

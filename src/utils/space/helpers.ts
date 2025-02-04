@@ -40,7 +40,7 @@ export const constructQuery = (params: any, startTime?: any, endTime?: any, filt
     tenant_code,
     tenant,
   } = params;
-  let query: any = {};
+  const query: any = {};
   const date = dayjs(start_date);
   const dayOfWeek = date.format("dddd").toUpperCase();
 
@@ -452,7 +452,7 @@ export const constructQuery = (params: any, startTime?: any, endTime?: any, filt
   if (representationArray.length > 0) {
     query["representation"] = { $in: representationArray };
   }
-  
+
   return query;
 };
 

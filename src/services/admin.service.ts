@@ -2,13 +2,14 @@
 /* eslint-disable no-useless-catch */
 import { ObjectId } from "mongodb";
 
-import { CC_SUPPORT_EMAIL, VENUE_4_USE_URI } from "../config";
+import { CC_SUPPORT_EMAIL } from "../config";
 import { OrgRoles, StatusType } from "../models/organization-member.model";
 import { SaleTransactionsStatus } from "../models/sale-transactions.model";
 import { space_status } from "../models/space.model";
 import { hashPassword, user_role, user_status } from "../models/user.model";
 import { venue_status } from "../models/venue.models";
 import AdminRepo from "../repositories/admin.repository";
+import EmailLogsRepo from "../repositories/email_logs.repository";
 import EnquiryRepo from "../repositories/enquiries.repository";
 import SpaceRepository from "../repositories/space.repository";
 import VenueRepo from "../repositories/venue.repository";
@@ -27,7 +28,6 @@ import { createPrice, createProduction } from "../utils/stripe";
 import SaleTransactionSvc from "./sale-transactions.service";
 import StripeProductSvc from "./stripe-product.service";
 import UserRolesSvc from "./user-roles.service";
-import EmailLogsRepo from "../repositories/email_logs.repository";
 
 const PREFIX_VENUE = "venues";
 const PREFIX_SPACE = "spaces";
@@ -41,7 +41,7 @@ export default class AdminSvc {
     }
   }
 
-  static async updateVenue(data: any, status: string) {
+  static async updateVenue(data: any, status: string, tenant?: any) {
     try {
       const [venue_data] = await AdminRepo.getSpaces({ venue: data });
 
@@ -63,10 +63,10 @@ export default class AdminSvc {
       if ([venue_status.PUBLISHED, venue_status.REJECTED, venue_status.SUSPENDED].includes(status as venue_status)) {
         const subject =
           status === venue_status.PUBLISHED
-            ? "Venue4Use: Venue Approved"
+            ? `${tenant?.config?.name}: Venue Approved`
             : status === venue_status.REJECTED
-              ? "Venue Submission Status"
-              : "Venue Suspension Notice";
+              ? `${tenant?.config?.name} Venue Submission Status`
+              : `${tenant?.config?.name} Venue Suspension Notice`;
 
         const template_name =
           status === venue_status.PUBLISHED
@@ -89,6 +89,9 @@ export default class AdminSvc {
               date_approved: date_approved.replace(/_/g, " "),
             },
             template_name,
+            support_email: tenant?.config?.support_email,
+            email_credentials: tenant?.config?.email_credentials,
+            tenant: tenant?.config?.name,
           });
           emailStatus = "sent";
         } catch (err) {
@@ -198,7 +201,7 @@ export default class AdminSvc {
     }
   }
 
-  static async updateSpace(query: any, data: any) {
+  static async updateSpace(query: any, data: any, tenant?: any) {
     try {
       const [space_data] = await SpaceRepository.getPaginatedSpaces({ query: query, skip: 0, limit: 1, user_id: null });
 
@@ -213,12 +216,12 @@ export default class AdminSvc {
         if ([space_status.PUBLISHED, space_status.REJECTED, space_status.DELETED, space_status.SUSPENDED].includes(data.status)) {
           const subject =
             data.status === space_status.PUBLISHED
-              ? "Venue4Use: Space Approved"
+              ? `${tenant?.config?.name}: Space Approved`
               : data.status === space_status.REJECTED
-                ? "Space Submission Status"
+                ? `${tenant?.config?.name}: Space Submission Status`
                 : data.status === space_status.DELETED
-                  ? "Space Submission Status"
-                  : "Space Suspension Notice";
+                  ? `${tenant?.config?.name}: Space Submission Status`
+                  : `${tenant?.config?.name}: Space Suspension Notice`;
 
           const template_name =
             data.status === space_status.PUBLISHED
@@ -240,6 +243,9 @@ export default class AdminSvc {
               date_approved: date_approved.replace(/_/g, " "),
             },
             template_name,
+            support_email: tenant?.config?.support_email,
+            email_credentials: tenant?.config?.email_credentials,
+            tenant: tenant?.config?.name,
           });
 
           emailMessage = `Email sent successfully to: ${space_data.venue.user.email}`;
@@ -301,26 +307,29 @@ export default class AdminSvc {
     }
   }
 
-  static async deleteVenue(query: any, updateData: any, spaceData?: any[]) {
+  static async deleteVenue(query: any, updateData: any, spaceData?: any[], tenant?: any) {
     let message = null;
     try {
       const dateSubmitted = new Date().toISOString();
       const date_submitted = formatDate(dateSubmitted);
       const space = spaceData[0];
-      const emailRecepient = space.venue.user.email;
+      const emailRecipient = space.venue.user.email;
       sendTemplatedEmail({
-        subject: "Venue4Use: Venue Deletion Approved",
+        subject: `${tenant?.config?.name}: Venue Deletion Approved`,
         email_data: {
           venue_name: space?.venue?.name?.replace(/_/g, " ") || "",
           first_name: space?.venue?.user?.first_name?.replace(/_/g, " ") || "Venue Owner",
           date_deleted: date_submitted || "",
-          email: emailRecepient,
+          email: emailRecipient,
         },
         cc: CC_SUPPORT_EMAIL,
         template_name: "admin-venue-deletion-approval.html",
+        support_email: tenant?.config?.support_email,
+        email_credentials: tenant?.config?.email_credentials,
+        tenant: tenant?.config?.name,
       });
 
-      message = `Email sent successfully to: ${emailRecepient}`;
+      message = `Email sent successfully to: ${emailRecipient}`;
 
       const result = await AdminRepo.deleteVenue(query, updateData);
 
@@ -333,7 +342,7 @@ export default class AdminSvc {
     }
   }
 
-  static async deleteSpace(query: any, updateData: any) {
+  static async deleteSpace(query: any, updateData: any, tenant?: any) {
     try {
       const idQuery = Array.isArray(query._id) ? { $in: query._id } : query._id;
       const spaces_data = await SpaceRepository.getPaginatedSpaces({
@@ -347,7 +356,7 @@ export default class AdminSvc {
         throw new Error("No spaces found");
       }
 
-      const emailRecepient = spaces_data[0].venue.user.email;
+      const emailRecipient = spaces_data[0].venue.user.email;
       const first_name = spaces_data[0]?.venue?.user?.first_name?.replace(/_/g, " ") || "Venue Owner";
 
       const newDate = new Date();
@@ -357,21 +366,24 @@ export default class AdminSvc {
       const spaceNames = spaces_data.map((space) => space.name?.replace(/_/g, " ") || "").join(", ");
 
       sendTemplatedEmail({
-        subject: "Venue4Use: Space Deletion Approved",
+        subject: `${tenant?.config?.name}: Space Deletion Approved`,
         email_data: {
-          email: emailRecepient,
+          email: emailRecipient,
           first_name: first_name,
           space_name: spaceNames,
           date_deleted: date_deleted,
         },
         cc: CC_SUPPORT_EMAIL,
         template_name: "admin-space-deletion-approval.html",
+        support_email: tenant?.config?.support_email,
+        email_credentials: tenant?.config?.email_credentials,
+        tenant: tenant?.config?.name,
       });
 
       const result = await AdminRepo.deleteSpace(query, updateData);
 
       return {
-        message: `Email sent successfully to ${emailRecepient}`,
+        message: `Email sent successfully to ${emailRecipient}`,
         result,
       };
     } catch (error) {
@@ -382,59 +394,65 @@ export default class AdminSvc {
 
   static async getEnquiries(query: any, pageNumber: number, limitNumber: number) {
     try {
-      const result = await EnquiryRepo.getEnquiries(query, pageNumber, limitNumber);
-      return result;
+      return await EnquiryRepo.getEnquiries(query, pageNumber, limitNumber);
     } catch (error) {
       throw error;
     }
   }
 
-  static async updateAssociatedSpaces(query: any, data: any) {
+  static async updateAssociatedSpaces(query: any, data: any, tenant?: any) {
     const spacesDetails = await AdminSvc.getSpaces(query);
 
     for (const space of spacesDetails) {
-      const date_submitted = formatDate(space.updatedAt);
-
-      const subject = data.status === space_status.SUSPENDED ? "Space Suspension Notice" : "Space Submission Status";
-      const template_name = data.status === space_status.SUSPENDED ? "space-suspension.html" : "space-declined.html";
-
-      sendTemplatedEmail({
-        subject,
-        email_data: {
-          email: space?.venue?.user?.email,
-          first_name: space?.venue?.user?.first_name?.replace(/_/g, " ") || "Venue Owner",
-          venue_name: space?.venue?.name?.replace(/_/g, " ") || "",
-          space_name: space?.name?.replace(/_/g, " ") || "",
-          date_submitted: date_submitted.replace(/_/g, " "),
-        },
-        template_name,
-      });
+      const user = await UserSvc.getUser({ _id: space.venue.user });
+      if (user) {
+        const date_submitted = formatDate(space.updatedAt);
+        const subject =
+          data.status === space_status.SUSPENDED
+            ? `${tenant?.config?.name} Space Suspension Notice`
+            : `${tenant?.config?.name} Space Submission Status`;
+        const template_name = data.status === space_status.SUSPENDED ? "space-suspension.html" : "space-declined.html";
+        sendTemplatedEmail({
+          subject,
+          email_data: {
+            email: space?.venue?.user?.email,
+            first_name: space?.venue?.user?.first_name?.replace(/_/g, " ") || "Venue Owner",
+            venue_name: space?.venue?.name?.replace(/_/g, " ") || "",
+            space_name: space?.name?.replace(/_/g, " ") || "",
+            date_submitted: date_submitted.replace(/_/g, " "),
+          },
+          template_name,
+          support_email: tenant?.config?.support_email,
+          email_credentials: tenant?.config?.email_credentials,
+          tenant: tenant?.config?.name,
+        });
+      }
     }
 
     return AdminRepo.updateSpace(query, data);
   }
 
-  static async patchVenueKeywords(count: number, query: any) {
+  static async patchVenueKeywords(count: number, query: any, tenant?: any) {
     let page = 1;
     const limit = 1;
     while ((page - 1) * limit < count) {
       const offset = (page - 1) * limit;
       const [venue] = await VenueSvc.getPaginatedVenues(query, offset, limit);
-      if (venue.keywords.length === 0 || !venue.keywords) await this.randomizeKeywordsInSpaceVenue(venue._id, "VENUE");
+      if (venue.keywords.length === 0 || !venue.keywords) await this.randomizeKeywordsInSpaceVenue(venue._id, "VENUE", tenant);
       const keywordIds = await KeywordSvc.handleParsingKeywords(venue.keywords);
-      await VenueSvc.updateVenue(venue._id, { keywords: keywordIds });
+      await VenueSvc.updateVenue(venue._id, { keywords: keywordIds }, tenant);
       console.log("VENUE_KEYWORD_UPDATED", venue._id);
       page++;
     }
   }
 
-  static async patchSpaceKeywords(count: number, query: any) {
+  static async patchSpaceKeywords(count: number, query: any, tenant?: any) {
     let page = 1;
     const limit = 1;
     while ((page - 1) * limit < count) {
       const skip = (page - 1) * limit;
       const [space] = await SpaceSvc.getSpaceKeywords({ query, skip, limit } as PaginationType);
-      if (space.keywords.length === 0 || !space.keywords) await this.randomizeKeywordsInSpaceVenue(space._id, "SPACE");
+      if (space.keywords.length === 0 || !space.keywords) await this.randomizeKeywordsInSpaceVenue(space._id, "SPACE", tenant);
       const keywordIds = await KeywordSvc.handleParsingKeywords(space.keywords);
       await SpaceSvc.updateSpaces({ keywords: keywordIds }, { _id: space._id });
       console.log("SPACE_KEYWORD_UPDATED", space._id);
@@ -442,14 +460,14 @@ export default class AdminSvc {
     }
   }
 
-  static async randomizeKeywordsInSpaceVenue(_id: ObjectId, identifier: string) {
+  static async randomizeKeywordsInSpaceVenue(_id: ObjectId, identifier: string, tenant?: any) {
     const keyword_lists = await KeywordSvc.getKeywords({ type: "SPACE" }, 0, 100);
     const keywordIds = keyword_lists.map((item) => item._id);
     const randomCount = Math.floor(Math.random() * 8) + 1;
     const randomKeywordIds = this.getRandomKeywordIds(keywordIds, randomCount);
 
     if (identifier === "SPACE") return await SpaceSvc.updateSpaces({ keywords: randomKeywordIds }, { _id: _id });
-    if (identifier === "VENUE") return await VenueSvc.updateVenue(_id, { keywords: randomKeywordIds });
+    if (identifier === "VENUE") return await VenueSvc.updateVenue(_id, { keywords: randomKeywordIds }, tenant);
   }
 
   static getRandomKeywordIds(ids, count) {
@@ -457,10 +475,10 @@ export default class AdminSvc {
     return shuffled.slice(0, count);
   }
 
-  static async transferOwnershipInvite(payload: TransferOwnershipPayload) {
+  static async transferOwnershipInvite(payload: TransferOwnershipPayload, tenant: any) {
     const { email, role, status, country, venue_id, current_user } = payload;
 
-    const existingUser = await UserSvc.getUser({ email, status: user_status.ACTIVE });
+    const existingUser = await UserSvc.getUser({ email });
     let user: any;
 
     if (!existingUser) {
@@ -486,10 +504,10 @@ export default class AdminSvc {
     ]);
 
     // Send venue owner transfer invitation
-    return this.sendVenueOwnerTransfer(existingUser || user, payload, isExisting);
+    return this.sendVenueOwnerTransfer(existingUser || user, payload, isExisting, tenant);
   }
 
-  static async sendVenueOwnerTransfer(user: any, payload: TransferOwnershipPayload, isExisting: boolean = false) {
+  static async sendVenueOwnerTransfer(user: any, payload: TransferOwnershipPayload, isExisting: boolean = false, tenant?: any) {
     const token = generateVerificationToken(
       {
         _id: user?._id,
@@ -504,23 +522,26 @@ export default class AdminSvc {
     );
 
     const verification_link = !isExisting
-      ? `${VENUE_4_USE_URI}/${payload?.country}/signup/complete-profile/${token}?email=${payload?.email}&transfer_request=true`
-      : `${VENUE_4_USE_URI}/callback/venue/transfer-ownership/${token}?email=${payload.email}&transfer_request=true`;
+      ? `${tenant?.config.site_url}/signup/complete-profile/${token}?email=${payload?.email}&transfer_request=true`
+      : `${tenant?.config.site_url}/callback/venue/transfer-ownership/${token}?email=${payload.email}&transfer_request=true`;
 
     sendTemplatedEmail({
-      subject: "Venue4Use: Admin Invitation",
+      subject: `${tenant?.config?.name}: Admin Invitation`,
       email_data: {
         verification_link,
         email: payload.email,
         venue_name: payload.venue_name,
       },
       template_name: "request-venue-transfer-owner.html",
+      support_email: tenant?.config?.support_email,
+      email_credentials: tenant?.config?.email_credentials,
+      tenant: tenant?.config?.name,
     });
 
     return { token };
   }
 
-  static async handleOwnerTransfership(payload: any) {
+  static async handleOwnerTransfership(payload: any, tenant?: any) {
     /**
      *  1. Update User
      *  2. Update Venue
@@ -529,14 +550,14 @@ export default class AdminSvc {
      */
     const { user_id, venue_id, first_name, last_name, phone_number, password, organization_id } = payload;
     const hashedPassword = hashPassword(password);
-    const userId = new ObjectId(user_id);
-    const organizationId = new ObjectId(organization_id);
-    const venueId = new ObjectId(venue_id);
+    const userId = new ObjectId(user_id as string);
+    const organizationId = new ObjectId(organization_id as string);
+    const venueId = new ObjectId(venue_id as string);
     const associatedSpace = await SpaceSvc.getSpace({ venue: venueId });
     const existingUserRole = await UserRolesSvc.getUserRoles({ user: userId });
     const [venue] = await VenueSvc.getVenue({ _id: venueId });
     const newDate = new Date();
-    let userRoleId = existingUserRole ? existingUserRole._id : new ObjectId();
+    const userRoleId = existingUserRole ? existingUserRole._id : new ObjectId();
 
     if (!existingUserRole) {
       await UserRolesSvc.createUserRoles({
@@ -564,6 +585,7 @@ export default class AdminSvc {
           organization: organizationId,
           user_roles: [userRoleId],
           updatedAt: newDate,
+          tenant: tenant.code,
         },
       ),
       OrganizationSvc.createOrganization({
@@ -580,12 +602,17 @@ export default class AdminSvc {
         is_owner: true,
         createdAt: newDate,
       }),
-      VenueSvc.updateVenue(venueId, {
-        user: userId,
-        organization: organizationId,
-        status: venue_status.DRAFT,
-        updatedAt: newDate,
-      }),
+      VenueSvc.updateVenue(
+        venueId,
+        {
+          user: userId,
+          organization: organizationId,
+          status: venue_status.DRAFT,
+          updatedAt: newDate,
+          tenant: tenant.code,
+        },
+        tenant,
+      ),
       SpaceSvc.updateSpaces({ status: space_status.DRAFT, updatedAt: new Date(), user: userId }, { _id: associatedSpace._id }),
       SaleTransactionSvc.updateSaleTransaction(
         { venue: venueId, venue_owner: userId },
@@ -598,7 +625,7 @@ export default class AdminSvc {
     ]);
   }
 
-  static async handleOwnerExistingTransfership(payload: any) {
+  static async handleOwnerExistingTransfership(payload: any, tenant?: any) {
     /**
      *  1. Update User
      *  2. Update Venue
@@ -607,19 +634,23 @@ export default class AdminSvc {
      */
     const { user_id, venue_id, organization_id } = payload;
 
-    const userId = new ObjectId(user_id);
-    const organizationId = new ObjectId(organization_id);
-    const venueId = new ObjectId(venue_id);
+    const userId = new ObjectId(user_id as string);
+    const organizationId = new ObjectId(organization_id as string);
+    const venueId = new ObjectId(venue_id as string);
 
     const newDate = new Date();
 
     return await Promise.allSettled([
-      VenueSvc.updateVenue(venueId, {
-        user: userId,
-        organization: organizationId,
-        status: venue_status.DRAFT,
-        updatedAt: newDate,
-      }),
+      VenueSvc.updateVenue(
+        venueId,
+        {
+          user: userId,
+          organization: organizationId,
+          status: venue_status.DRAFT,
+          updatedAt: newDate,
+        },
+        tenant,
+      ),
       SpaceSvc.updateSpaces(
         { user: userId, status: space_status.DRAFT, updatedAt: newDate },
         { venue: venueId, status: space_status.REQUIRES_CONSENT },
@@ -706,7 +737,7 @@ export default class AdminSvc {
     return result;
   }
 
-  static async processSpaceDeletion({ venue_id, user_id, space_id }: { venue_id: ObjectId; user_id: ObjectId; space_id: ObjectId }) {
+  static async processSpaceDeletion({ venue_id, user_id, space_id }: { venue_id: ObjectId; user_id: ObjectId; space_id: ObjectId }, tenant?: any) {
     const data = { status: space_status.DELETED, deletedAt: new Date(), deletedBy: user_id };
 
     const [emailLogForApproval, emailLogPublished, [associatedVenue]] = await Promise.all([
@@ -731,6 +762,6 @@ export default class AdminSvc {
 
     if (venueStatus) await AdminSvc.updateVenue(venue_id, venueStatus);
 
-    return AdminSvc.deleteSpace({ _id: space_id }, data);
+    return AdminSvc.deleteSpace({ _id: space_id }, data, tenant);
   }
 }

@@ -13,12 +13,12 @@ router.post("/registration", [tenantMiddleware], AuthCtrl.registrationViaEmail);
 router.post("/logout", [sessionMiddleware, authenticateToken], AuthCtrl.logout);
 router.get("/google", AuthCtrl.generateGoogleAuthUrl);
 router.get("/callback/google", AuthCtrl.googleAuthorization);
-router.get("/email-verification", [sessionMiddleware, authenticateToken], AuthCtrl.sendEmailVerification);
+router.get("/email-verification", [sessionMiddleware, authenticateToken, tenantMiddleware], AuthCtrl.sendEmailVerification);
 router.patch("/validate-email-otp", [sessionMiddleware, authenticateToken], AuthCtrl.validateOtp);
 router.patch("/update-password", [sessionMiddleware, authenticateToken], AuthCtrl.updateUserPassword);
 router.post("/refresh-token", AuthCtrl.refreshAccessToken);
 router.get("/verify-email/:token", AuthCtrl.verifyEmail);
-router.post("/account-recovery", AuthCtrl.accountRecovery);
+router.post("/account-recovery", tenantMiddleware, AuthCtrl.accountRecovery);
 router.patch("/password-reset/:token", AuthCtrl.newPasswordReset);
 
 export default router;

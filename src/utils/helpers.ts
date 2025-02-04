@@ -121,7 +121,17 @@ export const getHTMLContents = ({ template_name, email_data }: any) => {
   return html;
 };
 
-export const sendTemplatedEmail = ({ template_name, subject, email_data, attachments = [], cc = null, isAdmin = false }: any) => {
+export const sendTemplatedEmail = ({
+  template_name,
+  subject,
+  email_data,
+  attachments = [],
+  cc = null,
+  isAdmin = false,
+  support_email,
+  email_credentials,
+  tenant,
+}: any) => {
   const html = getHTMLContents({ template_name, email_data });
 
   handleSendEmail({
@@ -131,6 +141,9 @@ export const sendTemplatedEmail = ({ template_name, subject, email_data, attachm
     attachments,
     cc: isDev ? DEBUG_EMAIL : cc,
     isAdmin,
+    support_email,
+    email_credentials,
+    tenant,
   });
 };
 

@@ -34,14 +34,14 @@ export default class PaymentCtrl {
       const { enquiries } = await EnquirySvc.getEnquiriesFromMicroservice({ enquiry_id });
       [enquiry] = enquiries;
     } else {
-      [enquiry] = await EnquirySvc.getEnquiries({ _id: new ObjectId(enquiry_id) }, 0, 1);
+      [enquiry] = await EnquirySvc.getEnquiries({ _id: new ObjectId(enquiry_id as string) }, 0, 1);
     }
 
     if (!enquiry) {
       return handleErrorResponse(res, {}, { code: "ENQUIRY_NOT_FOUND_FOR_CREATE_OFFER" });
     }
     try {
-      const result = await PaymentSvc.processPayment(enquiry_id, req.user, enquiry);
+      const result = await PaymentSvc.processPayment(enquiry_id, req.user, enquiry, req?.tenant);
 
       return handleResponse(res, result, "PAYMENT_SUCCESSFULLY");
     } catch (error) {
@@ -74,7 +74,7 @@ export default class PaymentCtrl {
       message: `[PAYMENT_STATUS]: PAYLOAD ${JSON.stringify(req.body)}`,
     });
     try {
-      const result = await PaymentSvc.processPaymentStatus(req.body);
+      const result = await PaymentSvc.processPaymentStatus(req.body, req?.tenant);
       return handleResponse(res, result, "PAYMENT_STATUS");
     } catch (error) {
       console.log(error);

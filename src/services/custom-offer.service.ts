@@ -1,38 +1,38 @@
 import { ObjectId } from "mongodb";
 
+import { booking_status } from "../models/booking.model";
+import { CounterType } from "../models/counter.model";
 import { offer_status } from "../models/custom-offer.model";
 import { enquiry_status } from "../models/enquiries.model";
+import { RequestStatus, RequestType } from "../models/requests.model";
 import CustomOfferRepo from "../repositories/custom-offer.repository";
 import { convertCentsToDollars, convertDollarsToCents, convertToIsoDate, dateFormat, sendTemplatedEmail } from "../utils/helpers";
-import UserSvc from "./user.service";
-import EnquirySvc from "./enquiries.service";
-import CounterSvc from "./counter.service";
-import { CounterType } from "../models/counter.model";
-import { initInvoiceQueueProcess } from "../utils/queues/invoice";
 import { useMongoClient, useTransactionOptions } from "../utils/mongo";
-import StripeCustomerSvc from "./stripe-customer.service";
-import { booking_status } from "../models/booking.model";
+import { initInvoiceQueueProcess } from "../utils/queues/invoice";
 import { handlePayment } from "../utils/stripe";
 import BookingSvc from "./booking.service";
-import { RequestStatus, RequestType } from "../models/requests.model";
+import CounterSvc from "./counter.service";
+import EnquirySvc from "./enquiries.service";
 import PaymentSvc from "./payment.service";
 import RequestSvc from "./requests.service";
 import StripeAccountSvc from "./stripe-account.service";
 import StripeAccountTransactionSvc from "./stripe-account-transaction.service";
+import StripeCustomerSvc from "./stripe-customer.service";
+import UserSvc from "./user.service";
 
-export default class CustomeOfferSvc {
-  static async createCustomOffer(payload: any, enquiry: any, user: any) {
+export default class CustomOfferSvc {
+  static async createCustomOffer(payload: any, enquiry: any, user: any, tenant?: any) {
     try {
       const { inbox_id, date, guests, venue_computation, user_computation, notes, currency } = payload;
 
       const formattedDate = dateFormat(date);
 
-      const [existingCustomOffer] = await CustomeOfferSvc.getCustomOffer({ inbox: new ObjectId(inbox_id) });
+      const [existingCustomOffer] = await CustomOfferSvc.getCustomOffer({ inbox: new ObjectId(inbox_id as string) });
       if (existingCustomOffer) {
-        await CustomeOfferSvc.deleteCustomOffer(existingCustomOffer.inbox);
+        await CustomOfferSvc.deleteCustomOffer(existingCustomOffer.inbox);
       }
 
-      const user_id = new ObjectId(user?._id);
+      const user_id = new ObjectId(user?._id as string);
       const inboxId = enquiry.inbox._id;
       const customOfferData = {
         user: user_id,
@@ -63,6 +63,9 @@ export default class CustomeOfferSvc {
           email: enquiry?.user?.email || "",
         },
         template_name: "enquiry-status.html",
+        support_email: tenant?.config?.support_email,
+        email_credentials: tenant?.config?.email_credentials,
+        tenant: tenant?.config?.name,
       });
 
       return await CustomOfferRepo.createCustomOffer(customOfferData);
@@ -89,7 +92,7 @@ export default class CustomeOfferSvc {
     }
   }
 
-  static async updateCustomOffer(_id: ObjectId, data: any, offer: any) {
+  static async updateCustomOffer(_id: ObjectId, data: any, offer: any, tenant?: any) {
     try {
       let user_recipient: any = null;
       const updatedOffer = await CustomOfferRepo.updateCustomOffer(_id, data);
@@ -108,6 +111,9 @@ export default class CustomeOfferSvc {
               email: user_recipient?.email || "",
             },
             template_name: "enquiry-status.html",
+            support_email: tenant?.config?.support_email,
+            email_credentials: tenant?.config?.email_credentials,
+            tenant: tenant?.config?.name,
           });
         };
 
@@ -135,16 +141,16 @@ export default class CustomeOfferSvc {
     }
   }
 
-  static async updateCustomOfferStatus(user_id: any, payload: any, custom_offer_id: string, offer: any) {
+  static async updateCustomOfferStatus(user_id: any, payload: any, custom_offer_id: string, offer: any, tenant?: any) {
     const { status } = payload;
 
-    const user: any = await UserSvc.getUser({ _id: new ObjectId(user_id) });
+    const user: any = await UserSvc.getUser({ _id: new ObjectId(user_id as string) });
     const updatedOfferData = {
       status,
       updatedAt: new Date(),
     };
 
-    const updatedOffer = await this.updateCustomOffer(new ObjectId(custom_offer_id), updatedOfferData, offer);
+    const updatedOffer = await this.updateCustomOffer(new ObjectId(custom_offer_id), updatedOfferData, offer, tenant);
     const counter = await CounterSvc.generateCounter({ type: CounterType.INVOICE });
     const current_date = new Date();
     const year = current_date.getFullYear().toString();
@@ -167,7 +173,7 @@ export default class CustomeOfferSvc {
 
     return updatedOffer;
   }
-  static async requestToBook(payload: any, enquiry: any, user: any) {
+  static async requestToBook(payload: any, enquiry: any, user: any, tenant?: any) {
     try {
       const { inbox_id, date, guests, venue_computation, user_computation, notes, currency, event_type } = payload;
 
@@ -182,12 +188,12 @@ export default class CustomeOfferSvc {
       await session.withTransaction(async () => {
         const formattedDate = dateFormat(date);
 
-        const [existingCustomOffer] = await CustomeOfferSvc.getCustomOffer({ inbox: new ObjectId(inbox_id) });
+        const [existingCustomOffer] = await CustomOfferSvc.getCustomOffer({ inbox: new ObjectId(inbox_id) });
         if (existingCustomOffer) {
-          await CustomeOfferSvc.deleteCustomOffer(existingCustomOffer.inbox);
+          await CustomOfferSvc.deleteCustomOffer(existingCustomOffer.inbox);
         }
 
-        const user_id = new ObjectId(user._id);
+        const user_id = new ObjectId(user._id as string);
         const inboxId = enquiry.inbox._id;
 
         const customer: any = await StripeCustomerSvc.getCustomer({ user: user_id });
@@ -251,7 +257,7 @@ export default class CustomeOfferSvc {
             customer: customer?.customer_id,
           }),
           BookingSvc.createBooking(bookingData),
-          CustomeOfferSvc.createOrUpdateCustomOffer({ inbox: enquiry.inbox._id }, customOfferData, { upsert: true }),
+          CustomOfferSvc.createOrUpdateCustomOffer({ inbox: enquiry.inbox._id }, customOfferData, { upsert: true }),
           EnquirySvc.updateEnquiry({ _id: enquiry._id }, enquiryData),
 
           sendTemplatedEmail({
@@ -264,10 +270,13 @@ export default class CustomeOfferSvc {
               email: enquiry?.user?.email || "",
             },
             template_name: "enquiry-status.html",
+            support_email: tenant?.config?.support_email,
+            email_credentials: tenant?.config?.email_credentials,
+            tenant: tenant?.config?.name,
           }),
 
           sendTemplatedEmail({
-            subject: `Venue4Use - Booking Requested`,
+            subject: `${tenant?.config?.name} - Booking Requested`,
             email_data: {
               previous_status: enquiry?.status?.replace(/_/g, " ") || "",
               booking_date: customOfferData?.date?.date || "",
@@ -278,6 +287,9 @@ export default class CustomeOfferSvc {
               email: enquiry?.venue?.user?.email || "",
             },
             template_name: "booking-requested.html",
+            support_email: tenant?.config?.support_email,
+            email_credentials: tenant?.config?.email_credentials,
+            tenant: tenant?.config?.name,
           }),
         ]);
 
@@ -288,7 +300,7 @@ export default class CustomeOfferSvc {
           venue: enquiry.venue._id,
           space: enquiry.space._id,
           enquiry: enquiry._id,
-          user: new ObjectId(user._id),
+          user: new ObjectId(user._id as string),
           payment_id: results[0]?.value?.id,
           payment_method: results[0]?.value?.payment_method_types,
           payment_amount: convertCentsToDollars(results[0]?.value?.amount),

@@ -5,18 +5,20 @@ import { CC_SUPPORT_EMAIL, IS_ENQUIRY_MICROSERVICES } from "../config";
 import authenticateTokenAndStatus from "../middleware/authenticate-socket";
 import { enquiry_status } from "../models/enquiries.model";
 import { user_role } from "../models/user.model";
-import CustomeOfferSvc from "../services/custom-offer.service";
+import CustomOfferSvc from "../services/custom-offer.service";
 import EnquirySvc from "../services/enquiries.service";
 import FileSvc from "../services/file.service";
 import InboxSvc from "../services/inbox.service";
 import MessageSvc from "../services/message.services";
 import UserSvc from "../services/user.service";
 import VenueSvc from "../services/venue.service";
+import { LookupFields } from "../types/common";
 import { sendTemplatedEmail } from "../utils/helpers";
 import { logger } from "../utils/logger";
-import { LookupFields } from "../types/common";
+
 interface AuthenticatedSocket extends Socket {
   user?: any;
+  tenant?: any;
 }
 
 export default (io: Server) => {
@@ -117,7 +119,7 @@ export default (io: Server) => {
         });
 
         sendTemplatedEmail({
-          subject: `Venue4Use - New Message Notification`,
+          subject: `${socket?.tenant?.config?.name} - New Message Notification`,
           email_data: {
             first_name: recepient_first_name.replace(/_/g, " "),
             sender_first_name: sender_first_name.replace(/_/g, " "),
@@ -132,7 +134,7 @@ export default (io: Server) => {
 
         if (enquiry.status === enquiry_status.NEW) {
           sendTemplatedEmail({
-            subject: `Your Inquiry Status Update - Now ${enquiry_status.IN_PROGRESS.replace(/_/g, " ")}`,
+            subject: `${socket?.tenant?.config?.name} Your Inquiry Status Update - Now ${enquiry_status.IN_PROGRESS.replace(/_/g, " ")}`,
             email_data: {
               previous_status: enquiry.status.replace(/_/g, " "),
               new_status: enquiry_status.IN_PROGRESS.replace(/_/g, " "),
@@ -142,12 +144,12 @@ export default (io: Server) => {
             },
             template_name: "enquiry-status.html",
           });
-          await EnquirySvc.updateEnquiry({ inbox: new ObjectId(inbox?._id) }, { status: enquiry_status.IN_PROGRESS });
+          await EnquirySvc.updateEnquiry({ inbox: new ObjectId(inbox?._id as string) }, { status: enquiry_status.IN_PROGRESS });
         }
         await MessageSvc.createMessage({
           inbox: inbox?._id,
           room_id,
-          sender: new ObjectId(socket.user._id),
+          sender: new ObjectId(socket.user._id as string),
           content: message,
           attachments: attachmentIds,
         });
@@ -156,13 +158,13 @@ export default (io: Server) => {
 
     socket.on("generate_custom_offer", async (data: any) => {
       const { room_id, custom_offer_id, message } = data;
-      const [customOffer]: any = await CustomeOfferSvc.getCustomOffer({ _id: new ObjectId(custom_offer_id) });
+      const [customOffer]: any = await CustomOfferSvc.getCustomOffer({ _id: new ObjectId(custom_offer_id as string) });
       const [enquiry]: any = await EnquirySvc.getEnquiry({ inbox: customOffer?.inbox });
       const messagePayload: any = {
         inbox: customOffer?.inbox,
         key: "CUSTOM_OFFER_SENT",
         room_id,
-        sender: new ObjectId(socket?.user?._id),
+        sender: new ObjectId(socket?.user?._id as string),
         generated_content: {
           payment_computation: {
             venue_computation: customOffer?.venue_computation,
@@ -182,7 +184,7 @@ export default (io: Server) => {
         createdAt: new Date(),
       };
 
-      const sender = await UserSvc.getUser({ _id: new ObjectId(socket.user._id) });
+      const sender = await UserSvc.getUser({ _id: new ObjectId(socket.user._id as string) });
       io.to(room_id).emit("send_message_to_room", {
         room_id,
         key: "CUSTOM_OFFER_SENT",
@@ -197,12 +199,12 @@ export default (io: Server) => {
 
     socket.on("custom_offer_status", async (data: any) => {
       const { room_id, custom_offer_id, message = null, key } = data;
-      const [customOffer]: any = await CustomeOfferSvc.getCustomOffer({ _id: new ObjectId(custom_offer_id) });
+      const [customOffer]: any = await CustomOfferSvc.getCustomOffer({ _id: new ObjectId(custom_offer_id as string) });
       const messagePayload: any = {
         inbox: customOffer?.inbox,
         key,
         room_id,
-        sender: new ObjectId(socket?.user?._id),
+        sender: new ObjectId(socket?.user?._id as string),
         generated_content: {
           payment_computation: {
             venue_computation: customOffer?.venue_computation,
@@ -221,7 +223,7 @@ export default (io: Server) => {
         admin_generated: true,
         createdAt: new Date(),
       };
-      const sender = await UserSvc.getUser({ _id: new ObjectId(socket.user._id) });
+      const sender = await UserSvc.getUser({ _id: new ObjectId(socket.user._id as string) });
       io.to(room_id).emit("send_message_to_room", {
         room_id,
         key,
@@ -236,15 +238,15 @@ export default (io: Server) => {
 
     socket.on("request_phone_number", async (data: any) => {
       const { room_id, key, enquiry_id } = data;
-      const [enquiry]: any = await EnquirySvc.getEnquiry({ _id: new ObjectId(enquiry_id) });
-      const [venue]: any = await VenueSvc.getVenue({ _id: new ObjectId(enquiry?.venue) });
+      const [enquiry]: any = await EnquirySvc.getEnquiry({ _id: new ObjectId(enquiry_id as string) });
+      const [venue]: any = await VenueSvc.getVenue({ _id: new ObjectId(enquiry?.venue as string) });
       const user: any = await UserSvc.getUser({ _id: venue.user });
-      const sender = await UserSvc.getUser({ _id: new ObjectId(socket.user._id) });
+      const sender = await UserSvc.getUser({ _id: new ObjectId(socket.user._id as string) });
       const messagePayload: any = {
         inbox: enquiry?.inbox,
         key,
         room_id,
-        sender: new ObjectId(socket?.user?._id),
+        sender: new ObjectId(socket?.user?._id as string),
         generated_content: {
           message: null,
           user_info: {

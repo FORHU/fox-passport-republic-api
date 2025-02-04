@@ -72,7 +72,7 @@ export default class VenueCtrl {
 
   static async createVenue(req: Request, res: Response) {
     const { error } = validateCreateVenueSchema(req.body);
-    const tenantCode = req?.tenant?.code
+    const tenantCode = req?.tenant?.code;
 
     if (tenantCode) {
       req.body.tenant = tenantCode;
@@ -108,7 +108,7 @@ export default class VenueCtrl {
         return handleErrorResponse(res, {}, { code: "VENUE_NOT_FOUND" });
       }
 
-      const result = await VenueSvc.processVenueUpdate(payload, user, venue_id, venue);
+      const result = await VenueSvc.processVenueUpdate(payload, user, venue_id, venue, req?.tenant);
       return handleResponse(res, result, "VENUE_UPDATED_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "VENUE_NOT_ADDED" });
@@ -159,7 +159,7 @@ export default class VenueCtrl {
 
       venueQuery = { _id: venueId };
       if (userRole !== "ADMIN") {
-        userId = new ObjectId(req.user._id);
+        userId = new ObjectId(req.user._id as string);
         venueQuery = { ...venueQuery, user: userId };
       }
 
@@ -222,7 +222,7 @@ export default class VenueCtrl {
             return handleErrorResponse(res, {}, { code: "VENUE_CAN_NOT_BE_DELETED_WITH_PENDING_ENQUIRIES" });
           } else {
             await SpaceSvc.updateSpaces(statusChangeData, { _id: spaceId });
-            await VenueSvc.updateVenue(venueId, { status: venue_status.SPACE_FOR_DELETION, updatedAt: new Date() });
+            await VenueSvc.updateVenue(venueId, { status: venue_status.SPACE_FOR_DELETION, updatedAt: new Date() }, req?.tenant);
           }
         }
 
@@ -316,18 +316,21 @@ export default class VenueCtrl {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
 
-      await AdminSvc.handleOwnerTransfership({
-        first_name,
-        last_name,
-        password,
-        phone_number,
-        user_id: decodedToken._id,
-        email: decodedToken.email,
-        role: decodedToken.role,
-        venue_id: decodedToken.venue_id,
-        country: decodedToken.country,
-        organization_id: decodedToken.organization,
-      });
+      await AdminSvc.handleOwnerTransfership(
+        {
+          first_name,
+          last_name,
+          password,
+          phone_number,
+          user_id: decodedToken._id,
+          email: decodedToken.email,
+          role: decodedToken.role,
+          venue_id: decodedToken.venue_id,
+          country: decodedToken.country,
+          organization_id: decodedToken.organization,
+        },
+        req?.tenant,
+      );
 
       return handleResponse(res, {}, "TRANSFER_SUCCESS");
     } catch (error) {
@@ -344,11 +347,14 @@ export default class VenueCtrl {
 
       const [venue] = await VenueSvc.getVenue({ _id: new ObjectId(decodedToken.venue_id) });
 
-      const results = await AdminSvc.handleOwnerExistingTransfership({
-        user_id: decodedToken._id,
-        venue_id: decodedToken.venue_id,
-        organization_id: decodedToken.organization,
-      });
+      const results = await AdminSvc.handleOwnerExistingTransfership(
+        {
+          user_id: decodedToken._id,
+          venue_id: decodedToken.venue_id,
+          organization_id: decodedToken.organization,
+        },
+        req?.tenant,
+      );
 
       return handleResponse(res, { results }, "TRANSFER_SUCCESS");
     } catch (error) {

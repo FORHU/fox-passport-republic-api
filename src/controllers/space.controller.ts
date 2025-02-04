@@ -104,7 +104,7 @@ export default class SpaceCtrl {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR_MISSING_FIELDS" });
       }
 
-      const result = await SpaceSvc.processUpdateSpaces(payload, spaceId, space, userRole);
+      const result = await SpaceSvc.processUpdateSpaces(payload, spaceId, space, userRole, req?.tenant);
 
       return handleResponse(res, result, "SPACE_UPDATED_SUCCESSFULLY");
     } catch (error) {
@@ -167,6 +167,7 @@ export default class SpaceCtrl {
     }
 
     const params = req.query;
+    params.tenant = req?.tenant;
     try {
       const result = await SpaceSvc.getRecentlyListedSpaces({ params, user: req?.user });
 
@@ -241,7 +242,7 @@ export default class SpaceCtrl {
       };
 
       if (userRole !== "ADMIN") {
-        userId = new ObjectId(req.user._id);
+        userId = new ObjectId(req.user._id as string);
         spaceQuery = { ...spaceQuery, user: userId };
       }
 
@@ -274,7 +275,7 @@ export default class SpaceCtrl {
         return handleErrorResponse(res, {}, { code: "SPACE_CAN_NOT_BE_DELETED_WITH_PENDING_ENQUIRIES" });
       }
 
-      await VenueSvc.updateVenue(existingSpace.venue, { status: venue_status.SPACE_FOR_DELETION });
+      await VenueSvc.updateVenue(existingSpace.venue, { status: venue_status.SPACE_FOR_DELETION }, req?.tenant);
       const result = await SpaceSvc.updateSpaces(statusChangeData, spaceQuery);
 
       return handleResponse(res, result.result, "SPACE_DELETED_SUCCESSFULLY");

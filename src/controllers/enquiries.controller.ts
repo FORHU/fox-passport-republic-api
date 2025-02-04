@@ -20,7 +20,7 @@ export default class EnquiriesCtrl {
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR_MISSING_FIELDS" });
       }
-      const spaceId = new ObjectId(space);
+      const spaceId = new ObjectId(space as string);
       const _space = await SpaceSvc.getSpace({ _id: spaceId });
       if (!_space) {
         return handleErrorResponse(
@@ -35,7 +35,7 @@ export default class EnquiriesCtrl {
           MESSAGE_CODE["3001"].description,
         );
       }
-      const result = await EnquirySvc.processEnquiryCreation(req.body, _space, req?.user);
+      const result = await EnquirySvc.processEnquiryCreation(req.body, _space, req?.user, req?.tenant);
 
       return handleResponse(res, result, "ENQUIRY_ADDED_SUCCESSFULLY");
     } catch (error) {
@@ -157,7 +157,7 @@ export default class EnquiriesCtrl {
         const microserviceResponse = await EnquirySvc.updateEnquiriesFromMicroservice(enquiry_id, updatedData);
         return handleResponse(res, microserviceResponse, "ENQUIRY_UPDATED_SUCCESSFULLY");
       }
-      const result = await EnquirySvc.updateEnquiry({ _id: enquiry_id }, updatedData);
+      const result = await EnquirySvc.updateEnquiry({ _id: enquiry_id }, updatedData, req?.tenant);
 
       if (result.modifiedCount === 0) {
         return handleErrorResponse(res, new Error("No enquiries were updated"), { code: "UPDATE_FAILED" });

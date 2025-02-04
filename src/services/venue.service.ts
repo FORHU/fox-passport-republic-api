@@ -40,7 +40,7 @@ export default class VenueSvc {
     return VenueRepo.countVenues(query);
   }
 
-  static async updateVenue(venueId: ObjectId, data: any) {
+  static async updateVenue(venueId: ObjectId, data: any, tenant?: any) {
     const [venueData] = await this.getPaginatedVenues({ _id: venueId }, 0, 1);
     const [spaceData] = await SpaceRepository.getPaginatedSpaces({ query: { "venue._id": venueId }, skip: 0, limit: 1, user_id: null });
     const emailLogData = await EmailLogsRepo.getOneEmailLog({
@@ -58,7 +58,7 @@ export default class VenueSvc {
 
     if (data.status && data.status === "FOR_APPROVAL" && !emailLogData) {
       sendTemplatedEmail({
-        subject: "Venue4Use: Venue For Approval",
+        subject: `${tenant?.config?.name}: Venue For Approval`,
         email_data: {
           email: venueData?.user?.email,
           first_name: venueData?.user?.first_name?.replace(/_/g, " ") || "Venue Owner",
@@ -66,10 +66,13 @@ export default class VenueSvc {
           date_submitted: date_submitted?.replace(/_/g, " "),
         },
         template_name: "venue-for-approval.html",
+        support_email: tenant?.config?.support_email,
+        email_credentials: tenant?.config?.email_credentials,
+        tenant: tenant?.config?.name,
       });
 
       sendTemplatedEmail({
-        subject: "Venue4Use: Venue Approval Needed",
+        subject: `${tenant?.config?.name}: Venue Approval Needed`,
         email_data: {
           verification_link: `${VENUE_4_USE_URI}/sg/login/admin`,
           first_name: venueData?.user?.first_name?.replace(/_/g, " ") || "Venue",
@@ -91,6 +94,9 @@ export default class VenueSvc {
         cc: CC_SUPPORT_EMAIL,
         isAdmin: true,
         template_name: "approval-notification.html",
+        support_email: tenant?.config?.support_email,
+        email_credentials: tenant?.config?.email_credentials,
+        tenant: tenant?.config?.name,
       });
 
       emailStatus = "sent";
@@ -255,7 +261,7 @@ export default class VenueSvc {
     return VenueRepo.createVenue(venueData);
   }
 
-  static async processVenueUpdate(payload: any, user: any, venue_id: ObjectId, venue: TVenue) {
+  static async processVenueUpdate(payload: any, user: any, venue_id: ObjectId, venue: TVenue, tenant?: any) {
     const {
       name,
       representation,
@@ -376,7 +382,7 @@ export default class VenueSvc {
     };
 
     // Update venue outside of the conditional block to ensure it's always called
-    return await this.updateVenue(venue_id, venueUpdateData);
+    return await this.updateVenue(venue_id, venueUpdateData, tenant);
   }
 
   static async processCountAdminVenues(params: any, user: any) {

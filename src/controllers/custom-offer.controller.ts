@@ -18,7 +18,7 @@ import { handleErrorResponse, handleResponse } from "../utils/reponse";
 export default class CustomOfferCtrl {
   static async createCustomOffer(req: Request, res: Response) {
     try {
-      const { inbox_id, date, guests, venue_computation, user_computation, notes, currency } = req.body;
+      const { inbox_id } = req.body;
 
       const { error } = validateCreateCOSchema(req.body);
       if (error) {
@@ -30,13 +30,13 @@ export default class CustomOfferCtrl {
         const { enquiries } = await EnquirySvc.getEnquiriesFromMicroservice({ inbox_id });
         [enquiry] = enquiries;
       } else {
-        [enquiry] = await EnquirySvc.getEnquiries({ "inbox._id": new ObjectId(inbox_id) }, 0, 1);
+        [enquiry] = await EnquirySvc.getEnquiries({ "inbox._id": new ObjectId(inbox_id as string) }, 0, 1);
       }
       if (!enquiry) {
         return handleErrorResponse(res, error, { code: "ENQUIRY_NOT_FOUND_FOR_CREATE_OFFER" });
       }
 
-      const createdCustomOffer = await CustomOfferSvc.createCustomOffer(req.body, enquiry, req?.user);
+      const createdCustomOffer = await CustomOfferSvc.createCustomOffer(req.body, enquiry, req?.user, req?.tenant);
       return handleResponse(res, createdCustomOffer, "CUSTOM_OFFER_SENT");
     } catch (error) {
       console.log({ error });
@@ -116,7 +116,7 @@ export default class CustomOfferCtrl {
         return handleErrorResponse(res, {}, { code: "CUSTOM_OFFER_NOT_FOUND_FOR_UPDATE_OFFER" });
       }
 
-      const result = CustomOfferSvc.updateCustomOfferStatus(req.user._id, req.body, custom_offer_id, offer);
+      const result = CustomOfferSvc.updateCustomOfferStatus(req.user._id, req.body, custom_offer_id, offer, req?.tenant);
       return handleResponse(res, result, "CUSTOM_OFFER_UPDATED");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "CUSTOM_OFFER_UPDATE_FAILED" });
@@ -159,7 +159,7 @@ export default class CustomOfferCtrl {
         return handleErrorResponse(res, error, { code: "ENQUIRY_NOT_FOUND_FOR_CREATE_OFFER" });
       }
 
-      const result = await CustomOfferSvc.requestToBook(req.body, enquiry, req.user);
+      const result = await CustomOfferSvc.requestToBook(req.body, enquiry, req.user, req?.tenant);
 
       return handleResponse(res, result, "REQUEST_FOR_BOOKING_SUCCESS");
     } catch (error) {

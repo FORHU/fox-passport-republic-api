@@ -1,5 +1,11 @@
 import {
   GOGOJI_URI,
+  MAILER_EMAIL,
+  MAILER_PASSWORD,
+  MAILER_TRANSPORT_HOST,
+  MAILER_TRANSPORT_PORT,
+  MAILER_TRANSPORT_SECURE,
+  SUPPORT_EMAIL,
   TENANT_ALLOW_REFERER,
   TENANT_GOGOJI_API_KEY,
   TENANT_VENUE4USE_API_KEY,
@@ -128,6 +134,16 @@ export const TENANT_CONFIGS = {
     site_url: VENUE_4_USE_URI,
     SUPPORTED_COUNTRIES: ["SG", "MY", "PH"],
     X_API_KEYS: stringToArray(TENANT_VENUE4USE_API_KEY),
+    support_email: SUPPORT_EMAIL,
+    email_credentials: {
+      host: MAILER_TRANSPORT_HOST,
+      port: MAILER_TRANSPORT_PORT,
+      secure: MAILER_TRANSPORT_SECURE,
+      auth: {
+        user: MAILER_EMAIL,
+        pass: MAILER_PASSWORD,
+      },
+    },
   },
   TH: {
     name: "Gogoji",
@@ -140,5 +156,15 @@ export const TENANT_CONFIGS = {
     site_url: GOGOJI_URI,
     SUPPORTED_COUNTRIES: ["TH"],
     X_API_KEYS: stringToArray(TENANT_GOGOJI_API_KEY),
+    support_email: SUPPORT_EMAIL,
+    email_credentials: {
+      host: MAILER_TRANSPORT_HOST,
+      port: MAILER_TRANSPORT_PORT,
+      secure: MAILER_TRANSPORT_SECURE,
+      auth: {
+        user: MAILER_EMAIL,
+        pass: MAILER_PASSWORD,
+      },
+    },
   },
 };

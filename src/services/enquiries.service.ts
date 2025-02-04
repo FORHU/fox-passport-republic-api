@@ -4,22 +4,22 @@ import { IS_ENQUIRY_MICROSERVICES } from "../config";
 import { enquiry_status, TEnquiries } from "../models/enquiries.model";
 import CustomOfferRepo from "../repositories/custom-offer.repository";
 import EnquiryRepo from "../repositories/enquiries.repository";
+import OrganizationMemberRepo from "../repositories/organization-member.repository";
 import SpaceRepository from "../repositories/space.repository";
 import UserRepo from "../repositories/user.repository";
 import VenueRepo from "../repositories/venue.repository";
-import { dateFormat, sendTemplatedEmail, calculatePagination } from "../utils/helpers";
-import { handleInitCreateEnquiry, handleInitGetEnquiry, handleInitUpdateEnquiry } from "../utils/v2/microservices/enquiry";
-import OrganizationMemberRepo from "../repositories/organization-member.repository";
-import UserSvc from "./user.service";
-import { logger } from "../utils/logger";
-import VenueSvc from "./venue.service";
+import { constructQuery } from "../utils/enquiries/helpers";
+import { calculatePagination, dateFormat, sendTemplatedEmail } from "../utils/helpers";
 import { generateRoomId } from "../utils/inbox.utils";
+import { logger } from "../utils/logger";
+import { handleInitCreateEnquiry, handleInitGetEnquiry, handleInitUpdateEnquiry } from "../utils/v2/microservices/enquiry";
 import InboxSvc from "./inbox.service";
 import MessageSvc from "./message.services";
-import { constructQuery } from "../utils/enquiries/helpers";
+import UserSvc from "./user.service";
+import VenueSvc from "./venue.service";
 
 export default class EnquirySvc {
-  static async createEnquiry(data: TEnquiries, message: string) {
+  static async createEnquiry(data: TEnquiries, message: string, tenant?: any) {
     let result = null;
     if (IS_ENQUIRY_MICROSERVICES) {
       result = handleInitCreateEnquiry(data);
@@ -61,6 +61,9 @@ export default class EnquirySvc {
             inquired_space: spaceData.name,
           },
           template_name: "new-message-notification.html",
+          support_email: tenant?.config?.support_email,
+          email_credentials: tenant?.config?.email_credentials,
+          tenant: tenant?.config?.name,
         });
 
         logger.log({
@@ -78,10 +81,10 @@ export default class EnquirySvc {
     return result;
   }
 
-  static async processEnquiryCreation(payload: any, _space: any, user: any) {
+  static async processEnquiryCreation(payload: any, _space: any, user: any, tenant?: any) {
     const { type, guests, value, space, date, own_catering = false, require_catering = false, flexible_time, catering_options, message } = payload;
 
-    const spaceId = new ObjectId(space);
+    const spaceId = new ObjectId(space as string);
 
     const [_venue]: any = await VenueSvc.getVenue({ _id: _space.venue });
     const room_id: string = generateRoomId();
@@ -90,13 +93,13 @@ export default class EnquirySvc {
 
     const inbox: any = await InboxSvc.createInbox({
       room_id,
-      sender: new ObjectId(user._id),
+      sender: new ObjectId(user._id as string),
     });
 
     const messagePayload: any = {
       inbox: inbox?.insertedId,
       room_id,
-      sender: new ObjectId(user._id),
+      sender: new ObjectId(user._id as string),
       generated_content: {
         message: message,
         guests,
@@ -116,7 +119,7 @@ export default class EnquirySvc {
     const initialMessagePayload: any = {
       inbox: inbox?.insertedId,
       room_id,
-      sender: new ObjectId(user?._id),
+      sender: new ObjectId(user?._id as string),
       content: message,
       createdAt: new Date(Date.now() + 100),
     };
@@ -135,15 +138,14 @@ export default class EnquirySvc {
       require_catering,
       flexible_time,
       catering_options,
-      user: new ObjectId(user?._id),
+      user: new ObjectId(user?._id as string),
       inbox: inbox.insertedId,
     };
 
-    const result = await this.createEnquiry(enquiryData, message);
-    return result;
+    return await this.createEnquiry(enquiryData, message, tenant);
   }
 
-  static async updateEnquiry(query: any, data: any) {
+  static async updateEnquiry(query: any, data: any, tenant?: any) {
     const result = await EnquiryRepo.updateEnquiry(query, data);
     const [customOfferData] = await CustomOfferRepo.getCustomOffer({ "enquiry._id": query._id });
     if (!customOfferData) {
@@ -162,6 +164,9 @@ export default class EnquirySvc {
             email: customOfferData.user.email,
           },
           template_name: "booking-declined.html",
+          support_email: tenant?.config?.support_email,
+          email_credentials: tenant?.config?.email_credentials,
+          tenant: tenant?.config?.name,
         });
         break;
 
@@ -177,6 +182,9 @@ export default class EnquirySvc {
             email: venueData?.user?.email,
           },
           template_name: "booking-withdrawn.html",
+          support_email: tenant?.config?.support_email,
+          email_credentials: tenant?.config?.email_credentials,
+          tenant: tenant?.config?.name,
         });
         break;
 

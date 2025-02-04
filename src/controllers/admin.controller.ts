@@ -45,6 +45,7 @@ export default class AdminCtrl {
     try {
       const _id = new ObjectId(req.params.venue_id);
       const { status } = req.body;
+      const tenant = req?.tenant;
 
       const { error } = validateUpdateVenueStatus(req.body);
       if (error) {
@@ -60,10 +61,10 @@ export default class AdminCtrl {
           return handleErrorResponse(res, new Error("No associated spaces found for this venue"), { code: "NO_ASSOCIATED_SPACES" });
         }
 
-        await AdminSvc.updateAssociatedSpaces({ _id: { $in: associatedSpaceIds } }, { status: newStatus, updatedAt: new Date() });
+        await AdminSvc.updateAssociatedSpaces({ _id: { $in: associatedSpaceIds } }, { status: newStatus, updatedAt: new Date() }, tenant);
       }
 
-      const result = await AdminSvc.updateVenue(_id, status);
+      const result = await AdminSvc.updateVenue(_id, status, req?.tenant);
       return handleResponse(res, result, "VENUE_UPDATED_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
@@ -110,7 +111,7 @@ export default class AdminCtrl {
         updatedAt: new Date(),
       };
 
-      const result = await AdminSvc.updateSpace(query, data);
+      const result = await AdminSvc.updateSpace(query, data, req?.tenant);
       return handleResponse(res, result, "SPACE_UPDATED_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
@@ -232,9 +233,9 @@ export default class AdminCtrl {
 
       const spaceIds = existingSpace.map((space: any) => space._id);
 
-      await AdminSvc.deleteSpace({ _id: { $in: spaceIds } }, { status: "DELETED", deletedAt: new Date(), deletedBy: user_id });
+      await AdminSvc.deleteSpace({ _id: { $in: spaceIds } }, { status: "DELETED", deletedAt: new Date(), deletedBy: user_id }, req?.tenant);
 
-      const result = await AdminSvc.deleteVenue(venue_id, updatedData, existingSpace);
+      const result = await AdminSvc.deleteVenue(venue_id, updatedData, existingSpace, req?.tenant);
       return handleResponse(res, result, "VENUE_DELETED_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
@@ -243,7 +244,7 @@ export default class AdminCtrl {
 
   static async deleteSpace(req: Request, res: Response) {
     try {
-      const user_id = new ObjectId(req.user._id);
+      const user_id = new ObjectId(req.user._id as string);
       const space_id = new ObjectId(req.params.space_id);
 
       const [existingSpace] = await AdminSvc.getSpaces({ _id: space_id, status: "FOR_DELETION" });
@@ -262,7 +263,7 @@ export default class AdminCtrl {
         return handleErrorResponse(res, {}, { code: "VENUE_CANNOT_BE_DELETED_WITH_PENDING_BOOKINGS" });
       }
 
-      const result = await AdminSvc.processSpaceDeletion({ venue_id, user_id, space_id });
+      const result = await AdminSvc.processSpaceDeletion({ venue_id, user_id, space_id }, req?.tenant);
 
       return handleResponse(res, result, "SPACE_DELETED_SUCCESSFULLY");
     } catch (error) {
@@ -384,7 +385,10 @@ export default class AdminCtrl {
 
       const [countVenues, countSpace]: any = await Promise.allSettled([VenueSvc.countVenues(query), SpaceSvc.countSpaces(query)]);
 
-      await Promise.allSettled([AdminSvc.patchVenueKeywords(countVenues?.value, query), AdminSvc.patchSpaceKeywords(countSpace?.value, query)]);
+      await Promise.allSettled([
+        AdminSvc.patchVenueKeywords(countVenues?.value, query, req?.tenant),
+        AdminSvc.patchSpaceKeywords(countSpace?.value, query, req?.tenant),
+      ]);
       await KeywordSvc.deleteKeywords({ status: false });
 
       return handleResponse(res, { space: countSpace.value, venue: countVenues.value }, "KEYWORDS_UPDATED_SUCCESSFULLY");
@@ -422,7 +426,7 @@ export default class AdminCtrl {
       const { email } = req.body;
       const venue_id = new ObjectId(req.params.venueId);
 
-      const current_user = new ObjectId(req?.user?._id);
+      const current_user = new ObjectId(req?.user?._id as string);
 
       const { error } = validateVenueTransfer(req.body);
 
@@ -444,7 +448,7 @@ export default class AdminCtrl {
         current_user,
       };
 
-      const results = await AdminSvc.transferOwnershipInvite(payload_user);
+      const results = await AdminSvc.transferOwnershipInvite(payload_user, req.tenant);
 
       return handleResponse(res, results, "INVITATION_SENT_SUCCESSFULLY");
     } catch (error) {
@@ -473,7 +477,7 @@ export default class AdminCtrl {
       venue_name: venue.name,
     };
 
-    const sendEmail = await AdminSvc.sendVenueOwnerTransfer(user, payload_user);
+    const sendEmail = await AdminSvc.sendVenueOwnerTransfer(user, payload_user, false, req?.tenant);
 
     return handleResponse(res, sendEmail, "INVITATION_SENT_SUCCESSFULLY");
   }

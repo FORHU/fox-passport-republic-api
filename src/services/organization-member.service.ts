@@ -14,11 +14,11 @@ export default class OrganizationMemberSvc {
   static async teamMemberRegistration(payload: any, decodedToken: any) {
     try {
       const { first_name, last_name, password, phone_number } = payload;
-      const _id = new ObjectId(decodedToken._id);
+      const _id = new ObjectId(decodedToken._id as string);
 
       const hashedPassword = hashPassword(password);
       await UserSvc.updateUser(
-        { _id: new ObjectId(decodedToken.invited_user_id) },
+        { _id: new ObjectId(decodedToken.invited_user_id as string) },
         {
           first_name,
           last_name,
@@ -30,26 +30,25 @@ export default class OrganizationMemberSvc {
 
       const userRolesData = {
         _id: new ObjectId(),
-        user: new ObjectId(decodedToken.invited_user_id),
+        user: new ObjectId(decodedToken.invited_user_id as string),
         role: user_role.VENUE_LISTER,
         password: password,
         status: user_status.ACTIVE,
-        organization: new ObjectId(decodedToken.organization),
+        organization: new ObjectId(decodedToken.organization as string),
       };
 
       await UserRolesSvc.createUserRoles(userRolesData);
 
       const data = {
-        organization: new ObjectId(decodedToken.organization),
-        invited_user_id: new ObjectId(decodedToken.invited_user_id),
+        organization: new ObjectId(decodedToken.organization as string),
+        invited_user_id: new ObjectId(decodedToken.invited_user_id as string),
         venues: decodedToken.venues.map((venue_id: string) => new ObjectId(venue_id)),
         assigned_roles: decodedToken.assigned_roles,
-        inviter_user_id: new ObjectId(decodedToken.inviter_user_id),
+        inviter_user_id: new ObjectId(decodedToken.inviter_user_id as string),
         status: StatusType.ACCEPTED,
       };
 
-      const result = await OrganizationMemberRepo.updateOrganizationMembers(_id, data);
-      return result;
+      return await OrganizationMemberRepo.updateOrganizationMembers(_id, data);
     } catch (error) {
       throw error;
     }
@@ -149,6 +148,9 @@ export default class OrganizationMemberSvc {
           email: data.email,
         },
         template_name: "team-member-invite.html",
+        support_email: tenant?.config?.support_email,
+        email_credentials: tenant?.config?.email_credentials,
+        tenant: tenant?.config?.name,
       });
 
       return `Invitation email sent successfully to: ${data.invited_user_email}`;

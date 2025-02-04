@@ -1,12 +1,12 @@
 import { Request, Response } from "express";
+import { ObjectId } from "mongodb";
 
 import AuthSvc from "../../services/service-v2/auth.service";
 import { generateHash } from "../../utils/auth";
 import { validateLoginSchema, validateRegistrationSchema } from "../../utils/auth/validation";
 import { MESSAGE_CODE } from "../../utils/constant";
-import { handleErrorResponse, handleResponse } from "../../utils/reponse";
+import { handleErrorResponse } from "../../utils/reponse";
 import { getUAResult } from "../../utils/ua-parser.util";
-import { ObjectId } from "mongodb";
 
 export default class AuthCtrlV2 {
   static async registrationViaEmail(req: Request, res: Response) {

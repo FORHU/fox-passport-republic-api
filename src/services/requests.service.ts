@@ -27,7 +27,7 @@ export default class RequestSvc {
     return RequestRepo.updateRequest(request_id, data);
   }
 
-  static async approveDeletion(Id: ObjectId, payload: any, user: TUser) {
+  static async approveDeletion(Id: ObjectId, payload: any, user: TUser, tenant?: any) {
     const user_id = new ObjectId(user._id);
     const { type } = payload as any;
     const data = {
@@ -49,7 +49,7 @@ export default class RequestSvc {
         if (!existingVenue) {
           return { error_code: 404, CODE: "VENUE_NOT_FOUND" };
         }
-        await VenueSvc.updateVenue(Id, data);
+        await VenueSvc.updateVenue(Id, data, tenant);
         break;
       case RequestType.SPACE:
         const existingSpace = await SpaceSvc.getSpace({ _id: Id });
@@ -86,8 +86,8 @@ export default class RequestSvc {
     return { data: result };
   }
 
-  static async approveUpdate(Id: ObjectId, paylaod: any) {
-    const { type } = paylaod;
+  static async approveUpdate(Id: ObjectId, payload: any, tenant?: any) {
+    const { type } = payload;
     const object_id = Id;
 
     switch (type) {
@@ -140,7 +140,7 @@ export default class RequestSvc {
         }
 
         const data = existingRequest.request_data;
-        const result = await VenueSvc.updateVenue(object_id, data);
+        const result = await VenueSvc.updateVenue(object_id, data, tenant);
         await this.updateRequest(existingRequest._id, { status: RequestStatus.COMPLETED });
         return { data: result, code: "SPACE_UPDATED_SUCCESSFULLY" };
       }

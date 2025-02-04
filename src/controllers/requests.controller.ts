@@ -135,7 +135,7 @@ export default class RequestCtrl {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
 
-      const result = await RequestSvc.approveDeletion(Id, payload, user);
+      const result = await RequestSvc.approveDeletion(Id, payload, user, req?.tenant);
       if (result.error_code) {
         return handleErrorResponse(res, result.CODE, { code: result.CODE }, result.error_code);
       }

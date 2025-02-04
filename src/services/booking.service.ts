@@ -1,13 +1,29 @@
-import { Document, ObjectId } from "mongodb";
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
+import { Response } from "express";
+import { Document, ObjectId } from "mongodb";
+
 import { IS_BOOKING_MICROSERVICES } from "../config";
 import { booking_status, TBooking } from "../models/booking.model";
+import { CancellationPolicy } from "../models/cancellation-policy.model";
+import { enquiry_status } from "../models/enquiries.model";
+import { user_role } from "../models/user.model";
 import BookingRepo from "../repositories/booking.repository";
 import CustomOfferRepo from "../repositories/custom-offer.repository";
 import VenueRepo from "../repositories/venue.repository";
+import { constructQuery, getRepeatedDates } from "../utils/bookings/helpers";
+import {
+  customCancellation,
+  flexibleCancellation,
+  standardSixtyCancellation,
+  standardThirtyCancellation,
+  veryFlexibleCancellation,
+} from "../utils/cancellation-policy/helpers";
 import { calculatePagination, convertDollarsToCents, dateFormat, hashSearch, sendTemplatedEmail } from "../utils/helpers";
+import RedisUtil from "../utils/redis.util";
+import { getAvailableTimeSlots, isSlotWithinAvailableSlot } from "../utils/space/logic";
+import { getPaymentAccount, refundAccount } from "../utils/stripe";
 import {
   handleInitCreateBooking,
   handleInitDeleteBooking,
@@ -16,24 +32,9 @@ import {
   handleInitGetBooking,
   handleInitUpdateBooking,
 } from "../utils/v2/microservices/booking";
-import { getRepeatedDates, constructQuery } from "../utils/bookings/helpers";
-import { Response } from "express";
-import PricingSvc from "./pricing.service";
-import { getAvailableTimeSlots, isSlotWithinAvailableSlot } from "../utils/space/logic";
-import { CancellationPolicy } from "../models/cancellation-policy.model";
-import {
-  customCancellation,
-  flexibleCancellation,
-  standardSixtyCancellation,
-  standardThirtyCancellation,
-  veryFlexibleCancellation,
-} from "../utils/cancellation-policy/helpers";
 import EnquirySvc from "./enquiries.service";
-import { enquiry_status } from "../models/enquiries.model";
 import PaymentSvc from "./payment.service";
-import { user_role } from "../models/user.model";
-import { getPaymentAccount, refundAccount } from "../utils/stripe";
-import RedisUtil from "../utils/redis.util";
+import PricingSvc from "./pricing.service";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -397,7 +398,7 @@ export default class BookingSvc {
     return { message: "BOOKING_UPDATED", data: updateResult };
   }
 
-  static async updateBooking(booking_id: ObjectId, updateData: any) {
+  static async updateBooking(booking_id: ObjectId, updateData: any, tenant?: any) {
     if (IS_BOOKING_MICROSERVICES) {
       return handleInitUpdateBooking(booking_id, updateData);
     }
@@ -415,6 +416,9 @@ export default class BookingSvc {
           email: venueData?.user?.email || "",
         },
         template_name: "booking-cancelled.html",
+        support_email: tenant?.config?.support_email,
+        email_credentials: tenant?.config?.email_credentials,
+        tenant: tenant?.config?.name,
       });
     }
     return BookingRepo.updateBooking(booking_id, updateData);
@@ -527,9 +531,10 @@ export default class BookingSvc {
     cancellation_policy: any,
     existingBooking: any,
     existingCustomOffer: any,
+    tenant?: any,
   ) {
     const { reason_for_cancellation, message } = payload;
-    const user_id = new ObjectId(user._id);
+    const user_id = new ObjectId(user._id as string);
     const userRole = user.role;
 
     const booked_dates = {
@@ -570,6 +575,7 @@ export default class BookingSvc {
         cancelledAt: new Date(),
         cancelledBy: user_id,
       },
+      tenant,
     );
 
     let refundData: any = null;

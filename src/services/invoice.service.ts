@@ -1,7 +1,7 @@
 import { ObjectId } from "mongodb";
 import { InvoiceStatus, TInvoice } from "../models/invoice.model";
 import InvoiceRepo from "../repositories/invoice.repository";
-import CustomeOfferSvc from "./custom-offer.service";
+import CustomOfferSvc from "./custom-offer.service";
 import CounterSvc from "./counter.service";
 import { CounterType } from "../models/counter.model";
 import { getVenueCountry, getVenueLocation } from "../utils/helpers";
@@ -25,7 +25,7 @@ export default class InvoiceSvc {
     let invoiceNo = null;
 
     const existingInvoice = await InvoiceSvc.getInvoice({ enquiry: new ObjectId(enquiry_id) });
-    const [custom_offer]: any = await Promise.allSettled([ CustomeOfferSvc.getCustomOffer({ enquiry_id: new ObjectId(enquiry_id) })]);
+    const [custom_offer]: any = await Promise.allSettled([ CustomOfferSvc.getCustomOffer({ enquiry_id: new ObjectId(enquiry_id) })]);
     if (!existingInvoice) {
       const counter = await CounterSvc.generateCounter({ type: CounterType.INVOICE });
       const year = current_date.getFullYear().toString();
