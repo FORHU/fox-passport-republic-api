@@ -31,6 +31,7 @@ export default class RatingRepo {
             as: "user",
           },
         },
+        { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
         {
           $lookup: {
             from: "spaces",
@@ -39,16 +40,36 @@ export default class RatingRepo {
             as: "space",
           },
         },
-        { $unwind: "$user" },
-        { $unwind: "$space" },
+        { $unwind: { path: "$space", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: "files",
+            localField: "user.profile_picture",
+            foreignField: "_id",
+            as: "profile_picture",
+          },
+        },
+        { $unwind: { path: "$profile_picture", preserveNullAndEmptyArrays: true } },
         {
           $project: {
             _id: 1,
             rating: 1,
             review: 1,
             status: 1,
-            user: { _id: 1, name: 1, email: 1 },
-            space: { _id: 1, name: 1 },
+            user: {
+              _id: "$user._id",
+              first_name: "$user.first_name",
+              last_name: "$user.last_name",
+              email: "$user.email",
+              profile_picture: {
+                _id: "$profile_picture._id",
+                path: "$profile_picture.path",
+              },
+            },
+            space: {
+              _id: "$space._id",
+              name: "$space.name",
+            },
             createdAt: 1,
             updatedAt: 1,
           },
@@ -57,6 +78,7 @@ export default class RatingRepo {
         { $skip: skip },
         { $limit: limit },
       ];
+
       return collection.aggregate(pipeline).toArray();
     } catch (error) {
       throw error;
