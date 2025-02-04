@@ -54,7 +54,8 @@ export default class RatingRepo {
           $project: {
             _id: 1,
             rating: 1,
-            review: 1,
+            publicNote: 1,
+            privateNote: 1,
             status: 1,
             user: {
               _id: "$user._id",
