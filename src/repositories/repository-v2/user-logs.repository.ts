@@ -72,10 +72,10 @@ export default class UserLogsV2Repo {
       },
     ];
 
-    if (space?.status) {
+    if (space) {
       pipeline.push({
         $match: {
-          "spaceDetails.status": space?.status,
+          "spaceDetails.status": space,
         },
       });
     }
@@ -229,7 +229,7 @@ export default class UserLogsV2Repo {
     if (space?.status) {
       pipeline.push({
         $match: {
-          "spaceDetails.status": space?.status,
+          "spaceDetails.status": space,
         },
       });
     }
