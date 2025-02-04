@@ -31,7 +31,28 @@ export default class RatingRepo {
             as: "user",
           },
         },
+        {
+          $lookup: {
+            from: "spaces",
+            localField: "space",
+            foreignField: "_id",
+            as: "space",
+          },
+        },
         { $unwind: "$user" },
+        { $unwind: "$space" },
+        {
+          $project: {
+            _id: 1,
+            rating: 1,
+            review: 1,
+            status: 1,
+            user: { _id: 1, name: 1, email: 1 },
+            space: { _id: 1, name: 1 },
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
         { $sort: { createdAt: -1 } },
         { $skip: skip },
         { $limit: limit },
