@@ -355,17 +355,6 @@ export default class SpaceRepository {
           features: 1,
           keywords: 1,
           pricing: { $arrayElemAt: ["$pricing", 0] },
-          rating: {
-            totalRating: { $sum: "$ratings.rating" },
-            averageRating: {
-              $cond: {
-                if: { $eq: [{ $size: "$ratings" }, 0] },
-                then: 0,
-                else: { $avg: "$ratings.rating" },
-              },
-            },
-            totalReviews: { $size: "$ratings" },
-          },
           status: 1,
           form_steps: 1,
           createdAt: 1,
