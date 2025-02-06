@@ -27,6 +27,15 @@ export default class RatingRepo {
           },
         },
         { $unwind: { path: "$space", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: "venues",
+            localField: "space.venue",
+            foreignField: "_id",
+            as: "space.venue",
+          },
+        },
+        { $unwind: { path: "$space.venue", preserveNullAndEmptyArrays: true } },
         { $match: query },
         { $count: "totalCount" },
       ];
@@ -51,6 +60,15 @@ export default class RatingRepo {
           },
         },
         { $unwind: { path: "$space", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: "venues",
+            localField: "space.venue",
+            foreignField: "_id",
+            as: "space.venue",
+          },
+        },
+        { $unwind: { path: "$space.venue", preserveNullAndEmptyArrays: true } },
         { $match: query },
         {
           $lookup: {
