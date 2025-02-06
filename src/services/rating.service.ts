@@ -5,7 +5,7 @@ import { status_rating, TRating } from "../models/rating.model";
 import RatingRepo from "../repositories/rating.repository";
 
 export default class RatingSvc {
-  static async getRatings(query: any, limit: number, skip: number) {
+  static async getRatings(query: any, limit: number, skip: number, tenantCode: string) {
     try {
       const { search, status, sort = "desc", rating } = query;
       let sortQuery: { createdAt?: number } = {};
@@ -25,6 +25,10 @@ export default class RatingSvc {
 
       if (rating) {
         generatedQuery["rating"] = Number(rating);
+      }
+
+      if (tenantCode) {
+        generatedQuery["space.venue.tenant"] = tenantCode;
       }
 
       const list_count = await RatingRepo.countRatings(generatedQuery);
