@@ -4,19 +4,14 @@ import { Filter } from "mongodb";
 import { TRating, TUpdateRating } from "../models/rating.model";
 import { getDB } from "../utils/mongo";
 
+import RedisUtil from "../utils/redis.util";
+
+const SPACE_PREFIX = "spaces";
+
 export default class RatingRepo {
   static collection() {
     return getDB().collection("ratings");
   }
-
-  // static async countRatings(query: Filter<TRating>) {
-  //   try {
-  //     const collection = this.collection();
-  //     // return await collection.countDocuments(query);
-  //   } catch (error) {
-  //     throw error;
-  //   }
-  // }
 
   static async countRatings(query: Filter<TRating>) {
     try {
@@ -115,7 +110,7 @@ export default class RatingRepo {
     try {
       const collection = this.collection();
       const now = new Date();
-
+      await RedisUtil.invalidateByPrefix(SPACE_PREFIX);
       return await collection.updateOne(
         query,
         {
@@ -159,7 +154,7 @@ export default class RatingRepo {
       return result.map((item) => ({
         space: item._id,
         averageRating: parseFloat(item.averageRating.toFixed(2)),
-        totalRatings: parseFloat(item.totalRatings.toFixed(2)),
+        totalRating: parseFloat(item.totalRatings.toFixed(2)),
         totalReviews: parseFloat(item.totalReviews.toFixed(2)),
         details: item.details,
       }));
@@ -170,6 +165,7 @@ export default class RatingRepo {
 
   static async updateRating(query: Filter<TRating>, data: TUpdateRating) {
     const collection = this.collection();
+    await RedisUtil.invalidateByPrefix(SPACE_PREFIX);
     return await collection.updateOne(query, { $set: data });
   }
 }
