@@ -54,8 +54,7 @@ export default class SpaceSvc {
     const updatedLists = await Promise.all(
       lists.map(async (item: any) => {
         const [rating] = (await RatingSvc.getOverAllRating(item?._id.toString())) || [null];
-        const ratingWithoutDetails = rating ? { ...rating, details: undefined } : { averageRating: 0, totalRatings: 0, totalReviews: 0 };
-
+        const ratingWithoutDetails = rating ? { ...rating, details: undefined } : { averageRating: 0, totalRating: 0, totalReviews: 0 };
         const pricingSummary = getOneSummarizedPricing({
           space_id: item?.pricing?.space_id.toString(),
           selected_pricing: item?.pricing?.selected_pricing || null,
