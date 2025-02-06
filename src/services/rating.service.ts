@@ -7,8 +7,28 @@ import RatingRepo from "../repositories/rating.repository";
 export default class RatingSvc {
   static async getRatings(query: any, limit: number, skip: number) {
     try {
-      const list_count = await RatingRepo.countRatings(query);
-      const lists = await RatingRepo.getRatings(query, limit, skip);
+      const { search, status, sort = "desc", rating } = query;
+      let sortQuery: { createdAt?: number } = {};
+      if (sort === "asc") {
+        sortQuery = { createdAt: 1 };
+      } else if (sort === "desc") {
+        sortQuery = { createdAt: -1 };
+      }
+      const generatedQuery = {};
+      if (search) {
+        generatedQuery["space.name"] = { $regex: search, $options: "i" };
+      }
+
+      if (status) {
+        generatedQuery["status"] = status;
+      }
+
+      if (rating) {
+        generatedQuery["rating"] = Number(rating);
+      }
+
+      const list_count = await RatingRepo.countRatings(generatedQuery);
+      const lists = await RatingRepo.getRatings(generatedQuery, limit, skip, sortQuery);
       return {
         total: list_count,
         data: lists,

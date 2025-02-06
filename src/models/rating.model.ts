@@ -1,13 +1,5 @@
 import { ObjectId } from "mongodb";
 
-export enum space_rating {
-  "POOR" = "POOR",
-  "NEEDS_IMPROVEMENT" = "NEEDS_IMPROVEMENT",
-  "GOOD" = "GOOD",
-  "VERY_GOOD" = "VERY_GOOD",
-  "EXCELLENT" = "EXCELLENT",
-}
-
 export enum status_rating {
   "APPROVED" = "APPROVED",
   "PENDING" = "PENDING",
@@ -26,7 +18,16 @@ export interface TRating {
   updatedAt?: Date;
 }
 
-export interface TUpdateRating extends Partial<TRating> {}
+export interface TUpdateRating extends Partial<TRating> {
+  user?: ObjectId;
+  space?: ObjectId;
+  rating?: number;
+  status?: status_rating;
+  publicNote?: string;
+  privateNote?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
 
 export class MRating implements Partial<TRating> {
   _id?: ObjectId;

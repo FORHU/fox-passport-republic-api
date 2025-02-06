@@ -1,7 +1,7 @@
 /* eslint-disable no-useless-catch */
 import { Filter } from "mongodb";
 
-import { TRating } from "../models/rating.model";
+import { TRating, TUpdateRating } from "../models/rating.model";
 import { getDB } from "../utils/mongo";
 
 export default class RatingRepo {
@@ -9,19 +9,53 @@ export default class RatingRepo {
     return getDB().collection("ratings");
   }
 
+  // static async countRatings(query: Filter<TRating>) {
+  //   try {
+  //     const collection = this.collection();
+  //     // return await collection.countDocuments(query);
+  //   } catch (error) {
+  //     throw error;
+  //   }
+  // }
+
   static async countRatings(query: Filter<TRating>) {
     try {
       const collection = this.collection();
-      return await collection.countDocuments(query);
+
+      const pipeline = [
+        {
+          $lookup: {
+            from: "spaces",
+            localField: "space",
+            foreignField: "_id",
+            as: "space",
+          },
+        },
+        { $unwind: { path: "$space", preserveNullAndEmptyArrays: true } },
+        { $match: query },
+        { $count: "totalCount" },
+      ];
+
+      const result = await collection.aggregate(pipeline).toArray();
+      return result[0]?.totalCount || 0; // Get count or default to 0
     } catch (error) {
       throw error;
     }
   }
 
-  static async getRatings(query: Filter<TRating>, limit: number, skip: number) {
+  static async getRatings(query: Filter<TRating>, limit: number, skip: number, sort?: any) {
     try {
       const collection = this.collection();
       const pipeline = [
+        {
+          $lookup: {
+            from: "spaces",
+            localField: "space",
+            foreignField: "_id",
+            as: "space",
+          },
+        },
+        { $unwind: { path: "$space", preserveNullAndEmptyArrays: true } },
         { $match: query },
         {
           $lookup: {
@@ -32,15 +66,6 @@ export default class RatingRepo {
           },
         },
         { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
-        {
-          $lookup: {
-            from: "spaces",
-            localField: "space",
-            foreignField: "_id",
-            as: "space",
-          },
-        },
-        { $unwind: { path: "$space", preserveNullAndEmptyArrays: true } },
         {
           $lookup: {
             from: "files",
@@ -75,7 +100,7 @@ export default class RatingRepo {
             updatedAt: 1,
           },
         },
-        { $sort: { createdAt: -1 } },
+        { $sort: sort },
         { $skip: skip },
         { $limit: limit },
       ];
@@ -143,7 +168,7 @@ export default class RatingRepo {
     }
   }
 
-  static async updateRating(query: Filter<TRating>, data: TRating) {
+  static async updateRating(query: Filter<TRating>, data: TUpdateRating) {
     const collection = this.collection();
     return await collection.updateOne(query, { $set: data });
   }

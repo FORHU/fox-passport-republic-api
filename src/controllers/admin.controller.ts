@@ -560,7 +560,7 @@ export default class AdminCtrl {
     if (error) {
       return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
     }
-    const results: { data: any; total: number } = await RatingSvc.getRatings({}, limitNumber, offset);
+    const results: { data: any; total: number } = await RatingSvc.getRatings(req?.query, limitNumber, offset);
 
     const response = {
       data: results?.data,

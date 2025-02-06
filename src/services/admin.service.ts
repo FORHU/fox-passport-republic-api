@@ -613,7 +613,7 @@ export default class AdminSvc {
         },
         tenant,
       ),
-      SpaceSvc.updateSpaces({ status: space_status.DRAFT, updatedAt: new Date(), user: userId }, { _id: associatedSpace._id }),
+      SpaceSvc.updateSpaces({ status: space_status.DRAFT, updatedAt: new Date(), user: userId }, { venue: venueId }),
       SaleTransactionSvc.updateSaleTransaction(
         { venue: venueId, venue_owner: userId },
         {
