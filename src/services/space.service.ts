@@ -692,7 +692,7 @@ export default class SpaceSvc {
     if (!cacheSpacePayload) {
       const list = await this.getPaginatedSpaces(spacesPayload);
 
-      const spaceIdList = list.map((s: any) => new ObjectId(s._id));
+      const spaceIdList = list.map((s: any) => new ObjectId(s._id as string));
       const priceList = await PricingRepo.getPrices({ space_id: { $in: spaceIdList } });
 
       const transformedPriceList: PricingData[] = priceList.map((price: any) => ({
@@ -721,7 +721,7 @@ export default class SpaceSvc {
       updatedList = JSON.parse(cacheSpacePayload);
     }
 
-    const result = {
+    return {
       data: updatedList,
       total_pages: Math.ceil(list_count / limitNumber) || 0,
       total_items: list_count,
@@ -729,7 +729,6 @@ export default class SpaceSvc {
       size: limitNumber,
       offset,
     };
-    return result;
   }
 
   static async getSpaceNameIdAndStatus(payload: RequestWithParamsAndUser) {
