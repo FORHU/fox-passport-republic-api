@@ -1,6 +1,7 @@
-import { customJoi as Joi } from "../customJoi";
-
 import { cateringOptionsName, enquiry_status } from "../../models/enquiries.model";
+import { status_rating } from "../../models/rating.model";
+import { customJoi as Joi } from "../customJoi";
+import { space_status } from "../../models/space.model";
 
 export const validateCreateEnquiriesSchema = (data: any) => {
   const schema = Joi.object({
@@ -60,9 +61,18 @@ export const validateGetEnquiriesSchema = (data: any) => {
 };
 
 export const validateGetRatingSchema = (data: any) => {
+  const rating = [1, 2, 3, 4, 5];
   const schema = Joi.object({
     page: Joi.number().allow(null, ""),
     limit: Joi.number().allow(null, ""),
+    search: Joi.string().allow(null, ""),
+    status: Joi.string()
+      .valid(...Object.values(status_rating))
+      .allow(null, ""),
+    sort: Joi.string().allow(null, ""),
+    rating: Joi.number()
+      .valid(...rating)
+      .allow(null, ""),
   });
   return schema.validate(data);
 };
