@@ -6,6 +6,7 @@ import { TMostPopular } from "../../types/space";
 import { getCacheOrFetch } from "../../utils/cache.util";
 import { getOneSummarizedPricing, hashSearch, tenantBuildQuery } from "../../utils/helpers";
 import { constructQueryV2 } from "../../utils/space/helpers";
+import RatingSvc from "../rating.service";
 
 const PREFIX_USER_LOGS = "user_logs";
 
@@ -50,19 +51,27 @@ export default class SpaceSvc {
       UserLogsV2Repo.handleGetMostPopularSpaces(query, skip, limitNumber),
     );
 
-    const updatedLists = lists.map((item: any) => {
-      return {
-        ...item,
-        pricing_summary: getOneSummarizedPricing({
+    const updatedLists = await Promise.all(
+      lists.map(async (item: any) => {
+        const [rating] = (await RatingSvc.getOverAllRating(item?._id.toString())) || [null];
+        const ratingWithoutDetails = rating ? { ...rating, details: undefined } : { averageRating: 0, totalRatings: 0, totalReviews: 0 };
+
+        const pricingSummary = getOneSummarizedPricing({
           space_id: item?.pricing?.space_id.toString(),
           selected_pricing: item?.pricing?.selected_pricing || null,
           currency: item?.pricing?.currency || "USD",
           hire_fee: item?.pricing?.hire_fee || [],
           custom_price: item?.pricing?.custom_price || [],
           cleaning_fee: item?.pricing?.cleaning_fee || 0,
-        }),
-      };
-    });
+        });
+
+        return {
+          ...item,
+          rating: ratingWithoutDetails,
+          pricing_summary: pricingSummary,
+        };
+      }),
+    );
 
     return {
       data: updatedLists,
