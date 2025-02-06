@@ -20,6 +20,7 @@ import QuestionSvc from "./questions.service";
 import UserSvc from "./user.service";
 import UserLogsSvc from "./user-logs.service";
 import VenueSvc from "./venue.service";
+import RatingSvc from "./rating.service";
 
 const PREFIX = "spaces";
 const PREFIX_USER_LOGS = "user_logs";
@@ -27,7 +28,7 @@ const PREFIX_USER_LOGS = "user_logs";
 export default class SpaceSvc {
   static async getPaginatedSpaces({ query, skip, limit, user_id, mark_as_favorite, startDate, endDate }: PaginationType) {
     try {
-      return await SpaceRepo.getPaginatedSpaces({
+      const results = await SpaceRepo.getPaginatedSpaces({
         query,
         skip,
         limit,
@@ -36,6 +37,16 @@ export default class SpaceSvc {
         startDate,
         endDate,
       });
+
+      return await Promise.all(
+        results.map(async (result: any) => {
+          const [rating] = await RatingSvc.getOverAllRating(result._id.toString());
+          if (!rating) return { ...result, rating: { averageRating: 0, totalRating: 0, totalReviews: 0 } };
+          // eslint-disable-next-line no-unused-vars
+          const { details, ...ratingWithoutDetails } = rating;
+          return { ...result, rating: ratingWithoutDetails };
+        }),
+      );
     } catch (error) {
       throw new Error("Failed to get spaces");
     }
@@ -116,7 +127,7 @@ export default class SpaceSvc {
         ...(endDateTime ? { endDate: endDateTime } : {}),
       };
 
-      const list = null;
+      let list = null;
       const hashSpacePayload = hashSearch({ spacesPayload, description: "getPaginatedSpacesWithPricing" });
       const cacheSpacePayload = await RedisUtil.getCache(hashSpacePayload, PREFIX);
 
@@ -124,10 +135,9 @@ export default class SpaceSvc {
 
       if (!cacheSpacePayload) {
         // Fetch spaces from the database
-        const list = await this.getPaginatedSpaces(spacesPayload);
-
+        list = await this.getPaginatedSpaces(spacesPayload);
         // Get pricing details for spaces
-        const spaceIdList = list.map((s: any) => new ObjectId(s._id));
+        const spaceIdList = list.map((s: any) => new ObjectId(s._id as string));
         const priceList = await PricingRepo.getPrices({ space_id: { $in: spaceIdList } });
 
         // Transform pricing data
@@ -157,7 +167,7 @@ export default class SpaceSvc {
         updatedList = JSON.parse(cacheSpacePayload);
       }
 
-      const result = {
+      return {
         data: updatedList,
         total_pages: Math.ceil(list_count / limitNumber) || 0,
         total_items: list_count,
@@ -165,8 +175,6 @@ export default class SpaceSvc {
         size: limitNumber,
         offset,
       };
-
-      return result;
     } catch (error) {
       throw new Error("Failed to get spaces");
     }
