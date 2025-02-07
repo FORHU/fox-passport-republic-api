@@ -12,11 +12,11 @@ import BookingSvc from "../services/booking.service";
 import EnquirySvc from "../services/enquiries.service";
 import FileSrvc from "../services/file.service";
 import KeywordSvc from "../services/keyword.service";
+import RatingSvc from "../services/rating.service";
 import SpaceSvc from "../services/space.service";
 import StripeProductSvc from "../services/stripe-product.service";
 import UserSvc from "../services/user.service";
 import VenueSvc from "../services/venue.service";
-import RatingSvc from "../services/rating.service";
 import { constructEnquiryQuery, parseWorkbook, validateSheetsData } from "../utils/admin/helpers";
 import {
   validateGetSpaceSchema,
@@ -34,6 +34,7 @@ import { initTenantUserQueue } from "../utils/queues/tenant/user.tenant.queue";
 import { initTenantVenueQueue } from "../utils/queues/tenant/venue.tenant.queue";
 import { initUserRolesQueue } from "../utils/queues/user/migrate-user.queue";
 import { initAddVenueQueue } from "../utils/queues/venue/add-venue.queue";
+import { initUserLogsQueue } from "../utils/queues/user-logs";
 import { validateUpdateRatingSchema } from "../utils/rating/validation";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
 
@@ -573,5 +574,14 @@ export default class AdminCtrl {
     };
 
     return handleResponse(res, response, "RATING_FETCH_SUCCESSFULLY");
+  }
+  
+  static async migrateUserLogs(req: Request, res: Response) {
+    try {
+      await initUserLogsQueue();
+      return handleResponse(res, {}, "USER_LOGS_MIGRATED_SUCCESSFULLY");
+    } catch (error) {
+      return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
+    }
   }
 }

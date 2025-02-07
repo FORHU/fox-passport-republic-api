@@ -24,6 +24,14 @@ export default class SpaceSvc {
     return SpaceV2Repo.getSpace({ _id: space_id });
   }
 
+  static async getSpaceWithoutUserLogs(limit: number, offset: number) {
+    return SpaceV2Repo.getSpaceWithoutUserLogs(limit, offset);
+  }
+
+  static async getTotalSpacesWithoutLogs() {
+    return SpaceV2Repo.getTotalSpacesWithoutLogs();
+  }
+
   static async handleGetMostPopularSpaces(params: TMostPopular) {
     const { page = 1, limit = 20, country, status, user_id, tenant_code, tenant } = params;
 
@@ -43,11 +51,17 @@ export default class SpaceSvc {
     const limitNumber = Number(limit);
     const skip = (pageNumber - 1) * limitNumber;
 
-    const list_count = await getCacheOrFetch(hashSearch({ query, description: "countGetMostPopularSpaces" }), PREFIX_USER_LOGS, () =>
+    const additionalQuery = {
+      skip,
+      limit: limitNumber,
+      ...query,
+    };
+
+    const list_count = await getCacheOrFetch(hashSearch({ additionalQuery, description: "countGetMostPopularSpaces" }), PREFIX_USER_LOGS, () =>
       UserLogsV2Repo.countGetMostPopularSpaces({ query }),
     );
 
-    const lists = await getCacheOrFetch(hashSearch({ query, description: "getMostPopularSpaces" }), PREFIX_USER_LOGS, () =>
+    const lists = await getCacheOrFetch(hashSearch({ additionalQuery, description: "getMostPopularSpaces" }), PREFIX_USER_LOGS, () =>
       UserLogsV2Repo.handleGetMostPopularSpaces(query, skip, limitNumber),
     );
 
