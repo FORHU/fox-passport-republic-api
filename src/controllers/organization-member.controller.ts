@@ -40,6 +40,8 @@ export default class OrganizationMemberCtrl {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
 
+      req.body.email = req.body.email.toLowerCase();
+
       const result = await OrganizationMemberSvc.processTeamMemberInvitation(req.body, userId, country, tenant);
 
       return handleResponse(res, result, "ALL_FIELDS_SATISFIED");
