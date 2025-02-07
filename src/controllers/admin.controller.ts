@@ -424,16 +424,18 @@ export default class AdminCtrl {
 
   static async transferOwnershipRequest(req: Request, res: Response) {
     try {
-      const { email } = req.body;
-      const venue_id = new ObjectId(req.params.venueId);
-
-      const current_user = new ObjectId(req?.user?._id as string);
 
       const { error } = validateVenueTransfer(req.body);
 
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
+
+      req.body.email = req.body.email.toLowerCase();
+      const { email } = req.body;
+      const venue_id = new ObjectId(req.params.venueId);
+
+      const current_user = new ObjectId(req?.user?._id as string);
 
       const [venue] = await VenueSvc.getVenue({ _id: venue_id });
 
