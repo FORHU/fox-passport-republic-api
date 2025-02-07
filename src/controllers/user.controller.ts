@@ -2,9 +2,7 @@
 import { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 
-import UserRepo from "../repositories/user.repository";
 import UserSvc from "../services/user.service";
-import { LookupFields } from "../types/common";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
 import { validateUpdateUserSchema } from "../utils/user/validation";
 

@@ -182,9 +182,9 @@ export default class AuthCtrl {
    * Responds with a success or error message.
    */
   static async loginViaEmail(req: Request, res: Response) {
-    const { email, password, role } = req.body;
     const { error } = validateLoginSchema(req.body);
-
+    req.body.email = req.body.email.toLowerCase();
+    const { email, password, role } = req.body;
     if (error) {
       return handleErrorResponse(res, error, {
         code: "ERROR_LOGIN_VIA_EMAIL",
@@ -378,12 +378,13 @@ export default class AuthCtrl {
 
   static async accountRecovery(req: Request, res: Response) {
     try {
-      const { email } = req.body;
       const { error } = validateEmailSchema(req.body);
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
-      const user = await UserSvc.getUser({ email: email, deletedAt: null });
+      req.body.email = req.body.email.toLowerCase();
+      const { email } = req.body;
+      const user = await UserSvc.getUser({ email, deletedAt: null });
       if (!user) {
         return handleErrorResponse(res, 400, { code: "EMAIL_DOES_NOT_EXIST_OR_HAS_BEEN_DELETED" });
       }
