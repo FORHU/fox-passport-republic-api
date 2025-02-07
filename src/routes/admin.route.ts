@@ -7,7 +7,6 @@ import rolesMiddleware from "../middleware/roles.middleware";
 import tenantMiddleware from "../middleware/tenant.middleware";
 import tenantValidationMiddleware from "../middleware/tenant-validation.middleware";
 import sessionMiddleware from "../middleware/valid-session.middleware";
-import { initUserEmailQueue } from "../utils/queues/user/email-tolowercase.queue";
 
 const ADMIN_MIDDLEWARE = [sessionMiddleware, authenticateToken, rolesMiddleware];
 

@@ -32,10 +32,10 @@ import { initFileQueue } from "../utils/queues/files/file-migration.queue";
 import { initQuestionQueue } from "../utils/queues/question/delete-question.queue";
 import { initTenantUserQueue } from "../utils/queues/tenant/user.tenant.queue";
 import { initTenantVenueQueue } from "../utils/queues/tenant/venue.tenant.queue";
-import { initUserRolesQueue } from "../utils/queues/user/migrate-user.queue";
-import { initAddVenueQueue } from "../utils/queues/venue/add-venue.queue";
 import { initUserEmailQueue } from "../utils/queues/user/email-tolowercase.queue";
+import { initUserRolesQueue } from "../utils/queues/user/migrate-user.queue";
 import { initUserLogsQueue } from "../utils/queues/user-logs";
+import { initAddVenueQueue } from "../utils/queues/venue/add-venue.queue";
 import { validateUpdateRatingSchema } from "../utils/rating/validation";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
 
