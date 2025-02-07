@@ -2,7 +2,7 @@ import fs from "fs";
 import { ObjectId } from "mongodb";
 import path from "path";
 
-import { REFRESH_TOKEN_SECRET, VENUE_4_USE_URI } from "../config";
+import { REFRESH_TOKEN_SECRET } from "../config";
 import { AuthStatus, TUpdateAuth } from "../models/auth.model";
 import { hashPassword, MUser, TUser, user_role, user_status } from "../models/user.model";
 import AdminMembersRepo from "../repositories/admin-members.repository";

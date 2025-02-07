@@ -111,7 +111,7 @@ export default class AuthCtrl {
         {
           _id: userId,
           ...(tenant && { tenant: tenant?.code }),
-          email,
+          email: email.toLowerCase(),
           password,
           role,
           phone_number,
