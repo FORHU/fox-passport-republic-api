@@ -22,7 +22,14 @@ import VenueSvc from "../services/venue.service";
 import { PaginationType, TransferOwnershipPayload } from "../types/common";
 import { generateVerificationToken } from "../utils/auth";
 import { SUPPORTED_CURRENCIES } from "../utils/constant";
-import { convertCentsToDollars, convertDollarsToCents, convertToCurrency, formatDate, hashSearch, sendTemplatedEmail } from "../utils/helpers";
+import {
+  convertCentsToDollars,
+  convertDollarsToCents,
+  convertToCurrency,
+  formatDate,
+  hashSearch,
+  sendTemplatedEmail
+} from "../utils/helpers";
 import RedisUtil from "../utils/redis.util";
 import { createPrice, createProduction } from "../utils/stripe";
 import SaleTransactionSvc from "./sale-transactions.service";
@@ -119,11 +126,10 @@ export default class AdminSvc {
           await EmailLogsRepo.createEmailLog(email_logs_data);
         }
 
-        return `Email sent successfully to: ${venue_data.venue.user.email}`;
+        // return `Email sent successfully to: ${venue_data.venue.user.email}`;
       }
 
-      const result = await AdminRepo.updateVenue(data, status);
-      return result;
+      return await AdminRepo.updateVenue(data, status);
     } catch (error) {
       console.error("Error in updateVenue:", error);
       throw error;
