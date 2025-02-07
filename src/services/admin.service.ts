@@ -166,8 +166,14 @@ export default class AdminSvc {
       const limitNumber = parseInt(limit as string);
       const offset = (pageNumber - 1) * limitNumber;
 
+      const additionQuery = {
+        limit: limitNumber,
+        offset,
+        ...query,
+      };
+
       let list_count = null;
-      const hashSpaceCount = hashSearch({ query, count: true });
+      const hashSpaceCount = hashSearch({ additionQuery, count: true });
       const cacheSpaceCount = await RedisUtil.getCache(hashSpaceCount, PREFIX_VENUE);
 
       if (!cacheSpaceCount) {
@@ -178,7 +184,7 @@ export default class AdminSvc {
       }
 
       let list = null;
-      const hashSpaceList = hashSearch(query);
+      const hashSpaceList = hashSearch(additionQuery);
       const cacheSpaceList = await RedisUtil.getCache(hashSpaceList, PREFIX_VENUE);
 
       if (!cacheSpaceList) {
