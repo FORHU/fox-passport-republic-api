@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { CC_SUPPORT_EMAIL, SUPPORT_EMAIL, VENUE_4_USE_URI } from "../config";
 import { formatDate } from "../models/enquiries.model";
 import { space_status } from "../models/space.model";
+import { actions_enums } from "../models/user-logs.model";
 import { TVenue, venue_status } from "../models/venue.models";
 import EmailLogsRepo from "../repositories/email_logs.repository";
 import SpaceRepository from "../repositories/space.repository";
@@ -20,6 +21,7 @@ import KeywordSvc from "./keyword.service";
 import QuestionSvc from "./questions.service";
 import SaleTransactionSvc from "./sale-transactions.service";
 import SpaceSvc from "./space.service";
+import UserLogsSvc from "./user-logs.service";
 
 const PREFIX = "venues";
 
@@ -258,6 +260,16 @@ export default class VenueSvc {
       payment_method,
       ...(tenant && { tenant }),
     };
+
+    const query = {
+      user: new ObjectId(user?._id as string),
+      details: { venue: venueId },
+      action: actions_enums.VIEW_VENUE,
+    };
+
+    const existingLogs = await UserLogsSvc.getUser(query);
+    const count = existingLogs?.count || 0;
+    await UserLogsSvc.updateUserlogs(query, { count: count + 1, updatedAt: new Date(), action: actions_enums.VIEW_VENUE });
     return VenueRepo.createVenue(venueData);
   }
 

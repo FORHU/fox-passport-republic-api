@@ -3,7 +3,7 @@ import { Filter } from "mongodb";
 import { MUserLogs, TUserLogs } from "../models/user-logs.model";
 import { getDB } from "../utils/mongo";
 
-export default class TodoRepo {
+export default class UserLogsRepo {
   static collection() {
     return getDB().collection("user-logs");
   }

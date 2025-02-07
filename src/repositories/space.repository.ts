@@ -7,6 +7,7 @@ import { getDB } from "../utils/mongo";
 import RedisUtil from "../utils/redis.util";
 
 const PREFIX = "spaces";
+const PREFIX_USER_LOGS = "user_logs";
 
 export default class SpaceRepository {
   static collection() {
@@ -618,7 +619,7 @@ export default class SpaceRepository {
   }
 
   static async createSpaces(data: TSpace) {
-    await RedisUtil.invalidateByPrefix(PREFIX);
+    await Promise.allSettled([RedisUtil.invalidateByPrefix(PREFIX), RedisUtil.invalidateByPrefix(PREFIX_USER_LOGS)]);
     return this.collection().insertOne(new MSpace(data));
   }
 
@@ -627,7 +628,7 @@ export default class SpaceRepository {
     const result = await this.collection().updateMany(query, {
       $set: payload,
     });
-    await RedisUtil.invalidateByPrefix(PREFIX);
+    await Promise.allSettled([RedisUtil.invalidateByPrefix(PREFIX), RedisUtil.invalidateByPrefix(PREFIX_USER_LOGS)]);
     return result;
   }
 
@@ -1065,7 +1066,7 @@ export default class SpaceRepository {
 
   static async deleteSpaces(query: Filter<TSpace>) {
     const result = await this.collection().deleteMany(query);
-    await RedisUtil.invalidateByPrefix(PREFIX);
+    await Promise.allSettled([RedisUtil.invalidateByPrefix(PREFIX), RedisUtil.invalidateByPrefix(PREFIX_USER_LOGS)]);
     return result;
   }
 

@@ -17,10 +17,11 @@ import { constructQuery } from "../utils/space/helpers";
 import KeywordSvc from "./keyword.service";
 import PricingSvc from "./pricing.service";
 import QuestionSvc from "./questions.service";
+import RatingSvc from "./rating.service";
 import UserSvc from "./user.service";
 import UserLogsSvc from "./user-logs.service";
 import VenueSvc from "./venue.service";
-import RatingSvc from "./rating.service";
+import { actions_enums } from "../models/user-logs.model";
 
 const PREFIX = "spaces";
 const PREFIX_USER_LOGS = "user_logs";
@@ -214,8 +215,9 @@ export default class SpaceSvc {
       }
 
       const newSpaceData = {
-        venue: new ObjectId(venue_id),
-        user: new ObjectId(user?._id),
+        _id: new ObjectId(),
+        venue: new ObjectId(venue_id as string),
+        user: new ObjectId(user?._id as string),
         name,
         status,
         ...(representation && { representation }),
@@ -223,6 +225,17 @@ export default class SpaceSvc {
         ...(description && { description }),
       };
 
+      const query = {
+        user: new ObjectId(user?._id as string),
+        details: { space: newSpaceData._id },
+        action: actions_enums.VIEW_SPACE,
+      };
+
+      const existingLogs = await UserLogsSvc.getUser(query);
+
+      const count = existingLogs?.count || 0;
+
+      await UserLogsSvc.updateUserlogs(query, { count: count + 1, updatedAt: new Date(), action: actions_enums.VIEW_SPACE });
       return await SpaceRepo.createSpaces(newSpaceData);
     } catch (error) {
       throw new Error("Failed to create space");

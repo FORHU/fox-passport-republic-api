@@ -226,7 +226,7 @@ export default class UserLogsV2Repo {
       },
     );
 
-    if (space?.status) {
+    if (space) {
       pipeline.push({
         $match: {
           "spaceDetails.status": space,

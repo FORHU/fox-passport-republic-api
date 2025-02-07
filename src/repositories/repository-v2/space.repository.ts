@@ -25,7 +25,6 @@ export default class SpaceRepository {
   }
 
   static getSpaces(query: any, limit: number, skip: number) {
-    console.log(query)
     const spaceProjectPayload = {
       _id: 1,
       space_details_name: 1,
@@ -98,5 +97,58 @@ export default class SpaceRepository {
 
   static getSpace(query: Filter<TSpace>) {
     return this.collection().findOne(query);
+  }
+
+  static async getSpaceWithoutUserLogs(limit: number, offset: number) {
+    const pipeline = [
+      {
+        $lookup: {
+          from: "user-logs",
+          localField: "_id",
+          foreignField: "details.space",
+          as: "logs",
+        },
+      },
+      {
+        $match: {
+          logs: { $size: 0 },
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+        },
+      },
+      {
+        $skip: offset,
+      },
+      {
+        $limit: limit,
+      },
+    ];
+    return this.collection().aggregate(pipeline).toArray();
+  }
+
+  static async getTotalSpacesWithoutLogs() {
+    const pipeline = [
+      {
+        $lookup: {
+          from: "user-logs",
+          localField: "_id",
+          foreignField: "details.space",
+          as: "logs",
+        },
+      },
+      {
+        $match: {
+          $expr: { $eq: [{ $size: "$logs" }, 0] }, // Ensures logs array is empty
+        },
+      },
+      {
+        $count: "totalCount",
+      },
+    ];
+    const total = await this.collection().aggregate(pipeline).toArray();
+    return total[0]?.totalCount || 0;
   }
 }
