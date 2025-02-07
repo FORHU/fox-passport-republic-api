@@ -7,6 +7,7 @@ import rolesMiddleware from "../middleware/roles.middleware";
 import tenantMiddleware from "../middleware/tenant.middleware";
 import tenantValidationMiddleware from "../middleware/tenant-validation.middleware";
 import sessionMiddleware from "../middleware/valid-session.middleware";
+import { initUserEmailQueue } from "../utils/queues/user/email-tolowercase.queue";
 
 const ADMIN_MIDDLEWARE = [sessionMiddleware, authenticateToken, rolesMiddleware];
 
@@ -67,8 +68,11 @@ router.post("/upload-excel", [...ADMIN_MIDDLEWARE], AdminCtrl.uploadExcelFile);
 
 router.post("/migrate-user-roles", AdminCtrl.migrateUserRoles);
 
-//mirate user logs
+//migrate user logs
 router.patch("/migrate-user-logs", AdminCtrl.migrateUserLogs);
+
+//migrate user email
+router.patch("/migrate-user-email", AdminCtrl.migrateUserEmail);
 
 //rating
 router.get("/ratings", [...ADMIN_MIDDLEWARE, tenantMiddleware], AdminCtrl.getRatings);

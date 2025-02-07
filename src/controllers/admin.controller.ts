@@ -34,6 +34,7 @@ import { initTenantUserQueue } from "../utils/queues/tenant/user.tenant.queue";
 import { initTenantVenueQueue } from "../utils/queues/tenant/venue.tenant.queue";
 import { initUserRolesQueue } from "../utils/queues/user/migrate-user.queue";
 import { initAddVenueQueue } from "../utils/queues/venue/add-venue.queue";
+import { initUserEmailQueue } from "../utils/queues/user/email-tolowercase.queue";
 import { initUserLogsQueue } from "../utils/queues/user-logs";
 import { validateUpdateRatingSchema } from "../utils/rating/validation";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
@@ -424,7 +425,6 @@ export default class AdminCtrl {
 
   static async transferOwnershipRequest(req: Request, res: Response) {
     try {
-
       const { error } = validateVenueTransfer(req.body);
 
       if (error) {
@@ -577,11 +577,20 @@ export default class AdminCtrl {
 
     return handleResponse(res, response, "RATING_FETCH_SUCCESSFULLY");
   }
-  
+
   static async migrateUserLogs(req: Request, res: Response) {
     try {
       await initUserLogsQueue();
       return handleResponse(res, {}, "USER_LOGS_MIGRATED_SUCCESSFULLY");
+    } catch (error) {
+      return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
+    }
+  }
+
+  static async migrateUserEmail(req: Request, res: Response) {
+    try {
+      await initUserEmailQueue();
+      return handleResponse(res, {}, "USER_EMAIL_MIGRATED_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
     }
