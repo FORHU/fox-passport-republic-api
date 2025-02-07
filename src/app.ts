@@ -29,6 +29,7 @@ import { useRolesQueue } from "./utils/queues/user/migrate-user.queue";
 import { addVenueQueue } from "./utils/queues/venue/add-venue.queue";
 import { userTenantQueue } from "./utils/queues/tenant/user.tenant.queue";
 import { venueTenantQueue } from "./utils/queues/tenant/venue.tenant.queue";
+import { userEmailQueue } from "./utils/queues/user/email-tolowercase.queue";
 import { userLogsQueue } from "./utils/queues/user-logs";
 
 // Initialize Express app
@@ -52,6 +53,7 @@ createBullBoard({
     new BullAdapter(userTenantQueue),
     new BullAdapter(venueTenantQueue),
     new BullAdapter(userLogsQueue),
+    new BullAdapter(userEmailQueue),
   ],
   serverAdapter,
 });

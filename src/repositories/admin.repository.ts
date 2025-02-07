@@ -2,8 +2,11 @@
 import { ObjectId } from "mongodb";
 import { getDB } from "../utils/mongo";
 import RedisUtil from "../utils/redis.util";
+
 const VENUE_PREFIX = "venues";
 const SPACE_PREFIX = "spaces";
+const PREFIX_USER_LOGS = "user_logs";
+
 export default class AdminRepo {
   //VENUES
 
@@ -13,8 +16,7 @@ export default class AdminRepo {
 
   static async getVenues(query: any) {
     try {
-      const data = await this.venuesCollection().find(query).toArray();
-      return data;
+      return await this.venuesCollection().find(query).toArray();
     } catch (error) {
       throw error;
     }
@@ -25,6 +27,7 @@ export default class AdminRepo {
       const result = await this.venuesCollection().updateOne({ _id: new ObjectId(_id) }, { $set: { status: status, updatedAt: new Date() } });
       await RedisUtil.invalidateByPrefix(VENUE_PREFIX);
       await RedisUtil.invalidateByPrefix(SPACE_PREFIX);
+      await RedisUtil.invalidateByPrefix(PREFIX_USER_LOGS);
       return result;
     } catch (error) {
       throw error;
@@ -301,6 +304,7 @@ export default class AdminRepo {
       });
       await RedisUtil.invalidateByPrefix(VENUE_PREFIX);
       await RedisUtil.invalidateByPrefix(SPACE_PREFIX);
+      await RedisUtil.invalidateByPrefix(PREFIX_USER_LOGS);
       return result;
     } catch (error) {
       throw error;
