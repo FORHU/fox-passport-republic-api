@@ -48,7 +48,6 @@ export default class AdminMemberCtrl {
 
   static async inviteAdminMember(req: Request, res: Response) {
     try {
-      const { email, assigned_roles } = req.body;
       const country = req?.query?.country || "SG";
       const tenant = req?.tenant;
       const user = new ObjectId(req.user._id as string);
@@ -56,6 +55,8 @@ export default class AdminMemberCtrl {
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
+      req.body.email = req.body.email.toLowerCase();
+      const { email, assigned_roles } = req.body;
       const existingUser = await UserSvc.getUser({ email });
 
       if (existingUser) {
