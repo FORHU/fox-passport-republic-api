@@ -7,7 +7,7 @@ const TenantValidationMiddleware = async (req: Request, res: Response, next: Nex
 
   const tenantCode = req.tenant.code;
 
-  const email = req.user ? req.user.email : req.body.email;
+  const email = req.user ? req.user.email.toLowerCase() : req.body.email.toLowerCase();
 
   const query = { email };
 

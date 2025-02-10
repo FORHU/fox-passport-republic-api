@@ -3,9 +3,9 @@ import { randomBytes } from "crypto";
 import { account_transcation_status } from "../../../models/stripe-account-transaction.model";
 import PaymentSvc from "../../../services/payment.service";
 import StripeAccountTransactionSvc from "../../../services/stripe-account-transaction.service";
-import { convertDollarsToCents } from "../../../utils/helpers";
-import { logger } from "../../../utils/logger";
-import { createTransfer } from "../../../utils/stripe";
+import { convertDollarsToCents } from "../../helpers";
+import { logger } from "../../logger";
+import { createTransfer } from "../../stripe";
 import { createQueue } from "../index";
 
 export const paymentQueue = createQueue("paymentQueue");
