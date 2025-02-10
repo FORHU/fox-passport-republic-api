@@ -168,7 +168,7 @@ export default class AuthSvc {
     device_payload?: { device_id: string; device: string; operating_system: string; browser: string },
   ) {
     try {
-      const user = await UserRepo.getUser({ email: { $regex: new RegExp(`^${email}$`, "i") } });
+      const user = await UserRepo.getUser({ email });
 
       const validRoles = {
         [user_role.VENUE_OWNER]: [user_role.VENUE_OWNER, user_role.VENUE_LISTER],
