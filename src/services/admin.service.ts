@@ -22,7 +22,14 @@ import VenueSvc from "../services/venue.service";
 import { PaginationType, TransferOwnershipPayload } from "../types/common";
 import { generateVerificationToken } from "../utils/auth";
 import { SUPPORTED_CURRENCIES } from "../utils/constant";
-import { convertCentsToDollars, convertDollarsToCents, convertToCurrency, formatDate, hashSearch, sendTemplatedEmail } from "../utils/helpers";
+import {
+  convertCentsToDollars,
+  convertDollarsToCents,
+  convertToCurrency,
+  formatDate,
+  hashSearch,
+  sendTemplatedEmail
+} from "../utils/helpers";
 import RedisUtil from "../utils/redis.util";
 import { createPrice, createProduction } from "../utils/stripe";
 import SaleTransactionSvc from "./sale-transactions.service";
@@ -119,11 +126,10 @@ export default class AdminSvc {
           await EmailLogsRepo.createEmailLog(email_logs_data);
         }
 
-        return `Email sent successfully to: ${venue_data.venue.user.email}`;
+        // return `Email sent successfully to: ${venue_data.venue.user.email}`;
       }
 
-      const result = await AdminRepo.updateVenue(data, status);
-      return result;
+      return await AdminRepo.updateVenue(data, status);
     } catch (error) {
       console.error("Error in updateVenue:", error);
       throw error;
@@ -166,8 +172,14 @@ export default class AdminSvc {
       const limitNumber = parseInt(limit as string);
       const offset = (pageNumber - 1) * limitNumber;
 
+      const additionQuery = {
+        limit: limitNumber,
+        offset,
+        ...query,
+      };
+
       let list_count = null;
-      const hashSpaceCount = hashSearch({ query, count: true });
+      const hashSpaceCount = hashSearch({ additionQuery, count: true });
       const cacheSpaceCount = await RedisUtil.getCache(hashSpaceCount, PREFIX_VENUE);
 
       if (!cacheSpaceCount) {
@@ -178,7 +190,7 @@ export default class AdminSvc {
       }
 
       let list = null;
-      const hashSpaceList = hashSearch(query);
+      const hashSpaceList = hashSearch(additionQuery);
       const cacheSpaceList = await RedisUtil.getCache(hashSpaceList, PREFIX_VENUE);
 
       if (!cacheSpaceList) {

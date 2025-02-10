@@ -12,11 +12,11 @@ import BookingSvc from "../services/booking.service";
 import EnquirySvc from "../services/enquiries.service";
 import FileSrvc from "../services/file.service";
 import KeywordSvc from "../services/keyword.service";
+import RatingSvc from "../services/rating.service";
 import SpaceSvc from "../services/space.service";
 import StripeProductSvc from "../services/stripe-product.service";
 import UserSvc from "../services/user.service";
 import VenueSvc from "../services/venue.service";
-import RatingSvc from "../services/rating.service";
 import { constructEnquiryQuery, parseWorkbook, validateSheetsData } from "../utils/admin/helpers";
 import {
   validateGetSpaceSchema,
@@ -32,7 +32,9 @@ import { initFileQueue } from "../utils/queues/files/file-migration.queue";
 import { initQuestionQueue } from "../utils/queues/question/delete-question.queue";
 import { initTenantUserQueue } from "../utils/queues/tenant/user.tenant.queue";
 import { initTenantVenueQueue } from "../utils/queues/tenant/venue.tenant.queue";
+import { initUserEmailQueue } from "../utils/queues/user/email-tolowercase.queue";
 import { initUserRolesQueue } from "../utils/queues/user/migrate-user.queue";
+import { initUserLogsQueue } from "../utils/queues/user-logs";
 import { initAddVenueQueue } from "../utils/queues/venue/add-venue.queue";
 import { validateUpdateRatingSchema } from "../utils/rating/validation";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
@@ -423,16 +425,17 @@ export default class AdminCtrl {
 
   static async transferOwnershipRequest(req: Request, res: Response) {
     try {
-      const { email } = req.body;
-      const venue_id = new ObjectId(req.params.venueId);
-
-      const current_user = new ObjectId(req?.user?._id as string);
-
       const { error } = validateVenueTransfer(req.body);
 
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
+
+      req.body.email = req.body.email.toLowerCase();
+      const { email } = req.body;
+      const venue_id = new ObjectId(req.params.venueId);
+
+      const current_user = new ObjectId(req?.user?._id as string);
 
       const [venue] = await VenueSvc.getVenue({ _id: venue_id });
 
@@ -573,5 +576,23 @@ export default class AdminCtrl {
     };
 
     return handleResponse(res, response, "RATING_FETCH_SUCCESSFULLY");
+  }
+
+  static async migrateUserLogs(req: Request, res: Response) {
+    try {
+      await initUserLogsQueue();
+      return handleResponse(res, {}, "USER_LOGS_MIGRATED_SUCCESSFULLY");
+    } catch (error) {
+      return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
+    }
+  }
+
+  static async migrateUserEmail(req: Request, res: Response) {
+    try {
+      await initUserEmailQueue();
+      return handleResponse(res, {}, "USER_EMAIL_MIGRATED_SUCCESSFULLY");
+    } catch (error) {
+      return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
+    }
   }
 }

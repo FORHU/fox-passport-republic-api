@@ -103,9 +103,7 @@ export default class OrganizationMemberSvc {
       all_venues: all_venues,
     };
 
-    const result = await this.teamMemberInvitation(user_details, data, tenant);
-
-    return result;
+    return await this.teamMemberInvitation(user_details, data, tenant);
   }
 
   static async teamMemberInvitation(userData: any, data: any, tenant?: any) {

@@ -4,6 +4,7 @@ import { ObjectId } from "mongodb";
 import { CC_SUPPORT_EMAIL, SUPPORT_EMAIL, VENUE_4_USE_URI } from "../config";
 import { formatDate } from "../models/enquiries.model";
 import { space_status, TSpace } from "../models/space.model";
+import { actions_enums } from "../models/user-logs.model";
 import PricingRepo from "../repositories/pricing.repository";
 import SpaceRepo from "../repositories/space.repository";
 import UserLogsRepo from "../repositories/user-logs.repository";
@@ -17,10 +18,10 @@ import { constructQuery } from "../utils/space/helpers";
 import KeywordSvc from "./keyword.service";
 import PricingSvc from "./pricing.service";
 import QuestionSvc from "./questions.service";
+import RatingSvc from "./rating.service";
 import UserSvc from "./user.service";
 import UserLogsSvc from "./user-logs.service";
 import VenueSvc from "./venue.service";
-import RatingSvc from "./rating.service";
 
 const PREFIX = "spaces";
 const PREFIX_USER_LOGS = "user_logs";
@@ -209,13 +210,14 @@ export default class SpaceSvc {
       const { venue_id, name, type, representation, description, status } = payload;
 
       const user_role = user?.role;
-      if (user_role !== "ADMIN" && [space_status.REQUIRES_CONSENT, space_status.PENDING].includes(status)) {
+      if (user_role !== user_role && [space_status.REQUIRES_CONSENT, space_status.PENDING].includes(status)) {
         throw new Error("Only ADMIN can set the status to PENDING or REQUIRES_CONSENT.");
       }
 
       const newSpaceData = {
-        venue: new ObjectId(venue_id),
-        user: new ObjectId(user?._id),
+        _id: new ObjectId(),
+        venue: new ObjectId(venue_id as string),
+        user: new ObjectId(user?._id as string),
         name,
         status,
         ...(representation && { representation }),
@@ -223,6 +225,17 @@ export default class SpaceSvc {
         ...(description && { description }),
       };
 
+      const query = {
+        user: new ObjectId(user?._id as string),
+        details: { space: newSpaceData._id },
+        action: actions_enums.VIEW_SPACE,
+      };
+
+      const existingLogs = await UserLogsSvc.getUser(query);
+
+      const count = existingLogs?.count || 0;
+
+      await UserLogsSvc.updateUserlogs(query, { count: count + 1, updatedAt: new Date(), action: actions_enums.VIEW_SPACE });
       return await SpaceRepo.createSpaces(newSpaceData);
     } catch (error) {
       throw new Error("Failed to create space");
@@ -774,30 +787,46 @@ export default class SpaceSvc {
     const { page = 1, limit = 20, venueId, status } = params;
     const pageNumber = parseInt(page.toString());
     const limitNumber = parseInt(limit.toString());
-    const userId = new ObjectId(user._id);
+    const userId = new ObjectId(user._id as string);
     const userRole = user.role;
     const offset = (page - 1) * limit;
     const query: any = {};
 
+    const userData = await UserSvc.getUser({ _id: userId });
+    if (!userData) {
+      throw new Error("User not found");
+    }
+
     if (venueId) {
-      query.venue = new ObjectId(venueId);
+      query["venue._id"] = new ObjectId(venueId as string);
     }
 
     if (status) {
-      query.status = { $in: status.split(",").map((s: string) => s.trim()) };
+      query.status = {
+        $in: status.split(",").map((s: string) => s.trim()),
+        $ne: "DELETED",
+      };
     }
 
     if (userRole !== "ADMIN") {
-      query.user = userId;
+      query["venue.organization"] = userData?.organization;
     }
 
     const subscribedSpaces = await SpaceRepo.getSpaceList({ query, skip: pageNumber, limit: limitNumber });
-    const count = await SpaceRepo.countSpaces({ ...query, status: { $ne: "DELETED" } });
+    const count = await SpaceRepo.handleSpaceCount({ query });
 
-    const result = {
+    const result: {
+      data: any;
+      total_pages: number;
+      total_items: number;
+      current_active: number;
+      current_page: number;
+      size: number;
+      offset: number;
+    } = {
       data: subscribedSpaces,
       total_pages: Math.ceil(subscribedSpaces.length / limitNumber) || 0,
-      total_items: subscribedSpaces.length,
+      total_items: count,
       current_active: count,
       current_page: pageNumber,
       size: limitNumber,

@@ -18,7 +18,7 @@ import { connectToMongo } from "./utils/mongo";
 import { sendEmailQueue } from "./utils/queues/email/email.queue";
 import { enquiryQueue } from "./utils/queues/enquiries/enquries-status.queue";
 import { fileQueue } from "./utils/queues/files/file-migration.queue";
-import { invoiceQueue } from "./utils/queues/invoice/index";
+import { invoiceQueue } from "./utils/queues/invoice";
 import { startJobs } from "./utils/queues/jobs";
 import { paymentQueue } from "./utils/queues/payment/payment.queue";
 import { questionDeletionQueue } from "./utils/queues/question/delete-question.queue";
@@ -29,6 +29,8 @@ import { useRolesQueue } from "./utils/queues/user/migrate-user.queue";
 import { addVenueQueue } from "./utils/queues/venue/add-venue.queue";
 import { userTenantQueue } from "./utils/queues/tenant/user.tenant.queue";
 import { venueTenantQueue } from "./utils/queues/tenant/venue.tenant.queue";
+import { userEmailQueue } from "./utils/queues/user/email-tolowercase.queue";
+import { userLogsQueue } from "./utils/queues/user-logs";
 
 // Initialize Express app
 const app = express();
@@ -50,6 +52,8 @@ createBullBoard({
     new BullAdapter(useRolesQueue),
     new BullAdapter(userTenantQueue),
     new BullAdapter(venueTenantQueue),
+    new BullAdapter(userLogsQueue),
+    new BullAdapter(userEmailQueue),
   ],
   serverAdapter,
 });

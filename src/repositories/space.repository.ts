@@ -7,6 +7,7 @@ import { getDB } from "../utils/mongo";
 import RedisUtil from "../utils/redis.util";
 
 const PREFIX = "spaces";
+const PREFIX_USER_LOGS = "user_logs";
 
 export default class SpaceRepository {
   static collection() {
@@ -613,12 +614,61 @@ export default class SpaceRepository {
   }
 
   static async countSpaces(query: any) {
-    const count = await this.collection().countDocuments(query);
-    return count;
+    return await this.collection().countDocuments(query);
+  }
+
+  static async handleSpaceCount({ query }: { query: any }) {
+    const pipeline = [
+      {
+        $lookup: {
+          from: "venues",
+          localField: "venue",
+          foreignField: "_id",
+          as: "venue",
+        },
+      },
+      { $unwind: "$venue" },
+      { $match: query },
+      {
+        $lookup: {
+          from: "files",
+          localField: "space_photo",
+          foreignField: "_id",
+          as: "space_photo",
+        },
+      },
+      {
+        $unwind: {
+          path: "$space_photo",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $group: {
+          _id: "$_id",
+          name: { $first: "$name" },
+          venue: { $first: "$venue" },
+          status: { $first: "$status" },
+          user: { $first: "$user" },
+          space_photo: { $push: "$space_photo" },
+          latestDate: {
+            $max: {
+              $ifNull: ["$updatedAt", "$createdAt"],
+            },
+          },
+        },
+      },
+      {
+        $count: "totalCount",
+      },
+    ];
+
+    const result = await this.collection().aggregate(pipeline).toArray();
+    return result.length > 0 ? result[0].totalCount : 0;
   }
 
   static async createSpaces(data: TSpace) {
-    await RedisUtil.invalidateByPrefix(PREFIX);
+    await Promise.allSettled([RedisUtil.invalidateByPrefix(PREFIX), RedisUtil.invalidateByPrefix(PREFIX_USER_LOGS)]);
     return this.collection().insertOne(new MSpace(data));
   }
 
@@ -627,7 +677,7 @@ export default class SpaceRepository {
     const result = await this.collection().updateMany(query, {
       $set: payload,
     });
-    await RedisUtil.invalidateByPrefix(PREFIX);
+    await Promise.allSettled([RedisUtil.invalidateByPrefix(PREFIX), RedisUtil.invalidateByPrefix(PREFIX_USER_LOGS)]);
     return result;
   }
 
@@ -1011,6 +1061,15 @@ export default class SpaceRepository {
   static async getSpaceList({ query, skip, limit }: PaginationType) {
     const page = (skip - 1) * limit;
     const pipeline = [
+      {
+        $lookup: {
+          from: "venues",
+          localField: "venue",
+          foreignField: "_id",
+          as: "venue",
+        },
+      },
+      { $unwind: "$venue" },
       { $match: query },
       {
         $lookup: {
@@ -1050,7 +1109,11 @@ export default class SpaceRepository {
         $project: {
           _id: 1,
           name: 1,
-          venue: 1,
+          venue: {
+            _id: 1,
+            name: 1,
+            organization: 1,
+          },
           status: 1,
           user: 1,
           space_photo: 1,
@@ -1065,7 +1128,7 @@ export default class SpaceRepository {
 
   static async deleteSpaces(query: Filter<TSpace>) {
     const result = await this.collection().deleteMany(query);
-    await RedisUtil.invalidateByPrefix(PREFIX);
+    await Promise.allSettled([RedisUtil.invalidateByPrefix(PREFIX), RedisUtil.invalidateByPrefix(PREFIX_USER_LOGS)]);
     return result;
   }
 

@@ -40,6 +40,8 @@ export default class OrganizationMemberCtrl {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
 
+      req.body.email = req.body.email.toLowerCase();
+
       const result = await OrganizationMemberSvc.processTeamMemberInvitation(req.body, userId, country, tenant);
 
       return handleResponse(res, result, "ALL_FIELDS_SATISFIED");
@@ -52,7 +54,7 @@ export default class OrganizationMemberCtrl {
     try {
       const { page = 1, limit = 10 } = req.query as any;
 
-      const user = await UserSvc.getUser({ _id: new ObjectId(req?.user?._id) });
+      const user = await UserSvc.getUser({ _id: new ObjectId(req?.user?._id as string) });
 
       const pageNumber = parseInt(page.toString());
       const limitNumber = parseInt(limit.toString());

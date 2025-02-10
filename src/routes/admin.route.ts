@@ -67,6 +67,12 @@ router.post("/upload-excel", [...ADMIN_MIDDLEWARE], AdminCtrl.uploadExcelFile);
 
 router.post("/migrate-user-roles", AdminCtrl.migrateUserRoles);
 
+//migrate user logs
+router.patch("/migrate-user-logs", AdminCtrl.migrateUserLogs);
+
+//migrate user email
+router.patch("/migrate-user-email", AdminCtrl.migrateUserEmail);
+
 //rating
 router.get("/ratings", [...ADMIN_MIDDLEWARE, tenantMiddleware], AdminCtrl.getRatings);
 router.patch("/rating/:rating_id", [...ADMIN_MIDDLEWARE], AdminCtrl.updateRating);
