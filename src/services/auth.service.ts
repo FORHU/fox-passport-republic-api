@@ -169,7 +169,6 @@ export default class AuthSvc {
   ) {
     try {
       const user = await UserRepo.getUser({ email });
-
       const validRoles = {
         [user_role.VENUE_OWNER]: [user_role.VENUE_OWNER, user_role.VENUE_LISTER],
         [user_role.USER]: [user_role.USER],
