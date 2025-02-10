@@ -54,7 +54,7 @@ export default class OrganizationMemberCtrl {
     try {
       const { page = 1, limit = 10 } = req.query as any;
 
-      const user = await UserSvc.getUser({ _id: new ObjectId(req?.user?._id) });
+      const user = await UserSvc.getUser({ _id: new ObjectId(req?.user?._id as string) });
 
       const pageNumber = parseInt(page.toString());
       const limitNumber = parseInt(limit.toString());
