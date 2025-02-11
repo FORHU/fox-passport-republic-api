@@ -6,7 +6,15 @@ import { ObjectId } from "mongodb";
 import path from "path";
 import puppeteer from "puppeteer-core";
 
-import { BUCKET_PROTOCOL, CDN_ENDPOINT, DEBUG_EMAIL, isDev, S3_BUCKET_NAME, SUPPORT_EMAIL } from "../config";
+import {
+  BUCKET_PROTOCOL,
+  CDN_ENDPOINT,
+  DEBUG_EMAIL,
+  DO_ENDPOINT,
+  isDev,
+  S3_BUCKET_NAME,
+  SUPPORT_EMAIL
+} from "../config";
 import { OrgRoles } from "../models/organization-member.model";
 import SpaceSvc from "../services/space.service";
 import VenueSvc from "../services/venue.service";
@@ -514,5 +522,8 @@ export const tenantBuildQuery = ({ status, tenant_code, tenant, country, support
 };
 
 export const extractFilePath = (filePath: string): string => {
-  return filePath.replace(`${BUCKET_PROTOCOL}${S3_BUCKET_NAME}.${CDN_ENDPOINT}/`, "");
+  if (filePath.includes("cdn")) {
+    return filePath.replace(`${BUCKET_PROTOCOL}${S3_BUCKET_NAME}.${CDN_ENDPOINT}/`, "");
+  }
+  return filePath.replace(`${BUCKET_PROTOCOL}${S3_BUCKET_NAME}.${DO_ENDPOINT}/`, "");
 };
