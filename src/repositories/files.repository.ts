@@ -35,4 +35,8 @@ export default class KeywordRepo {
   static async updateFiles(query: Partial<TFile>, data: any) {
     return await this.collection().updateOne(query, { $set: data });
   }
+
+  static async deleteFilesById(_id: ObjectId) {
+    return await this.collection().deleteOne({ _id });
+  }
 }
