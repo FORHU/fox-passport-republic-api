@@ -1,4 +1,4 @@
-import { GetObjectCommand, ObjectCannedACL, PutObjectCommand, S3 as AWSS3 } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, ObjectCannedACL, PutObjectCommand, S3 as AWSS3 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import https from "https";
 import { Readable } from "stream";
@@ -133,4 +133,19 @@ const downloadFiletoS3 = (fileUrl: string) => {
   });
 };
 
-export { copyFile, downloadFiletoS3, uploadFileToS3, uploadPdfFileTos3 };
+const deleteSpaceFile = async (fileKey: string) => {
+  try {
+    const deleteParams = {
+      Bucket: S3_BUCKET_NAME,
+      Key: fileKey,
+    };
+
+    const command = new DeleteObjectCommand(deleteParams);
+    await doS3.send(command);
+    console.log(`✅ File "${fileKey}" deleted successfully.`);
+  } catch (error) {
+    console.error("Error deleting space:", error);
+  }
+};
+
+export { copyFile, deleteSpaceFile, downloadFiletoS3, uploadFileToS3, uploadPdfFileTos3 };

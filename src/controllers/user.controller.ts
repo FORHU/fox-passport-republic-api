@@ -2,9 +2,12 @@
 import { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 
+import FileSvc from "../services/file.service"
 import UserSvc from "../services/user.service";
+import { extractFilePath } from "../utils/helpers";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
 import { validateUpdateUserSchema } from "../utils/user/validation";
+import { deleteSpaceFile } from "../utils/aws";
 
 export default class AuthCtrl {
   static async updateUser(req: Request, res: Response) {
@@ -22,7 +25,7 @@ export default class AuthCtrl {
       return handleErrorResponse(res, { message: customMessages.join(", ") }, { code: "VALIDATION_ERROR_MISSING_FIELDS" });
     }
     const id = new ObjectId(req.params.id);
-    req.body.email = req.body.toLowerCase();
+    req.body.email = req.body?.email?.toLowerCase();
     const { email, first_name, last_name, profile_picture, company_name, phone_number, venue_name, country, date_of_birth, zip_code, username } =
       req.body;
 
@@ -49,6 +52,17 @@ export default class AuthCtrl {
         }
       }
 
+      if (profile_picture) {
+        const file = await FileSvc.getFileById(user?.profile_picture as string);
+        if (file) {
+          const filePath = extractFilePath(file?.path);
+          await Promise.allSettled([
+            deleteSpaceFile(filePath),
+            FileSvc.deleteFilesById(user?.profile_picture as string),
+          ]);
+        }
+      }
+
       const payload = {
         ...(email && { email }),
         ...(first_name && { first_name }),
@@ -62,6 +76,7 @@ export default class AuthCtrl {
         ...(zip_code && { zip_code }),
         ...(username && { username }),
       };
+
 
       const result = await UserSvc.updateUser(query, payload);
       return handleResponse(res, result, "USER_UPDATED_SUCCESSFULLY");

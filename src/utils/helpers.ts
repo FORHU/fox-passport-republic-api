@@ -6,7 +6,7 @@ import { ObjectId } from "mongodb";
 import path from "path";
 import puppeteer from "puppeteer-core";
 
-import { DEBUG_EMAIL, isDev, SUPPORT_EMAIL } from "../config";
+import { BUCKET_PROTOCOL, CDN_ENDPOINT, DEBUG_EMAIL, isDev, S3_BUCKET_NAME, SUPPORT_EMAIL } from "../config";
 import { OrgRoles } from "../models/organization-member.model";
 import SpaceSvc from "../services/space.service";
 import VenueSvc from "../services/venue.service";
@@ -79,25 +79,20 @@ export const convertDollarsToCents = (amountInDollars: number): number => {
   if (isNaN(amountInDollars)) {
     throw new Error("Invalid amount");
   }
-  const amountInCents = Math.round(amountInDollars * 100);
-
-  return amountInCents;
+  return Math.round(amountInDollars * 100);
 };
 
 export const convertCentsToDollars = (amountInCents: number): number => {
   if (isNaN(amountInCents)) {
     throw new Error("Invalid amount");
   }
-  const amountInDollars = amountInCents / 100;
-
-  return amountInDollars;
+  return amountInCents / 100;
 };
 
 export const convertToIsoDate = (date: any): string => {
   const createdTimestampMilliseconds = date * 1000;
   const createdDate = new Date(createdTimestampMilliseconds);
-  const createdIsoDate = createdDate.toISOString();
-  return createdIsoDate;
+  return createdDate.toISOString();
 };
 
 export const hashSearch = (data: any) => {
@@ -112,8 +107,7 @@ export const hashSearch = (data: any) => {
 
 export const getHTMLContents = ({ template_name, email_data }: any) => {
   const filePath = path.join(process.cwd(), `email-template/${template_name}`);
-  const content = fs.readFileSync(filePath, "utf8");
-  let html = content;
+  let html = fs.readFileSync(filePath, "utf8");
   for (const key in email_data) {
     const placeholder = `{${key}}`;
     html = html.replace(new RegExp(placeholder, "g"), email_data[key]);
@@ -148,8 +142,7 @@ export const sendTemplatedEmail = ({
 };
 
 export const getVenueLocation = (venue: any): string => {
-  const location = `${venue.address.street} ${venue.address.city} ${venue.address.state}`;
-  return location;
+  return `${venue.address.street} ${venue.address.city} ${venue.address.state}`;
 };
 
 export const getVenueCountry = (country: string) => {
@@ -265,9 +258,7 @@ export const bookingDateFormat = (dateString: any) => {
 
 export const dateFormatter = (dateString: any) => {
   const newDate = dayjs(dateString, "DD/MM/YYYY");
-  const formattedDate = newDate.format("YYYY-MM-DD");
-
-  return formattedDate;
+  return newDate.format("YYYY-MM-DD");
 };
 
 export const verifyObjectId = (id: string): ObjectId | null => {
@@ -520,4 +511,8 @@ export const tenantBuildQuery = ({ status, tenant_code, tenant, country, support
     },
     ...(user_id && { user_id }),
   };
+};
+
+export const extractFilePath = (filePath: string): string => {
+  return filePath.replace(`${BUCKET_PROTOCOL}${S3_BUCKET_NAME}.${CDN_ENDPOINT}/`, "");
 };

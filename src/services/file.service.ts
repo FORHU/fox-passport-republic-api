@@ -27,4 +27,8 @@ export default class BookingSvc {
   static updateFiles(query: Partial<TFile>, data: any) {
     return FileRepo.updateFiles(query, data);
   }
+
+  static deleteFilesById(id: string) {
+    return FileRepo.deleteFilesById(new ObjectId(id));
+  }
 }
