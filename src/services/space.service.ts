@@ -10,6 +10,7 @@ import SpaceRepo from "../repositories/space.repository";
 import UserLogsRepo from "../repositories/user-logs.repository";
 import { PaginationType, RequestWithParamsAndUser } from "../types/common";
 import { TMostPopular } from "../types/space";
+import { deleteSpaceFile } from "../utils/aws";
 import { processBookingsAndPricing } from "../utils/bookings/bookingUtils";
 import {
   extractFilePath,
@@ -23,6 +24,7 @@ import {
 import { parseQuestion } from "../utils/question/utils";
 import RedisUtil from "../utils/redis.util";
 import { constructQuery } from "../utils/space/helpers";
+import FileSvc from "./file.service";
 import KeywordSvc from "./keyword.service";
 import PricingSvc from "./pricing.service";
 import QuestionSvc from "./questions.service";
@@ -30,8 +32,6 @@ import RatingSvc from "./rating.service";
 import UserSvc from "./user.service";
 import UserLogsSvc from "./user-logs.service";
 import VenueSvc from "./venue.service";
-import FileSvc from "./file.service";
-import { deleteSpaceFile } from "../utils/aws";
 
 const PREFIX = "spaces";
 const PREFIX_USER_LOGS = "user_logs";
@@ -287,7 +287,6 @@ export default class SpaceSvc {
     //saving old files objectId
     const oldSpacePhoto = space.space_photo;
     const oldFloorPlan = space.floor_plan;
-
     space.space_photo = space_photo;
     space.venue_photo = venue_photo;
     space.guest_capacity = guest_capacity;
@@ -362,19 +361,20 @@ export default class SpaceSvc {
     };
 
     if (space_photo) {
-      await this.handleFileDeletion(oldSpacePhoto);
+      await this.handleFileDeletion(oldSpacePhoto, space.space_photo);
     }
 
     if (floor_plan) {
-      await this.handleFileDeletion(oldFloorPlan);
+      await this.handleFileDeletion(oldFloorPlan, space.floor_plan);
     }
 
     await VenueSvc.updateVenue(space.venue, { updatedAt: updatedAt }, tenant);
     return await this.updateSpaces(updatedData, { _id: spaceId }, tenant);
   }
 
-  static async handleFileDeletion(files: any) {
-    for (const _file of files) {
+  static async handleFileDeletion(files: any, newFiles: any) {
+    const filesToDelete = files.filter((file: { toString: () => any }) => !newFiles.includes(file.toString()));
+    for (const _file of filesToDelete) {
       const file = await FileSvc.getFileById(_file as string);
       if (file) {
         const filePath = extractFilePath(file?.path);
@@ -568,11 +568,12 @@ export default class SpaceSvc {
       custom_price: price.custom_price || 0,
     }));
 
-    let updatedList;
+    let updatedList = null;
     const summarizedPricing = await getSummarizedPricing(transformedPriceList);
     const pricingMap = new Map(summarizedPricing.map((item: any) => [item.space_id, item]));
 
     // Attach summarized pricing to spaces
+    // eslint-disable-next-line prefer-const
     updatedList = list.map((space: any) => ({
       ...space,
       pricing_summary: pricingMap.get(space._id.toString()) || null,
