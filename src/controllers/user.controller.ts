@@ -75,7 +75,7 @@ export default class AuthCtrl {
       const query = { _id: new ObjectId(req?.user?._id as string) };
 
       const result = await UserSvc.getUserInfo(query);
-      return handleResponse(res, result, "USER_FETCHED_SUCCESFULLY");
+      return handleResponse(res, result, "USER_FETCHED_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "USER_FETCH_FAILED" });
     }
@@ -83,7 +83,7 @@ export default class AuthCtrl {
 
   static async deleteUser(req: Request, res: Response) {
     try {
-      const userId = new ObjectId(req?.user?._id);
+      const userId = new ObjectId(req?.user?._id as string);
 
       const existingUser = await UserSvc.getUser({ _id: userId });
       if (!existingUser) {
@@ -99,6 +99,16 @@ export default class AuthCtrl {
       return handleResponse(res, result, "DELETED_USER_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "USER_DELETE_FAILED" });
+    }
+  }
+
+  static async getOnboardingStatus(req: Request, res: Response) {
+    const user_id = req?.params.user_id;
+    try {
+      const result = await UserSvc.getOnboardingStatus(user_id);
+      return handleResponse(res, result, "ONBOARDING_STATUS_FETCHED_SUCCESSFULLY");
+    } catch (error) {
+      return handleErrorResponse(res, error, { code: "ONBOARDING_STATUS_FETCH_FAILED" });
     }
   }
 }

@@ -1,10 +1,11 @@
 import { ObjectId } from "mongodb";
 
+import { TUser, user_status } from "../models/user.model";
 import UserRepo from "../repositories/user.repository";
 import { LookupFields } from "../types/common";
 import { hashSearch } from "../utils/helpers";
 import RedisUtil from "../utils/redis.util";
-import { TUser } from "../models/user.model";
+import StripeAccountSvc from "./stripe-account.service";
 
 const PREFIX = "user";
 
@@ -90,5 +91,18 @@ export default class UserSvc {
 
   static async getUsers(query: any) {
     return UserRepo.getUsers(query);
+  }
+
+  static async getOnboardingStatus(userId: string) {
+    const user = await UserRepo.getUser({ _id: new ObjectId(userId) });
+    if (!user) {
+      return null;
+    }
+    const stripeAccount = await StripeAccountSvc.getAccount({ user: new ObjectId(userId) });
+    return {
+      user_id: userId,
+      is_email_verified: user.status === user_status.ACTIVE,
+      is_stripe_account_verified: stripeAccount?.status === "COMPLETED",
+    };
   }
 }
