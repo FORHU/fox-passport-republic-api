@@ -11,7 +11,15 @@ import UserLogsRepo from "../repositories/user-logs.repository";
 import { PaginationType, RequestWithParamsAndUser } from "../types/common";
 import { TMostPopular } from "../types/space";
 import { processBookingsAndPricing } from "../utils/bookings/bookingUtils";
-import { getOneSummarizedPricing, getSummarizedPricing, hashSearch, parseDate, PricingData, sendTemplatedEmail } from "../utils/helpers";
+import {
+  extractFilePath,
+  getOneSummarizedPricing,
+  getSummarizedPricing,
+  hashSearch,
+  parseDate,
+  PricingData,
+  sendTemplatedEmail,
+} from "../utils/helpers";
 import { parseQuestion } from "../utils/question/utils";
 import RedisUtil from "../utils/redis.util";
 import { constructQuery } from "../utils/space/helpers";
@@ -22,6 +30,8 @@ import RatingSvc from "./rating.service";
 import UserSvc from "./user.service";
 import UserLogsSvc from "./user-logs.service";
 import VenueSvc from "./venue.service";
+import FileSvc from "./file.service";
+import { deleteSpaceFile } from "../utils/aws";
 
 const PREFIX = "spaces";
 const PREFIX_USER_LOGS = "user_logs";
@@ -273,7 +283,7 @@ export default class SpaceSvc {
     //     throw new Error("Space name already exists");
     //   }
     // }
-
+    const oldSpacePhoto = space.space_photo;
     space.space_photo = space_photo;
     space.venue_photo = venue_photo;
     space.guest_capacity = guest_capacity;
@@ -347,8 +357,22 @@ export default class SpaceSvc {
       updatedAt: updatedAt,
     };
 
+    if (space_photo) {
+      await this.handleFileDeletion(oldSpacePhoto);
+    }
+
     await VenueSvc.updateVenue(space.venue, { updatedAt: updatedAt }, tenant);
     return await this.updateSpaces(updatedData, { _id: spaceId }, tenant);
+  }
+
+  static async handleFileDeletion(files: any) {
+    for (const _file of files) {
+      const file = await FileSvc.getFileById(_file as string);
+      if (file) {
+        const filePath = extractFilePath(file?.path);
+        await Promise.allSettled([deleteSpaceFile(filePath), FileSvc.deleteFilesById(_file as string)]);
+      }
+    }
   }
 
   static async updateSpaces(payload: Partial<TSpace>, query: any, tenant?: any) {
