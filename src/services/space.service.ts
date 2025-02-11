@@ -283,7 +283,11 @@ export default class SpaceSvc {
     //     throw new Error("Space name already exists");
     //   }
     // }
+
+    //saving old files objectId
     const oldSpacePhoto = space.space_photo;
+    const oldFloorPlan = space.floor_plan;
+
     space.space_photo = space_photo;
     space.venue_photo = venue_photo;
     space.guest_capacity = guest_capacity;
@@ -359,6 +363,10 @@ export default class SpaceSvc {
 
     if (space_photo) {
       await this.handleFileDeletion(oldSpacePhoto);
+    }
+
+    if (floor_plan) {
+      await this.handleFileDeletion(oldFloorPlan);
     }
 
     await VenueSvc.updateVenue(space.venue, { updatedAt: updatedAt }, tenant);
