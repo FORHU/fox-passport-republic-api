@@ -327,6 +327,7 @@ export default class SpaceRepository {
               "$venue",
               {
                 user: {
+                  _id: "$venue.user._id",
                   first_name: "$venue.user.first_name",
                   last_name: "$venue.user.last_name",
                   email: "$venue.user.email",
