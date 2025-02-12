@@ -33,7 +33,7 @@ export const constructQuery = (params: any, user: any, userId: any, togglePastCu
   const query: any = {};
 
   if (space_id) {
-    query["space._id"] = new ObjectId(space_id);
+    query["space._id"] = new ObjectId(space_id as string);
   }
 
   if (search_name) {
@@ -69,11 +69,11 @@ export const constructQuery = (params: any, user: any, userId: any, togglePastCu
   }
 
   if (venue_id) {
-    query.venue = new ObjectId(venue_id);
+    query.venue = new ObjectId(venue_id as string);
   }
 
   if (enquiry_id) {
-    query._id = new ObjectId(enquiry_id);
+    query._id = new ObjectId(enquiry_id as string);
   }
 
   if (status) {

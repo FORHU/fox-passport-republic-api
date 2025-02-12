@@ -10,6 +10,7 @@ import BookingSvc from "../services/booking.service";
 import CancellationPolicySvc from "../services/cancellation-policy.service";
 import CustomOfferSvc from "../services/custom-offer.service";
 import SpaceSvc from "../services/space.service";
+import UserSvc from "../services/user.service";
 import {
   validateCancelBookingSchema,
   validateCreateBookingsSchema,
@@ -18,7 +19,6 @@ import {
   validateUpdateBookingSchema,
   validateUpdateMultipleBookingsSchema,
 } from "../utils/bookings/validation";
-
 import { dateFormat } from "../utils/helpers";
 import { logger } from "../utils/logger";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
@@ -304,6 +304,10 @@ export default class BookingCtrl {
   static async refundComputation(req: Request, res: Response) {
     const booking_id = new ObjectId(req.params.booking_id);
     try {
+      const user = await UserSvc.getUser({ _id: new ObjectId(req.user._id as string) });
+      if (!user) {
+        return handleErrorResponse(res, "USER_NOT_FOUND", { code: "USER_NOT_FOUND" });
+      }
       let booking: Document[];
       if (IS_BOOKING_MICROSERVICES) {
         ({ booking: booking } = await BookingSvc.fetchBookingsFromMicroservices({ booking_id: booking_id, page: 1, limit: 1 }));
@@ -325,7 +329,7 @@ export default class BookingCtrl {
         return handleErrorResponse(res, "CANCELLATION_POLICY_NOT_FOUND", { code: "CANCELLATION_POLICY_NOT_FOUND" });
       }
 
-      const result = await BookingSvc.processRefundComputation(booking_id, req.user, cancellation_policy, existingBooking, existingCustomOffer);
+      const result = await BookingSvc.processRefundComputation(booking_id, user, cancellation_policy, existingBooking, existingCustomOffer);
 
       return handleResponse(res, result.result, result.message);
     } catch (error) {
