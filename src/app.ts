@@ -18,6 +18,7 @@ import { connectToMongo } from "./utils/mongo";
 import { sendEmailQueue } from "./utils/queues/email/email.queue";
 import { enquiryQueue } from "./utils/queues/enquiries/enquries-status.queue";
 import { fileQueue } from "./utils/queues/files/file-migration.queue";
+import { removeFileQueue } from "./utils/queues/files/file-remove-do";
 import { invoiceQueue } from "./utils/queues/invoice";
 import { startJobs } from "./utils/queues/jobs";
 import { paymentQueue } from "./utils/queues/payment/payment.queue";
@@ -54,6 +55,7 @@ createBullBoard({
     new BullAdapter(venueTenantQueue),
     new BullAdapter(userLogsQueue),
     new BullAdapter(userEmailQueue),
+    new BullAdapter(removeFileQueue),
   ],
   serverAdapter,
 });

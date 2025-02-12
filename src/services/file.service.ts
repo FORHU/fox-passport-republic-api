@@ -8,6 +8,10 @@ export default class BookingSvc {
     return FileRepo.createFiles(data);
   }
 
+  static handleGetFiles(query: any) {
+    return FileRepo.handleGetFiles(query);
+  }
+
   static getFiles(ids: any) {
     return FileRepo.getFiles(ids);
   }

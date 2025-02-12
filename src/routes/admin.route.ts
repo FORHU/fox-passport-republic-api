@@ -65,16 +65,20 @@ router.post("/upload-excel", [...ADMIN_MIDDLEWARE], AdminCtrl.uploadExcelFile);
 
 //migrate user roles
 
-router.post("/migrate-user-roles", AdminCtrl.migrateUserRoles);
+router.post("/migrate-user-roles", [...ADMIN_MIDDLEWARE], AdminCtrl.migrateUserRoles);
 
 //migrate user logs
-router.patch("/migrate-user-logs", AdminCtrl.migrateUserLogs);
+router.patch("/migrate-user-logs", [...ADMIN_MIDDLEWARE], AdminCtrl.migrateUserLogs);
 
 //migrate user email
-router.patch("/migrate-user-email", AdminCtrl.migrateUserEmail);
+router.patch("/migrate-user-email", [...ADMIN_MIDDLEWARE], AdminCtrl.migrateUserEmail);
 
 //rating
 router.get("/ratings", [...ADMIN_MIDDLEWARE, tenantMiddleware], AdminCtrl.getRatings);
 router.patch("/rating/:rating_id", [...ADMIN_MIDDLEWARE], AdminCtrl.updateRating);
+
+//files
+
+router.patch("/remove-do-files", [...ADMIN_MIDDLEWARE], AdminCtrl.removeDoFiles);
 
 export default router;

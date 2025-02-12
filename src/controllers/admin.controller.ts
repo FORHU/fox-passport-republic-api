@@ -38,6 +38,7 @@ import { initUserLogsQueue } from "../utils/queues/user-logs";
 import { initAddVenueQueue } from "../utils/queues/venue/add-venue.queue";
 import { validateUpdateRatingSchema } from "../utils/rating/validation";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
+import { initRemoveFileQueue } from "../utils/queues/files/file-remove-do";
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -591,6 +592,15 @@ export default class AdminCtrl {
     try {
       await initUserEmailQueue();
       return handleResponse(res, {}, "USER_EMAIL_MIGRATED_SUCCESSFULLY");
+    } catch (error) {
+      return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
+    }
+  }
+
+  static async removeDoFiles(req: Request, res: Response) {
+    try {
+      await initRemoveFileQueue();
+      return handleResponse(res, {}, "REMOVE_DO_FILES_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
     }
