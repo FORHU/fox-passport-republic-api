@@ -210,7 +210,7 @@ export default class EnquirySvc {
       event_date,
     } = params as any;
 
-    const userId = new ObjectId(user._id);
+    const userId = new ObjectId(user._id as string);
     const userData: any = await UserSvc.getUser({ _id: userId });
 
     const censorPhoneNumber = toggle_censor === "true";
