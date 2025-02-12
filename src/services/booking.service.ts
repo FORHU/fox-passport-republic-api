@@ -579,9 +579,12 @@ export default class BookingSvc {
     );
 
     let refundData: any = null;
-    let cancellationMessage;
+    let cancellationMessage: string;
     let refundAmount: number = 0;
-    if (valid_for_cancellation.allowed && valid_for_cancellation.amount > 0) {
+    if (
+      [user_role.VENUE_OWNER, user_role.VENUE_LISTER].includes(userRole) ||
+      (valid_for_cancellation?.allowed && valid_for_cancellation?.amount > 0)
+    ) {
       const paymentQuery = {
         custom_offer: existingCustomOffer._id,
       };
@@ -591,8 +594,8 @@ export default class BookingSvc {
         refundAmount = parseFloat(payment?.payment_amount);
         cancellationMessage = "The venue owner canceled, full refund applies.";
       } else {
-        refundAmount = parseFloat(payment?.payment_amount) * parseFloat(valid_for_cancellation.amount);
-        cancellationMessage = valid_for_cancellation.message;
+        refundAmount = parseFloat(payment?.payment_amount) * parseFloat(valid_for_cancellation?.amount);
+        cancellationMessage = valid_for_cancellation?.message;
       }
 
       const paymentIntent: any = await getPaymentAccount(payment.payment_id);
