@@ -24,6 +24,10 @@ router.patch("/:booking_id", [sessionMiddleware, authenticateToken, tenantMiddle
 router.delete("/:booking_id", [sessionMiddleware, authenticateToken, tenantMiddleware, ...teamOrganizationMiddleware], BookingCtrl.deleteBooking);
 router.get("/cancel/computation/:booking_id", [sessionMiddleware, authenticateToken, tenantMiddleware], BookingCtrl.refundComputation);
 router.get("/existing-booking", [sessionMiddleware, authenticateToken, tenantMiddleware], BookingCtrl.existingBooking);
-router.patch("/cancel/:booking_id", [sessionMiddleware, authenticateToken, tenantMiddleware, ...teamOrganizationMiddleware], BookingCtrl.cancelBooking);
+router.patch(
+  "/cancel/:booking_id",
+  [sessionMiddleware, authenticateToken, tenantMiddleware, ...teamOrganizationMiddleware],
+  BookingCtrl.cancelBooking,
+);
 
 export default router;
