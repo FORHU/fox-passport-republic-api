@@ -8,6 +8,10 @@ export default class KeywordRepo {
     return getDB().collection("files");
   }
 
+  static async handleGetFiles(query: any) {
+    return await this.collection().find(query).toArray();
+  }
+
   static async getFileById(id: ObjectId) {
     return await this.collection().findOne({ _id: id });
   }
