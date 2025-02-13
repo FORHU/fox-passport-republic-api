@@ -220,7 +220,13 @@ export default class VenueRepo {
         },
         venue_photos: 1,
         space_photos: 1,
-        user: { $arrayElemAt: ["$user", 0] },
+        user: {
+          $cond: {
+            if: { $gt: [{ $size: "$user" }, 0] },
+            then: { $arrayElemAt: ["$user", 0] },
+            else: null,
+          },
+        },
         foods_and_beverages: 1,
         venue_details: 1,
         organization: 1,
