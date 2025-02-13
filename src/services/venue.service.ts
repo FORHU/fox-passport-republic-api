@@ -22,6 +22,7 @@ import QuestionSvc from "./questions.service";
 import SaleTransactionSvc from "./sale-transactions.service";
 import SpaceSvc from "./space.service";
 import UserLogsSvc from "./user-logs.service";
+import UserRepo from "../repositories/user.repository";
 
 const PREFIX = "venues";
 
@@ -45,8 +46,20 @@ export default class VenueSvc {
   static async updateVenue(venueId: ObjectId, data: any, tenant?: any) {
     const [venueData] = await this.getPaginatedVenues({ _id: venueId }, 0, 1);
     const [spaceData] = await SpaceRepository.getPaginatedSpaces({ query: { "venue._id": venueId }, skip: 0, limit: 1, user_id: null });
+
+    const userVenue = venueData.user;
+    const userSpace = spaceData.venue.user;
+
+    if (!userVenue || !userVenue.email?.trim()) {
+      throw new Error("User for venue does not exist or has no email.");
+    }
+
+    if (!userSpace || !userSpace.email?.trim()) {
+      throw new Error("User for space does not exist or has no email.");
+    }
+
     const emailLogData = await EmailLogsRepo.getOneEmailLog({
-      user_id: venueData.user,
+      user_id: venueData.user._id,
       email_type: "venue_for_approval",
       venue_id: venueId,
       status: "sent",
