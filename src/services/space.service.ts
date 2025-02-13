@@ -32,6 +32,7 @@ import RatingSvc from "./rating.service";
 import UserSvc from "./user.service";
 import UserLogsSvc from "./user-logs.service";
 import VenueSvc from "./venue.service";
+import UserRepo from "../repositories/user.repository";
 
 const PREFIX = "spaces";
 const PREFIX_USER_LOGS = "user_logs";
@@ -367,8 +368,7 @@ export default class SpaceSvc {
     if (floor_plan) {
       await this.handleFileDeletion(oldFloorPlan, space.floor_plan);
     }
-
-    await VenueSvc.updateVenue(space.venue, { updatedAt: updatedAt }, tenant);
+    const result = await VenueSvc.updateVenue(space.venue, { updatedAt: updatedAt }, tenant);
     return await this.updateSpaces(updatedData, { _id: spaceId }, tenant);
   }
 
@@ -386,7 +386,6 @@ export default class SpaceSvc {
   static async updateSpaces(payload: Partial<TSpace>, query: any, tenant?: any) {
     try {
       const message = null;
-
       await this.sendEmailNotif(query, payload.status, tenant);
       const result = await SpaceRepo.updateSpaces(payload, query);
       return {
@@ -401,6 +400,12 @@ export default class SpaceSvc {
   static async sendEmailNotif(query: any, status: string, send = true, tenant?: any) {
     if (send && status && status === "FOR_APPROVAL") {
       const [spaceData] = await SpaceRepo.getPaginatedSpaces({ query: query, skip: 0, limit: 1, user_id: null });
+
+      const userSpace = spaceData.venue.user;
+      if (!userSpace || !userSpace.email?.trim()) {
+        throw new Error("User for space does not exist or has no email.");
+      }
+
       const dateSubmitted = new Date().toISOString();
       const date_submitted = formatDate(dateSubmitted);
 
