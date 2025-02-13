@@ -2,9 +2,12 @@
 import { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 
+import FileSvc from "../services/file.service"
 import UserSvc from "../services/user.service";
+import { extractFilePath } from "../utils/helpers";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
 import { validateUpdateUserSchema } from "../utils/user/validation";
+import { deleteSpaceFile } from "../utils/aws";
 
 export default class AuthCtrl {
   static async updateUser(req: Request, res: Response) {
@@ -22,7 +25,7 @@ export default class AuthCtrl {
       return handleErrorResponse(res, { message: customMessages.join(", ") }, { code: "VALIDATION_ERROR_MISSING_FIELDS" });
     }
     const id = new ObjectId(req.params.id);
-    req.body.email = req.body.toLowerCase();
+    req.body.email = req.body?.email?.toLowerCase();
     const { email, first_name, last_name, profile_picture, company_name, phone_number, venue_name, country, date_of_birth, zip_code, username } =
       req.body;
 
@@ -49,6 +52,17 @@ export default class AuthCtrl {
         }
       }
 
+      if (profile_picture) {
+        const file = await FileSvc.getFileById(user?.profile_picture as string);
+        if (file) {
+          const filePath = extractFilePath(file?.path);
+          await Promise.allSettled([
+            deleteSpaceFile(filePath),
+            FileSvc.deleteFilesById(user?.profile_picture as string),
+          ]);
+        }
+      }
+
       const payload = {
         ...(email && { email }),
         ...(first_name && { first_name }),
@@ -63,6 +77,7 @@ export default class AuthCtrl {
         ...(username && { username }),
       };
 
+
       const result = await UserSvc.updateUser(query, payload);
       return handleResponse(res, result, "USER_UPDATED_SUCCESSFULLY");
     } catch (error) {
@@ -75,7 +90,7 @@ export default class AuthCtrl {
       const query = { _id: new ObjectId(req?.user?._id as string) };
 
       const result = await UserSvc.getUserInfo(query);
-      return handleResponse(res, result, "USER_FETCHED_SUCCESFULLY");
+      return handleResponse(res, result, "USER_FETCHED_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "USER_FETCH_FAILED" });
     }
@@ -83,7 +98,7 @@ export default class AuthCtrl {
 
   static async deleteUser(req: Request, res: Response) {
     try {
-      const userId = new ObjectId(req?.user?._id);
+      const userId = new ObjectId(req?.user?._id as string);
 
       const existingUser = await UserSvc.getUser({ _id: userId });
       if (!existingUser) {
@@ -99,6 +114,16 @@ export default class AuthCtrl {
       return handleResponse(res, result, "DELETED_USER_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "USER_DELETE_FAILED" });
+    }
+  }
+
+  static async getOnboardingStatus(req: Request, res: Response) {
+    const user_id = req?.params.user_id;
+    try {
+      const result = await UserSvc.getOnboardingStatus(user_id);
+      return handleResponse(res, result, "ONBOARDING_STATUS_FETCHED_SUCCESSFULLY");
+    } catch (error) {
+      return handleErrorResponse(res, error, { code: "ONBOARDING_STATUS_FETCH_FAILED" });
     }
   }
 }

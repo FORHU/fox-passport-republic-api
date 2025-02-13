@@ -234,4 +234,8 @@ export default class UserRepo {
   static async handleGetUser({ query, limit, offset }: { query: any; limit: number; offset: number }) {
     return await this.collection().find(query).limit(limit).skip(offset).toArray();
   }
+
+  static async handleGetUsersV2(query: any) {
+    return await this.collection().find(query).toArray();
+  }
 }

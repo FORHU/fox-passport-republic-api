@@ -327,6 +327,7 @@ export default class SpaceRepository {
               "$venue",
               {
                 user: {
+                  _id: "$venue.user._id",
                   first_name: "$venue.user.first_name",
                   last_name: "$venue.user.last_name",
                   email: "$venue.user.email",
@@ -1186,5 +1187,15 @@ export default class SpaceRepository {
 
     const result = await this.collection().aggregate(pipeline).toArray();
     return result;
+  }
+
+  static async handeGetSpacesPhotos(query?: any) {
+    const pipeline = [
+      { $match: query },
+      { $project: { all_photos: { $concatArrays: ["$space_photo", "$floor_plan"] } } }, // Merge space_photo and floor_plan
+      { $unwind: "$all_photos" },
+      { $group: { _id: null, usedFileIds: { $addToSet: "$all_photos" } } },
+    ];
+    return await this.collection().aggregate(pipeline).toArray();
   }
 }

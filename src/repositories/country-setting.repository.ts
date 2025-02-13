@@ -108,4 +108,14 @@ export default class TodoRepo {
       return Promise.reject("Server internal error.");
     }
   }
+
+  static async handeCountrySettingsPhotos(query?: any) {
+    const pipeline = [
+      { $match: query },
+      { $project: { all_photos: { $concatArrays: ["$photo"] } } },
+      { $unwind: "$all_photos" },
+      { $group: { _id: null, usedFileIds: { $addToSet: "$all_photos" } } },
+    ];
+    return await this.collection().aggregate(pipeline).toArray();
+  }
 }

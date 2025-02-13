@@ -8,6 +8,10 @@ export default class BookingSvc {
     return FileRepo.createFiles(data);
   }
 
+  static handleGetFiles(query: any) {
+    return FileRepo.handleGetFiles(query);
+  }
+
   static getFiles(ids: any) {
     return FileRepo.getFiles(ids);
   }
@@ -26,5 +30,9 @@ export default class BookingSvc {
 
   static updateFiles(query: Partial<TFile>, data: any) {
     return FileRepo.updateFiles(query, data);
+  }
+
+  static deleteFilesById(id: string) {
+    return FileRepo.deleteFilesById(new ObjectId(id));
   }
 }

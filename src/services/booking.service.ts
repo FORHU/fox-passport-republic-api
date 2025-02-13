@@ -579,9 +579,12 @@ export default class BookingSvc {
     );
 
     let refundData: any = null;
-    let cancellationMessage;
+    let cancellationMessage: string;
     let refundAmount: number = 0;
-    if (valid_for_cancellation.allowed && valid_for_cancellation.amount > 0) {
+    if (
+      [user_role.VENUE_OWNER, user_role.VENUE_LISTER].includes(userRole) ||
+      (valid_for_cancellation?.allowed && valid_for_cancellation?.amount > 0)
+    ) {
       const paymentQuery = {
         custom_offer: existingCustomOffer._id,
       };
@@ -591,8 +594,8 @@ export default class BookingSvc {
         refundAmount = parseFloat(payment?.payment_amount);
         cancellationMessage = "The venue owner canceled, full refund applies.";
       } else {
-        refundAmount = parseFloat(payment?.payment_amount) * parseFloat(valid_for_cancellation.amount);
-        cancellationMessage = valid_for_cancellation.message;
+        refundAmount = parseFloat(payment?.payment_amount) * parseFloat(valid_for_cancellation?.amount);
+        cancellationMessage = valid_for_cancellation?.message;
       }
 
       const paymentIntent: any = await getPaymentAccount(payment.payment_id);
@@ -625,7 +628,7 @@ export default class BookingSvc {
   }
 
   static async processRefundComputation(booking_id: ObjectId, user: any, cancellation_policy: any, existingBooking: any, existingCustomOffer: any) {
-    const userRole = user;
+    const userRole = user.role;
     let booking: Document[];
     if (IS_BOOKING_MICROSERVICES) {
       ({ booking: booking } = await BookingSvc.fetchBookingsFromMicroservices({ booking_id: booking_id, page: 1, limit: 1 }));
@@ -673,14 +676,14 @@ export default class BookingSvc {
     let refundAmount: number = 0;
     let refundPercentage: number = 0;
     let message;
-    if (userRole === "VENUE_OWNER") {
+    if ([user_role.VENUE_OWNER, user_role.VENUE_LISTER].includes(userRole)) {
       refundPercentage = 1;
       refundAmount = parseFloat(payment?.payment_amount);
       message = "The venue owner canceled, full refund applies.";
     } else {
       refundPercentage = valid_for_cancellation?.amount;
       refundAmount = parseFloat(payment?.payment_amount) * parseFloat(valid_for_cancellation?.amount);
-      message = valid_for_cancellation.message;
+      message = valid_for_cancellation?.message;
     }
 
     const result = {
