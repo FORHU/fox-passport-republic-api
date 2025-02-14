@@ -349,6 +349,26 @@ export default class EnquiryRepo {
     return this.collection().updateOne(query, { $set: data });
   }
 
+  static async updateEnquiriesArchiveStatus(endDate: any) {
+    return this.collection().updateMany(
+      {
+        "date.timestamp.end_date_time": { $lt: endDate },
+        status: { $nin: ["HAPPENED", "CANCELLED", "ARCHIVED", "BOOKING_CONFIRMED"] },
+      },
+      { $set: { status: "ARCHIVED" } },
+    );
+  }
+
+  static async updateEnquiriesHappenedStatus(endDate: any) {
+    return this.collection().updateMany(
+      {
+        "date.timestamp.end_date_time": { $lt: endDate },
+        status: { $in: ["BOOKING_CONFIRMED"], $ne: "HAPPENED" },
+      },
+      { $set: { status: "HAPPENED" } },
+    );
+  }
+
   static async getEnquiry(query: any) {
     try {
       return this.collection().find(query).toArray();
