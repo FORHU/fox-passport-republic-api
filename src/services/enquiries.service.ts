@@ -9,7 +9,7 @@ import SpaceRepository from "../repositories/space.repository";
 import UserRepo from "../repositories/user.repository";
 import VenueRepo from "../repositories/venue.repository";
 import { constructQuery } from "../utils/enquiries/helpers";
-import { calculatePagination, dateFormat, sendTemplatedEmail } from "../utils/helpers";
+import { calculatePagination, dateFormat, sendTemplatedEmail, formatDateTimeAsObject } from "../utils/helpers";
 import { generateRoomId } from "../utils/inbox.utils";
 import { logger } from "../utils/logger";
 import { handleInitCreateEnquiry, handleInitGetEnquiry, handleInitUpdateEnquiry } from "../utils/v2/microservices/enquiry";
@@ -215,6 +215,15 @@ export default class EnquirySvc {
 
     const censorPhoneNumber = toggle_censor === "true";
     const togglePastCurrent = toggle_current === "true" ? true : toggle_current === "false" ? false : null;
+
+    const newDate = new Date();
+    newDate.setDate(newDate.getDate() - 1);
+
+    const date = formatDateTimeAsObject(newDate);
+    const formattedDate = dateFormat(date);
+    const endDate = formattedDate.timestamp.end_date_time;
+
+    await Promise.all([EnquiryRepo.updateEnquiriesArchiveStatus(endDate), EnquiryRepo.updateEnquiriesHappenedStatus(endDate)]);
 
     const pageNumber = parseInt(page.toString());
     const limitNumber = parseInt(limit.toString());
