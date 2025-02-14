@@ -22,19 +22,13 @@ import VenueSvc from "../services/venue.service";
 import { PaginationType, TransferOwnershipPayload } from "../types/common";
 import { generateVerificationToken } from "../utils/auth";
 import { SUPPORTED_CURRENCIES } from "../utils/constant";
-import {
-  convertCentsToDollars,
-  convertDollarsToCents,
-  convertToCurrency,
-  formatDate,
-  hashSearch,
-  sendTemplatedEmail
-} from "../utils/helpers";
+import { convertCentsToDollars, convertDollarsToCents, convertToCurrency, formatDate, hashSearch, sendTemplatedEmail } from "../utils/helpers";
 import RedisUtil from "../utils/redis.util";
 import { createPrice, createProduction } from "../utils/stripe";
 import SaleTransactionSvc from "./sale-transactions.service";
 import StripeProductSvc from "./stripe-product.service";
 import UserRolesSvc from "./user-roles.service";
+import UserRepo from "../repositories/user.repository";
 
 const PREFIX_VENUE = "venues";
 const PREFIX_SPACE = "spaces";
@@ -216,6 +210,11 @@ export default class AdminSvc {
   static async updateSpace(query: any, data: any, tenant?: any) {
     try {
       const [space_data] = await SpaceRepository.getPaginatedSpaces({ query: query, skip: 0, limit: 1, user_id: null });
+
+      const userSpace = space_data.venue.user;
+      if (!userSpace || !userSpace.email?.trim()) {
+        throw new Error("User for space does not exist or has no email.");
+      }
 
       let emailMessage = "";
 
