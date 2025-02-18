@@ -57,21 +57,26 @@ export default class AdminMemberCtrl {
       }
       req.body.email = req.body.email.toLowerCase();
       const { email, assigned_roles } = req.body;
+      const newUserId = new ObjectId();
       const existingUser = await UserSvc.getUser({ email });
 
-      if (existingUser) {
-        return handleErrorResponse(res, { message: "Existing user" }, { code: "Existing user" });
+      if (!existingUser) {
+        await UserSvc.createUser({
+          _id: newUserId,
+          email,
+          role: user_role.ADMIN,
+          status: user_status.PENDING,
+          ...(tenant && { tenant: tenant?.code }),
+        });
+      } else {
+        const existingAdminMember = await AdminMemberSvc.getAdminMember({ invited_user: existingUser._id, status: "ACCEPTED" });
+        if (existingAdminMember) {
+          return handleErrorResponse(res, { message: "Existing user" }, { code: "Existing user" });
+        }
       }
 
-      const userData = await UserSvc.createUser({
-        email,
-        role: user_role.ADMIN,
-        status: user_status.PENDING,
-        ...(tenant && { tenant: tenant?.code }),
-      });
-
       const data = {
-        _id: userData?._id,
+        _id: existingUser?._id ?? newUserId,
         admin: user,
         email,
         assigned_roles,
@@ -82,7 +87,7 @@ export default class AdminMemberCtrl {
       const adminMemberData = {
         _id: new ObjectId(),
         admin: new ObjectId(req?.user?._id as string),
-        invited_user: new ObjectId(userData?._id),
+        invited_user: existingUser?._id ?? newUserId,
         assigned_roles: Number(data.assigned_roles),
         status: "PENDING",
         createdAt: new Date(),
@@ -203,7 +208,7 @@ export default class AdminMemberCtrl {
       deletedBy: user,
       status: "DELETED",
     };
-   
+
     const result = await AdminMemberSvc.deleteAdminMemberById(_id, updatedData);
     return handleResponse(res, result, "ADMIN_MEMBER_DELETED_SUCCESSFULLY");
   }
