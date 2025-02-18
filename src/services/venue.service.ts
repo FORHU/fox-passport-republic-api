@@ -354,9 +354,6 @@ export default class VenueSvc {
         venue_id: new ObjectId(venue_id),
         ...cancellation_policy,
       };
-      if (cancellationPolicyId) {
-        cancellationPolicyPayload._id = cancellationPolicyId;
-      }
 
       cancellationPolicyId = await CancellationPolicySvc.createOrUpdateCancellationPolicy(cancellationPolicyPayload);
     }

@@ -11,8 +11,6 @@ export default class CancellationPolicyRepo {
   static async createOrUpdateCancellationPolicy(data: TCancellationPolicy, _id?: ObjectId) {
     try {
       const updateData = { ...data, updatedAt: new Date() };
-      delete updateData._id;
-
       const newOrExistingId = _id || new ObjectId();
 
       const result = await this.collection().updateOne({ _id: newOrExistingId }, { $set: updateData }, { upsert: true });
