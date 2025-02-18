@@ -58,7 +58,6 @@ export default class OrganizationMemberSvc {
 
     let owner_venues: any[] = [];
 
-    //current user details
     const user_details: any = await UserSvc.getUser({ _id: userId });
 
     if (all_venues) {
@@ -67,21 +66,18 @@ export default class OrganizationMemberSvc {
       owner_venues = venues.map((venueId: string) => new ObjectId(venueId));
     }
 
-    const [existingMember]: any = await OrganizationMemberSvc.getOrganizationMembers({
-      "invited_user.email": email,
-      deleteAt: null,
-    });
-
-    if (existingMember) {
-      throw new Error("USER_IS_ALREADY_A_MEMBER");
-    }
+    const invitedMember = await UserSvc.getUser({ email: email });
 
     let user_data: any;
 
-    const invitedMember = await UserSvc.getUser({ email: email });
-
     if (invitedMember) {
-      user_data = invitedMember;
+      const existingUserRole = await UserRolesSvc.getUserRoles({ user: invitedMember._id, status: user_status.ACTIVE });
+
+      if (existingUserRole) {
+        throw new Error("USER_IS_ALREADY_A_MEMBER");
+      } else {
+        user_data = invitedMember;
+      }
     } else {
       user_data = await UserSvc.createUser({
         email,
@@ -118,9 +114,6 @@ export default class OrganizationMemberSvc {
         status: StatusType.PENDING,
         all_venues: data.all_venues,
       };
-
-      const existingUserRole = await UserRolesSvc.getUserRoles({ user: data.invited_user_id, role: user_role.VENUE_LISTER });
-      if (existingUserRole) throw new Error("USER_IS_ALREADY_A_VENUE_LISTER");
 
       await OrganizationMemberSvc.createOrganizationMember(payload);
 
