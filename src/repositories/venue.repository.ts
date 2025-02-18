@@ -65,9 +65,7 @@ export default class VenueRepo {
 
   static async getPaginatedVenues(query: any, skip: number, limit: number) {
     const pipeline = [];
-    pipeline.push({
-      $match: query,
-    });
+
     pipeline.push(
       {
         $lookup: {
@@ -148,6 +146,10 @@ export default class VenueRepo {
         },
       },
     );
+
+    pipeline.push({
+      $match: query,
+    });
 
     pipeline.push(
       {

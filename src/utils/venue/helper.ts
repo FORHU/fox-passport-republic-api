@@ -13,7 +13,7 @@ export const constructVenueQuery = (params: any, user: any, venues?: any) => {
       .filter(Boolean);
     const regexPattern = new RegExp(words.map((word: string) => `(?=.*${word})`).join(""), "i");
 
-    query.$or = [{ name: { $regex: regexPattern } }, { spaces: { $elemMatch: { name: { $regex: regexPattern } } } }];
+    query.$or = [{ name: regexPattern }, { "spaces.name": regexPattern }];
   }
 
   if (user_id) {
