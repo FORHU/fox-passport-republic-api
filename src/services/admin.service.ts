@@ -146,15 +146,14 @@ export default class AdminSvc {
         }
       }
 
-      if (typeof venue_name === "string") {
+      if (venue_name) {
         const words = venue_name
           .split(" ")
           .map((word: string) => word.trim())
           .filter(Boolean);
-
         const regexPattern = new RegExp(words.map((word: string) => `(?=.*${word})`).join(""), "i");
 
-        query.$or = [{ name: { $regex: regexPattern } }, { spaces: { $elemMatch: { name: { $regex: regexPattern } } } }];
+        query.$or = [{ name: regexPattern }, { "spaces.name": regexPattern }];
       }
 
       if (venues !== "ALL") {
