@@ -44,22 +44,10 @@ export default class VenueSvc {
   }
 
   static async updateVenue(venueId: ObjectId, data: any, tenant?: any) {
-    const [venueData] = await this.getPaginatedVenues({ _id: venueId }, 0, 1);
-    const [spaceData] = await SpaceRepository.getPaginatedSpaces({ query: { "venue._id": venueId }, skip: 0, limit: 1, user_id: null });
-
-    const userVenue = venueData.user;
-    const userSpace = spaceData.venue.user;
-
-    if (!userVenue || !userVenue.email?.trim()) {
-      throw new Error("User for venue does not exist or has no email.");
-    }
-
-    if (!userSpace || !userSpace.email?.trim()) {
-      throw new Error("User for space does not exist or has no email.");
-    }
+    const venueData = await VenueRepo.getVenue({ _id: venueId }, { name: 1, address: 1, user: 1, description: 1 });
 
     const emailLogData = await EmailLogsRepo.getOneEmailLog({
-      user_id: venueData.user._id,
+      user_id: venueData?.user?._id,
       email_type: "venue_for_approval",
       venue_id: venueId,
       status: "sent",
@@ -72,6 +60,8 @@ export default class VenueSvc {
     let emailStatus = null;
 
     if (data.status && data.status === "FOR_APPROVAL" && !emailLogData) {
+      const [spaceData] = await SpaceRepository.getPaginatedSpaces({ query: { "venue._id": venueId }, skip: 0, limit: 1, user_id: null });
+
       sendTemplatedEmail({
         subject: `${tenant?.config?.name}: Venue For Approval`,
         email_data: {
@@ -123,7 +113,7 @@ export default class VenueSvc {
       });
     } else {
       emailStatus = "failed";
-      message = `Failed to send email to  ${venueData.user.email}`;
+      message = `Failed to send email to  ${venueData?.user?.email}`;
 
       logger.log({
         level: "warn",
@@ -134,7 +124,7 @@ export default class VenueSvc {
     if (!emailLogData) {
       const email_logs_data = {
         _id: new ObjectId(),
-        user_id: venueData.user._id,
+        user_id: venueData?.user?._id,
         venue_id: venueId,
         email_type: "venue_for_approval",
         status: emailStatus,
