@@ -81,8 +81,16 @@ export default class UserSvc {
     return result;
   }
 
-  static async deleteUser(_id: ObjectId, data: any) {
+  static async deleteUser(_id: ObjectId, data: any, role?: string) {
     try {
+      if (role === "VENUE_OWNER") {
+        const existingTransaction = await UserRepo.getActiveTransactions({ _id: _id });
+
+        if (existingTransaction.hasActiveTransactions) {
+          throw new Error(existingTransaction.message);
+        }
+      }
+
       return await UserRepo.deleteUser(_id, data);
     } catch (error) {
       throw new Error(`Failed to delete user: ${error}`);
