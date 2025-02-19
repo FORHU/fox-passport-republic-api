@@ -238,4 +238,117 @@ export default class UserRepo {
   static async handleGetUsersV2(query: any) {
     return await this.collection().find(query).toArray();
   }
+
+  static async getActiveTransactions(query: any) {
+    try {
+      const excludedStatuses = [
+        "ARCHIVED",
+        "CANCELLED",
+        "DECLINED",
+        "HAPPENED",
+        "BOOKING_REQUEST_DECLINED",
+        "BOOKING_REQUEST_WITHDRAWN",
+        "PAYMENT_FAILED",
+        "COMMISION_DUE",
+      ];
+
+      const pipeline = [
+        { $match: query },
+        {
+          $project: {
+            _id: 1,
+          },
+        },
+        {
+          $lookup: {
+            from: "venues",
+            localField: "_id",
+            foreignField: "user",
+            pipeline: [
+              {
+                $project: {
+                  _id: 1,
+                },
+              },
+            ],
+            as: "venue",
+          },
+        },
+        {
+          $lookup: {
+            from: "enquiries",
+            localField: "venue._id",
+            foreignField: "venue",
+            pipeline: [
+              {
+                $match: {
+                  status: {
+                    $nin: excludedStatuses,
+                  },
+                },
+              },
+              {
+                $project: {
+                  _id: 1,
+                  date: 1,
+                  status: 1,
+                },
+              },
+            ],
+            as: "enquiries",
+          },
+        },
+        {
+          $lookup: {
+            from: "bookings",
+            localField: "enquiries._id",
+            foreignField: "enquiry",
+            pipeline: [
+              {
+                $match: {
+                  event_type: "BOOKING",
+                  status: {
+                    $nin: excludedStatuses,
+                  },
+                },
+              },
+              { $project: { _id: 1, status: 1 } },
+            ],
+            as: "booking",
+          },
+        },
+        {
+          $addFields: {
+            enquiryCount: { $size: "$enquiries" },
+            bookingCount: { $size: "$booking" },
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            enquiries: 1,
+            booking: 1,
+            enquiryCount: 1,
+            bookingCount: 1,
+          },
+        },
+      ];
+
+      const result = await this.collection().aggregate(pipeline).toArray();
+
+      const totalEnquiries = result.reduce((sum, entry) => sum + entry.enquiryCount, 0);
+      const totalBookings = result.reduce((sum, entry) => sum + entry.bookingCount, 0);
+
+      const hasActiveTransactions = totalEnquiries > 0 || totalBookings > 0;
+
+      const message = hasActiveTransactions
+        ? `There are ${totalEnquiries} active enquiries,  and ${totalBookings} active bookings remaining.`
+        : "No active transactions found.";
+
+      return { hasActiveTransactions, message };
+    } catch (error) {
+      console.error("Error fetching active transactions:", error);
+      throw error;
+    }
+  }
 }
