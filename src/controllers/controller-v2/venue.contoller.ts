@@ -41,6 +41,19 @@ export default class VenueCtrl {
     }
   }
 
+  static async getVenueName(req: Request, res: Response) {
+    try {
+      const { name } = req.query;
+
+      const lowerCaseName = (name as string).toLowerCase();
+      const result = await VenueSvc.getVenueName({ name_lower_case: lowerCaseName });
+
+      return handleResponse(res, result, "VENUE_FETCHED_SUCCESSFULY");
+    } catch (error) {
+      return handleErrorResponse(res, error, { code: "VENUE_NOT_FETCHED" });
+    }
+  }
+
   // static async getVenues(req: Request, res: Response) {
   //   const { error } = validateGetVenueSchema(req.query);
   //   if (error) {
