@@ -490,10 +490,10 @@ export default class PaymentSvc {
   }
 
   static async createAccount(payload: any, userStripeAccount: any, user: any, tenant?: any) {
-    const { user_id, country = "SG" } = payload;
+    const { user_id, country = "SG", return_url } = payload;
 
     if (userStripeAccount && userStripeAccount.stripe_account_id && userStripeAccount.status === account_status.PENDING) {
-      const retrievedAccount: any = await retriveAccount(userStripeAccount.stripe_account_id, tenant);
+      const retrievedAccount: any = await retriveAccount(userStripeAccount.stripe_account_id, tenant, return_url);
       if (retrievedAccount) {
         await StripeAccountSvc.deleteAccount({ _id: userStripeAccount._id });
         await deleteAccount(userStripeAccount?.stripe_account_id);
