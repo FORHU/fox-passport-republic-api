@@ -87,7 +87,7 @@ export default class PaymentCtrl {
   }
 
   static async createAccount(req: Request, res: Response) {
-    const { user_id } = req.body;
+    const { user_id, return_url } = req.body;
 
     const user = await UserSvc.getUser({ _id: new ObjectId(user_id as string) });
     if (!user) {
