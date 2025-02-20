@@ -5,8 +5,7 @@ import { ObjectId } from "mongodb";
 import UserSvc from "../../services/user.service"; // TODO Create v2
 import VenueSvc from "../../services/service-v2/venue.service";
 import { handleErrorResponse, handleResponse } from "../../utils/reponse";
-import { validateCreateVenueSchema } from "../../utils/venue/validation";
-import { validateGetVenueSchema } from "../../utils/admin/validation";
+import { validateCreateVenueSchema, validateGetVenueSchema } from "../../utils/venue/validation";
 
 export default class VenueCtrl {
   /**

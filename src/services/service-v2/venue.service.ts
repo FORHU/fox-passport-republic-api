@@ -8,7 +8,6 @@ import CountrySettingSvc from ".././country-setting.service"; // TODO v2
 import KeywordSvc from ".././keyword.service"; // TODO v2
 import UserLogsSvc from ".././user-logs.service"; // TODO v2
 import { constructVenueV2Query } from "../../utils/venue/helper";
-import crypto from "crypto";
 
 // import { CC_SUPPORT_EMAIL, SUPPORT_EMAIL, VENUE_4_USE_URI } from "../../config";
 // import { formatDate } from "../../models/enquiries.model";
@@ -102,7 +101,7 @@ export default class VenueSvc {
   // static async processedVenuePagination(params: any, user: any, venues: any) {
   //   const { page = 1, limit = 20 } = params as any;
 
-  //   const query = constructVenueQuery(params, user, venues);
+  //   const query = constructVenueV2Query(params, user, venues);
 
   //   const pageNumber = parseInt(page.toString());
   //   const limitNumber = parseInt(limit.toString());
@@ -121,8 +120,34 @@ export default class VenueSvc {
   //   let list = null;
   //   const hashList = hashSearch({ query, offset, limitNumber, description: "getPaginatedVenues" });
   //   const cacheList = await RedisUtil.getCache(hashList, PREFIX);
+
+  //   const project = {
+  //     _id: 1,
+  //     user: 1,
+  //     name: 1,
+  //     representation: 1,
+  //     description: 1,
+  //     keywords: 1,
+  //     cancellation_policy: 1,
+  //     foods_and_beverages: 1,
+  //     venue_details: 1,
+  //     address: 1,
+  //     status: 1,
+  //     organization: 1,
+  //     age_restriction: 1,
+  //     commission: 1,
+  //     rebate: 1,
+  //     payment_method: 1,
+  //     venue_photos: 1,
+  //     space_photos: 1,
+  //     spaces: 1,
+  //     createdAt: 1,
+  //     updatedAt: 1,
+  //     latestDate: 1,
+  //   };
+
   //   if (!cacheList) {
-  //     list = await VenueRepo.getPaginatedVenues(query, offset, limitNumber);
+  //     list = await VenueRepo.getPaginatedVenues(query, offset, limitNumber, project);
   //     await RedisUtil.saveCache({ key: hashList, data: JSON.stringify(list), prefix: PREFIX });
   //   } else {
   //     list = JSON.parse(cacheList);
@@ -136,9 +161,5 @@ export default class VenueSvc {
   //     size: limitNumber,
   //     offset,
   //   };
-  // }
-
-  // static async getPaginatedVenues(query: any, skip: number, limit: number) {
-  //   return VenueRepo.getPaginatedVenues(query, skip, limit);
   // }
 }
