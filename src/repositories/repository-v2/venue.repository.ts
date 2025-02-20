@@ -18,6 +18,21 @@ export default class VenueRepo {
     return this.collection().insertOne(new MVenue(data));
   }
 
+  static async getVenueNames(query: any) {
+    try {
+      const result = await this.collection().findOne(query);
+
+      if (result) {
+        return "Name is invalid";
+      } else {
+        return "Name is valid";
+      }
+    } catch (error) {
+      console.error("Error while fetching venue:", error);
+      throw new Error("Failed to fetch venue");
+    }
+  }
+
   // static async getPaginatedVenues(query: any, skip: number, limit: number) {
   //   const pipeline = [];
 
