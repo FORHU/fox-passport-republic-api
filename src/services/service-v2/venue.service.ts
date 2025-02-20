@@ -7,7 +7,8 @@ import RedisUtil from "../../utils/redis.util";
 import CountrySettingSvc from ".././country-setting.service"; // TODO v2
 import KeywordSvc from ".././keyword.service"; // TODO v2
 import UserLogsSvc from ".././user-logs.service"; // TODO v2
-import { constructVenueQuery } from "../../utils/venue/helper";
+import { constructVenueV2Query } from "../../utils/venue/helper";
+import crypto from "crypto";
 
 // import { CC_SUPPORT_EMAIL, SUPPORT_EMAIL, VENUE_4_USE_URI } from "../../config";
 // import { formatDate } from "../../models/enquiries.model";
@@ -40,9 +41,6 @@ export default class VenueSvc {
     const country = user?.country || "SG";
     const user_role = user?.role;
     const [country_settings] = await CountrySettingSvc.getCountrySetting({ cca2: country });
-
-    const venue_name = await VenueRepo.getVenue({ name: name });
-    if (venue_name) throw new Error("Venue name already exists");
 
     let country_commission = 0.15,
       country_rebate = 0;
@@ -90,19 +88,15 @@ export default class VenueSvc {
     return VenueRepo.createVenue(venueData);
   }
 
-  static async getVenueNameIdAndStatus(query?: any) {
-    const project = { name: 1, _id: 1, status: 1 };
-    let list = null;
-    const hashList = hashSearch({ query, project, description: "getVenueNameIdAndStatus" });
-    const cacheList = await RedisUtil.getCache(hashList, PREFIX);
-    if (!cacheList) {
-      list = await VenueRepo.getVenues(query, project);
-      await RedisUtil.saveCache({ key: hashList, data: JSON.stringify(list), prefix: PREFIX });
-    } else {
-      list = JSON.parse(cacheList);
+  static async getVenueName(query: any) {
+    try {
+      const result = await VenueRepo.getVenueNames(query);
+      console.log(result);
+      return result;
+    } catch (error) {
+      console.error("Failed to process fetching of venue name", error);
+      throw new Error("Failed to fetch venue name");
     }
-
-    return list;
   }
 
   // static async processedVenuePagination(params: any, user: any, venues: any) {
