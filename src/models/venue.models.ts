@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
 import { ObjectId } from "mongodb";
-
+import crypto from "crypto";
 import { PaymentMethod } from "./venue-subscription.model";
 
 export enum country_select {
@@ -155,7 +155,7 @@ export class MVenue implements Partial<TVenue> {
     this._id = _id;
     this.user = user;
     this.name = name;
-    this.name_lower_case = name_lower_case;
+    this.name_lower_case = name?.toLowerCase() ?? crypto.randomBytes(8).toString("hex");
     this.representation = representation;
     this.description = description;
     this.address = address;

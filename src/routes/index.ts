@@ -28,6 +28,7 @@ import userRoutes from "./user.route";
 import AuthV2Routes from "./v2-routes/auth.routes";
 import venueRoutes from "./venue.route";
 import spaceV2Routes from "./v2-routes/space.route";
+import venueV2Routes from "./v2-routes/venue.route";
 
 const router = express.Router();
 
@@ -57,8 +58,10 @@ router.use("/v1/payment-transaction", paymentTransaction);
 router.use("/v1/rating", ratingRoutes);
 router.use("/v1/subscription", subscriptionRoutes);
 router.use("/v1/setting", salesSettingRoutes);
+//version 2 APIs
 router.use("/v2/auth", AuthV2Routes);
 router.use("/v2/space", spaceV2Routes);
+router.use("/v2/venue", venueV2Routes);
 
 router.get("/v1/healthcheck", (_, res) => {
   res.json({
