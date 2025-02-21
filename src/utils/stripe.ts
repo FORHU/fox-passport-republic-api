@@ -63,7 +63,7 @@ export const updateCustomer = async ({ payment_method_id, customer_id }: { payme
   }
 };
 
-export const createAccount = async ({ country, email, tenant }: { country: string; email: string; tenant?: any }) => {
+export const createAccount = async ({ country, email, tenant, return_url }: { country: string; email: string; tenant?: any; return_url?: any }) => {
   const account = await stripe.accounts.create({
     type: "express",
     country,
@@ -80,8 +80,8 @@ export const createAccount = async ({ country, email, tenant }: { country: strin
 
   const accountLink = await stripe.accountLinks.create({
     account: account.id,
-    refresh_url: tenant?.config?.site_url,
-    return_url: tenant?.config?.site_url,
+    refresh_url: return_url ?? tenant?.config?.site_url,
+    return_url: return_url ?? tenant?.config?.site_url,
     type: "account_onboarding",
   });
 
@@ -116,7 +116,7 @@ export const retriveAccount = async (account_id: string, tenant: any, return_url
     // Create a new account link for the existing account
     return await stripe.accountLinks.create({
       account: stripeAccount.id,
-      refresh_url: tenant?.config?.site_url,
+      refresh_url: return_url ?? tenant?.config?.site_url,
       return_url: return_url ?? tenant?.config?.site_url,
       type: "account_onboarding",
     });

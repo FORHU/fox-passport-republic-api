@@ -500,7 +500,7 @@ export default class PaymentSvc {
       }
     }
 
-    const results: any = await createAccount({ country, email: user?.email, tenant });
+    const results: any = await createAccount({ country, email: user?.email, tenant, return_url });
 
     const stripeAccountId = new ObjectId();
 
