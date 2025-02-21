@@ -1,13 +1,34 @@
 export const createPaginationStages = (skip: number, limit: number) => [
   {
-    $skip: skip,
+    $facet: {
+      metadata: [{ $count: "total_items" }],
+      data: [{ $skip: skip }, { $limit: limit }],
+    },
   },
   {
-    $limit: limit,
+    $addFields: {
+      total_items: { $arrayElemAt: ["$metadata.total_items", 0] },
+      data: "$data",
+    },
   },
   {
-    $sort: {
-      created_at: -1,
+    $addFields: {
+      total_items: { $ifNull: ["$total_items", 0] },
+      total_pages: {
+        $ceil: {
+          $divide: ["$total_items", limit],
+        },
+      },
+      current_page: {
+        $add: [{ $divide: [skip, limit] }, 1],
+      },
+      size: limit,
+      offset: skip,
+    },
+  },
+  {
+    $project: {
+      metadata: 0,
     },
   },
 ];
