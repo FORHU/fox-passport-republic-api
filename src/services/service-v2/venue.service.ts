@@ -98,68 +98,68 @@ export default class VenueSvc {
     }
   }
 
-  // static async processedVenuePagination(params: any, user: any, venues: any) {
-  //   const { page = 1, limit = 20 } = params as any;
+  static async processedVenuePagination(params: any, user: any, venues: any) {
+    const { page = 1, limit = 20 } = params as any;
 
-  //   const query = constructVenueV2Query(params, user, venues);
+    const query = constructVenueV2Query(params, user, venues);
 
-  //   const pageNumber = parseInt(page.toString());
-  //   const limitNumber = parseInt(limit.toString());
-  //   const offset = (pageNumber - 1) * limitNumber;
+    const pageNumber = parseInt(page.toString());
+    const limitNumber = parseInt(limit.toString());
+    const offset = (pageNumber - 1) * limitNumber;
 
-  //   let list_count = 0;
-  //   const hashCount = hashSearch({ query, description: "countVenues" });
-  //   const cacheCount = await RedisUtil.getCache(hashCount, PREFIX);
-  //   if (!cacheCount) {
-  //     list_count = await VenueRepo.countVenues(query);
-  //     await RedisUtil.saveCache({ key: hashCount, data: list_count, prefix: PREFIX });
-  //   } else {
-  //     list_count = Number(cacheCount);
-  //   }
+    let list_count = 0;
+    const hashCount = hashSearch({ query, description: "countVenues" });
+    const cacheCount = await RedisUtil.getCache(hashCount, PREFIX);
+    if (!cacheCount) {
+      list_count = await VenueRepo.countVenues(query);
+      await RedisUtil.saveCache({ key: hashCount, data: list_count, prefix: PREFIX });
+    } else {
+      list_count = Number(cacheCount);
+    }
 
-  //   let list = null;
-  //   const hashList = hashSearch({ query, offset, limitNumber, description: "getPaginatedVenues" });
-  //   const cacheList = await RedisUtil.getCache(hashList, PREFIX);
+    let list = null;
+    const hashList = hashSearch({ query, offset, limitNumber, description: "getPaginatedVenues" });
+    const cacheList = await RedisUtil.getCache(hashList, PREFIX);
 
-  //   const project = {
-  //     _id: 1,
-  //     user: 1,
-  //     name: 1,
-  //     representation: 1,
-  //     description: 1,
-  //     keywords: 1,
-  //     cancellation_policy: 1,
-  //     foods_and_beverages: 1,
-  //     venue_details: 1,
-  //     address: 1,
-  //     status: 1,
-  //     organization: 1,
-  //     age_restriction: 1,
-  //     commission: 1,
-  //     rebate: 1,
-  //     payment_method: 1,
-  //     venue_photos: 1,
-  //     space_photos: 1,
-  //     spaces: 1,
-  //     createdAt: 1,
-  //     updatedAt: 1,
-  //     latestDate: 1,
-  //   };
+    const project = {
+      _id: 1,
+      user: 1,
+      name: 1,
+      representation: 1,
+      description: 1,
+      keywords: 1,
+      cancellation_policy: 1,
+      foods_and_beverages: 1,
+      venue_details: 1,
+      address: 1,
+      status: 1,
+      organization: 1,
+      age_restriction: 1,
+      commission: 1,
+      rebate: 1,
+      payment_method: 1,
+      venue_photos: 1,
+      space_photos: 1,
+      spaces: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      latestDate: 1,
+    };
 
-  //   if (!cacheList) {
-  //     list = await VenueRepo.getPaginatedVenues(query, offset, limitNumber, project);
-  //     await RedisUtil.saveCache({ key: hashList, data: JSON.stringify(list), prefix: PREFIX });
-  //   } else {
-  //     list = JSON.parse(cacheList);
-  //   }
+    if (!cacheList) {
+      list = await VenueRepo.getPaginatedVenues(query, offset, limitNumber, project);
+      await RedisUtil.saveCache({ key: hashList, data: JSON.stringify(list), prefix: PREFIX });
+    } else {
+      list = JSON.parse(cacheList);
+    }
 
-  //   return {
-  //     data: list,
-  //     total_pages: Math.ceil(list_count / limitNumber) || 0,
-  //     total_items: list_count,
-  //     current_page: page,
-  //     size: limitNumber,
-  //     offset,
-  //   };
-  // }
+    return {
+      data: list,
+      total_pages: Math.ceil(list_count / limitNumber) || 0,
+      total_items: list_count,
+      current_page: page,
+      size: limitNumber,
+      offset,
+    };
+  }
 }

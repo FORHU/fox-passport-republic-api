@@ -53,28 +53,28 @@ export default class VenueCtrl {
     }
   }
 
-  // static async getVenues(req: Request, res: Response) {
-  //   const { error } = validateGetVenueSchema(req.query);
-  //   if (error) {
-  //     return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
-  //   }
+  static async getVenues(req: Request, res: Response) {
+    const { error } = validateGetVenueSchema(req.query);
+    if (error) {
+      return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
+    }
 
-  //   const user = await UserSvc.getUser({ _id: new ObjectId(req.user._id as string) });
-  //   if (!user) {
-  //     return handleErrorResponse(res, {}, { code: "INVALID_USER" });
-  //   }
+    const user = await UserSvc.getUser({ _id: new ObjectId(req.user._id as string) });
+    if (!user) {
+      return handleErrorResponse(res, {}, { code: "INVALID_USER" });
+    }
 
-  //   if (req?.tenant) {
-  //     req.query["tenant_code"] = req.tenant.code;
-  //   }
+    if (req?.tenant) {
+      req.query["tenant_code"] = req.tenant.code;
+    }
 
-  //   const params = req.query;
+    const params = req.query;
 
-  //   try {
-  //     const result = await VenueSvc.processedVenuePagination(params, user, req?.venues);
-  //     return handleResponse(res, result, "VENUE_FETCHED_SUCCESSFULLY");
-  //   } catch (error: any) {
-  //     return handleErrorResponse(res, error, { code: "VENUE_FETCH_FAILED" });
-  //   }
-  // }
+    try {
+      const result = await VenueSvc.processedVenuePagination(params, user, req?.venues);
+      return handleResponse(res, result, "VENUE_FETCHED_SUCCESSFULLY");
+    } catch (error: any) {
+      return handleErrorResponse(res, error, { code: "VENUE_FETCH_FAILED" });
+    }
+  }
 }
