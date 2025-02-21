@@ -24,7 +24,7 @@ export default class SpaceRepository {
     return getDB().collection("spaces");
   }
 
-  static getSpaces(query: any, limit: number, skip: number) {
+  static async getSpaces(query: any, limit: number, skip: number) {
     const spaceProjectPayload = {
       _id: 1,
       user: 1,
@@ -93,9 +93,9 @@ export default class SpaceRepository {
       ...createPaginationStages(skip, limit),
     ];
 
-    //console.log({ pipeline: JSON.stringify(pipeline) });
+    const [result] = await this.collection().aggregate(pipeline).toArray();
 
-    return this.collection().aggregate(pipeline).toArray();
+    return result;
   }
 
   static getSpace(query: Filter<TSpace>) {
