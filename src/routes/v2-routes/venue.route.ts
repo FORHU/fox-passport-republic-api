@@ -16,7 +16,7 @@ const router = express.Router();
 
 router.post("/", [...defaultMiddleware, ...teamOrganizationMiddleware, ...groupTenantMiddleware], VenueCtrl.createVenue);
 router.get("/get-venue-name", [...defaultMiddleware, ...teamOrganizationMiddleware, ...groupTenantMiddleware], VenueCtrl.getVenueName);
-// router.get("/", [...defaultMiddleware, teamRolesOrganizationMiddleware, tenantMiddleware], VenueCtrl.getVenues);
+router.get("/", [...defaultMiddleware, teamRolesOrganizationMiddleware, tenantMiddleware], VenueCtrl.getVenues);
 
 // router.get("/venue-list", [...defaultMiddleware, teamRolesOrganizationMiddleware, tenantMiddleware], VenueCtrl.getVenueNameIdAndStatus);
 // router.get("/venue-details", [...defaultMiddleware, tenantMiddleware], VenueCtrl.getVenueDetails);
