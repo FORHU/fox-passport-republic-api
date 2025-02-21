@@ -32,6 +32,7 @@ export const SPACE_PHOTO_LOOKUP = {
     from: "files",
     localField: "space_photo",
     foreignField: "_id",
+    pipeline: [{ $project: { filename: 1, path: 1, description: 1 } }],
     as: "space_photo",
   },
 };
@@ -41,6 +42,7 @@ export const VENUE_PHOTO_LOOKUP = {
     from: "files",
     localField: "venue_photo",
     foreignField: "_id",
+    pipeline: [{ $project: { filename: 1, path: 1, description: 1 } }],
     as: "venue_photo",
   },
 };
@@ -59,6 +61,7 @@ export const CAPACITY_LAYOUT_LOOKUP = {
     from: "questions",
     localField: "capacity_layout",
     foreignField: "_id",
+    pipeline: [{ $project: { answer: 1, question: 1, max_capacity: 1, options: 1 } }],
     as: "capacity_layout",
   },
 };
@@ -77,6 +80,7 @@ export const KEYWORDS_LOOKUP = {
     from: "keywords",
     localField: "keywords",
     foreignField: "_id",
+    pipeline: [{ $project: { keyword: 1, categories: { $arrayElemAt: ["$categories", 0] } } }],
     as: "keywords",
   },
 };
@@ -95,6 +99,30 @@ export const BOOKING_LOOKUP = {
     from: "bookings",
     localField: "_id",
     foreignField: "space",
+    pipeline: [
+      {
+        $project: {
+          space: 0,
+          venue: 0,
+          createdAt: 0,
+          updatedAt: 0,
+          deletedAt: 0,
+          deletedBy: 0,
+          reason_for_cancellation: 0,
+        },
+      },
+      {
+        $addFields: {
+          message: { $cond: { if: { $eq: ["$message", null] }, then: "$$REMOVE", else: "$message" } },
+          optional_input: { $cond: { if: { $eq: ["$optional_input", null] }, then: "$$REMOVE", else: "$optional_input" } },
+          repeat_event: { $cond: { if: { $eq: ["$repeat_event", null] }, then: "$$REMOVE", else: "$repeat_event" } },
+          event_duration: { $cond: { if: { $eq: ["$event_duration", null] }, then: "$$REMOVE", else: "$event_duration" } },
+          refund_data: { $cond: { if: { $eq: ["$refund_data", null] }, then: "$$REMOVE", else: "$refund_data" } },
+          cancelledAt: { $cond: { if: { $eq: ["$cancelledAt", null] }, then: "$$REMOVE", else: "$cancelledAt" } },
+          cancelledBy: { $cond: { if: { $eq: ["$cancelledBy", null] }, then: "$$REMOVE", else: "$cancelledBy" } },
+        },
+      },
+    ],
     as: "bookings",
   },
 };
@@ -102,8 +130,10 @@ export const BOOKING_LOOKUP = {
 export const createSpacesProject = ({
   _id,
   status,
-  space_details_name,
-  space_details_description,
+  name,
+  type,
+  representation,
+  description,
   space_photo,
   venue,
   pricing,
@@ -118,8 +148,10 @@ export const createSpacesProject = ({
     $project: {
       ...(_id && { _id }),
       ...(status && { status }),
-      ...(space_details_name && { name: space_details_name }),
-      ...(space_details_description && { description: space_details_description }),
+      ...(name && { name }),
+      ...(type && { type }),
+      ...(representation && { representation }),
+      ...(description && { description: description }),
       ...(space_photo && { space_photo }),
       ...(venue && { venue }),
       ...(pricing && { pricing }),
