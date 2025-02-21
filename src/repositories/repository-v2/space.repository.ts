@@ -27,8 +27,11 @@ export default class SpaceRepository {
   static getSpaces(query: any, limit: number, skip: number) {
     const spaceProjectPayload = {
       _id: 1,
-      space_details_name: 1,
-      space_details_description: 1,
+      user: 1,
+      name: 1,
+      type: 1,
+      representation: 1,
+      description: 1,
       space_photo: 1,
       status: 1,
       venue: {
