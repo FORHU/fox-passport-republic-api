@@ -213,101 +213,101 @@ export default class SpaceRepository {
           as: "venue.keywords",
         },
       },
-      // {
-      //   $lookup: {
-      //     from: "questions",
-      //     localField: "venue.venue_details",
-      //     foreignField: "_id",
-      //     pipeline: [
-      //       {
-      //         $project: {
-      //           question: 1,
-      //           reference: 1,
-      //           answer: 1,
-      //           options: 1,
-      //         },
-      //       },
-      //     ],
-      //     as: "venue.venue_details",
-      //   },
-      // },
-      // {
-      //   $lookup: {
-      //     from: "users",
-      //     localField: "user",
-      //     foreignField: "_id",
-      //     pipeline: [
-      //       {
-      //         $project: {
-      //           first_name: 1,
-      //           last_name: 1,
-      //           phone_number: 1,
-      //           email: 1,
-      //           date_of_birth: 1,
-      //           country: 1,
-      //           organization: 1,
-      //           social_link: 1,
-      //           company_name: 1,
-      //           role: 1,
-      //         },
-      //       },
-      //     ],
-      //     as: "user",
-      //   },
-      // },
-      // {
-      //   $set: {
-      //     user: {
-      //       $ifNull: [{ $first: "$user" }, null],
-      //     },
-      //   },
-      // },
-      // {
-      //   $lookup: {
-      //     from: "files",
-      //     localField: "venue_photo",
-      //     foreignField: "_id",
-      //     pipeline: [
-      //       {
-      //         $project: {
-      //           filename: 1,
-      //           path: 1,
-      //           createdAt: 1,
-      //         },
-      //       },
-      //     ],
-      //     as: "venue_photos",
-      //   },
-      // },
-      // {
-      //   $sort: {
-      //     "venue_photos.createdAt": -1,
-      //   },
-      // },
-      // { $unset: "venue_photo" },
-      // {
-      //   $lookup: {
-      //     from: "files",
-      //     localField: "space_photo",
-      //     foreignField: "_id",
-      //     pipeline: [
-      //       {
-      //         $project: {
-      //           filename: 1,
-      //           path: 1,
-      //           createdAt: 1,
-      //         },
-      //       },
-      //     ],
-      //     as: "space_photos",
-      //   },
-      // },
-      // {
-      //   $sort: {
-      //     "space_photos.createdAt": -1,
-      //   },
-      // },
-      // { $unset: "space_photo" },
+      {
+        $lookup: {
+          from: "questions",
+          localField: "venue.venue_details",
+          foreignField: "_id",
+          pipeline: [
+            {
+              $project: {
+                question: 1,
+                reference: 1,
+                answer: 1,
+                options: 1,
+              },
+            },
+          ],
+          as: "venue.venue_details",
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "user",
+          foreignField: "_id",
+          pipeline: [
+            {
+              $project: {
+                first_name: 1,
+                last_name: 1,
+                phone_number: 1,
+                email: 1,
+                date_of_birth: 1,
+                country: 1,
+                organization: 1,
+                social_link: 1,
+                company_name: 1,
+                role: 1,
+              },
+            },
+          ],
+          as: "user",
+        },
+      },
+      {
+        $set: {
+          user: {
+            $ifNull: [{ $first: "$user" }, null],
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: "files",
+          localField: "venue_photo",
+          foreignField: "_id",
+          pipeline: [
+            {
+              $project: {
+                filename: 1,
+                path: 1,
+                createdAt: 1,
+              },
+            },
+          ],
+          as: "venue_photos",
+        },
+      },
+      {
+        $sort: {
+          "venue_photos.createdAt": -1,
+        },
+      },
+      { $unset: "venue_photo" },
+      {
+        $lookup: {
+          from: "files",
+          localField: "space_photo",
+          foreignField: "_id",
+          pipeline: [
+            {
+              $project: {
+                filename: 1,
+                path: 1,
+                createdAt: 1,
+              },
+            },
+          ],
+          as: "space_photos",
+        },
+      },
+      {
+        $sort: {
+          "space_photos.createdAt": -1,
+        },
+      },
+      { $unset: "space_photo" },
       // {
       //   $lookup: {
       //     from: "questions",
