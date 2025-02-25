@@ -1,32 +1,25 @@
 // eslint-disable-next-line import/named
 import { TSpaceProjectPayload } from "../../types/space";
+import {
+  getCancellationPolicyProjection,
+  getUserProjection,
+  getVenueProjection,
+  getKeywordsProjection,
+  getQuestionsProjection,
+  getFilesProjection,
+} from "../projection/project";
 
 export const INITIAL_SORT = { $sort: { _id: -1 } };
 
-export const USER_LOOKUP = {
+export const USER_LOOKUP = (fields = []) => ({
   $lookup: {
     from: "users",
     localField: "user",
     foreignField: "_id",
-    pipeline: [
-      {
-        $project: {
-          first_name: 1,
-          last_name: 1,
-          phone_number: 1,
-          email: 1,
-          date_of_birth: 1,
-          country: 1,
-          organization: 1,
-          social_link: 1,
-          company_name: 1,
-          role: 1,
-        },
-      },
-    ],
+    pipeline: [getUserProjection(fields)],
     as: "user",
   },
-};
+});
 
 export const USER_SET = {
   $set: {
@@ -38,29 +31,15 @@ export const USER_SET = {
 
 // START Venue lookup, set
 
-export const VENUE_LOOKUP = {
+export const VENUE_LOOKUP = (fields = []) => ({
   $lookup: {
     from: "venues",
     localField: "venue",
     foreignField: "_id",
-    pipeline: [
-      {
-        $project: {
-          name: 1,
-          representation: 1,
-          description: 1,
-          address: 1,
-          cancellation_policy: 1,
-          keywords: 1,
-          status: 1,
-          age_restriction: 1,
-          venue_details: 1,
-        },
-      },
-    ],
+    pipeline: [getVenueProjection(fields)],
     as: "venue",
   },
-};
+});
 
 export const VENUE_SET = {
   $set: {
@@ -79,23 +58,15 @@ export const VENUE_SET = {
 
 // START Cancellation Policy lookup, set
 
-export const CANCELLATION_LOOKUP = {
+export const CANCELLATION_LOOKUP = (fields = []) => ({
   $lookup: {
     from: "cancellation-policies",
     localField: "venue.cancellation_policy",
     foreignField: "_id",
-    pipeline: [
-      {
-        $project: {
-          venue_id: 0,
-          updatedAt: 0,
-          createdAt: 0,
-        },
-      },
-    ],
+    pipeline: [getCancellationPolicyProjection(fields)],
     as: "venue.cancellation_policy",
   },
-};
+});
 
 export const CANCELLATION_POLICY_SET = {
   $set: {
@@ -114,69 +85,43 @@ export const CANCELLATION_POLICY_SET = {
 
 // START Venue keywords lookup
 
-export const VENUE_KEYWORDS_LOOKUP = {
+export const VENUE_KEYWORDS_LOOKUP = (fields = []) => ({
   $lookup: {
     from: "keywords",
     localField: "venue.keywords",
     foreignField: "_id",
-    pipeline: [
-      {
-        $project: {
-          keyword: 1,
-          categories: {
-            $arrayElemAt: ["$categories", 0],
-          },
-        },
-      },
-    ],
+    pipeline: [getKeywordsProjection(fields)],
     as: "venue.keywords",
   },
-};
+});
 
 // END Venue keywords lookup
 
 // START Venue details lookup
 
-export const VENUE_DETAILS_LOOKUP = {
+export const VENUE_DETAILS_LOOKUP = (fields = []) => ({
   $lookup: {
     from: "questions",
     localField: "venue.venue_details",
     foreignField: "_id",
-    pipeline: [
-      {
-        $project: {
-          question: 1,
-          reference: 1,
-          answer: 1,
-          options: 1,
-        },
-      },
-    ],
+    pipeline: [getQuestionsProjection(fields)],
     as: "venue.venue_details",
   },
-};
+});
 
 // END Venue details lookup
 
 // START Venue photo lookup, sort, and unset
 
-export const VENUE_PHOTO_LOOKUP_AS_VENUE_PHOTOS = {
+export const VENUE_PHOTO_LOOKUP_AS_VENUE_PHOTOS = (fields = []) => ({
   $lookup: {
     from: "files",
     localField: "venue_photo",
     foreignField: "_id",
-    pipeline: [
-      {
-        $project: {
-          filename: 1,
-          path: 1,
-          createdAt: 1,
-        },
-      },
-    ],
+    pipeline: [getFilesProjection(fields)],
     as: "venue_photos",
   },
-};
+});
 
 export const VENUE_PHOTOS_SORT = {
   $sort: {
@@ -190,23 +135,15 @@ export const VENUE_PHOTO_UNSET = { $unset: "venue_photo" };
 
 // START Space photo, lookup, sort, unset
 
-export const SPACE_PHOTO_LOOKUP_AS_SPACE_PHOTOS = {
+export const SPACE_PHOTO_LOOKUP_AS_SPACE_PHOTOS = (fields = []) => ({
   $lookup: {
     from: "files",
     localField: "space_photo",
     foreignField: "_id",
-    pipeline: [
-      {
-        $project: {
-          filename: 1,
-          path: 1,
-          createdAt: 1,
-        },
-      },
-    ],
+    pipeline: [getFilesProjection(fields)],
     as: "space_photos",
   },
-};
+});
 
 export const SPACE_PHOTOS_SORT = {
   $sort: {
@@ -220,82 +157,47 @@ export const SPACE_PHOTO_UNSET = { $unset: "space_photo" };
 
 // START Capacity Layout lookup
 
-export const CAPACITY_LAYOUT_LOOKUP = {
+export const CAPACITY_LAYOUT_LOOKUP = (fields = []) => ({
   $lookup: {
     from: "questions",
     localField: "capacity_layout",
     foreignField: "_id",
-    pipeline: [
-      {
-        $project: {
-          question: 1,
-          reference: 1,
-          answer: 1,
-          options: 1,
-        },
-      },
-    ],
+    pipeline: [getQuestionsProjection(fields)],
     as: "capacity_layout",
   },
-};
+});
 
 // END Capacity Layout lookup
 
-export const FLOOR_PLAN_LOOKUP = {
+export const FLOOR_PLAN_LOOKUP = (fields = []) => ({
   $lookup: {
     from: "files",
     localField: "floor_plan",
     foreignField: "_id",
-    pipeline: [
-      {
-        $project: {
-          filename: 1,
-          path: 1,
-          createdAt: 1,
-        },
-      },
-    ],
+    pipeline: [getFilesProjection(fields)],
     as: "floor_plan",
   },
-};
+});
 
-export const FEATURES_LOOKUP = {
+export const FEATURES_LOOKUP = (fields = []) => ({
   $lookup: {
     from: "questions",
     localField: "features",
     foreignField: "_id",
-    pipeline: [
-      {
-        $project: {
-          question: 1,
-          reference: 1,
-          answer: 1,
-          options: 1,
-        },
-      },
-    ],
+    pipeline: [getQuestionsProjection(fields)],
     as: "features",
   },
-};
+});
 
-export const KEYWORDS_LOOKUP = {
+export const KEYWORDS_LOOKUP = (fields = []) => ({
   $lookup: {
     from: "keywords",
     localField: "keywords",
     foreignField: "_id",
-    pipeline: [
-      {
-        $project: {
-          keyword: 1,
-          categories: {
-            $arrayElemAt: ["$categories", 0],
-          },
-        },
-      },
-    ],
+    pipeline: [getKeywordsProjection(fields)],
     as: "keywords",
   },
-};
+});
 
 export const GET_SPACES_RATING = {
   $lookup: {

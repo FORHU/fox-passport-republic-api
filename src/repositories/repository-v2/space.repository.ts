@@ -33,7 +33,23 @@ export default class SpaceRepository {
     return getDB().collection("spaces");
   }
 
-  static async getSpaces(query: any, limit: number, skip: number, userId?: string) {
+  static async getSpaces(
+    query: any,
+    limit: number,
+    skip: number,
+    userId?: string,
+    userProject?: string[],
+    venueProject?: string[],
+    cancellationPolicyProject?: string[],
+    venueKeywordsProject?: string[],
+    venueDetailsProject?: string[],
+    venuePhotosProject?: string[],
+    spacePhotosProject?: string[],
+    capacityLayoutProject?: string[],
+    floorPlanProject?: string[],
+    featuresProject?: string[],
+    keywordsProject?: string[],
+  ) {
     const user_id = userId ? new ObjectId(userId) : null;
 
     const filterQuery = {
@@ -66,25 +82,25 @@ export default class SpaceRepository {
         },
       },
       INITIAL_SORT,
-      VENUE_LOOKUP,
+      VENUE_LOOKUP(venueProject),
       VENUE_SET,
-      CANCELLATION_LOOKUP,
+      CANCELLATION_LOOKUP(cancellationPolicyProject),
       CANCELLATION_POLICY_SET,
-      VENUE_KEYWORDS_LOOKUP,
-      VENUE_DETAILS_LOOKUP,
-      USER_LOOKUP,
+      VENUE_KEYWORDS_LOOKUP(venueKeywordsProject),
+      VENUE_DETAILS_LOOKUP(venueDetailsProject),
+      USER_LOOKUP(userProject),
       USER_SET,
-      VENUE_PHOTO_LOOKUP_AS_VENUE_PHOTOS,
+      VENUE_PHOTO_LOOKUP_AS_VENUE_PHOTOS(venuePhotosProject),
       VENUE_PHOTOS_SORT,
       VENUE_PHOTO_UNSET,
       VENUE_PHOTO_UNSET,
-      SPACE_PHOTO_LOOKUP_AS_SPACE_PHOTOS,
+      SPACE_PHOTO_LOOKUP_AS_SPACE_PHOTOS(spacePhotosProject),
       SPACE_PHOTOS_SORT,
       SPACE_PHOTO_UNSET,
-      CAPACITY_LAYOUT_LOOKUP,
-      FLOOR_PLAN_LOOKUP,
-      FEATURES_LOOKUP,
-      KEYWORDS_LOOKUP,
+      CAPACITY_LAYOUT_LOOKUP(capacityLayoutProject),
+      FLOOR_PLAN_LOOKUP(floorPlanProject),
+      FEATURES_LOOKUP(featuresProject),
+      KEYWORDS_LOOKUP(keywordsProject),
       // {
       //   $lookup: {
       //     from: "pricing",
