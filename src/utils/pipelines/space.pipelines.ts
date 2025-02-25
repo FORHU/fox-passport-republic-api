@@ -213,6 +213,30 @@ export const BOOKING_LOOKUP = {
     from: "bookings",
     localField: "_id",
     foreignField: "space",
+    pipeline: [
+      {
+        $project: {
+          space: 0,
+          venue: 0,
+          createdAt: 0,
+          updatedAt: 0,
+          deletedAt: 0,
+          deletedBy: 0,
+          reason_for_cancellation: 0,
+        },
+      },
+      {
+        $addFields: {
+          message: { $cond: { if: { $eq: ["$message", null] }, then: "$$REMOVE", else: "$message" } },
+          optional_input: { $cond: { if: { $eq: ["$optional_input", null] }, then: "$$REMOVE", else: "$optional_input" } },
+          repeat_event: { $cond: { if: { $eq: ["$repeat_event", null] }, then: "$$REMOVE", else: "$repeat_event" } },
+          event_duration: { $cond: { if: { $eq: ["$event_duration", null] }, then: "$$REMOVE", else: "$event_duration" } },
+          refund_data: { $cond: { if: { $eq: ["$refund_data", null] }, then: "$$REMOVE", else: "$refund_data" } },
+          cancelledAt: { $cond: { if: { $eq: ["$cancelledAt", null] }, then: "$$REMOVE", else: "$cancelledAt" } },
+          cancelledBy: { $cond: { if: { $eq: ["$cancelledBy", null] }, then: "$$REMOVE", else: "$cancelledBy" } },
+        },
+      },
+    ],
     as: "bookings",
   },
 };
@@ -220,8 +244,10 @@ export const BOOKING_LOOKUP = {
 export const createSpacesProject = ({
   _id,
   status,
-  space_details_name,
-  space_details_description,
+  name,
+  type,
+  representation,
+  description,
   space_photo,
   venue,
   pricing,
@@ -236,8 +262,10 @@ export const createSpacesProject = ({
     $project: {
       ...(_id && { _id }),
       ...(status && { status }),
-      ...(space_details_name && { name: space_details_name }),
-      ...(space_details_description && { description: space_details_description }),
+      ...(name && { name }),
+      ...(type && { type }),
+      ...(representation && { representation }),
+      ...(description && { description: description }),
       ...(space_photo && { space_photo }),
       ...(venue && { venue }),
       ...(pricing && { pricing }),
