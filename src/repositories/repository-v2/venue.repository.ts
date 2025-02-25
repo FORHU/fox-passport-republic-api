@@ -286,4 +286,15 @@ export default class VenueRepo {
       return 0;
     }
   }
+
+  static async updateVenue(venueId: string | ObjectId, payload: TVenue) {
+    const _id = new ObjectId(venueId);
+    try {
+      const result = await this.collection().updateOne({ _id }, { $set: payload });
+      return result;
+    } catch (error) {
+      console.error("Error while updating venue venue:", error);
+      throw new Error("Failed to update venue");
+    }
+  }
 }
