@@ -308,77 +308,77 @@ export default class SpaceRepository {
         },
       },
       { $unset: "space_photo" },
-      // {
-      //   $lookup: {
-      //     from: "questions",
-      //     localField: "capacity_layout",
-      //     foreignField: "_id",
-      //     pipeline: [
-      //       {
-      //         $project: {
-      //           question: 1,
-      //           reference: 1,
-      //           answer: 1,
-      //           options: 1,
-      //         },
-      //       },
-      //     ],
-      //     as: "capacity_layout",
-      //   },
-      // },
-      // {
-      //   $lookup: {
-      //     from: "files",
-      //     localField: "floor_plan",
-      //     foreignField: "_id",
-      //     pipeline: [
-      //       {
-      //         $project: {
-      //           filename: 1,
-      //           path: 1,
-      //           createdAt: 1,
-      //         },
-      //       },
-      //     ],
-      //     as: "floor_plan",
-      //   },
-      // },
-      // {
-      //   $lookup: {
-      //     from: "questions",
-      //     localField: "features",
-      //     foreignField: "_id",
-      //     pipeline: [
-      //       {
-      //         $project: {
-      //           question: 1,
-      //           reference: 1,
-      //           answer: 1,
-      //           options: 1,
-      //         },
-      //       },
-      //     ],
-      //     as: "features",
-      //   },
-      // },
-      // {
-      //   $lookup: {
-      //     from: "keywords",
-      //     localField: "keywords",
-      //     foreignField: "_id",
-      //     pipeline: [
-      //       {
-      //         $project: {
-      //           keyword: 1,
-      //           categories: {
-      //             $arrayElemAt: ["$categories", 0],
-      //           },
-      //         },
-      //       },
-      //     ],
-      //     as: "keywords",
-      //   },
-      // },
+      {
+        $lookup: {
+          from: "questions",
+          localField: "capacity_layout",
+          foreignField: "_id",
+          pipeline: [
+            {
+              $project: {
+                question: 1,
+                reference: 1,
+                answer: 1,
+                options: 1,
+              },
+            },
+          ],
+          as: "capacity_layout",
+        },
+      },
+      {
+        $lookup: {
+          from: "files",
+          localField: "floor_plan",
+          foreignField: "_id",
+          pipeline: [
+            {
+              $project: {
+                filename: 1,
+                path: 1,
+                createdAt: 1,
+              },
+            },
+          ],
+          as: "floor_plan",
+        },
+      },
+      {
+        $lookup: {
+          from: "questions",
+          localField: "features",
+          foreignField: "_id",
+          pipeline: [
+            {
+              $project: {
+                question: 1,
+                reference: 1,
+                answer: 1,
+                options: 1,
+              },
+            },
+          ],
+          as: "features",
+        },
+      },
+      {
+        $lookup: {
+          from: "keywords",
+          localField: "keywords",
+          foreignField: "_id",
+          pipeline: [
+            {
+              $project: {
+                keyword: 1,
+                categories: {
+                  $arrayElemAt: ["$categories", 0],
+                },
+              },
+            },
+          ],
+          as: "keywords",
+        },
+      },
       // {
       //   $lookup: {
       //     from: "pricing",
