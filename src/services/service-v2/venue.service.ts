@@ -162,4 +162,14 @@ export default class VenueSvc {
       offset,
     };
   }
+
+  static async updateVenue(venueId: string | ObjectId, payload: TVenue) {
+    try {
+      const result = await VenueRepo.updateVenue(venueId, payload);
+      return result;
+    } catch (error) {
+      console.error("Failed to process updating of venue", error);
+      throw new Error("Failed to update venue");
+    }
+  }
 }

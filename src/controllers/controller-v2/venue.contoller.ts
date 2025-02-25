@@ -5,7 +5,7 @@ import { ObjectId } from "mongodb";
 import UserSvc from "../../services/user.service"; // TODO Create v2
 import VenueSvc from "../../services/service-v2/venue.service";
 import { handleErrorResponse, handleResponse } from "../../utils/reponse";
-import { validateCreateVenueSchema, validateGetVenueSchema } from "../../utils/venue/validation";
+import { validateCreateVenueSchema, validateGetVenueSchema, validateUpdateVenueSchema } from "../../utils/venue/validation";
 
 export default class VenueCtrl {
   /**
@@ -75,6 +75,22 @@ export default class VenueCtrl {
       return handleResponse(res, result, "VENUE_FETCHED_SUCCESSFULLY");
     } catch (error: any) {
       return handleErrorResponse(res, error, { code: "VENUE_FETCH_FAILED" });
+    }
+  }
+
+  static async updateVenue(req: Request, res: Response) {
+    const { venueId } = req.params;
+    const { error } = validateUpdateVenueSchema(req.body);
+
+    if (error) {
+      return handleErrorResponse(res, error, { code: "VALIDATION_ERROR_MISSING_FIELDS" });
+    }
+
+    try {
+      const result = await VenueSvc.updateVenue(venueId, req.body);
+      return handleResponse(res, result, "VENUE_UPDATED_SUCCESSFULLY");
+    } catch (error) {
+      return handleErrorResponse(res, error, { code: "VENUE_NOT_UPDATED" });
     }
   }
 }
