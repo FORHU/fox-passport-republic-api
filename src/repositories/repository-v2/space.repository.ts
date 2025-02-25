@@ -5,98 +5,33 @@ import { getDB } from "../../utils/mongo";
 import { createMatchStages, createPaginationStages } from "../../utils/pipelines/common.pipelines";
 import {
   BOOKING_LOOKUP,
+  CANCELLATION_LOOKUP,
+  CANCELLATION_POLICY_SET,
   CAPACITY_LAYOUT_LOOKUP,
   createSpacesProject,
   FEATURES_LOOKUP,
   FLOOR_PLAN_LOOKUP,
   GET_SPACES_RATING,
+  INITIAL_SORT,
   KEYWORDS_LOOKUP,
-  SPACE_PHOTO_LOOKUP,
+  SPACE_PHOTO_LOOKUP_AS_SPACE_PHOTOS,
+  SPACE_PHOTO_UNSET,
+  SPACE_PHOTOS_SORT,
   USER_LOOKUP,
-  USER_UNWIND,
+  USER_SET,
+  VENUE_DETAILS_LOOKUP,
+  VENUE_KEYWORDS_LOOKUP,
   VENUE_LOOKUP,
-  VENUE_PHOTO_LOOKUP,
-  VENUE_UNWIND,
+  VENUE_PHOTO_LOOKUP_AS_VENUE_PHOTOS,
+  VENUE_PHOTO_UNSET,
+  VENUE_PHOTOS_SORT,
+  VENUE_SET,
 } from "../../utils/pipelines/space.pipelines";
 
 export default class SpaceRepository {
   static collection() {
     return getDB().collection("spaces");
   }
-
-  // static async getSpaces(query: any, limit: number, skip: number) {
-  //   const spaceProjectPayload = {
-  //     _id: 1,
-  //     user: 1,
-  //     name: 1,
-  //     type: 1,
-  //     representation: 1,
-  //     description: 1,
-  //     space_photo: 1,
-  //     status: 1,
-  //     venue: {
-  //       _id: 1,
-  //       name: 1,
-  //       address: 1,
-  //       tenant: 1,
-  //     },
-  //     pricing: 1,
-  //     capacity_layout: 1,
-  //     marked_as_favorite: {
-  //       $cond: {
-  //         if: { $isArray: "$marked_as_favorite" },
-  //         then: {
-  //           _id: { $arrayElemAt: ["$marked_as_favorite._id", 0] },
-  //           isFavorite: { $cond: { if: { $gt: [{ $size: "$marked_as_favorite" }, 0] }, then: true, else: false } },
-  //         },
-  //         else: {
-  //           _id: null,
-  //           isFavorite: false,
-  //         },
-  //       },
-  //     },
-  //     rating: {
-  //       totalRating: { $sum: "$ratings.rating" },
-  //       averageRating: {
-  //         $cond: {
-  //           if: { $eq: [{ $size: "$ratings" }, 0] },
-  //           then: 0,
-  //           else: { $avg: "$ratings.rating" },
-  //         },
-  //       },
-  //       totalReviews: { $size: "$ratings" },
-  //     },
-  //     total_views: "$totalViews",
-  //     keywords: {
-  //       _id: 1,
-  //       keyword: 1,
-  //       categories: 1,
-  //     },
-  //     bookings: 1,
-  //   };
-
-  //   const pipeline = [
-  //     USER_LOOKUP,
-  //     USER_UNWIND,
-  //     VENUE_LOOKUP,
-  //     VENUE_UNWIND,
-  //     KEYWORDS_LOOKUP,
-  //     SPACE_PHOTO_LOOKUP,
-  //     VENUE_PHOTO_LOOKUP,
-  //     CAPACITY_LAYOUT_LOOKUP,
-  //     FEATURES_LOOKUP,
-  //     FLOOR_PLAN_LOOKUP,
-  //     GET_SPACES_RATING,
-  //     BOOKING_LOOKUP,
-  //     ...createMatchStages(query),
-  //     ...createSpacesProject(spaceProjectPayload),
-  //     ...createPaginationStages(skip, limit),
-  //   ];
-
-  //   const [result] = await this.collection().aggregate(pipeline).toArray();
-
-  //   return result;
-  // }
 
   static async getSpaces(query: any, limit: number, skip: number, userId?: string) {
     const user_id = userId ? new ObjectId(userId) : null;
@@ -130,255 +65,26 @@ export default class SpaceRepository {
           pricing: 1,
         },
       },
-      { $sort: { _id: -1 } },
-      {
-        $lookup: {
-          from: "venues",
-          localField: "venue",
-          foreignField: "_id",
-          pipeline: [
-            {
-              $project: {
-                name: 1,
-                representation: 1,
-                description: 1,
-                address: 1,
-                cancellation_policy: 1,
-                keywords: 1,
-                status: 1,
-                age_restriction: 1,
-                venue_details: 1,
-              },
-            },
-          ],
-          as: "venue",
-        },
-      },
-      {
-        $set: {
-          venue: {
-            $ifNull: [
-              {
-                $first: "$venue",
-              },
-              null,
-            ],
-          },
-        },
-      },
-      {
-        $lookup: {
-          from: "cancellation-policies",
-          localField: "venue.cancellation_policy",
-          foreignField: "_id",
-          pipeline: [
-            {
-              $project: {
-                venue_id: 0,
-                updatedAt: 0,
-                createdAt: 0,
-              },
-            },
-          ],
-          as: "venue.cancellation_policy",
-        },
-      },
-      {
-        $set: {
-          "venue.cancellation_policy": {
-            $ifNull: [
-              {
-                $first: "$venue.cancellation_policy",
-              },
-              null,
-            ],
-          },
-        },
-      },
-      {
-        $lookup: {
-          from: "keywords",
-          localField: "venue.keywords",
-          foreignField: "_id",
-          pipeline: [
-            {
-              $project: {
-                keyword: 1,
-                categories: {
-                  $arrayElemAt: ["$categories", 0],
-                },
-              },
-            },
-          ],
-          as: "venue.keywords",
-        },
-      },
-      {
-        $lookup: {
-          from: "questions",
-          localField: "venue.venue_details",
-          foreignField: "_id",
-          pipeline: [
-            {
-              $project: {
-                question: 1,
-                reference: 1,
-                answer: 1,
-                options: 1,
-              },
-            },
-          ],
-          as: "venue.venue_details",
-        },
-      },
-      {
-        $lookup: {
-          from: "users",
-          localField: "user",
-          foreignField: "_id",
-          pipeline: [
-            {
-              $project: {
-                first_name: 1,
-                last_name: 1,
-                phone_number: 1,
-                email: 1,
-                date_of_birth: 1,
-                country: 1,
-                organization: 1,
-                social_link: 1,
-                company_name: 1,
-                role: 1,
-              },
-            },
-          ],
-          as: "user",
-        },
-      },
-      {
-        $set: {
-          user: {
-            $ifNull: [{ $first: "$user" }, null],
-          },
-        },
-      },
-      {
-        $lookup: {
-          from: "files",
-          localField: "venue_photo",
-          foreignField: "_id",
-          pipeline: [
-            {
-              $project: {
-                filename: 1,
-                path: 1,
-                createdAt: 1,
-              },
-            },
-          ],
-          as: "venue_photos",
-        },
-      },
-      {
-        $sort: {
-          "venue_photos.createdAt": -1,
-        },
-      },
-      { $unset: "venue_photo" },
-      {
-        $lookup: {
-          from: "files",
-          localField: "space_photo",
-          foreignField: "_id",
-          pipeline: [
-            {
-              $project: {
-                filename: 1,
-                path: 1,
-                createdAt: 1,
-              },
-            },
-          ],
-          as: "space_photos",
-        },
-      },
-      {
-        $sort: {
-          "space_photos.createdAt": -1,
-        },
-      },
-      { $unset: "space_photo" },
-      // {
-      //   $lookup: {
-      //     from: "questions",
-      //     localField: "capacity_layout",
-      //     foreignField: "_id",
-      //     pipeline: [
-      //       {
-      //         $project: {
-      //           question: 1,
-      //           reference: 1,
-      //           answer: 1,
-      //           options: 1,
-      //         },
-      //       },
-      //     ],
-      //     as: "capacity_layout",
-      //   },
-      // },
-      // {
-      //   $lookup: {
-      //     from: "files",
-      //     localField: "floor_plan",
-      //     foreignField: "_id",
-      //     pipeline: [
-      //       {
-      //         $project: {
-      //           filename: 1,
-      //           path: 1,
-      //           createdAt: 1,
-      //         },
-      //       },
-      //     ],
-      //     as: "floor_plan",
-      //   },
-      // },
-      // {
-      //   $lookup: {
-      //     from: "questions",
-      //     localField: "features",
-      //     foreignField: "_id",
-      //     pipeline: [
-      //       {
-      //         $project: {
-      //           question: 1,
-      //           reference: 1,
-      //           answer: 1,
-      //           options: 1,
-      //         },
-      //       },
-      //     ],
-      //     as: "features",
-      //   },
-      // },
-      // {
-      //   $lookup: {
-      //     from: "keywords",
-      //     localField: "keywords",
-      //     foreignField: "_id",
-      //     pipeline: [
-      //       {
-      //         $project: {
-      //           keyword: 1,
-      //           categories: {
-      //             $arrayElemAt: ["$categories", 0],
-      //           },
-      //         },
-      //       },
-      //     ],
-      //     as: "keywords",
-      //   },
-      // },
+      INITIAL_SORT,
+      VENUE_LOOKUP,
+      VENUE_SET,
+      CANCELLATION_LOOKUP,
+      CANCELLATION_POLICY_SET,
+      VENUE_KEYWORDS_LOOKUP,
+      VENUE_DETAILS_LOOKUP,
+      USER_LOOKUP,
+      USER_SET,
+      VENUE_PHOTO_LOOKUP_AS_VENUE_PHOTOS,
+      VENUE_PHOTOS_SORT,
+      VENUE_PHOTO_UNSET,
+      VENUE_PHOTO_UNSET,
+      SPACE_PHOTO_LOOKUP_AS_SPACE_PHOTOS,
+      SPACE_PHOTOS_SORT,
+      SPACE_PHOTO_UNSET,
+      CAPACITY_LAYOUT_LOOKUP,
+      FLOOR_PLAN_LOOKUP,
+      FEATURES_LOOKUP,
+      KEYWORDS_LOOKUP,
       // {
       //   $lookup: {
       //     from: "pricing",
@@ -530,3 +236,76 @@ export default class SpaceRepository {
     return total[0]?.totalCount || 0;
   }
 }
+// static async getSpaces(query: any, limit: number, skip: number) {
+//   const spaceProjectPayload = {
+//     _id: 1,
+//     user: 1,
+//     name: 1,
+//     type: 1,
+//     representation: 1,
+//     description: 1,
+//     space_photo: 1,
+//     status: 1,
+//     venue: {
+//       _id: 1,
+//       name: 1,
+//       address: 1,
+//       tenant: 1,
+//     },
+//     pricing: 1,
+//     capacity_layout: 1,
+//     marked_as_favorite: {
+//       $cond: {
+//         if: { $isArray: "$marked_as_favorite" },
+//         then: {
+//           _id: { $arrayElemAt: ["$marked_as_favorite._id", 0] },
+//           isFavorite: { $cond: { if: { $gt: [{ $size: "$marked_as_favorite" }, 0] }, then: true, else: false } },
+//         },
+//         else: {
+//           _id: null,
+//           isFavorite: false,
+//         },
+//       },
+//     },
+//     rating: {
+//       totalRating: { $sum: "$ratings.rating" },
+//       averageRating: {
+//         $cond: {
+//           if: { $eq: [{ $size: "$ratings" }, 0] },
+//           then: 0,
+//           else: { $avg: "$ratings.rating" },
+//         },
+//       },
+//       totalReviews: { $size: "$ratings" },
+//     },
+//     total_views: "$totalViews",
+//     keywords: {
+//       _id: 1,
+//       keyword: 1,
+//       categories: 1,
+//     },
+//     bookings: 1,
+//   };
+
+//   const pipeline = [
+//     USER_LOOKUP,
+//     USER_UNWIND,
+//     VENUE_LOOKUP,
+//     VENUE_UNWIND,
+//     KEYWORDS_LOOKUP,
+//     SPACE_PHOTO_LOOKUP,
+//     VENUE_PHOTO_LOOKUP,
+//     CAPACITY_LAYOUT_LOOKUP,
+//     FEATURES_LOOKUP,
+//     FLOOR_PLAN_LOOKUP,
+//     GET_SPACES_RATING,
+//     BOOKING_LOOKUP,
+//     ...createMatchStages(query),
+//     ...createSpacesProject(spaceProjectPayload),
+//     ...createPaginationStages(skip, limit),
+//   ];
+
+//   const [result] = await this.collection().aggregate(pipeline).toArray();
+
+//   return result;
+// }
