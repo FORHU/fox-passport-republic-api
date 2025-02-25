@@ -1,85 +1,203 @@
 // eslint-disable-next-line import/named
 import { TSpaceProjectPayload } from "../../types/space";
+import {
+  getCancellationPolicyProjection,
+  getUserProjection,
+  getVenueProjection,
+  getKeywordsProjection,
+  getQuestionsProjection,
+  getFilesProjection,
+} from "../projection/project";
 
-export const USER_LOOKUP = {
+export const INITIAL_SORT = { $sort: { _id: -1 } };
+
+export const USER_LOOKUP = (fields = []) => ({
   $lookup: {
     from: "users",
     localField: "user",
     foreignField: "_id",
+    pipeline: [getUserProjection(fields)],
     as: "user",
+  },
+});
+
+export const USER_SET = {
+  $set: {
+    user: {
+      $ifNull: [{ $first: "$user" }, null],
+    },
   },
 };
 
-export const USER_UNWIND = {
-  $unwind: "$user",
-};
+// START Venue lookup, set
 
-export const VENUE_LOOKUP = {
+export const VENUE_LOOKUP = (fields = []) => ({
   $lookup: {
     from: "venues",
     localField: "venue",
     foreignField: "_id",
+    pipeline: [getVenueProjection(fields)],
     as: "venue",
   },
-};
+});
 
-export const VENUE_UNWIND = {
-  $unwind: "$venue",
-};
-
-export const SPACE_PHOTO_LOOKUP = {
-  $lookup: {
-    from: "files",
-    localField: "space_photo",
-    foreignField: "_id",
-    as: "space_photo",
+export const VENUE_SET = {
+  $set: {
+    venue: {
+      $ifNull: [
+        {
+          $first: "$venue",
+        },
+        null,
+      ],
+    },
   },
 };
 
-export const VENUE_PHOTO_LOOKUP = {
+// END Venue lookup, set
+
+// START Cancellation Policy lookup, set
+
+export const CANCELLATION_LOOKUP = (fields = []) => ({
+  $lookup: {
+    from: "cancellation-policies",
+    localField: "venue.cancellation_policy",
+    foreignField: "_id",
+    pipeline: [getCancellationPolicyProjection(fields)],
+    as: "venue.cancellation_policy",
+  },
+});
+
+export const CANCELLATION_POLICY_SET = {
+  $set: {
+    "venue.cancellation_policy": {
+      $ifNull: [
+        {
+          $first: "$venue.cancellation_policy",
+        },
+        null,
+      ],
+    },
+  },
+};
+
+// END Cancellation Policy lookup, set
+
+// START Venue keywords lookup
+
+export const VENUE_KEYWORDS_LOOKUP = (fields = []) => ({
+  $lookup: {
+    from: "keywords",
+    localField: "venue.keywords",
+    foreignField: "_id",
+    pipeline: [getKeywordsProjection(fields)],
+    as: "venue.keywords",
+  },
+});
+
+// END Venue keywords lookup
+
+// START Venue details lookup
+
+export const VENUE_DETAILS_LOOKUP = (fields = []) => ({
+  $lookup: {
+    from: "questions",
+    localField: "venue.venue_details",
+    foreignField: "_id",
+    pipeline: [getQuestionsProjection(fields)],
+    as: "venue.venue_details",
+  },
+});
+
+// END Venue details lookup
+
+// START Venue photo lookup, sort, and unset
+
+export const VENUE_PHOTO_LOOKUP_AS_VENUE_PHOTOS = (fields = []) => ({
   $lookup: {
     from: "files",
     localField: "venue_photo",
     foreignField: "_id",
-    as: "venue_photo",
+    pipeline: [getFilesProjection(fields)],
+    as: "venue_photos",
+  },
+});
+
+export const VENUE_PHOTOS_SORT = {
+  $sort: {
+    "venue_photos.createdAt": -1,
   },
 };
 
-export const FLOOR_PLAN_LOOKUP = {
+export const VENUE_PHOTO_UNSET = { $unset: "venue_photo" };
+
+// END Venue photo lookup, sort, and unset
+
+// START Space photo, lookup, sort, unset
+
+export const SPACE_PHOTO_LOOKUP_AS_SPACE_PHOTOS = (fields = []) => ({
   $lookup: {
     from: "files",
-    localField: "floor_plan",
+    localField: "space_photo",
     foreignField: "_id",
-    as: "floor_plan",
+    pipeline: [getFilesProjection(fields)],
+    as: "space_photos",
+  },
+});
+
+export const SPACE_PHOTOS_SORT = {
+  $sort: {
+    "space_photos.createdAt": -1,
   },
 };
 
-export const CAPACITY_LAYOUT_LOOKUP = {
+export const SPACE_PHOTO_UNSET = { $unset: "space_photo" };
+
+// END Space photo, lookup, sort, unset
+
+// START Capacity Layout lookup
+
+export const CAPACITY_LAYOUT_LOOKUP = (fields = []) => ({
   $lookup: {
     from: "questions",
     localField: "capacity_layout",
     foreignField: "_id",
+    pipeline: [getQuestionsProjection(fields)],
     as: "capacity_layout",
   },
-};
+});
 
-export const FEATURES_LOOKUP = {
+// END Capacity Layout lookup
+
+export const FLOOR_PLAN_LOOKUP = (fields = []) => ({
   $lookup: {
-    from: "features",
+    from: "files",
+    localField: "floor_plan",
+    foreignField: "_id",
+    pipeline: [getFilesProjection(fields)],
+    as: "floor_plan",
+  },
+});
+
+export const FEATURES_LOOKUP = (fields = []) => ({
+  $lookup: {
+    from: "questions",
     localField: "features",
     foreignField: "_id",
+    pipeline: [getQuestionsProjection(fields)],
     as: "features",
   },
-};
+});
 
-export const KEYWORDS_LOOKUP = {
+export const KEYWORDS_LOOKUP = (fields = []) => ({
   $lookup: {
     from: "keywords",
     localField: "keywords",
     foreignField: "_id",
+    pipeline: [getKeywordsProjection(fields)],
     as: "keywords",
   },
-};
+});
 
 export const GET_SPACES_RATING = {
   $lookup: {
