@@ -12,7 +12,7 @@ import { initVenueOwnerMemberQueue } from "../suspension/venue-owner-member.queu
 
 export const startCronJob = async () => {
   try {
-    const job = new CronJob("30 11 * * *", async () => {
+    const job = new CronJob("0 * * * *", async () => {
       console.log("Running the scheduled task...");
       try {
         await initEnquiriesQueue();

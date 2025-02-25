@@ -6,15 +6,7 @@ import { ObjectId } from "mongodb";
 import path from "path";
 import puppeteer from "puppeteer-core";
 
-import {
-  BUCKET_PROTOCOL,
-  CDN_ENDPOINT,
-  DEBUG_EMAIL,
-  DO_ENDPOINT,
-  isDev,
-  S3_BUCKET_NAME,
-  SUPPORT_EMAIL
-} from "../config";
+import { BUCKET_PROTOCOL, CDN_ENDPOINT, DEBUG_EMAIL, DO_ENDPOINT, isDev, S3_BUCKET_NAME, SUPPORT_EMAIL } from "../config";
 import { OrgRoles } from "../models/organization-member.model";
 import SpaceSvc from "../services/space.service";
 import VenueSvc from "../services/venue.service";
@@ -526,4 +518,25 @@ export const extractFilePath = (filePath: string): string => {
     return filePath.replace(`${BUCKET_PROTOCOL}${S3_BUCKET_NAME}.${CDN_ENDPOINT}/`, "");
   }
   return filePath.replace(`${BUCKET_PROTOCOL}${S3_BUCKET_NAME}.${DO_ENDPOINT}/`, "");
+};
+
+export const formatDateTimeAsObject = (newDate: Date) => {
+  const formatDate = (date: Date) => {
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const formatTime = (date) => {
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
+
+  return {
+    date: formatDate(newDate),
+    from: formatTime(newDate),
+    to: formatTime(newDate),
+  };
 };

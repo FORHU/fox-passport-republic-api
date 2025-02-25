@@ -2,7 +2,7 @@
 import { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 
-import FileSvc from "../services/file.service"
+import FileSvc from "../services/file.service";
 import UserSvc from "../services/user.service";
 import { extractFilePath } from "../utils/helpers";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
@@ -56,10 +56,7 @@ export default class AuthCtrl {
         const file = await FileSvc.getFileById(user?.profile_picture as string);
         if (file) {
           const filePath = extractFilePath(file?.path);
-          await Promise.allSettled([
-            deleteSpaceFile(filePath),
-            FileSvc.deleteFilesById(user?.profile_picture as string),
-          ]);
+          await Promise.allSettled([deleteSpaceFile(filePath), FileSvc.deleteFilesById(user?.profile_picture as string)]);
         }
       }
 
@@ -76,7 +73,6 @@ export default class AuthCtrl {
         ...(zip_code && { zip_code }),
         ...(username && { username }),
       };
-
 
       const result = await UserSvc.updateUser(query, payload);
       return handleResponse(res, result, "USER_UPDATED_SUCCESSFULLY");
@@ -110,7 +106,7 @@ export default class AuthCtrl {
         deletedBy: userId,
         status: "INACTIVE",
       };
-      const result = await UserSvc.deleteUser(userId, data);
+      const result = await UserSvc.deleteUser(userId, data, existingUser?.role);
       return handleResponse(res, result, "DELETED_USER_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "USER_DELETE_FAILED" });

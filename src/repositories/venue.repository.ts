@@ -15,16 +15,27 @@ export default class VenueRepo {
   static async getVenue(query: any, project?: Record<string, number>) {
     const pipeline = [];
 
-    pipeline.push({ $match: query });
-
-    pipeline.push({
-      $lookup: {
-        from: "keywords",
-        localField: "keywords",
-        foreignField: "_id",
-        as: "keywords",
+    pipeline.push(
+      { $match: query },
+      {
+        $lookup: {
+          from: "keywords",
+          localField: "keywords",
+          foreignField: "_id",
+          as: "keywords",
+        },
       },
-    });
+      {
+        $lookup: {
+          from: "users",
+          localField: "user",
+          foreignField: "_id",
+          pipeline: [{ $project: { email: 1, first_name: 1, last_name: 1, phone_number: 1 } }],
+          as: "user",
+        },
+      },
+      { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+    );
 
     if (project) {
       pipeline.push({ $project: project });
@@ -65,9 +76,7 @@ export default class VenueRepo {
 
   static async getPaginatedVenues(query: any, skip: number, limit: number) {
     const pipeline = [];
-    pipeline.push({
-      $match: query,
-    });
+
     pipeline.push(
       {
         $lookup: {
@@ -148,6 +157,10 @@ export default class VenueRepo {
         },
       },
     );
+
+    pipeline.push({
+      $match: query,
+    });
 
     pipeline.push(
       {

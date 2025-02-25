@@ -542,7 +542,6 @@ export default class BookingSvc {
       end_date: existingBooking.end_date,
     };
     let valid_for_cancellation: any = null;
-
     if (cancellation_policy.policy.no_cancellation || cancellation_policy.policy.cancellation_range === CancellationPolicy.OTHER) {
       valid_for_cancellation = {
         message: "Venue owner chose no cancellation policy for the venue.",
@@ -643,7 +642,7 @@ export default class BookingSvc {
 
     let valid_for_cancellation: any = null;
 
-    if (cancellation_policy.policy.no_cancellation || cancellation_policy.policy.cancellation_range === CancellationPolicy.OTHER) {
+    if (cancellation_policy.policy.no_cancellation && cancellation_policy.policy.cancellation_range === CancellationPolicy.OTHER) {
       valid_for_cancellation = {
         message: "Venue owner chose no cancellation policy for the venue.",
       };

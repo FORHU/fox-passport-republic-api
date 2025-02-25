@@ -13,7 +13,7 @@ export const constructVenueQuery = (params: any, user: any, venues?: any) => {
       .filter(Boolean);
     const regexPattern = new RegExp(words.map((word: string) => `(?=.*${word})`).join(""), "i");
 
-    query.$or = [{ name: { $regex: regexPattern } }, { spaces: { $elemMatch: { name: { $regex: regexPattern } } } }];
+    query.$or = [{ name: regexPattern }, { "spaces.name": regexPattern }];
   }
 
   if (user_id) {
@@ -129,4 +129,64 @@ const roleDisplayName: { [key in user_role]: string } = {
 
 export const getRoleDisplayName = (role: user_role): string => {
   return roleDisplayName[role] || "Unknown Role";
+};
+
+export const constructVenueV2Query = (params: any, user: any, venues?: any) => {
+  const { user_id, venue_id, keywords, categories, status, venue_name, tenant_code } = params;
+  const query: any = {};
+
+  if (venue_name) {
+    const words = venue_name
+      .split(" ")
+      .map((word: string) => word.trim())
+      .filter(Boolean);
+    const regexPattern = new RegExp(words.map((word: string) => `(?=.*${word})`).join(""), "i");
+
+    query.$or = [{ name: regexPattern }, { "spaces.name": regexPattern }];
+  }
+
+  if (user_id) {
+    query.user = new ObjectId(user_id as string);
+  }
+
+  if (venue_id) {
+    query._id = new ObjectId(venue_id as string);
+  }
+
+  if (keywords) {
+    const keywordArray = keywords.split(",").map((keyword: string) => keyword.trim());
+    query.keywords = { $in: keywordArray.map((keyword: string | RegExp) => new RegExp(keyword, "i")) };
+  }
+
+  if (categories) {
+    const categoriesRegex = categories.split(",").map((category: string) => new RegExp(category.trim(), "i"));
+    query.categories = categoriesRegex;
+  }
+
+  if (status) {
+    const statusStrings = status as string;
+    const statusArray = statusStrings.split(",");
+    if (!statusStrings.includes("ALL")) {
+      query.status = { $in: statusArray };
+    }
+  }
+
+  /**
+   * Special case condition, if user role is not a ADMIN or SUPER ADMIN ROLE
+   * Will only display its venue organization
+   */
+
+  if (venues) {
+    if (Array.isArray(venues)) {
+      query._id = { $in: venues.map((id: string) => new ObjectId(id as string)) };
+    } else if (typeof venues === "object") {
+      Object.assign(query, venues);
+    }
+  }
+
+  if (tenant_code) {
+    query["tenant"] = tenant_code;
+  }
+
+  return query;
 };

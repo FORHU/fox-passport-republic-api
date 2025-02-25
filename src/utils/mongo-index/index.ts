@@ -1,3 +1,4 @@
+import { enquiryQueue } from "../queues/enquiries/enquries-status.queue";
 import { createBookingIndex } from "./booking";
 import { createFavoriteIndex } from "./favorite";
 import { createPricingIndex } from "./pricing";
@@ -17,3 +18,9 @@ export const InitializeCreateIndex = (db: any) => {
     createUserLogsIndex(db),
   ]);
 };
+
+// TODO ADD INDEX
+// collections;
+// -enquiry;
+//   a. date.timestamp.start_date_time
+//   bdate.timestamp.end_date_time
