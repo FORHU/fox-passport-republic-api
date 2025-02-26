@@ -11,10 +11,10 @@ export interface TMostPopular {
 export interface TSpaceProjectPayload {
   _id?: any;
   status?: any;
-  name?: any;
+  space_details_name?: any;
   type?: any;
   representation?: any;
-  description?: any;
+  space_details_description?: any;
   space_photo?: any;
   venue?: any;
   pricing?: any;
