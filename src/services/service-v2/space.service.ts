@@ -7,31 +7,37 @@ import { getCacheOrFetch } from "../../utils/cache.util";
 import { getOneSummarizedPricing, hashSearch, tenantBuildQuery } from "../../utils/helpers";
 import { constructQueryV2 } from "../../utils/space/helpers";
 import RatingSvc from "../rating.service";
+import { finalProjectAllowedValues } from "../../utils/projection/project";
 
 const PREFIX_USER_LOGS = "user_logs";
 
 export default class SpaceSvc {
   static async handleGetSpaces(params: any) {
-    const { page = 1, limit = 10, user_id } = params;
+    const { page = 1, limit = 10 } = params;
 
     const limitNumber = Number(limit);
     const skip = (page - 1) * limitNumber;
     const query = constructQueryV2(params);
 
-    const userProject = [
-      "first_name",
-      "last_name",
-      "phone_number",
-      "email",
-      "date_of_birth",
-      "country",
-      "organization",
-      "social link",
-      "company_name",
-      "role",
+    const finalProject: finalProjectAllowedValues[] = [
+      "venue",
+      "user",
+      "status",
+      "name",
+      "type",
+      "representation",
+      "description",
+      "capacity_layout",
+      "guest_capacity",
+      "floor_plan",
+      "features",
+      "keywords",
+      "pricing",
+      "venue_photos",
+      "space_photos",
     ];
 
-    return SpaceV2Repo.getSpaces(query, limitNumber, skip, user_id, userProject);
+    return SpaceV2Repo.getSpaces(query, limitNumber, skip, params?.user?._id, { finalProject });
   }
 
   static async handleGetSpace(spaceId: string) {

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 
 import SpaceSvcV2 from "../../services/service-v2/space.service";
-import { handleErrorResponse, handleResponse } from "../../utils/reponse";
+import { handleErrorResponse, handleResponse } from "../../utils/reponse-V2";
 import { validateGetSpacesSchema } from "../../utils/space/validation";
 
 export default class SpaceCtrl {

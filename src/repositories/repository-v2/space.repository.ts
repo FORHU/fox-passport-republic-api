@@ -9,11 +9,17 @@ import {
   CANCELLATION_POLICY_SET,
   CAPACITY_LAYOUT_LOOKUP,
   createSpacesProject,
+  FAVORITE_LOOKUP,
+  FAVORITE_SET,
   FEATURES_LOOKUP,
+  FINAL_PROJECTION,
   FLOOR_PLAN_LOOKUP,
   GET_SPACES_RATING,
   INITIAL_SORT,
+  INITIAL_SPACE_PROJECTION,
   KEYWORDS_LOOKUP,
+  PRICING_LOOKUP,
+  PRICING_SET,
   SPACE_PHOTO_LOOKUP_AS_SPACE_PHOTOS,
   SPACE_PHOTO_UNSET,
   SPACE_PHOTOS_SORT,
@@ -27,29 +33,14 @@ import {
   VENUE_PHOTOS_SORT,
   VENUE_SET,
 } from "../../utils/pipelines/space.pipelines";
+import { ProjectFields } from "../../utils/projection/project";
 
 export default class SpaceRepository {
   static collection() {
     return getDB().collection("spaces");
   }
 
-  static async getSpaces(
-    query: any,
-    limit: number,
-    skip: number,
-    userId?: string,
-    userProject?: string[],
-    venueProject?: string[],
-    cancellationPolicyProject?: string[],
-    venueKeywordsProject?: string[],
-    venueDetailsProject?: string[],
-    venuePhotosProject?: string[],
-    spacePhotosProject?: string[],
-    capacityLayoutProject?: string[],
-    floorPlanProject?: string[],
-    featuresProject?: string[],
-    keywordsProject?: string[],
-  ) {
+  static async getSpaces(query: any, limit: number, skip: number, userId?: string, projects?: ProjectFields) {
     const user_id = userId ? new ObjectId(userId) : null;
 
     const filterQuery = {
@@ -61,134 +52,65 @@ export default class SpaceRepository {
       {
         $match: filterQuery,
       },
-      {
-        $project: {
-          _id: 1,
-          venue: 1,
-          user: 1,
-          status: 1,
-          name: 1,
-          type: 1,
-          representation: 1,
-          description: 1,
-          space_photo: 1,
-          venue_photo: 1,
-          capacity_layout: 1,
-          guest_capacity: 1,
-          floor_plan: 1,
-          features: 1,
-          keywords: 1,
-          pricing: 1,
-        },
-      },
+      INITIAL_SPACE_PROJECTION,
       INITIAL_SORT,
-      VENUE_LOOKUP(venueProject),
+      VENUE_LOOKUP(projects?.venueProject),
       VENUE_SET,
-      CANCELLATION_LOOKUP(cancellationPolicyProject),
+      CANCELLATION_LOOKUP(projects?.cancellationPolicyProject),
       CANCELLATION_POLICY_SET,
-      VENUE_KEYWORDS_LOOKUP(venueKeywordsProject),
-      VENUE_DETAILS_LOOKUP(venueDetailsProject),
-      USER_LOOKUP(userProject),
+      VENUE_KEYWORDS_LOOKUP(projects?.venueKeywordsProject),
+      VENUE_DETAILS_LOOKUP(projects?.venueDetailsProject),
+      USER_LOOKUP(projects?.userProject),
       USER_SET,
-      VENUE_PHOTO_LOOKUP_AS_VENUE_PHOTOS(venuePhotosProject),
+      VENUE_PHOTO_LOOKUP_AS_VENUE_PHOTOS(projects?.venuePhotosProject),
       VENUE_PHOTOS_SORT,
       VENUE_PHOTO_UNSET,
       VENUE_PHOTO_UNSET,
-      SPACE_PHOTO_LOOKUP_AS_SPACE_PHOTOS(spacePhotosProject),
+      SPACE_PHOTO_LOOKUP_AS_SPACE_PHOTOS(projects?.spacePhotosProject),
       SPACE_PHOTOS_SORT,
       SPACE_PHOTO_UNSET,
-      CAPACITY_LAYOUT_LOOKUP(capacityLayoutProject),
-      FLOOR_PLAN_LOOKUP(floorPlanProject),
-      FEATURES_LOOKUP(featuresProject),
-      KEYWORDS_LOOKUP(keywordsProject),
-      // {
-      //   $lookup: {
-      //     from: "pricing",
-      //     localField: "pricing",
-      //     foreignField: "_id",
-      //     pipeline: [
-      //       {
-      //         $project: {
-      //           space_id: 0,
-      //           updatedAt: 0,
-      //         },
-      //       },
-      //     ],
-      //     as: "pricing",
-      //   },
-      // },
-      // {
-      //   $set: {
-      //     pricing: {
-      //       $ifNull: [{ $first: "$pricing" }, null],
-      //     },
-      //   },
-      // },
-      // {
-      //   $lookup: {
-      //     from: "favorites",
-      //     localField: "_id",
-      //     foreignField: "space",
-      //     pipeline: [
-      //       {
-      //         $match: {
-      //           user: user_id,
-      //         },
-      //       },
-      //       {
-      //         $project: {
-      //           marked_as_favorite: 1,
-      //           _id: 0,
-      //         },
-      //       },
-      //     ],
-      //     as: "marked_as_favorite",
-      //   },
-      // },
-      // {
-      //   $set: {
-      //     marked_as_favorite: {
-      //       $ifNull: [
-      //         {
-      //           $first: "$marked_as_favorite.marked_as_favorite",
-      //         },
-      //         false,
-      //       ],
-      //     },
-      //   },
-      // },
-      // {
-      //   $facet: {
-      //     metadata: [{ $count: "total_items" }],
-      //     data: [{ $skip: skip }, { $limit: limit }],
-      //   },
-      // },
-      // {
-      //   $addFields: {
-      //     total_items: { $arrayElemAt: ["$metadata.total_items", 0] },
-      //     data: "$data",
-      //   },
-      // },
-      // {
-      //   $addFields: {
-      //     total_items: { $ifNull: ["$total_items", 0] },
-      //     total_pages: {
-      //       $ceil: {
-      //         $divide: ["$total_items", limit],
-      //       },
-      //     },
-      //     current_page: {
-      //       $add: [{ $divide: [skip, limit] }, 1],
-      //     },
-      //     size: limit,
-      //     offset: skip,
-      //   },
-      // },
-      // {
-      //   $project: {
-      //     metadata: 0,
-      //   },
-      // },
+      CAPACITY_LAYOUT_LOOKUP(projects?.capacityLayoutProject),
+      FLOOR_PLAN_LOOKUP(projects?.floorPlanProject),
+      FEATURES_LOOKUP(projects?.featuresProject),
+      KEYWORDS_LOOKUP(projects?.keywordsProject),
+      PRICING_LOOKUP(projects?.pricingProject),
+      PRICING_SET,
+      FAVORITE_LOOKUP(user_id),
+      FAVORITE_SET,
+      BOOKING_LOOKUP(projects?.bookingProject),
+      FINAL_PROJECTION(projects?.finalProject),
+      {
+        $facet: {
+          metadata: [{ $count: "total_items" }],
+          data: [{ $skip: skip }, { $limit: limit }],
+        },
+      },
+      {
+        $addFields: {
+          total_items: { $arrayElemAt: ["$metadata.total_items", 0] },
+          data: "$data",
+        },
+      },
+      {
+        $addFields: {
+          total_items: { $ifNull: ["$total_items", 0] },
+          total_pages: {
+            $ceil: {
+              $divide: ["$total_items", limit],
+            },
+          },
+          current_page: {
+            $add: [{ $divide: [skip, limit] }, 1],
+          },
+          size: limit,
+          offset: skip,
+        },
+      },
+      {
+        $project: {
+          metadata: 0,
+        },
+      },
     ];
 
     const [result] = await this.collection().aggregate(pipeline).toArray();
