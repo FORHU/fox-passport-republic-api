@@ -262,6 +262,7 @@ export default class SpaceSvc {
       description,
       space_photo,
       venue_photo,
+      menu_photo,
       capacity_layout,
       guest_capacity,
       floor_plan,
@@ -288,6 +289,7 @@ export default class SpaceSvc {
     //saving old files objectId
     const oldSpacePhoto = space.space_photo;
     const oldFloorPlan = space.floor_plan;
+    const oldMenuPhoto = space.menu_photo;
     space.space_photo = space_photo;
     space.venue_photo = venue_photo;
     space.guest_capacity = guest_capacity;
@@ -352,6 +354,7 @@ export default class SpaceSvc {
       ...(description && { description }),
       ...(space_photo && { space_photo: parseObjectIdArray(space_photo) }),
       ...(venue_photo && { venue_photo: parseObjectIdArray(venue_photo) }),
+      ...(menu_photo && { menu_photo: parseObjectIdArray(menu_photo) }),
       ...(capacity_layout && { capacity_layout: capacityLayoutIds }),
       ...(guest_capacity && { guest_capacity }),
       ...(floor_plan && { floor_plan: parseObjectIdArray(floor_plan) }),
@@ -367,6 +370,10 @@ export default class SpaceSvc {
 
     if (floor_plan) {
       await this.handleFileDeletion(oldFloorPlan, space.floor_plan);
+    }
+
+    if (menu_photo) {
+      await this.handleFileDeletion(oldMenuPhoto, space.menu_photo);
     }
     const result = await VenueSvc.updateVenue(space.venue, { updatedAt: updatedAt }, tenant);
     return await this.updateSpaces(updatedData, { _id: spaceId }, tenant);

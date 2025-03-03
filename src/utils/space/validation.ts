@@ -112,6 +112,7 @@ export const validateUpdateSpaceSchema = (data: any) => {
     description: Joi.string().escapeHTML().optional(),
     space_photo: Joi.array().items(Joi.string().escapeHTML()).min(0).optional(),
     venue_photo: Joi.array().items(Joi.string().escapeHTML()).min(0).optional(),
+    menu_photo: Joi.array().items(Joi.string().escapeHTML()).min(0).optional(),
     floor_plan: Joi.array().items(Joi.string().escapeHTML()).optional(),
     capacity_layout: questionSchemaValidation.optional(),
     guest_capacity: Joi.object({
