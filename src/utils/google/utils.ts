@@ -1,5 +1,5 @@
 import axios, { AxiosResponse } from "axios";
-import { GOOGLE_AUTH_URI, GOOGLE_REDIRECT_URI, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } from "../../config";
+import { GOOGLE_AUTH_URI, GOOGLE_REDIRECT_URI, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_URI } from "../../config";
 
 interface GoogleAccessTokenResponse {
   access_token: string;
@@ -14,6 +14,19 @@ interface GoogleProfile {
   email: string;
   name: string;
   // Add more fields as needed
+}
+
+interface GoogleAutocompletePrediction {
+  description: string;
+  place_id: string;
+  structured_formatting: {
+    main_text: string;
+    secondary_text: string;
+  };
+}
+
+interface GoogleAutocompleteResponse {
+  predictions: GoogleAutocompletePrediction[];
 }
 
 export const generateGoogleAuthURL = (): string => {
@@ -39,7 +52,7 @@ export async function googleGetAccessToken(code: string): Promise<GoogleAccessTo
       grant_type: "authorization_code",
     });
     return data;
-  } catch (error:any) {
+  } catch (error: any) {
     // Handle error
     throw new Error(`Failed to get Google access token: ${error.message}`);
   }
@@ -51,8 +64,35 @@ export async function getGoogleProfile(access_token: string): Promise<GoogleProf
       headers: { Authorization: `Bearer ${access_token}` },
     });
     return data;
-  } catch (error:any) {
+  } catch (error: any) {
     // Handle error
     throw new Error(`Failed to get Google profile: ${error.message}`);
+  }
+}
+
+export async function getAddressAutocomplete(input: string, country: string = "sg"): Promise<GoogleAutocompletePrediction[]> {
+  if (!input) {
+    throw new Error("Input field is required");
+  }
+
+  if (!GOOGLE_MAPS_API_KEY) {
+    throw new Error("Google Maps API key is missing");
+  }
+
+  try {
+    const url = GOOGLE_MAPS_URI;
+
+    const { data }: AxiosResponse<GoogleAutocompleteResponse> = await axios.get(url, {
+      params: {
+        input,
+        key: GOOGLE_MAPS_API_KEY,
+        components: `country:${country}`,
+      },
+    });
+
+    return data.predictions;
+  } catch (error: any) {
+    console.error("Failed to fetch autocomplete addresses:", error.message);
+    throw new Error(`Failed to fetch autocomplete addresses: ${error.message}`);
   }
 }

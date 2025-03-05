@@ -29,6 +29,7 @@ export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID as string;
 export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET as string;
 export const GOOGLE_AUTH_URI = process.env.GOOGLE_AUTH_URI as string;
 export const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY as string;
+export const GOOGLE_MAPS_URI = process.env.GOOGLE_MAPS_URI as string;
 export const ACCESS_KEY_AWS = process.env.ACCESS_KEY_AWS as string;
 export const SECRET_KEY_AWS = process.env.SECRET_KEY_AWS as string;
 export const REGION_AWS = process.env.REGION_AWS as string;
