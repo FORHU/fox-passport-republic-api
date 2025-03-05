@@ -29,6 +29,7 @@ import AuthV2Routes from "./v2-routes/auth.routes";
 import venueRoutes from "./venue.route";
 import spaceV2Routes from "./v2-routes/space.route";
 import venueV2Routes from "./v2-routes/venue.route";
+import placeRoutes from "./place.route";
 
 const router = express.Router();
 
@@ -58,6 +59,7 @@ router.use("/v1/payment-transaction", paymentTransaction);
 router.use("/v1/rating", ratingRoutes);
 router.use("/v1/subscription", subscriptionRoutes);
 router.use("/v1/setting", salesSettingRoutes);
+router.use("/v1/place", placeRoutes);
 //version 2 APIs
 router.use("/v2/auth", AuthV2Routes);
 router.use("/v2/space", spaceV2Routes);
