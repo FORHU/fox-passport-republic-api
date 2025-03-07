@@ -62,6 +62,15 @@ export default class SpaceRepository {
         {
           $lookup: {
             from: "files",
+            localField: "menu_photo",
+            foreignField: "_id",
+            pipeline: [{ $project: { origin: 0 } }],
+            as: "menu_photo",
+          },
+        },
+        {
+          $lookup: {
+            from: "files",
             localField: "floor_plan",
             foreignField: "_id",
             as: "floor_plan",
@@ -338,6 +347,7 @@ export default class SpaceRepository {
           },
           venue_photo: 1,
           space_photo: 1,
+          menu_photo: 1,
           floor_plan: 1,
           capacity_layout: 1,
           guest_capacity: 1,

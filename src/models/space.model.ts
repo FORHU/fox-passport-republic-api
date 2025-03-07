@@ -48,6 +48,7 @@ export type TSpace = {
   description?: string;
   space_photo?: ObjectId[];
   venue_photo?: ObjectId[];
+  menu_photo?: ObjectId[];
   capacity_layout?: ObjectId[];
   guest_capacity?: {
     minimum?: number | null;
@@ -83,6 +84,7 @@ export class MSpace implements Partial<TSpace> {
   description?: string;
   space_photo?: ObjectId[];
   venue_photo?: ObjectId[];
+  menu_photo?: ObjectId[];
   capacity_layout?: ObjectId[];
   guest_capacity?: {
     minimum?: number | null;
@@ -115,6 +117,7 @@ export class MSpace implements Partial<TSpace> {
       description,
       space_photo = [],
       venue_photo = [],
+      menu_photo = [],
       capacity_layout,
       guest_capacity,
       floor_plan = [],
@@ -140,6 +143,7 @@ export class MSpace implements Partial<TSpace> {
     this.description = description;
     this.space_photo = space_photo;
     this.venue_photo = venue_photo;
+    this.menu_photo = menu_photo;
     this.capacity_layout = capacity_layout;
     this.guest_capacity = guest_capacity;
     this.floor_plan = floor_plan;

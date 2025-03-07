@@ -1,4 +1,5 @@
 // eslint-disable-next-line import/named
+import { ObjectId } from "mongodb";
 import { TSpaceProjectPayload } from "../../types/space";
 import {
   getCancellationPolicyProjection,
@@ -7,7 +8,31 @@ import {
   getKeywordsProjection,
   getQuestionsProjection,
   getFilesProjection,
+  getPricingProjection,
+  getBookingProjection,
+  removeNullFieldsInBookingProjection,
+  getFinalProjection,
 } from "../projection/project";
+
+export const INITIAL_SPACE_PROJECTION = {
+  $project: {
+    venue: 1,
+    user: 1,
+    status: 1,
+    name: 1,
+    type: 1,
+    representation: 1,
+    description: 1,
+    space_photo: 1,
+    venue_photo: 1,
+    capacity_layout: 1,
+    guest_capacity: 1,
+    floor_plan: 1,
+    features: 1,
+    keywords: 1,
+    pricing: 1,
+  },
+};
 
 export const INITIAL_SORT = { $sort: { _id: -1 } };
 
@@ -199,6 +224,59 @@ export const KEYWORDS_LOOKUP = (fields = []) => ({
   },
 });
 
+export const PRICING_LOOKUP = (fields = []) => ({
+  $lookup: {
+    from: "pricing",
+    localField: "_id",
+    foreignField: "space_id",
+    pipeline: [getPricingProjection(fields)],
+    as: "pricing",
+  },
+});
+
+export const PRICING_SET = {
+  $set: {
+    pricing: {
+      $ifNull: [{ $first: "$pricing" }, null],
+    },
+  },
+};
+
+export const FAVORITE_LOOKUP = (userId: ObjectId) => ({
+  $lookup: {
+    from: "favorites",
+    localField: "_id",
+    foreignField: "space",
+    pipeline: [
+      {
+        $match: {
+          user: userId,
+        },
+      },
+      {
+        $project: {
+          marked_as_favorite: 1,
+          _id: 0,
+        },
+      },
+    ],
+    as: "marked_as_favorite",
+  },
+});
+
+export const FAVORITE_SET = {
+  $set: {
+    marked_as_favorite: {
+      $ifNull: [
+        {
+          $first: "$marked_as_favorite.marked_as_favorite",
+        },
+        false,
+      ],
+    },
+  },
+};
+
 export const GET_SPACES_RATING = {
   $lookup: {
     from: "ratings",
@@ -208,19 +286,26 @@ export const GET_SPACES_RATING = {
   },
 };
 
-export const BOOKING_LOOKUP = {
+export const BOOKING_LOOKUP = (fields = []) => ({
   $lookup: {
     from: "bookings",
     localField: "_id",
     foreignField: "space",
+    pipeline: [getBookingProjection(fields), removeNullFieldsInBookingProjection],
     as: "bookings",
   },
-};
+});
+
+export const FINAL_PROJECTION = (fields = []) => ({
+  ...getFinalProjection(fields),
+});
 
 export const createSpacesProject = ({
   _id,
   status,
   space_details_name,
+  type,
+  representation,
   space_details_description,
   space_photo,
   venue,
@@ -237,6 +322,8 @@ export const createSpacesProject = ({
       ...(_id && { _id }),
       ...(status && { status }),
       ...(space_details_name && { name: space_details_name }),
+      ...(type && { type }),
+      ...(representation && { representation }),
       ...(space_details_description && { description: space_details_description }),
       ...(space_photo && { space_photo }),
       ...(venue && { venue }),
