@@ -15,9 +15,9 @@ import VenueSvc from "../services/venue.service";
 import { LookupFields } from "../types/common";
 import { sendTemplatedEmail } from "../utils/helpers";
 import { logger } from "../utils/logger";
-import firebaseAdmin from "../utils/firebase/firebase.admin";
 import { NotificationStatusType, TNotications } from "../models/notification.model";
 import NotificationSvc from "../services/notification.service";
+import { initializeFirebaseAdmin } from "../utils/firebase/firebase.admin";
 
 interface AuthenticatedSocket extends Socket {
   user?: any;
@@ -159,6 +159,8 @@ export default (io: Server) => {
           attachments: attachmentIds,
         });
 
+        const firebaseAdmin = initializeFirebaseAdmin();
+
         const pushNotification = {
           notification: {
             title: "New Inquiry",
@@ -191,6 +193,7 @@ export default (io: Server) => {
           body: pushNotification.notification.body,
           status: NotificationStatusType.UNREAD,
         };
+
         await Promise.all([NotificationSvc.createNotification(notificationData), firebaseAdmin.messaging().send(pushNotification)]);
       }
     });
