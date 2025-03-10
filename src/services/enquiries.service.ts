@@ -21,7 +21,6 @@ import { NotificationStatusType, NotificationType, TNotications } from "../model
 import NotificationSvc from "./notification.service";
 import { initializeFirebaseAdmin } from "../utils/firebase/firebase.admin";
 
-const firebaseAdmin = initializeFirebaseAdmin();
 export default class EnquirySvc {
   static async createEnquiry(data: TEnquiries, message: string, tenant?: any) {
     let result = null;
@@ -132,6 +131,7 @@ export default class EnquirySvc {
     };
 
     await MessageSvc.bulkCreateMessage([messagePayload, initialMessagePayload]);
+    const firebaseAdmin = initializeFirebaseAdmin();
 
     const pushNotification = {
       notification: {
@@ -154,7 +154,7 @@ export default class EnquirySvc {
           },
         },
       },
-      topic: receiverId,
+      topic: String(receiverId),
     };
 
     const notificationData: TNotications = {
