@@ -17,7 +17,11 @@ import InboxSvc from "./inbox.service";
 import MessageSvc from "./message.services";
 import UserSvc from "./user.service";
 import VenueSvc from "./venue.service";
+import { NotificationStatusType, NotificationType, TNotications } from "../models/notification.model";
+import NotificationSvc from "./notification.service";
+import { initializeFirebaseAdmin } from "../utils/firebase/firebase.admin";
 
+const firebaseAdmin = initializeFirebaseAdmin();
 export default class EnquirySvc {
   static async createEnquiry(data: TEnquiries, message: string, tenant?: any) {
     let result = null;
@@ -85,8 +89,11 @@ export default class EnquirySvc {
     const { type, guests, value, space, date, own_catering = false, require_catering = false, flexible_time, catering_options, message } = payload;
 
     const spaceId = new ObjectId(space as string);
+    const enquiryId = new ObjectId();
+    const senderId = new ObjectId(user?._id as string);
 
     const [_venue]: any = await VenueSvc.getVenue({ _id: _space.venue });
+    const receiverId = _venue?.user?._id;
     const room_id: string = generateRoomId();
 
     const formattedDate = dateFormat(date);
@@ -119,14 +126,50 @@ export default class EnquirySvc {
     const initialMessagePayload: any = {
       inbox: inbox?.insertedId,
       room_id,
-      sender: new ObjectId(user?._id as string),
+      sender: senderId,
       content: message,
       createdAt: new Date(Date.now() + 100),
     };
 
     await MessageSvc.bulkCreateMessage([messagePayload, initialMessagePayload]);
 
+    const pushNotification = {
+      notification: {
+        title: "New Inquiry",
+        body: "You have a new inquiry to review.",
+      },
+      data: {
+        type: NotificationType.INQUIRY,
+        enquiryId: String(enquiryId),
+      },
+      android: {
+        notification: {
+          sound: "default",
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: "default",
+          },
+        },
+      },
+      topic: receiverId,
+    };
+
+    const notificationData: TNotications = {
+      sender: senderId,
+      receiver: receiverId,
+      metadata: { enquiry_id: enquiryId },
+      title: pushNotification.notification.title,
+      body: pushNotification.notification.body,
+      status: NotificationStatusType.UNREAD,
+    };
+
+    await Promise.all([NotificationSvc.createNotification(notificationData), firebaseAdmin.messaging().send(pushNotification)]);
+
     const enquiryData = {
+      _id: enquiryId,
       date: formattedDate,
       type,
       guests: Number(guests),
