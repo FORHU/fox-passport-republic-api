@@ -5,6 +5,10 @@ export enum NotificationStatusType {
   UNREAD = "UNREAD",
 }
 
+export enum NotificationType {
+  INQUIRY = "INQUIRY",
+  BOOKING = "BOOKING",
+}
 export interface TNotications {
   _id?: ObjectId;
   sender: ObjectId;

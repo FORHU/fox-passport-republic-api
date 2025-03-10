@@ -44,7 +44,7 @@ export default class VenueSvc {
   }
 
   static async updateVenue(venueId: ObjectId, data: any, tenant?: any) {
-    const venueData = await VenueRepo.getVenue({ _id: venueId }, { name: 1, address: 1, user: 1, description: 1 });
+    const [venueData] = await VenueRepo.getVenues({ _id: venueId }, { name: 1, address: 1, user: 1, description: 1 });
 
     const emailLogData = await EmailLogsRepo.getOneEmailLog({
       user_id: venueData?.user?._id,

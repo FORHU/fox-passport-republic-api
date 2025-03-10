@@ -52,7 +52,7 @@ addVenueQueue.process("process_add_venue", async (job: any, done: any) => {
   try {
     const { venue_name, lower_case_venue_name, lower_case_space_name, address, space_name } = job.data;
 
-    const venue = await VenueRepo.getVenue({ name_lower_case: lower_case_venue_name });
+    const [venue] = await VenueRepo.getVenues({ name_lower_case: lower_case_venue_name });
 
     if (!venue) {
       const venueId = new ObjectId();
