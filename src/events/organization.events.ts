@@ -15,6 +15,9 @@ import VenueSvc from "../services/venue.service";
 import { LookupFields } from "../types/common";
 import { sendTemplatedEmail } from "../utils/helpers";
 import { logger } from "../utils/logger";
+import { NotificationStatusType, TNotications } from "../models/notification.model";
+import NotificationSvc from "../services/notification.service";
+import { initializeFirebaseAdmin } from "../utils/firebase/firebase.admin";
 
 interface AuthenticatedSocket extends Socket {
   user?: any;
@@ -101,6 +104,7 @@ export default (io: Server) => {
         const recepient_first_name = isVenueOrAdminRole ? enquiry.user.first_name : enquiry.venue.user.first_name;
         const sender_first_name = isVenueOrAdminRole ? enquiry.venue.user.first_name : enquiry.user.first_name;
         const sender_email = isVenueOrAdminRole ? enquiry.venue.user.email : enquiry.user.email;
+        const receiver = await UserSvc.getUser({ email: recepient_email });
 
         logger.log({
           level: "info",
@@ -150,9 +154,47 @@ export default (io: Server) => {
           inbox: inbox?._id,
           room_id,
           sender: new ObjectId(socket.user._id as string),
+          receiver: receiver._id,
           content: message,
           attachments: attachmentIds,
         });
+
+        const firebaseAdmin = initializeFirebaseAdmin();
+
+        const pushNotification = {
+          notification: {
+            title: "New Inquiry",
+            body: "You have a new inquiry to review.",
+          },
+          data: {
+            type: "INQUIRY",
+            enquiryId: String(enquiry._id),
+          },
+          android: {
+            notification: {
+              sound: "default",
+            },
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: "default",
+              },
+            },
+          },
+          topic: String(receiver._id),
+        };
+
+        const notificationData: TNotications = {
+          sender: sender._id,
+          receiver: receiver._id,
+          metadata: { enquiry_id: enquiry._id },
+          title: pushNotification.notification.title,
+          body: pushNotification.notification.body,
+          status: NotificationStatusType.UNREAD,
+        };
+
+        await Promise.all([NotificationSvc.createNotification(notificationData), firebaseAdmin.messaging().send(pushNotification)]);
       }
     });
 
