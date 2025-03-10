@@ -38,6 +38,7 @@ import StripeAccountTransactionSvc from "./stripe-account-transaction.service";
 import UserSvc from "./user.service";
 import VenueSvc from "./venue.service";
 import VenueSubscriptionSvc from "./venue-subscription.service";
+import UserRepo from "../repositories/user.repository";
 
 export default class PaymentSvc {
   static createPayment(data: TPayment) {
@@ -321,7 +322,7 @@ export default class PaymentSvc {
     return results;
   }
 
-  static async processPaymentStatus(payload: any, tenant?: any) {
+  static async processPaymentStatus(payload: any, tenant?: any, userRole?: string) {
     const { payment_id, booking_id, status } = payload;
 
     let booking;
@@ -480,10 +481,14 @@ export default class PaymentSvc {
           },
           null,
         ),
-        BookingSvc.updateBooking(new ObjectId(booking_id), {
-          status: update_status === "PAID" ? booking_status.CONFIRMED : booking_status.PAYMENT_FAILED,
-          updatedAt: new Date(),
-        }),
+        BookingSvc.updateBooking(
+          new ObjectId(booking_id),
+          {
+            status: update_status === "PAID" ? booking_status.CONFIRMED : booking_status.PAYMENT_FAILED,
+            updatedAt: new Date(),
+          },
+          { tenant, customOfferId: payment?.custom_offer, enquiryData, userRole },
+        ),
       ]);
     }, useTransactionOptions);
     return { payment: true };
