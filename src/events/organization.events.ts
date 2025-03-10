@@ -102,18 +102,17 @@ export default (io: Server) => {
         const isVenueOrAdminRole = [user_role.VENUE_OWNER, user_role.ADMIN].includes(socket.user.role);
 
         const recepient_email = isVenueOrAdminRole ? enquiry.user.email : enquiry.venue.user.email;
-        const recepient_first_name = isVenueOrAdminRole ? enquiry.user.first_name : enquiry.venue.user.first_name;
-        const recipient_first_name = enquiry.user.first_name;
-        const recipient_last_name = enquiry.user.last_name;
-        const recipient_full_name = `${recipient_first_name} ${recipient_last_name}`;
+        const recipient_first_name = isVenueOrAdminRole ? enquiry.user.first_name : enquiry.venue.user.first_name;
         const receiver_id = isVenueOrAdminRole ? enquiry.user._id : enquiry.venue.user._id;
         const sender_first_name = isVenueOrAdminRole ? enquiry.venue.user.first_name : enquiry.user.first_name;
+        const sender_last_name = isVenueOrAdminRole ? enquiry.venue.user.last_name : enquiry.user.last_name;
+        const sender_full_name = `${sender_first_name} ${sender_last_name}`;
         const sender_email = isVenueOrAdminRole ? enquiry.venue.user.email : enquiry.user.email;
         const firebaseAdmin = initializeFirebaseAdmin();
 
         const pushNotification = {
           notification: {
-            title: recipient_full_name,
+            title: sender_full_name,
             body: message,
           },
           data: {
@@ -151,7 +150,7 @@ export default (io: Server) => {
           message: `PAYLOAD_EMIT_SEND_EMAIL_NOTIFICATION: ${JSON.stringify({
             subject: `Venue4Use - New Message Notification`,
             email_data: {
-              first_name: recepient_first_name.replace(/_/g, " "),
+              first_name: recipient_first_name.replace(/_/g, " "),
               sender_first_name: sender_first_name.replace(/_/g, " "),
               sender_email: sender_email.replace(/_/g, " "),
               email: recepient_email,
@@ -165,7 +164,7 @@ export default (io: Server) => {
         sendTemplatedEmail({
           subject: `${socket?.tenant?.config?.name} - New Message Notification`,
           email_data: {
-            first_name: recepient_first_name.replace(/_/g, " "),
+            first_name: recipient_first_name.replace(/_/g, " "),
             sender_first_name: sender_first_name.replace(/_/g, " "),
             sender_email: sender_email.replace(/_/g, " "),
             email: recepient_email,
