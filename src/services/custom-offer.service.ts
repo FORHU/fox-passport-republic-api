@@ -105,40 +105,40 @@ export default class CustomOfferSvc {
         user_recipient = await UserSvc.getUser({ _id: offer.enquiry.user });
 
         const sendUpdateEmail = (status: string) => {
-          // const statusTitle = offer_status_title[status as keyof typeof offer_status_title];
-          // const isVenueOrAdminRole = [user_role.VENUE_OWNER, user_role.ADMIN].includes(userRole);
+          const statusTitle = offer_status_title[status as keyof typeof offer_status_title];
+          const isVenueOrAdminRole = [user_role.VENUE_OWNER, user_role.ADMIN].includes(userRole);
 
-          // const receiverId = isVenueOrAdminRole ? enquiry.user._id : enquiry.venue.user._id;
-          // const senderUser = isVenueOrAdminRole ? enquiry.venue.user : enquiry.user;
-          // const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
-          // const senderId = senderUser._id;
+          const receiverId = isVenueOrAdminRole ? enquiry.user._id : enquiry.venue.user._id;
+          const senderUser = isVenueOrAdminRole ? enquiry.venue.user : enquiry.user;
+          const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
+          const senderId = senderUser._id;
 
-          // const participants = {
-          //   senderId,
-          //   receiverId,
-          //   userId: String(receiverId),
-          // };
+          const participants = {
+            senderId,
+            receiverId,
+            userId: String(receiverId),
+          };
 
-          // const metadata = {
-          //   key: metaDataKey.CUSTOM_OFFER_ID,
-          //   value: String(_id),
-          // };
+          const metadata = {
+            key: metaDataKey.CUSTOM_OFFER_ID,
+            value: String(_id),
+          };
 
-          // pushNotification(
-          //   {
-          //     title: statusTitle,
-          //     body: `You have received an update from ${sender_full_name}`,
-          //   },
-          //   {
-          //     type: NotificationType.CUSTOM_OFFER,
-          //     customOfferId: String(_id),
-          //     enquiryId: String(enquiry._id),
-          //   },
-          //   { notification: { sound: "default" } },
-          //   { payload: { aps: { sound: "default" } } },
-          //   participants,
-          //   metadata,
-          // );
+          pushNotification(
+            {
+              title: statusTitle,
+              body: `You have received an update from ${sender_full_name}`,
+            },
+            {
+              type: NotificationType.CUSTOM_OFFER,
+              customOfferId: String(_id),
+              enquiryId: String(enquiry._id),
+            },
+            { notification: { sound: "default" } },
+            { payload: { aps: { sound: "default" } } },
+            participants,
+            metadata,
+          );
 
           sendTemplatedEmail({
             subject: `Your Inquiry Status Update - Now ${status.replace(/_/g, " ")}`,
