@@ -7,12 +7,6 @@ interface DateRange {
   to?: string;
 }
 
-export enum offer_status_title {
-  OFFER_ACCEPTED = "Offer Accepted",
-  DECLINED = "Offer Declined",
-  CANCELLED = "Offer Cancelled",
-}
-
 export enum offer_status {
   OFFER_ACCEPTED = "OFFER_ACCEPTED",
   COMPLETED = "COMPLETED",
