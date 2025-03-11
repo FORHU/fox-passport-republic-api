@@ -73,8 +73,9 @@ export default class PaymentCtrl {
       level: "info",
       message: `[PAYMENT_STATUS]: PAYLOAD ${JSON.stringify(req.body)}`,
     });
+    const userRole = req.user.role;
     try {
-      const result = await PaymentSvc.processPaymentStatus(req.body, req?.tenant);
+      const result = await PaymentSvc.processPaymentStatus(req.body, req?.tenant, userRole);
       return handleResponse(res, result, "PAYMENT_STATUS");
     } catch (error) {
       console.log(error);

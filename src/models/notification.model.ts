@@ -7,7 +7,13 @@ export enum NotificationStatusType {
 
 export enum NotificationType {
   INQUIRY = "INQUIRY",
-  BOOKING = "BOOKING",
+  BOOKING_CONFIRMED = "BOOKING_CONFIRMED",
+  BOOKING_CANCELLED = "BOOKING_CANCELLED",
+}
+
+export enum metaDataKey {
+  ENQUIRY_ID = "enquiry_id",
+  BOOKING_ID = "booking_id",
 }
 export interface TNotications {
   _id?: ObjectId;

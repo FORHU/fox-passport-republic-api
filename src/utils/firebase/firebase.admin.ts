@@ -1,5 +1,8 @@
 import firebaseAdmin from "firebase-admin";
 import { FIREBASE_PRIVATE_KEY, FIREBASE_CLIENT_EMAIL, FIREBASE_PROJECT_ID } from "../../config";
+import { metaDataKey, NotificationStatusType, NotificationType, TNotications } from "../../models/notification.model";
+import { ObjectId } from "mongodb";
+import NotificationSvc from "../../services/notification.service";
 
 export function initializeFirebaseAdmin() {
   if (!firebaseAdmin.apps.length) {
@@ -13,3 +16,66 @@ export function initializeFirebaseAdmin() {
   }
   return firebaseAdmin;
 }
+
+type notification = {
+  title: string;
+  body: string;
+};
+
+type DataPayload = {
+  type: NotificationType;
+} & {
+  [key: string]: string;
+};
+
+type android = {
+  notification: {
+    sound: string;
+  };
+};
+
+type apns = {
+  payload: {
+    aps: {
+      sound: string;
+    };
+  };
+};
+
+export const pushNotification = async (
+  notification: notification,
+  data: DataPayload,
+  android: android,
+  apns: apns,
+  userId: string,
+  senderId: ObjectId,
+  receiverId: ObjectId,
+  metadataKey: metaDataKey,
+  metadataValue: string,
+) => {
+  try {
+    const firebaseAdmin = initializeFirebaseAdmin();
+    const pushNotification = {
+      notification: notification,
+      data: data,
+      android: android,
+      apns: apns,
+      topic: userId,
+    };
+
+    const notificationData: TNotications = {
+      sender: senderId,
+      receiver: receiverId,
+      metadata: { [metadataKey]: metadataValue },
+      title: pushNotification.notification.title,
+      body: pushNotification.notification.body,
+      status: NotificationStatusType.UNREAD,
+    };
+    console.log(pushNotification);
+    console.log(notificationData);
+    await Promise.all([NotificationSvc.createNotification(notificationData), firebaseAdmin.messaging().send(pushNotification)]);
+  } catch (error) {
+    console.log(error);
+    throw new Error(error);
+  }
+};

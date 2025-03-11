@@ -15,9 +15,8 @@ import VenueSvc from "../services/venue.service";
 import { LookupFields } from "../types/common";
 import { sendTemplatedEmail } from "../utils/helpers";
 import { logger } from "../utils/logger";
-import { NotificationStatusType, NotificationType, TNotications } from "../models/notification.model";
-import NotificationSvc from "../services/notification.service";
-import { initializeFirebaseAdmin } from "../utils/firebase/firebase.admin";
+import { metaDataKey, NotificationType } from "../models/notification.model";
+import { pushNotification } from "../utils/firebase/firebase.admin";
 
 interface AuthenticatedSocket extends Socket {
   user?: any;
@@ -103,47 +102,58 @@ export default (io: Server) => {
 
         const recepient_email = isVenueOrAdminRole ? enquiry.user.email : enquiry.venue.user.email;
         const recipient_first_name = isVenueOrAdminRole ? enquiry.user.first_name : enquiry.venue.user.first_name;
-        const receiver_id = isVenueOrAdminRole ? enquiry.user._id : enquiry.venue.user._id;
+        const receiverId = isVenueOrAdminRole ? enquiry.user._id : enquiry.venue.user._id;
         const sender_first_name = isVenueOrAdminRole ? enquiry.venue.user.first_name : enquiry.user.first_name;
         const sender_last_name = isVenueOrAdminRole ? enquiry.venue.user.last_name : enquiry.user.last_name;
         const sender_full_name = `${sender_first_name} ${sender_last_name}`;
+        const senderId = isVenueOrAdminRole ? enquiry.venue.user._id : enquiry.user._id;
         const sender_email = isVenueOrAdminRole ? enquiry.venue.user.email : enquiry.user.email;
-        const firebaseAdmin = initializeFirebaseAdmin();
 
-        const pushNotification = {
-          notification: {
-            title: sender_full_name,
-            body: message,
-          },
-          data: {
-            type: NotificationType.INQUIRY,
-            enquiryId: String(enquiry._id),
-          },
-          android: {
-            notification: {
-              sound: "default",
-            },
-          },
-          apns: {
-            payload: {
-              aps: {
-                sound: "default",
-              },
-            },
-          },
-          topic: String(receiver_id),
-        };
+        await pushNotification(
+          { title: sender_full_name, body: message },
+          { type: NotificationType.INQUIRY, enquiryId: String(enquiry._id) },
+          { notification: { sound: "default" } },
+          { payload: { aps: { sound: "default" } } },
+          String(receiverId),
+          senderId,
+          receiverId,
+          metaDataKey.ENQUIRY_ID,
+          String(enquiry._id),
+        );
+        // const pushNotification = {
+        //   notification: {
+        //     title: sender_full_name,
+        //     body: message,
+        //   },
+        //   data: {
+        //     type: NotificationType.INQUIRY,
+        //     enquiryId: String(enquiry._id),
+        //   },
+        //   android: {
+        //     notification: {
+        //       sound: "default",
+        //     },
+        //   },
+        //   apns: {
+        //     payload: {
+        //       aps: {
+        //         sound: "default",
+        //       },
+        //     },
+        //   },
+        //   topic: String(receiver_id),
+        // };
 
-        const notificationData: TNotications = {
-          sender: sender._id,
-          receiver: receiver_id,
-          metadata: { enquiry_id: enquiry._id },
-          title: pushNotification.notification.title,
-          body: pushNotification.notification.body,
-          status: NotificationStatusType.UNREAD,
-        };
+        // const notificationData: TNotications = {
+        //   sender: sender._id,
+        //   receiver: receiver_id,
+        //   metadata: { enquiry_id: enquiry._id },
+        //   title: pushNotification.notification.title,
+        //   body: pushNotification.notification.body,
+        //   status: NotificationStatusType.UNREAD,
+        // };
 
-        await Promise.all([NotificationSvc.createNotification(notificationData), firebaseAdmin.messaging().send(pushNotification)]);
+        // await Promise.all([NotificationSvc.createNotification(notificationData), firebaseAdmin.messaging().send(pushNotification)]);
 
         logger.log({
           level: "info",
@@ -193,7 +203,7 @@ export default (io: Server) => {
           inbox: inbox?._id,
           room_id,
           sender: new ObjectId(socket.user._id as string),
-          receiver: receiver_id,
+          receiver: receiverId,
           content: message,
           attachments: attachmentIds,
         });
