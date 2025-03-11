@@ -433,7 +433,12 @@ export default class BookingSvc {
     if (updateData.status === booking_status.CONFIRMED) {
       await pushNotification(
         { title: "Booking Confirmed", body: `Check out your new confirmed booking by ${sender_full_name}.` },
-        { type: NotificationType.BOOKING_CONFIRMED, customOfferId: String(customOfferId), enquiryId: String(enquiryData._id) },
+        {
+          type: NotificationType.BOOKING_CONFIRMED,
+          customOfferId: String(customOfferId),
+          enquiryId: String(enquiryData._id),
+          bookingid: String(booking_id),
+        },
         { notification: { sound: "default" } },
         { payload: { aps: { sound: "default" } } },
         participants,
@@ -444,7 +449,12 @@ export default class BookingSvc {
     if (updateData.status === booking_status.CANCELLED) {
       await pushNotification(
         { title: "Booking Cancelled", body: `A booking has been cancelled by ${sender_full_name}.` },
-        { type: NotificationType.BOOKING_CONFIRMED, customOfferId: String(customOfferId), enquiryId: String(enquiryData._id) },
+        {
+          type: NotificationType.BOOKING_CANCELLED,
+          customOfferId: String(customOfferId),
+          enquiryId: String(enquiryData._id),
+          bookingid: String(booking_id),
+        },
         { notification: { sound: "default" } },
         { payload: { aps: { sound: "default" } } },
         participants,
