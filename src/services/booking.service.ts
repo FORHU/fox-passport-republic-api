@@ -423,7 +423,7 @@ export default class BookingSvc {
     if (updateData.status === booking_status.CONFIRMED) {
       await pushNotification(
         { title: "Booking Confirmed", body: `Check out your new confirmed booking by ${sender_full_name}.` },
-        { type: NotificationType.BOOKING_CONFIRMED, customOfferId: String(customOfferId) },
+        { type: NotificationType.BOOKING_CONFIRMED, customOfferId: String(customOfferId), enquiryId: String(enquiryData._id) },
         { notification: { sound: "default" } },
         { payload: { aps: { sound: "default" } } },
         String(receiverId),
@@ -435,17 +435,17 @@ export default class BookingSvc {
     }
 
     if (updateData.status === booking_status.CANCELLED) {
-      // await pushNotification(
-      //   { title: "Booking Cancelled", body: `A booking has been cancelled by ${sender_full_name}.` },
-      //   { type: NotificationType.BOOKING_CANCELLED, customOfferId: String(customOfferId) },
-      //   { notification: { sound: "default" } },
-      //   { payload: { aps: { sound: "default" } } },
-      //   String(receiverId),
-      //   senderId,
-      //   receiverId,
-      //   metaDataKey.BOOKING_ID,
-      //   String(booking_id),
-      // );
+      await pushNotification(
+        { title: "Booking Cancelled", body: `A booking has been cancelled by ${sender_full_name}.` },
+        { type: NotificationType.BOOKING_CONFIRMED, customOfferId: String(customOfferId), enquiryId: String(enquiryData._id) },
+        { notification: { sound: "default" } },
+        { payload: { aps: { sound: "default" } } },
+        String(receiverId),
+        senderId,
+        receiverId,
+        metaDataKey.BOOKING_ID,
+        String(booking_id),
+      );
 
       const [customOfferData] = await CustomOfferRepo.getCustomOffer({ "booking._id": booking_id });
       const [venueData]: any = await VenueRepo.getPaginatedVenues({ _id: customOfferData.venue._id }, 0, 1);

@@ -71,8 +71,7 @@ export const pushNotification = async (
       body: pushNotification.notification.body,
       status: NotificationStatusType.UNREAD,
     };
-    console.log(pushNotification);
-    console.log(notificationData);
+
     await Promise.all([NotificationSvc.createNotification(notificationData), firebaseAdmin.messaging().send(pushNotification)]);
   } catch (error) {
     console.log(error);
