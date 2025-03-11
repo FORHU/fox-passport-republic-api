@@ -102,58 +102,33 @@ export default (io: Server) => {
 
         const recepient_email = isVenueOrAdminRole ? enquiry.user.email : enquiry.venue.user.email;
         const recipient_first_name = isVenueOrAdminRole ? enquiry.user.first_name : enquiry.venue.user.first_name;
-        const receiverId = isVenueOrAdminRole ? enquiry.user._id : enquiry.venue.user._id;
         const sender_first_name = isVenueOrAdminRole ? enquiry.venue.user.first_name : enquiry.user.first_name;
-        const sender_last_name = isVenueOrAdminRole ? enquiry.venue.user.last_name : enquiry.user.last_name;
-        const sender_full_name = `${sender_first_name} ${sender_last_name}`;
-        const senderId = isVenueOrAdminRole ? enquiry.venue.user._id : enquiry.user._id;
         const sender_email = isVenueOrAdminRole ? enquiry.venue.user.email : enquiry.user.email;
+
+        const receiverId = isVenueOrAdminRole ? enquiry.user._id : enquiry.venue.user._id;
+        const senderUser = isVenueOrAdminRole ? enquiry.venue.user : enquiry.user;
+        const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
+        const senderId = senderUser._id;
+
+        const participants = {
+          senderId,
+          receiverId,
+          userId: String(receiverId),
+        };
+
+        const metadata = {
+          key: metaDataKey.ENQUIRY_ID,
+          value: String(enquiry._id),
+        };
 
         await pushNotification(
           { title: sender_full_name, body: message },
           { type: NotificationType.INQUIRY, enquiryId: String(enquiry._id) },
           { notification: { sound: "default" } },
           { payload: { aps: { sound: "default" } } },
-          String(receiverId),
-          senderId,
-          receiverId,
-          metaDataKey.ENQUIRY_ID,
-          String(enquiry._id),
+          participants,
+          metadata,
         );
-        // const pushNotification = {
-        //   notification: {
-        //     title: sender_full_name,
-        //     body: message,
-        //   },
-        //   data: {
-        //     type: NotificationType.INQUIRY,
-        //     enquiryId: String(enquiry._id),
-        //   },
-        //   android: {
-        //     notification: {
-        //       sound: "default",
-        //     },
-        //   },
-        //   apns: {
-        //     payload: {
-        //       aps: {
-        //         sound: "default",
-        //       },
-        //     },
-        //   },
-        //   topic: String(receiver_id),
-        // };
-
-        // const notificationData: TNotications = {
-        //   sender: sender._id,
-        //   receiver: receiver_id,
-        //   metadata: { enquiry_id: enquiry._id },
-        //   title: pushNotification.notification.title,
-        //   body: pushNotification.notification.body,
-        //   status: NotificationStatusType.UNREAD,
-        // };
-
-        // await Promise.all([NotificationSvc.createNotification(notificationData), firebaseAdmin.messaging().send(pushNotification)]);
 
         logger.log({
           level: "info",
@@ -213,7 +188,7 @@ export default (io: Server) => {
     socket.on("generate_custom_offer", async (data: any) => {
       const { room_id, custom_offer_id, message } = data;
       const [customOffer]: any = await CustomOfferSvc.getCustomOffer({ _id: new ObjectId(custom_offer_id as string) });
-      const [enquiry]: any = await EnquirySvc.getEnquiry({ inbox: customOffer?.inbox });
+      const [enquiry] = await EnquirySvc.getEnquiries({ "inbox._id": customOffer.inbox }, 0, 1);
       const messagePayload: any = {
         inbox: customOffer?.inbox,
         key: "CUSTOM_OFFER_SENT",
@@ -249,6 +224,33 @@ export default (io: Server) => {
         createdAt: new Date().toISOString(),
       });
       await MessageSvc.createMessage(messagePayload);
+
+      const isVenueOrAdminRole = [user_role.VENUE_OWNER, user_role.ADMIN].includes(socket.user.role);
+
+      const receiverId = isVenueOrAdminRole ? enquiry.user._id : enquiry.venue.user._id;
+      const senderUser = isVenueOrAdminRole ? enquiry.venue.user : enquiry.user;
+      const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
+      const senderId = senderUser._id;
+
+      const participants = {
+        senderId,
+        receiverId,
+        userId: String(receiverId),
+      };
+
+      const metadata = {
+        key: metaDataKey.CUSTOM_OFFER_ID,
+        value: String(custom_offer_id),
+      };
+
+      await pushNotification(
+        { title: "Custom Offer Received", body: `You have received a custom offer from ${sender_full_name}` },
+        { type: NotificationType.CUSTOM_OFFER, customOfferId: String(custom_offer_id), enquiryId: String(enquiry._id) },
+        { notification: { sound: "default" } },
+        { payload: { aps: { sound: "default" } } },
+        participants,
+        metadata,
+      );
     });
 
     socket.on("custom_offer_status", async (data: any) => {
