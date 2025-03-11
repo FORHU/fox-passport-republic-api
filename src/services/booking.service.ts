@@ -415,10 +415,20 @@ export default class BookingSvc {
     const { tenant, customOfferId, enquiryData, userRole } = options;
     const isVenueOrAdminRole = [user_role.VENUE_OWNER, user_role.ADMIN].includes(userRole);
     const receiverId = isVenueOrAdminRole ? enquiryData.user._id : enquiryData.venue.user._id;
-    const senderId = isVenueOrAdminRole ? enquiryData.venue.user._id : enquiryData.user._id;
-    const sender_first_name = isVenueOrAdminRole ? enquiryData.venue.user.first_name : enquiryData.user.first_name;
-    const sender_last_name = isVenueOrAdminRole ? enquiryData.venue.user.last_name : enquiryData.user.last_name;
-    const sender_full_name = `${sender_first_name} ${sender_last_name}`;
+    const senderUser = isVenueOrAdminRole ? enquiryData.venue.user : enquiryData.user;
+    const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
+    const senderId = senderUser._id;
+
+    const participants = {
+      senderId,
+      receiverId,
+      userId: String(receiverId),
+    };
+
+    const metadata = {
+      key: metaDataKey.BOOKING_ID,
+      value: String(booking_id),
+    };
 
     if (updateData.status === booking_status.CONFIRMED) {
       await pushNotification(
@@ -426,11 +436,8 @@ export default class BookingSvc {
         { type: NotificationType.BOOKING_CONFIRMED, customOfferId: String(customOfferId), enquiryId: String(enquiryData._id) },
         { notification: { sound: "default" } },
         { payload: { aps: { sound: "default" } } },
-        String(receiverId),
-        senderId,
-        receiverId,
-        metaDataKey.BOOKING_ID,
-        String(booking_id),
+        participants,
+        metadata,
       );
     }
 
@@ -440,11 +447,8 @@ export default class BookingSvc {
         { type: NotificationType.BOOKING_CONFIRMED, customOfferId: String(customOfferId), enquiryId: String(enquiryData._id) },
         { notification: { sound: "default" } },
         { payload: { aps: { sound: "default" } } },
-        String(receiverId),
-        senderId,
-        receiverId,
-        metaDataKey.BOOKING_ID,
-        String(booking_id),
+        participants,
+        metadata,
       );
 
       const [customOfferData] = await CustomOfferRepo.getCustomOffer({ "booking._id": booking_id });
