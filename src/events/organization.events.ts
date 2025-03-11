@@ -256,6 +256,34 @@ export default (io: Server) => {
     socket.on("custom_offer_status", async (data: any) => {
       const { room_id, custom_offer_id, message = null, key } = data;
       const [customOffer]: any = await CustomOfferSvc.getCustomOffer({ _id: new ObjectId(custom_offer_id as string) });
+      const [enquiry] = await EnquirySvc.getEnquiries({ "inbox._id": customOffer.inbox }, 0, 1);
+
+      const isVenueOrAdminRole = [user_role.VENUE_OWNER, user_role.ADMIN].includes(socket.user.role);
+      const receiverId = isVenueOrAdminRole ? enquiry.user._id : enquiry.venue.user._id;
+      const senderUser = isVenueOrAdminRole ? enquiry.venue.user : enquiry.user;
+      const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
+      const senderId = senderUser._id;
+
+      const participants = {
+        senderId,
+        receiverId,
+        userId: String(receiverId),
+      };
+
+      const metadata = {
+        key: metaDataKey.CUSTOM_OFFER_ID,
+        value: String(custom_offer_id),
+      };
+
+      await pushNotification(
+        { title: "Custom Offer Updated", body: `You're custom offer was updated by ${sender_full_name}` },
+        { type: NotificationType.CUSTOM_OFFER, customOfferId: String(custom_offer_id), enquiryId: String(enquiry._id) },
+        { notification: { sound: "default" } },
+        { payload: { aps: { sound: "default" } } },
+        participants,
+        metadata,
+      );
+
       const messagePayload: any = {
         inbox: customOffer?.inbox,
         key,
