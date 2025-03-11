@@ -9,11 +9,13 @@ export enum NotificationType {
   INQUIRY = "INQUIRY",
   BOOKING_CONFIRMED = "BOOKING_CONFIRMED",
   BOOKING_CANCELLED = "BOOKING_CANCELLED",
+  CUSTOM_OFFER = "CUSTOM_OFFER",
 }
 
 export enum metaDataKey {
   ENQUIRY_ID = "enquiry_id",
   BOOKING_ID = "booking_id",
+  CUSTOM_OFFER_ID = "custom_offer_id"
 }
 export interface TNotications {
   _id?: ObjectId;

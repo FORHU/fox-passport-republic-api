@@ -2,7 +2,7 @@ import { ObjectId } from "mongodb";
 
 import { booking_status } from "../models/booking.model";
 import { CounterType } from "../models/counter.model";
-import { offer_status } from "../models/custom-offer.model";
+import { offer_status, offer_status_title } from "../models/custom-offer.model";
 import { enquiry_status } from "../models/enquiries.model";
 import { RequestStatus, RequestType } from "../models/requests.model";
 import CustomOfferRepo from "../repositories/custom-offer.repository";
@@ -19,6 +19,9 @@ import StripeAccountSvc from "./stripe-account.service";
 import StripeAccountTransactionSvc from "./stripe-account-transaction.service";
 import StripeCustomerSvc from "./stripe-customer.service";
 import UserSvc from "./user.service";
+import { user_role } from "../models/user.model";
+import { pushNotification } from "../utils/firebase/firebase.admin";
+import { metaDataKey, NotificationType } from "../models/notification.model";
 
 export default class CustomOfferSvc {
   static async createCustomOffer(payload: any, enquiry: any, user: any, tenant?: any) {
@@ -92,15 +95,51 @@ export default class CustomOfferSvc {
     }
   }
 
-  static async updateCustomOffer(_id: ObjectId, data: any, offer: any, tenant?: any) {
+  static async updateCustomOffer(_id: ObjectId, data: any, offer: any, tenant?: any, userRole?: any) {
     try {
       let user_recipient: any = null;
       const updatedOffer = await CustomOfferRepo.updateCustomOffer(_id, data);
+      const [enquiry] = await EnquirySvc.getEnquiries({ "inbox._id": offer.inbox }, 0, 1);
 
       if (offer) {
         user_recipient = await UserSvc.getUser({ _id: offer.enquiry.user });
 
         const sendUpdateEmail = (status: string) => {
+          // const statusTitle = offer_status_title[status as keyof typeof offer_status_title];
+          // const isVenueOrAdminRole = [user_role.VENUE_OWNER, user_role.ADMIN].includes(userRole);
+
+          // const receiverId = isVenueOrAdminRole ? enquiry.user._id : enquiry.venue.user._id;
+          // const senderUser = isVenueOrAdminRole ? enquiry.venue.user : enquiry.user;
+          // const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
+          // const senderId = senderUser._id;
+
+          // const participants = {
+          //   senderId,
+          //   receiverId,
+          //   userId: String(receiverId),
+          // };
+
+          // const metadata = {
+          //   key: metaDataKey.CUSTOM_OFFER_ID,
+          //   value: String(_id),
+          // };
+
+          // pushNotification(
+          //   {
+          //     title: statusTitle,
+          //     body: `You have received an update from ${sender_full_name}`,
+          //   },
+          //   {
+          //     type: NotificationType.CUSTOM_OFFER,
+          //     customOfferId: String(_id),
+          //     enquiryId: String(enquiry._id),
+          //   },
+          //   { notification: { sound: "default" } },
+          //   { payload: { aps: { sound: "default" } } },
+          //   participants,
+          //   metadata,
+          // );
+
           sendTemplatedEmail({
             subject: `Your Inquiry Status Update - Now ${status.replace(/_/g, " ")}`,
             email_data: {

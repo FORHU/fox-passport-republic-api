@@ -42,33 +42,42 @@ type apns = {
   };
 };
 
+type NotificationParticipants = {
+  senderId: ObjectId;
+  receiverId: ObjectId;
+  userId: string;
+};
+
+type NotificationMetadata = {
+  key: metaDataKey;
+  value: string;
+};
+
 export const pushNotification = async (
   notification: notification,
   data: DataPayload,
   android: android,
   apns: apns,
-  userId: string,
-  senderId: ObjectId,
-  receiverId: ObjectId,
-  metadataKey: metaDataKey,
-  metadataValue: string,
+  participants: NotificationParticipants,
+  metadata: NotificationMetadata,
 ) => {
   try {
     const firebaseAdmin = initializeFirebaseAdmin();
+
     const pushNotification = {
-      notification: notification,
-      data: data,
-      android: android,
-      apns: apns,
-      topic: userId,
+      notification,
+      data,
+      android,
+      apns,
+      topic: participants.userId,
     };
 
     const notificationData: TNotications = {
-      sender: senderId,
-      receiver: receiverId,
-      metadata: { [metadataKey]: metadataValue },
-      title: pushNotification.notification.title,
-      body: pushNotification.notification.body,
+      sender: participants.senderId,
+      receiver: participants.receiverId,
+      metadata: { [metadata.key]: metadata.value },
+      title: notification.title,
+      body: notification.body,
       status: NotificationStatusType.UNREAD,
     };
 
@@ -78,3 +87,40 @@ export const pushNotification = async (
     throw new Error(error);
   }
 };
+
+// export const pushNotification = async (
+//   notification: notification,
+//   data: DataPayload,
+//   android: android,
+//   apns: apns,
+//   userId: string,
+//   senderId: ObjectId,
+//   receiverId: ObjectId,
+//   metadataKey: metaDataKey,
+//   metadataValue: string,
+// ) => {
+//   try {
+//     const firebaseAdmin = initializeFirebaseAdmin();
+
+//     const pushNotification = {
+//       notification: notification,
+//       data: data,
+//       android: android,
+//       apns: apns,
+//       topic: userId,
+//     };
+
+//     const notificationData: TNotications = {
+//       sender: senderId,
+//       receiver: receiverId,
+//       metadata: { [metadataKey]: metadataValue },
+//       title: pushNotification.notification.title,
+//       body: pushNotification.notification.body,
+//       status: NotificationStatusType.UNREAD,
+//     };
+
+//     await Promise.all([NotificationSvc.createNotification(notificationData), firebaseAdmin.messaging().send(pushNotification)]);
+//   } catch (error) {
+//     console.log(error);
+//     throw new Error(error);
+//   }
