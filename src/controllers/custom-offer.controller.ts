@@ -66,6 +66,7 @@ export default class CustomOfferCtrl {
     try {
       const { date, guests, venue_computation, user_computation, agree_to_terms, message_to_owner, currency, status } = req.body;
       const custom_offer_id = new ObjectId(req.params.id);
+      const userRole = req?.user?.role;
 
       const { error } = validateUpdateCOSchema(req.body);
       if (error) {
@@ -93,7 +94,7 @@ export default class CustomOfferCtrl {
         updatedAt: new Date(),
       };
 
-      const updatedOffer = await CustomOfferSvc.updateCustomOffer(custom_offer_id, updatedOfferData, offer);
+      const updatedOffer = await CustomOfferSvc.updateCustomOffer(custom_offer_id, updatedOfferData, offer, userRole);
       return handleResponse(res, updatedOffer, "CUSTOM_OFFER_UPDATED");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "CUSTOM_OFFER_UPDATE_FAILED" });
