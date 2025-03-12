@@ -264,25 +264,29 @@ export default (io: Server) => {
       const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
       const senderId = senderUser._id;
 
-      const participants = {
-        senderId,
-        receiverId,
-        userId: String(receiverId),
-      };
+      const excludedKeys = ["CANCELLED", "DECLINED"];
 
-      const metadata = {
-        key: metaDataKey.CUSTOM_OFFER_ID,
-        value: String(custom_offer_id),
-      };
+      if (!excludedKeys.includes(key)) {
+        const participants = {
+          senderId,
+          receiverId,
+          userId: String(receiverId),
+        };
 
-      await pushNotification(
-        { title: "Custom Offer Updated", body: `You're custom offer was updated by ${sender_full_name}` },
-        { type: NotificationType.CUSTOM_OFFER, customOfferId: String(custom_offer_id), enquiryId: String(enquiry._id) },
-        { notification: { sound: "default" } },
-        { payload: { aps: { sound: "default" } } },
-        participants,
-        metadata,
-      );
+        const metadata = {
+          key: metaDataKey.CUSTOM_OFFER_ID,
+          value: String(custom_offer_id),
+        };
+
+        await pushNotification(
+          { title: "Custom Offer Updated", body: `You're custom offer was updated by ${sender_full_name}` },
+          { type: NotificationType.CUSTOM_OFFER, customOfferId: String(custom_offer_id), enquiryId: String(enquiry._id) },
+          { notification: { sound: "default" } },
+          { payload: { aps: { sound: "default" } } },
+          participants,
+          metadata,
+        );
+      }
 
       const messagePayload: any = {
         inbox: customOffer?.inbox,
