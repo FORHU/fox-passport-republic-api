@@ -264,7 +264,7 @@ export default (io: Server) => {
       const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
       const senderId = senderUser._id;
 
-      const excludedKeys = ["CANCELLED", "DECLINED"];
+      const excludedKeys = ["CANCELLED", "DECLINED", "BOOKING_CONFIRMED"];
 
       if (!excludedKeys.includes(key)) {
         const participants = {
