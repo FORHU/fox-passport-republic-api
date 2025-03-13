@@ -12,11 +12,12 @@ export default class VenueRepo {
     return getDB().collection("venues");
   }
 
-  static async getVenue(query: any, project?: Record<string, number>) {
+  static async getVenues(query: any, project?: Record<string, number>) {
     const pipeline = [];
 
+    pipeline.push({ $match: query });
+
     pipeline.push(
-      { $match: query },
       {
         $lookup: {
           from: "keywords",
@@ -34,30 +35,10 @@ export default class VenueRepo {
           as: "user",
         },
       },
-      { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
-    );
-
-    if (project) {
-      pipeline.push({ $project: project });
-    }
-
-    const [result] = await this.collection().aggregate(pipeline).toArray();
-    return result;
-  }
-
-  static async getVenues(query: any, project?: Record<string, number>) {
-    const pipeline = [];
-
-    pipeline.push({ $match: query });
-
-    pipeline.push({
-      $lookup: {
-        from: "keywords",
-        localField: "keywords",
-        foreignField: "_id",
-        as: "keywords",
+      {
+        $set: { user: { $first: "$user" } },
       },
-    });
+    );
 
     if (project) {
       pipeline.push({ $project: project });

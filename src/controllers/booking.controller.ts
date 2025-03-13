@@ -22,6 +22,7 @@ import {
 import { dateFormat } from "../utils/helpers";
 import { logger } from "../utils/logger";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
+import EnquirySvc from "../services/enquiries.service";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -281,6 +282,10 @@ export default class BookingCtrl {
         return handleErrorResponse(res, "CANCELLATION_POLICY_NOT_FOUND", { code: "CANCELLATION_POLICY_NOT_FOUND" });
       }
 
+      const [existingEnquiry] = await EnquirySvc.getEnquiries({ "inbox._id": existingCustomOffer.inbox }, 0, 1);
+      if (!existingBooking) {
+        return handleErrorResponse(res, "ENQUIRY_NOR_FOUND", { code: "ENQUIRY_NOR_FOUND" });
+      }
       const result = await BookingSvc.processBookingCancellation(
         booking_id,
         req.body,
@@ -288,6 +293,7 @@ export default class BookingCtrl {
         cancellation_policy,
         existingBooking,
         existingCustomOffer,
+        existingEnquiry,
         req?.tenant,
       );
       // const result = await BookingSvc.updateBooking(booking_id, updatedData);

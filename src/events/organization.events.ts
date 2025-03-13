@@ -15,6 +15,8 @@ import VenueSvc from "../services/venue.service";
 import { LookupFields } from "../types/common";
 import { sendTemplatedEmail } from "../utils/helpers";
 import { logger } from "../utils/logger";
+import { metaDataKey, NotificationType } from "../models/notification.model";
+import { pushNotification } from "../utils/firebase/firebase.admin";
 
 interface AuthenticatedSocket extends Socket {
   user?: any;
@@ -87,6 +89,7 @@ export default (io: Server) => {
         });
         //save message by room_id
         const inbox: any = await InboxSvc.getInbox({ room_id });
+
         let enquiry = null;
         if (IS_ENQUIRY_MICROSERVICES) {
           const { enquiries } = await EnquirySvc.getEnquiriesFromMicroservice({ inbox_id: inbox._id });
@@ -98,16 +101,41 @@ export default (io: Server) => {
         const isVenueOrAdminRole = [user_role.VENUE_OWNER, user_role.ADMIN].includes(socket.user.role);
 
         const recepient_email = isVenueOrAdminRole ? enquiry.user.email : enquiry.venue.user.email;
-        const recepient_first_name = isVenueOrAdminRole ? enquiry.user.first_name : enquiry.venue.user.first_name;
+        const recipient_first_name = isVenueOrAdminRole ? enquiry.user.first_name : enquiry.venue.user.first_name;
         const sender_first_name = isVenueOrAdminRole ? enquiry.venue.user.first_name : enquiry.user.first_name;
         const sender_email = isVenueOrAdminRole ? enquiry.venue.user.email : enquiry.user.email;
+
+        const receiverId = isVenueOrAdminRole ? enquiry.user._id : enquiry.venue.user._id;
+        const senderUser = isVenueOrAdminRole ? enquiry.venue.user : enquiry.user;
+        const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
+        const senderId = senderUser._id;
+
+        const participants = {
+          senderId,
+          receiverId,
+          userId: String(receiverId),
+        };
+
+        const metadata = {
+          key: metaDataKey.ENQUIRY_ID,
+          value: String(enquiry._id),
+        };
+
+        await pushNotification(
+          { title: sender_full_name, body: message },
+          { type: NotificationType.INQUIRY, enquiryId: String(enquiry._id) },
+          { notification: { sound: "default" } },
+          { payload: { aps: { sound: "default" } } },
+          participants,
+          metadata,
+        );
 
         logger.log({
           level: "info",
           message: `PAYLOAD_EMIT_SEND_EMAIL_NOTIFICATION: ${JSON.stringify({
             subject: `Venue4Use - New Message Notification`,
             email_data: {
-              first_name: recepient_first_name.replace(/_/g, " "),
+              first_name: recipient_first_name.replace(/_/g, " "),
               sender_first_name: sender_first_name.replace(/_/g, " "),
               sender_email: sender_email.replace(/_/g, " "),
               email: recepient_email,
@@ -121,7 +149,7 @@ export default (io: Server) => {
         sendTemplatedEmail({
           subject: `${socket?.tenant?.config?.name} - New Message Notification`,
           email_data: {
-            first_name: recepient_first_name.replace(/_/g, " "),
+            first_name: recipient_first_name.replace(/_/g, " "),
             sender_first_name: sender_first_name.replace(/_/g, " "),
             sender_email: sender_email.replace(/_/g, " "),
             email: recepient_email,
@@ -150,6 +178,7 @@ export default (io: Server) => {
           inbox: inbox?._id,
           room_id,
           sender: new ObjectId(socket.user._id as string),
+          receiver: receiverId,
           content: message,
           attachments: attachmentIds,
         });
@@ -159,7 +188,7 @@ export default (io: Server) => {
     socket.on("generate_custom_offer", async (data: any) => {
       const { room_id, custom_offer_id, message } = data;
       const [customOffer]: any = await CustomOfferSvc.getCustomOffer({ _id: new ObjectId(custom_offer_id as string) });
-      const [enquiry]: any = await EnquirySvc.getEnquiry({ inbox: customOffer?.inbox });
+      const [enquiry] = await EnquirySvc.getEnquiries({ "inbox._id": customOffer.inbox }, 0, 1);
       const messagePayload: any = {
         inbox: customOffer?.inbox,
         key: "CUSTOM_OFFER_SENT",
@@ -195,11 +224,70 @@ export default (io: Server) => {
         createdAt: new Date().toISOString(),
       });
       await MessageSvc.createMessage(messagePayload);
+
+      const isVenueOrAdminRole = [user_role.VENUE_OWNER, user_role.ADMIN].includes(socket.user.role);
+
+      const receiverId = isVenueOrAdminRole ? enquiry.user._id : enquiry.venue.user._id;
+      const senderUser = isVenueOrAdminRole ? enquiry.venue.user : enquiry.user;
+      const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
+      const senderId = senderUser._id;
+
+      const participants = {
+        senderId,
+        receiverId,
+        userId: String(receiverId),
+      };
+
+      const metadata = {
+        key: metaDataKey.CUSTOM_OFFER_ID,
+        value: String(custom_offer_id),
+      };
+
+      await pushNotification(
+        { title: "Custom Offer Received", body: `You have received a custom offer from ${sender_full_name}` },
+        { type: NotificationType.CUSTOM_OFFER, customOfferId: String(custom_offer_id), enquiryId: String(enquiry._id) },
+        { notification: { sound: "default" } },
+        { payload: { aps: { sound: "default" } } },
+        participants,
+        metadata,
+      );
     });
 
     socket.on("custom_offer_status", async (data: any) => {
       const { room_id, custom_offer_id, message = null, key } = data;
       const [customOffer]: any = await CustomOfferSvc.getCustomOffer({ _id: new ObjectId(custom_offer_id as string) });
+      const [enquiry] = await EnquirySvc.getEnquiries({ "inbox._id": customOffer.inbox }, 0, 1);
+
+      const isVenueOrAdminRole = [user_role.VENUE_OWNER, user_role.ADMIN].includes(socket.user.role);
+      const receiverId = isVenueOrAdminRole ? enquiry.user._id : enquiry.venue.user._id;
+      const senderUser = isVenueOrAdminRole ? enquiry.venue.user : enquiry.user;
+      const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
+      const senderId = senderUser._id;
+
+      const excludedKeys = ["CANCELLED", "DECLINED", "BOOKING_CONFIRMED"];
+
+      if (!excludedKeys.includes(key)) {
+        const participants = {
+          senderId,
+          receiverId,
+          userId: String(receiverId),
+        };
+
+        const metadata = {
+          key: metaDataKey.CUSTOM_OFFER_ID,
+          value: String(custom_offer_id),
+        };
+
+        await pushNotification(
+          { title: "Custom Offer Updated", body: `You're custom offer was updated by ${sender_full_name}` },
+          { type: NotificationType.CUSTOM_OFFER, customOfferId: String(custom_offer_id), enquiryId: String(enquiry._id) },
+          { notification: { sound: "default" } },
+          { payload: { aps: { sound: "default" } } },
+          participants,
+          metadata,
+        );
+      }
+
       const messagePayload: any = {
         inbox: customOffer?.inbox,
         key,

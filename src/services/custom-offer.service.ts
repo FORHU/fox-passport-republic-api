@@ -19,6 +19,9 @@ import StripeAccountSvc from "./stripe-account.service";
 import StripeAccountTransactionSvc from "./stripe-account-transaction.service";
 import StripeCustomerSvc from "./stripe-customer.service";
 import UserSvc from "./user.service";
+import { user_role } from "../models/user.model";
+import { pushNotification } from "../utils/firebase/firebase.admin";
+import { metaDataKey, NotificationType } from "../models/notification.model";
 
 export default class CustomOfferSvc {
   static async createCustomOffer(payload: any, enquiry: any, user: any, tenant?: any) {
@@ -92,15 +95,50 @@ export default class CustomOfferSvc {
     }
   }
 
-  static async updateCustomOffer(_id: ObjectId, data: any, offer: any, tenant?: any) {
+  static async updateCustomOffer(_id: ObjectId, data: any, offer: any, tenant?: any, userRole?: any) {
     try {
       let user_recipient: any = null;
       const updatedOffer = await CustomOfferRepo.updateCustomOffer(_id, data);
+      const [enquiry] = await EnquirySvc.getEnquiries({ "inbox._id": offer.inbox }, 0, 1);
 
       if (offer) {
         user_recipient = await UserSvc.getUser({ _id: offer.enquiry.user });
-
         const sendUpdateEmail = (status: string) => {
+          if (status === "DECLINED") {
+            const isVenueOrAdminRole = [user_role.VENUE_OWNER, user_role.ADMIN].includes(userRole);
+            const receiverId = isVenueOrAdminRole ? enquiry.user._id : enquiry.venue.user._id;
+            const senderUser = isVenueOrAdminRole ? enquiry.venue.user : enquiry.user;
+            const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
+            const senderId = senderUser._id;
+
+            const participants = {
+              senderId,
+              receiverId,
+              userId: String(receiverId),
+            };
+
+            const metadata = {
+              key: metaDataKey.CUSTOM_OFFER_ID,
+              value: String(_id),
+            };
+
+            pushNotification(
+              {
+                title: "Custom Offer Declined",
+                body: `You have received an update from ${sender_full_name}`,
+              },
+              {
+                type: NotificationType.CUSTOM_OFFER,
+                customOfferId: String(_id),
+                enquiryId: String(enquiry._id),
+              },
+              { notification: { sound: "default" } },
+              { payload: { aps: { sound: "default" } } },
+              participants,
+              metadata,
+            );
+          }
+
           sendTemplatedEmail({
             subject: `Your Inquiry Status Update - Now ${status.replace(/_/g, " ")}`,
             email_data: {
@@ -116,25 +154,20 @@ export default class CustomOfferSvc {
             tenant: tenant?.config?.name,
           });
         };
-
         switch (data.status) {
           case "OFFER_ACCEPTED":
             sendUpdateEmail(enquiry_status.OFFER_ACCEPTED);
             break;
-
           case "DECLINED":
             sendUpdateEmail(enquiry_status.DECLINED);
             break;
-
           case "CANCELLED":
             sendUpdateEmail(enquiry_status.CANCELLED);
             break;
-
           default:
             break;
         }
       }
-
       return updatedOffer;
     } catch (error) {
       throw new Error("Failed to update custom offer");

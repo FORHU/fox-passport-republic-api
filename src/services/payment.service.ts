@@ -38,6 +38,7 @@ import StripeAccountTransactionSvc from "./stripe-account-transaction.service";
 import UserSvc from "./user.service";
 import VenueSvc from "./venue.service";
 import VenueSubscriptionSvc from "./venue-subscription.service";
+import UserRepo from "../repositories/user.repository";
 
 export default class PaymentSvc {
   static createPayment(data: TPayment) {
@@ -214,46 +215,48 @@ export default class PaymentSvc {
     const dayOfWeek = startDate.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase();
     const timeDifference = endDate.getTime() - startDate.getTime();
     const hours = timeDifference / (1000 * 60 * 60);
+
     let totalPrice = 0;
     let cleaningFee = 0;
     let computationUsed = "";
     let type = "HIRE_FEE";
     let duration = "";
     let base_rate = "";
+    let fullDayDuration = 12;
+    let dayPricing: any;
 
     if (pricing.selected_pricing === "HIRE_FEE") {
       if (pricing.cleaning_fee) cleaningFee = Number(pricing.cleaning_fee);
-      const dayPricing = pricing.hire_fee.days.find((day: any) => day.name === dayOfWeek);
+      dayPricing = pricing.hire_fee.days.find((day: any) => day.name === dayOfWeek);
 
-      let fullDayDuration = 12;
-      if (dayPricing.full_day_hours) {
+      if (dayPricing?.full_day_hours) {
         fullDayDuration = Number(dayPricing.full_day_hours);
       }
 
-      if (dayPricing && dayPricing.hourlyCheckBox) {
-        totalPrice = hours * Number(dayPricing.slots.rate);
+      if (dayPricing && dayPricing?.hourlyCheckBox) {
+        totalPrice = hours * Number(dayPricing.slots.rate) || 0;
         computationUsed = "PER_HOUR";
         base_rate = dayPricing.slots.rate.toString();
       }
 
-      if (dayPricing && dayPricing.full_day_rate && dayPricing.fullRateCheckkBox) {
-        totalPrice = Number(dayPricing.full_day_rate);
+      if (dayPricing && dayPricing?.full_day_rate && dayPricing?.fullRateCheckkBox) {
+        totalPrice = Number(dayPricing.full_day_rate) || 0;
         computationUsed = "PER_DAY";
         base_rate = dayPricing.full_day_rate.toString();
       }
 
-      if (dayPricing && dayPricing.full_day_rate && dayPricing.hourlyCheckBox && hours < fullDayDuration) {
-        totalPrice = hours * Number(dayPricing.slots.rate);
+      if (dayPricing && dayPricing?.full_day_rate && dayPricing?.hourlyCheckBox && hours < fullDayDuration) {
+        totalPrice = hours * Number(dayPricing.slots.rate) || 0;
         computationUsed = "PER_HOUR";
         base_rate = dayPricing.slots.rate.toString();
       }
 
-      if (dayPricing && dayPricing.full_day_rate && dayPricing.hourlyCheckBox && hours >= fullDayDuration) {
-        totalPrice = Number(dayPricing.full_day_rate);
+      if (dayPricing && dayPricing?.full_day_rate && dayPricing?.hourlyCheckBox && hours >= fullDayDuration) {
+        totalPrice = Number(dayPricing.full_day_rate) || 0;
         computationUsed = "PER_DAY";
         base_rate = dayPricing.full_day_rate.toString();
       }
-    } else if (pricing.selected_pricing === "CUSTOM_PRICE") {
+    } else if (pricing?.selected_pricing === "CUSTOM_PRICE") {
       const priceDetails = pricing.custom_price.prices.filter((price: any) => {
         return price.weekdays.includes(dayOfWeek);
       });
@@ -288,22 +291,22 @@ export default class PaymentSvc {
     }
 
     const userRoleComputed = {
-      base_rate: base_rate,
-      subtotal: totalPrice.toFixed(2),
+      base_rate: dayPricing ? base_rate : "0",
+      subtotal: dayPricing ? totalPrice.toFixed(2) : "0",
       rebate: platform_fee,
-      grand_total: (totalPrice + cleaningFee - totalPrice * platform_fee).toFixed(2),
+      grand_total: dayPricing ? (totalPrice + cleaningFee - totalPrice * platform_fee).toFixed(2) : "0",
       cleaning_fee: cleaningFee,
     };
 
     const venueRoleComputation = {
-      base_rate: base_rate,
-      subtotal: totalPrice.toFixed(2),
+      base_rate: dayPricing ? base_rate : "0",
+      subtotal: dayPricing ? totalPrice.toFixed(2) : "0",
       commission_fee,
-      grand_total: (totalPrice + cleaningFee - totalPrice * commission_fee).toFixed(2),
+      grand_total: dayPricing ? (totalPrice + cleaningFee - totalPrice * commission_fee).toFixed(2) : "0",
       cleaning_fee: cleaningFee,
     };
 
-    const results = {
+    const results: any = {
       date,
       from: time_start,
       to: time_end,
@@ -318,10 +321,14 @@ export default class PaymentSvc {
       ...(type !== "HIRE_FEE" && { duration }),
     };
 
+    if (!dayPricing) {
+      results.message = "Space is not open during this date";
+    }
+
     return results;
   }
 
-  static async processPaymentStatus(payload: any, tenant?: any) {
+  static async processPaymentStatus(payload: any, tenant?: any, userRole?: string) {
     const { payment_id, booking_id, status } = payload;
 
     let booking;
@@ -480,10 +487,14 @@ export default class PaymentSvc {
           },
           null,
         ),
-        BookingSvc.updateBooking(new ObjectId(booking_id), {
-          status: update_status === "PAID" ? booking_status.CONFIRMED : booking_status.PAYMENT_FAILED,
-          updatedAt: new Date(),
-        }),
+        BookingSvc.updateBooking(
+          new ObjectId(booking_id),
+          {
+            status: update_status === "PAID" ? booking_status.CONFIRMED : booking_status.PAYMENT_FAILED,
+            updatedAt: new Date(),
+          },
+          { tenant, customOfferId: payment?.custom_offer, enquiryData, userRole },
+        ),
       ]);
     }, useTransactionOptions);
     return { payment: true };

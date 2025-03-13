@@ -35,6 +35,16 @@ import {
 import EnquirySvc from "./enquiries.service";
 import PaymentSvc from "./payment.service";
 import PricingSvc from "./pricing.service";
+import { metaDataKey, NotificationStatusType, NotificationType, TNotications } from "../models/notification.model";
+import { pushNotification } from "../utils/firebase/firebase.admin";
+
+type UpdateBookingOptions = {
+  tenant?: any;
+  customOfferId?: ObjectId;
+  enquiryData?: any;
+  userRole?: any;
+  bookingData?: any;
+};
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -398,11 +408,59 @@ export default class BookingSvc {
     return { message: "BOOKING_UPDATED", data: updateResult };
   }
 
-  static async updateBooking(booking_id: ObjectId, updateData: any, tenant?: any) {
+  static async updateBooking(booking_id: ObjectId, updateData: any, options: UpdateBookingOptions = {}) {
     if (IS_BOOKING_MICROSERVICES) {
       return handleInitUpdateBooking(booking_id, updateData);
     }
+    const { tenant, customOfferId, enquiryData, userRole } = options;
+    const isVenueOrAdminRole = [user_role.VENUE_OWNER, user_role.ADMIN].includes(userRole);
+    const receiverId = isVenueOrAdminRole ? enquiryData.user._id : enquiryData.venue.user._id;
+    const senderUser = isVenueOrAdminRole ? enquiryData.venue.user : enquiryData.user;
+    const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
+    const senderId = senderUser._id;
+
+    const participants = {
+      senderId,
+      receiverId,
+      userId: String(receiverId),
+    };
+
+    const metadata = {
+      key: metaDataKey.BOOKING_ID,
+      value: String(booking_id),
+    };
+
+    if (updateData.status === booking_status.CONFIRMED) {
+      await pushNotification(
+        { title: "Booking Confirmed", body: `Check out your new confirmed booking by ${sender_full_name}.` },
+        {
+          type: NotificationType.BOOKING_CONFIRMED,
+          customOfferId: String(customOfferId),
+          enquiryId: String(enquiryData._id),
+          bookingId: String(booking_id),
+        },
+        { notification: { sound: "default" } },
+        { payload: { aps: { sound: "default" } } },
+        participants,
+        metadata,
+      );
+    }
+
     if (updateData.status === booking_status.CANCELLED) {
+      await pushNotification(
+        { title: "Booking Cancelled", body: `A booking has been cancelled by ${sender_full_name}.` },
+        {
+          type: NotificationType.BOOKING_CANCELLED,
+          customOfferId: String(customOfferId),
+          enquiryId: String(enquiryData._id),
+          bookingId: String(booking_id),
+        },
+        { notification: { sound: "default" } },
+        { payload: { aps: { sound: "default" } } },
+        participants,
+        metadata,
+      );
+
       const [customOfferData] = await CustomOfferRepo.getCustomOffer({ "booking._id": booking_id });
       const [venueData]: any = await VenueRepo.getPaginatedVenues({ _id: customOfferData.venue._id }, 0, 1);
       sendTemplatedEmail({
@@ -531,6 +589,7 @@ export default class BookingSvc {
     cancellation_policy: any,
     existingBooking: any,
     existingCustomOffer: any,
+    existingEnquiry: any,
     tenant?: any,
   ) {
     const { reason_for_cancellation, message } = payload;
@@ -622,7 +681,12 @@ export default class BookingSvc {
       cancelledBy: user,
       refund_data: refundData,
     };
-    const result = await BookingSvc.updateBooking(booking_id, updatedData);
+
+    const result = await BookingSvc.updateBooking(booking_id, updatedData, {
+      enquiryData: existingEnquiry,
+      userRole,
+      customOfferId: existingCustomOffer._id,
+    });
     return { result, cancellationMessage };
   }
 
