@@ -12,41 +12,6 @@ export default class VenueRepo {
     return getDB().collection("venues");
   }
 
-  // static async getVenue(query: any, project?: Record<string, number>) {
-  //   const pipeline = [];
-
-  //   pipeline.push(
-  //     { $match: query },
-  //     {
-  //       $lookup: {
-  //         from: "keywords",
-  //         localField: "keywords",
-  //         foreignField: "_id",
-  //         as: "keywords",
-  //       },
-  //     },
-  //     {
-  //       $lookup: {
-  //         from: "users",
-  //         localField: "user",
-  //         foreignField: "_id",
-  //         pipeline: [{ $project: { email: 1, first_name: 1, last_name: 1, phone_number: 1 } }],
-  //         as: "user",
-  //       },
-  //     },
-  //     {
-  //       $set: { user: { $first: "$user" } },
-  //     },
-  //   );
-
-  //   if (project) {
-  //     pipeline.push({ $project: project });
-  //   }
-
-  //   const [result] = await this.collection().aggregate(pipeline).toArray();
-  //   return result;
-  // }
-
   static async getVenues(query: any, project?: Record<string, number>) {
     const pipeline = [];
 
