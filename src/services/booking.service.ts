@@ -35,7 +35,7 @@ import {
 import EnquirySvc from "./enquiries.service";
 import PaymentSvc from "./payment.service";
 import PricingSvc from "./pricing.service";
-import { metaDataKey, NotificationStatusType, NotificationType, TNotications } from "../models/notification.model";
+import { metaDataKey, NotificationType } from "../models/notification.model";
 import { pushNotification } from "../utils/firebase/firebase.admin";
 
 type UpdateBookingOptions = {
@@ -424,10 +424,9 @@ export default class BookingSvc {
       receiverId,
       userId: String(receiverId),
     };
-
     const metadata = {
-      key: metaDataKey.BOOKING_ID,
-      value: String(booking_id),
+      [metaDataKey.BOOKING_ID]: booking_id,
+      [metaDataKey.ENQUIRY_ID]: enquiryData._id,
     };
 
     if (updateData.status === booking_status.CONFIRMED) {

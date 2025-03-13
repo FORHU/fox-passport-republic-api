@@ -17,6 +17,7 @@ import { sendTemplatedEmail } from "../utils/helpers";
 import { logger } from "../utils/logger";
 import { metaDataKey, NotificationType } from "../models/notification.model";
 import { pushNotification } from "../utils/firebase/firebase.admin";
+import NotificationSvc from "../services/notification.service";
 
 interface AuthenticatedSocket extends Socket {
   user?: any;
@@ -110,6 +111,13 @@ export default (io: Server) => {
         const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
         const senderId = senderUser._id;
 
+        const tenSecondsAgo = new Date(Date.now() - 10 * 1000);
+        const existingNotification = await NotificationSvc.getOneNotification({
+          title: "New Inquiry",
+          createdAt: { $lte: tenSecondsAgo },
+          "metadata.enquiry_id": enquiry._id,
+        });
+
         const participants = {
           senderId,
           receiverId,
@@ -117,18 +125,18 @@ export default (io: Server) => {
         };
 
         const metadata = {
-          key: metaDataKey.ENQUIRY_ID,
-          value: String(enquiry._id),
+          [metaDataKey.ENQUIRY_ID]: enquiry._id,
         };
 
-        await pushNotification(
-          { title: sender_full_name, body: message },
-          { type: NotificationType.INQUIRY, enquiryId: String(enquiry._id) },
-          { notification: { sound: "default" } },
-          { payload: { aps: { sound: "default" } } },
-          participants,
-          metadata,
-        );
+        if (existingNotification)
+          await pushNotification(
+            { title: sender_full_name, body: message },
+            { type: NotificationType.INQUIRY, enquiryId: String(enquiry._id) },
+            { notification: { sound: "default" } },
+            { payload: { aps: { sound: "default" } } },
+            participants,
+            metadata,
+          );
 
         logger.log({
           level: "info",
@@ -239,8 +247,8 @@ export default (io: Server) => {
       };
 
       const metadata = {
-        key: metaDataKey.CUSTOM_OFFER_ID,
-        value: String(custom_offer_id),
+        [metaDataKey.CUSTOM_OFFER_ID]: custom_offer_id,
+        [metaDataKey.ENQUIRY_ID]: enquiry._id,
       };
 
       await pushNotification(
@@ -274,8 +282,8 @@ export default (io: Server) => {
         };
 
         const metadata = {
-          key: metaDataKey.CUSTOM_OFFER_ID,
-          value: String(custom_offer_id),
+          [metaDataKey.CUSTOM_OFFER_ID]: custom_offer_id,
+          [metaDataKey.ENQUIRY_ID]: enquiry._id,
         };
 
         await pushNotification(

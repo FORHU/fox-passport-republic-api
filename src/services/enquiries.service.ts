@@ -17,7 +17,7 @@ import InboxSvc from "./inbox.service";
 import MessageSvc from "./message.services";
 import UserSvc from "./user.service";
 import VenueSvc from "./venue.service";
-import { NotificationStatusType, NotificationType, TNotications } from "../models/notification.model";
+import { NotificationType, TNotifications } from "../models/notification.model";
 import NotificationSvc from "./notification.service";
 import { initializeFirebaseAdmin } from "../utils/firebase/firebase.admin";
 
@@ -157,13 +157,13 @@ export default class EnquirySvc {
       topic: String(receiverId),
     };
 
-    const notificationData: TNotications = {
+    const notificationData: TNotifications = {
       sender: senderId,
       receiver: receiverId,
       metadata: { enquiry_id: enquiryId },
       title: pushNotification.notification.title,
       body: pushNotification.notification.body,
-      status: NotificationStatusType.UNREAD,
+      read: false,
     };
 
     await Promise.all([NotificationSvc.createNotification(notificationData), firebaseAdmin.messaging().send(pushNotification)]);
@@ -311,7 +311,10 @@ export default class EnquirySvc {
     return EnquiryRepo.countEnquiries(query);
   }
 
-  static getEnquiries(query: any, skip?: number, limit?: number, toggle_censor?: boolean) {
+  static async getEnquiries(query: any, skip?: number, limit?: number, toggle_censor?: boolean, userId?: ObjectId) {
+    // if (query._id) {
+    //   await NotificationSvc.updateNotification({ "metadata.enquiry_id": query._id, receiver: userId }, { read: true });
+    // }
     return EnquiryRepo.getEnquiries(query, skip, limit, toggle_censor);
   }
 
