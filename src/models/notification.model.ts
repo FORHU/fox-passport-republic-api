@@ -1,10 +1,5 @@
 import { ObjectId } from "mongodb";
 
-export enum NotificationStatusType {
-  READ = "READ",
-  UNREAD = "UNREAD",
-}
-
 export enum NotificationType {
   INQUIRY = "INQUIRY",
   BOOKING_CONFIRMED = "BOOKING_CONFIRMED",
@@ -18,24 +13,25 @@ export enum metaDataKey {
   BOOKING_ID = "booking_id",
   CUSTOM_OFFER_ID = "custom_offer_id",
 }
-export interface TNotications {
+export interface TNotifications {
   _id?: ObjectId;
   sender: ObjectId;
   receiver: ObjectId;
   metadata?: {
     enquiry_id?: ObjectId;
     booking_id?: ObjectId;
+    custom_offer_id?: ObjectId;
   };
   title?: string;
   body?: string;
-  status?: NotificationStatusType;
+  read?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;
   deletedBy?: ObjectId;
 }
 
-export class MNotications implements Partial<TNotications> {
+export class MNotifications implements Partial<TNotifications> {
   _id?: ObjectId;
   sender: ObjectId;
   receiver: ObjectId;
@@ -43,9 +39,10 @@ export class MNotications implements Partial<TNotications> {
   metadata?: {
     enquiry_id?: ObjectId;
     booking_id?: ObjectId;
+    custom_offer_id?: ObjectId;
   };
   body?: string;
-  status?: NotificationStatusType;
+  read?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;
@@ -59,12 +56,12 @@ export class MNotications implements Partial<TNotications> {
       metadata,
       title,
       body,
-      status,
+      read,
       createdAt = new Date(),
       updatedAt,
       deletedAt,
       deletedBy,
-    }: TNotications = {} as TNotications,
+    }: TNotifications = {} as TNotifications,
   ) {
     this._id = _id;
     this.sender = sender;
@@ -72,7 +69,7 @@ export class MNotications implements Partial<TNotications> {
     this.metadata = metadata;
     this.title = title;
     this.body = body;
-    this.status = status;
+    this.read = read;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
     this.deletedAt = deletedAt;
