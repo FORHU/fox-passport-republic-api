@@ -312,9 +312,9 @@ export default class EnquirySvc {
   }
 
   static async getEnquiries(query: any, skip?: number, limit?: number, toggle_censor?: boolean, userId?: ObjectId) {
-    // if (query._id) {
-    //   await NotificationSvc.updateNotification({ "metadata.enquiry_id": query._id, receiver: userId }, { read: true });
-    // }
+    if (query._id) {
+      await NotificationSvc.updateNotification({ "metadata.enquiry_id": query._id, receiver: userId }, { read: true });
+    }
     return EnquiryRepo.getEnquiries(query, skip, limit, toggle_censor);
   }
 
