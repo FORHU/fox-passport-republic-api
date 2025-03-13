@@ -34,12 +34,12 @@ export default class NotificationRepo {
     }
   }
 
-  // static async updateNotification(query: any, data: any) {
-  //   try {
-  //     const result = await this.collection().updateMany(query, { $set: data });
-  //     return result;
-  //   } catch (error) {
-  //     throw error;
-  //   }
-  // }
+  static async updateNotification(query: any, data: any) {
+    try {
+      const result = await this.collection().updateMany(query, { $set: data });
+      return result;
+    } catch (error) {
+      throw error;
+    }
+  }
 }

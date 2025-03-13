@@ -18,8 +18,8 @@ export default class NotificationSvc {
     return result;
   }
 
-  // static async updateNotification(query: any, data: any) {
-  //   const result = await NotificationRepo.updateNotification(query, data);
-  //   return result;
-  // }
+  static async updateNotification(query: any, data: any) {
+    const result = await NotificationRepo.updateNotification(query, data);
+    return result;
+  }
 }
