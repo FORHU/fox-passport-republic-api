@@ -224,6 +224,7 @@ export default class PaymentSvc {
     let base_rate = "";
     let fullDayDuration = 12;
     let dayPricing: any;
+    let priceDetails: any;
 
     if (pricing.selected_pricing === "HIRE_FEE") {
       if (pricing.cleaning_fee) cleaningFee = Number(pricing.cleaning_fee);
@@ -257,7 +258,7 @@ export default class PaymentSvc {
         base_rate = dayPricing.full_day_rate.toString();
       }
     } else if (pricing?.selected_pricing === "CUSTOM_PRICE") {
-      const priceDetails = pricing.custom_price.prices.filter((price: any) => {
+      priceDetails = pricing.custom_price.prices.filter((price: any) => {
         return price.weekdays.includes(dayOfWeek);
       });
 
@@ -277,11 +278,6 @@ export default class PaymentSvc {
     let commission_fee = 0.15,
       platform_fee = 0;
 
-    // if (country_settings && venue.commission) {
-    //   commission_fee = parseFloat(venue.commission);
-    //   platform_fee = parseFloat(rebate);
-    // }
-
     if (venue.payment_method === "SUBSCRIPTION") {
       commission_fee = 0;
       platform_fee = parseFloat(rebate);
@@ -291,18 +287,18 @@ export default class PaymentSvc {
     }
 
     const userRoleComputed = {
-      base_rate: dayPricing ? base_rate : "0",
-      subtotal: dayPricing ? totalPrice.toFixed(2) : "0",
+      base_rate: base_rate || "0",
+      subtotal: totalPrice.toFixed(2) || "0",
       rebate: platform_fee,
-      grand_total: dayPricing ? (totalPrice + cleaningFee - totalPrice * platform_fee).toFixed(2) : "0",
+      grand_total: (totalPrice + cleaningFee - totalPrice * platform_fee).toFixed(2) || "0",
       cleaning_fee: cleaningFee,
     };
 
     const venueRoleComputation = {
-      base_rate: dayPricing ? base_rate : "0",
-      subtotal: dayPricing ? totalPrice.toFixed(2) : "0",
+      base_rate: base_rate || "0",
+      subtotal: totalPrice.toFixed(2) || "0",
       commission_fee,
-      grand_total: dayPricing ? (totalPrice + cleaningFee - totalPrice * commission_fee).toFixed(2) : "0",
+      grand_total: (totalPrice + cleaningFee - totalPrice * commission_fee).toFixed(2) || "0",
       cleaning_fee: cleaningFee,
     };
 
@@ -321,7 +317,7 @@ export default class PaymentSvc {
       ...(type !== "HIRE_FEE" && { duration }),
     };
 
-    if (!dayPricing) {
+    if ((pricing.selected_pricing === "HIRE_FEE" && !dayPricing) || (pricing?.selected_pricing === "CUSTOM_PRICE" && !priceDetails)) {
       results.message = "Space is not open during this date";
     }
 
