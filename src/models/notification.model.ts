@@ -17,6 +17,7 @@ export interface TNotifications {
   _id?: ObjectId;
   sender: ObjectId;
   receiver: ObjectId;
+  type?: NotificationType;
   metadata?: {
     enquiry_id?: ObjectId;
     booking_id?: ObjectId;
@@ -36,6 +37,7 @@ export class MNotifications implements Partial<TNotifications> {
   sender: ObjectId;
   receiver: ObjectId;
   title?: string;
+  type?: NotificationType;
   metadata?: {
     enquiry_id?: ObjectId;
     booking_id?: ObjectId;
@@ -54,6 +56,7 @@ export class MNotifications implements Partial<TNotifications> {
       sender,
       receiver,
       metadata,
+      type,
       title,
       body,
       read,
@@ -68,6 +71,7 @@ export class MNotifications implements Partial<TNotifications> {
     this.receiver = receiver;
     this.metadata = metadata;
     this.title = title;
+    this.type = type;
     this.body = body;
     this.read = read;
     this.createdAt = createdAt;
