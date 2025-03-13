@@ -102,6 +102,7 @@ export default class EnquiriesCtrl {
       const { toggle_censor } = req.query as any;
 
       const enquiry_id = new ObjectId(req.params.id);
+      const userId = new ObjectId(req?.user?._id);
 
       const { error } = validateGetEnquiriesSchema(req.query);
 
@@ -115,7 +116,7 @@ export default class EnquiriesCtrl {
 
       const enquiries: any = IS_ENQUIRY_MICROSERVICES
         ? await EnquirySvc.getEnquiriesFromMicroservice({ enquiry_id })
-        : await EnquirySvc.getEnquiries(query, 0, 1, censorPhoneNumber);
+        : await EnquirySvc.getEnquiries(query, 0, 1, censorPhoneNumber, userId);
 
       const result = {
         data: IS_ENQUIRY_MICROSERVICES ? [enquiries?.enquiries] : enquiries[0],
