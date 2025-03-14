@@ -8,6 +8,6 @@ const defaultMiddleware = [sessionMiddleware, authenticateToken];
 
 const router = express.Router();
 
-router.get("/", [...defaultMiddleware], NotificationCtrl.getUnreadNotificationsCountEnquiries);
+router.get("/", [...defaultMiddleware], NotificationCtrl.getUnreadNotificationsCount);
 
 export default router;

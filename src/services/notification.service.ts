@@ -8,8 +8,8 @@ export default class NotificationSvc {
     return result;
   }
 
-  static async getUnreadNotificationsCountEnquiries(query: any) {
-    const result = await NotificationRepo.getUnreadNotificationsCountEnquiries(query);
+  static async getUnreadNotificationsCount(query: any) {
+    const result = await NotificationRepo.getUnreadNotificationsCount(query);
     return result;
   }
 
