@@ -25,10 +25,42 @@ export default class NotificationRepo {
     }
   }
 
-  static async getUnreadNotificationsCountEnquiries(query: any) {
+  static async getUnreadNotificationsCount(query: any) {
     try {
-      const count = await this.collection().countDocuments(query);
-      return count;
+      const result = await this.collection()
+        .aggregate([
+          { $match: query },
+          {
+            $facet: {
+              totalUnreadCount: [{ $count: "count" }],
+              unreadCountsByType: [
+                {
+                  $group: {
+                    _id: "$type",
+                    count: { $sum: 1 },
+                  },
+                },
+                {
+                  $project: {
+                    _id: 0,
+                    type: "$_id",
+                    count: 1,
+                  },
+                },
+              ],
+            },
+          },
+        ])
+        .toArray();
+
+      const data = result[0] || {};
+      const totalUnreadCount = data.totalUnreadCount[0]?.count || 0;
+      const unreadCountsByType = data.unreadCountsByType || [];
+
+      return {
+        totalUnreadCount,
+        unreadCountsByType,
+      };
     } catch (error) {
       throw error;
     }
