@@ -49,6 +49,7 @@ export default class AdminCtrl {
       const _id = new ObjectId(req.params.venue_id);
       const { status } = req.body;
       const tenant = req?.tenant;
+      const adminId = new ObjectId(req?.user?._id);
 
       const { error } = validateUpdateVenueStatus(req.body);
       if (error) {
@@ -67,7 +68,7 @@ export default class AdminCtrl {
         await AdminSvc.updateAssociatedSpaces({ _id: { $in: associatedSpaceIds } }, { status: newStatus, updatedAt: new Date() }, tenant);
       }
 
-      const result = await AdminSvc.updateVenue(_id, status, req?.tenant);
+      const result = await AdminSvc.updateVenue(_id, status, req?.tenant, adminId);
       return handleResponse(res, result, "VENUE_UPDATED_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
@@ -103,7 +104,7 @@ export default class AdminCtrl {
     try {
       const query = { _id: new ObjectId(req.params.space_id) };
       const { status } = req.body;
-
+      const adminId = new ObjectId(req?.user?._id);
       const { error } = validateUpdateSpaceStatus(req.body);
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
@@ -114,7 +115,7 @@ export default class AdminCtrl {
         updatedAt: new Date(),
       };
 
-      const result = await AdminSvc.updateSpace(query, data, req?.tenant);
+      const result = await AdminSvc.updateSpace(query, data, req?.tenant, adminId);
       return handleResponse(res, result, "SPACE_UPDATED_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
