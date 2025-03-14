@@ -72,6 +72,7 @@ export const pushNotification = async (
     const notificationData: TNotifications = {
       sender: participants.senderId,
       receiver: participants.receiverId,
+      type: data.type,
       metadata,
       title: notification.title,
       body: notification.body,
