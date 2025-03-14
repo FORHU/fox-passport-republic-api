@@ -29,6 +29,8 @@ import SaleTransactionSvc from "./sale-transactions.service";
 import StripeProductSvc from "./stripe-product.service";
 import UserRolesSvc from "./user-roles.service";
 import UserRepo from "../repositories/user.repository";
+import { pushNotification } from "../utils/firebase/firebase.admin";
+import { metaDataKey, NotificationType } from "../models/notification.model";
 
 const PREFIX_VENUE = "venues";
 const PREFIX_SPACE = "spaces";
@@ -42,7 +44,7 @@ export default class AdminSvc {
     }
   }
 
-  static async updateVenue(data: any, status: string, tenant?: any) {
+  static async updateVenue(data: any, status: string, tenant?: any, adminId?: ObjectId) {
     try {
       const [venue_data] = await AdminRepo.getSpaces({ venue: data });
 
@@ -62,6 +64,52 @@ export default class AdminSvc {
       let emailStatus = null;
 
       if ([venue_status.PUBLISHED, venue_status.REJECTED, venue_status.SUSPENDED].includes(status as venue_status)) {
+        const participants = {
+          senderId: adminId,
+          receiverId: venue_data?.userData?._id,
+          userId: String(venue_data?.userData?._id),
+        };
+        const metadata = {
+          [metaDataKey.VENUE_ID]: new ObjectId(data),
+        };
+
+        let notificationTitle = "";
+        let notificationBody = "";
+        let notificationType: NotificationType;
+
+        switch (status) {
+          case venue_status.PUBLISHED:
+            notificationTitle = "Venue Approved";
+            notificationBody = "Your venue has been approved.";
+            notificationType = NotificationType.VENUE;
+            break;
+
+          case venue_status.REJECTED:
+            notificationTitle = "Venue Rejected";
+            notificationBody = "Your venue did not meet the requirements.";
+            notificationType = NotificationType.VENUE;
+
+          case venue_status.SUSPENDED:
+            notificationTitle = "Venue Suspended";
+            notificationBody = "Your venue has been suspended.";
+            notificationType = NotificationType.VENUE;
+
+          default:
+            return `Unknown venue status ${status}`;
+        }
+
+        await pushNotification(
+          { title: notificationTitle, body: notificationBody },
+          {
+            type: notificationType,
+            venue_id: data,
+          },
+          { notification: { sound: "default" } },
+          { payload: { aps: { sound: "default" } } },
+          participants,
+          metadata,
+        );
+
         const subject =
           status === venue_status.PUBLISHED
             ? `${tenant?.config?.name}: Venue Approved`
@@ -120,7 +168,7 @@ export default class AdminSvc {
           await EmailLogsRepo.createEmailLog(email_logs_data);
         }
 
-        // return `Email sent successfully to: ${venue_data.venue.user.email}`;
+        return `Email sent successfully to: ${venue_data.venue.user.email}`;
       }
 
       return await AdminRepo.updateVenue(data, status);
@@ -206,7 +254,7 @@ export default class AdminSvc {
     }
   }
 
-  static async updateSpace(query: any, data: any, tenant?: any) {
+  static async updateSpace(query: any, data: any, tenant?: any, adminId?: ObjectId) {
     try {
       const [space_data] = await SpaceRepository.getPaginatedSpaces({ query: query, skip: 0, limit: 1, user_id: null });
 
@@ -224,6 +272,57 @@ export default class AdminSvc {
         const date_submitted = formatDate(space_data.updatedAt);
 
         if ([space_status.PUBLISHED, space_status.REJECTED, space_status.DELETED, space_status.SUSPENDED].includes(data.status)) {
+          // const participants = {
+          //   senderId: adminId,
+          //   receiverId: space_data?.venue?.user?._id,
+          //   userId: String(space_data?.venue?.user?._id),
+          // };
+          // const metadata = {
+          //   [metaDataKey.SPACE_ID]: new ObjectId(query?._id),
+          // };
+
+          // let notificationTitle = "";
+          // let notificationBody = "";
+          // let notificationType: NotificationType;
+
+          // switch (data.status) {
+          //   case space_status.PUBLISHED:
+          //     notificationTitle = "Space Approved";
+          //     notificationBody = "Your space has been approved.";
+          //     notificationType = NotificationType.SPACE;
+          //     break;
+
+          //   case space_status.REJECTED:
+          //     notificationTitle = "Space Rejected";
+          //     notificationBody = "Your space did not meet the requirements.";
+          //     notificationType = NotificationType.SPACE;
+
+          //   case space_status.SUSPENDED:
+          //     notificationTitle = "Space Suspended";
+          //     notificationBody = "Your space has been suspended.";
+          //     notificationType = NotificationType.SPACE;
+
+          //   case space_status.DELETED:
+          //     notificationTitle = "Space Deleted";
+          //     notificationBody = "Your space has been deleted";
+          //     notificationType = NotificationType.SPACE;
+
+          //   default:
+          //     return `Unknown space status ${status}`;
+          // }
+
+          // await pushNotification(
+          //   { title: notificationTitle, body: notificationBody },
+          //   {
+          //     type: notificationType,
+          //     venue_id: data,
+          //   },
+          //   { notification: { sound: "default" } },
+          //   { payload: { aps: { sound: "default" } } },
+          //   participants,
+          //   metadata,
+          // );
+
           const subject =
             data.status === space_status.PUBLISHED
               ? `${tenant?.config?.name}: Space Approved`
@@ -263,6 +362,7 @@ export default class AdminSvc {
       } else {
         throw new Error("No space data found.");
       }
+
       const result = await AdminRepo.updateSpace(query, data);
 
       return {
@@ -451,7 +551,6 @@ export default class AdminSvc {
       if (venue.keywords.length === 0 || !venue.keywords) await this.randomizeKeywordsInSpaceVenue(venue._id, "VENUE", tenant);
       const keywordIds = await KeywordSvc.handleParsingKeywords(venue.keywords);
       await VenueSvc.updateVenue(venue._id, { keywords: keywordIds }, tenant);
-      console.log("VENUE_KEYWORD_UPDATED", venue._id);
       page++;
     }
   }
@@ -465,7 +564,6 @@ export default class AdminSvc {
       if (space.keywords.length === 0 || !space.keywords) await this.randomizeKeywordsInSpaceVenue(space._id, "SPACE", tenant);
       const keywordIds = await KeywordSvc.handleParsingKeywords(space.keywords);
       await SpaceSvc.updateSpaces({ keywords: keywordIds }, { _id: space._id });
-      console.log("SPACE_KEYWORD_UPDATED", space._id);
       page++;
     }
   }
