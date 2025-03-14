@@ -272,56 +272,56 @@ export default class AdminSvc {
         const date_submitted = formatDate(space_data.updatedAt);
 
         if ([space_status.PUBLISHED, space_status.REJECTED, space_status.DELETED, space_status.SUSPENDED].includes(data.status)) {
-          // const participants = {
-          //   senderId: adminId,
-          //   receiverId: space_data?.venue?.user?._id,
-          //   userId: String(space_data?.venue?.user?._id),
-          // };
-          // const metadata = {
-          //   [metaDataKey.SPACE_ID]: new ObjectId(query?._id),
-          // };
+          const participants = {
+            senderId: adminId,
+            receiverId: space_data?.venue?.user?._id,
+            userId: String(space_data?.venue?.user?._id),
+          };
+          const metadata = {
+            [metaDataKey.SPACE_ID]: new ObjectId(query?._id),
+          };
 
-          // let notificationTitle = "";
-          // let notificationBody = "";
-          // let notificationType: NotificationType;
+          let notificationTitle = "";
+          let notificationBody = "";
+          let notificationType: NotificationType;
 
-          // switch (data.status) {
-          //   case space_status.PUBLISHED:
-          //     notificationTitle = "Space Approved";
-          //     notificationBody = "Your space has been approved.";
-          //     notificationType = NotificationType.SPACE;
-          //     break;
+          switch (data.status) {
+            case space_status.PUBLISHED:
+              notificationTitle = "Space Approved";
+              notificationBody = "Your space has been approved.";
+              notificationType = NotificationType.SPACE;
+              break;
 
-          //   case space_status.REJECTED:
-          //     notificationTitle = "Space Rejected";
-          //     notificationBody = "Your space did not meet the requirements.";
-          //     notificationType = NotificationType.SPACE;
+            case space_status.REJECTED:
+              notificationTitle = "Space Rejected";
+              notificationBody = "Your space did not meet the requirements.";
+              notificationType = NotificationType.SPACE;
 
-          //   case space_status.SUSPENDED:
-          //     notificationTitle = "Space Suspended";
-          //     notificationBody = "Your space has been suspended.";
-          //     notificationType = NotificationType.SPACE;
+            case space_status.SUSPENDED:
+              notificationTitle = "Space Suspended";
+              notificationBody = "Your space has been suspended.";
+              notificationType = NotificationType.SPACE;
 
-          //   case space_status.DELETED:
-          //     notificationTitle = "Space Deleted";
-          //     notificationBody = "Your space has been deleted";
-          //     notificationType = NotificationType.SPACE;
+            case space_status.DELETED:
+              notificationTitle = "Space Deleted";
+              notificationBody = "Your space has been deleted";
+              notificationType = NotificationType.SPACE;
 
-          //   default:
-          //     return `Unknown space status ${status}`;
-          // }
+            default:
+              return `Unknown space status ${status}`;
+          }
 
-          // await pushNotification(
-          //   { title: notificationTitle, body: notificationBody },
-          //   {
-          //     type: notificationType,
-          //     venue_id: data,
-          //   },
-          //   { notification: { sound: "default" } },
-          //   { payload: { aps: { sound: "default" } } },
-          //   participants,
-          //   metadata,
-          // );
+          await pushNotification(
+            { title: notificationTitle, body: notificationBody },
+            {
+              type: notificationType,
+              venue_id: data,
+            },
+            { notification: { sound: "default" } },
+            { payload: { aps: { sound: "default" } } },
+            participants,
+            metadata,
+          );
 
           const subject =
             data.status === space_status.PUBLISHED
