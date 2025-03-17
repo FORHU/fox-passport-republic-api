@@ -5,15 +5,12 @@ import { formatDate } from "../models/enquiries.model";
 import { space_status } from "../models/space.model";
 import { actions_enums } from "../models/user-logs.model";
 import { TVenue, venue_status } from "../models/venue.models";
-import EmailLogsRepo from "../repositories/email_logs.repository";
-import SpaceRepository from "../repositories/space.repository";
-import VenueRepo from "../repositories/venue.repository";
 import { USER_ROLES } from "../utils/constant";
 import { hashSearch, sendTemplatedEmail } from "../utils/helpers";
 import { logger } from "../utils/logger";
 import { parseQuestion } from "../utils/question/utils";
-import RedisUtil from "../utils/redis.util";
 import { constructVenueQuery } from "../utils/venue/helper";
+
 import AdminSvc from "./admin.service";
 import CancellationPolicySvc from "./cancellation-policy.service";
 import CountrySettingSvc from "./country-setting.service";
@@ -22,7 +19,10 @@ import QuestionSvc from "./questions.service";
 import SaleTransactionSvc from "./sale-transactions.service";
 import SpaceSvc from "./space.service";
 import UserLogsSvc from "./user-logs.service";
-import UserRepo from "../repositories/user.repository";
+import EmailLogsRepo from "../repositories/email_logs.repository";
+import SpaceRepository from "../repositories/space.repository";
+import VenueRepo from "../repositories/venue.repository";
+import RedisUtil from "../utils/redis.util";
 
 const PREFIX = "venues";
 
@@ -322,7 +322,6 @@ export default class VenueSvc {
         const result = await QuestionSvc.createQuestions(parsedData);
         const upsertedIds = result.upsertedIds;
 
-        // eslint-disable-next-line no-unused-vars
         return Object.entries(upsertedIds).map(([key, value]) => new ObjectId(value));
       }
     };
@@ -364,11 +363,6 @@ export default class VenueSvc {
         { venue: venue_id },
         { status: transactionStatus, remarks: transactionStatus, updatedAt: new Date() },
       );
-
-      // const adminMember = await AdminMembersRepo.getAdminMember({ invited_user: salesTransactions.user });
-      // if (adminMember) {
-      //   await AdminMembersRepo.pullVenue(adminMember._id, venue_id);
-      // }
     }
 
     let commissionValue = commission;
@@ -393,7 +387,6 @@ export default class VenueSvc {
       ...(payment_method && { payment_method: venueSubscription }),
     };
 
-    // Update venue outside of the conditional block to ensure it's always called
     return await this.updateVenue(venue_id, venueUpdateData, tenant);
   }
 
