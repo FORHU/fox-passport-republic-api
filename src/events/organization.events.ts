@@ -88,7 +88,6 @@ export default (io: Server) => {
           attachments: attachmentFiles,
           createdAt: new Date().toISOString(),
         });
-        //save message by room_id
         const inbox: any = await InboxSvc.getInbox({ room_id });
 
         let enquiry = null;
@@ -128,7 +127,7 @@ export default (io: Server) => {
           [metaDataKey.ENQUIRY_ID]: enquiry._id,
         };
 
-        if (existingNotification)
+        if (existingNotification) {
           await pushNotification(
             { title: sender_full_name, body: message },
             { type: NotificationType.INQUIRY, enquiryId: String(enquiry._id) },
@@ -137,6 +136,16 @@ export default (io: Server) => {
             participants,
             metadata,
           );
+        } else {
+          await pushNotification(
+            { title: "New Inquiry", body: "You have a new inquiry to review." },
+            { type: NotificationType.INQUIRY, enquiryId: String(enquiry._id) },
+            { notification: { sound: "default" } },
+            { payload: { aps: { sound: "default" } } },
+            participants,
+            metadata,
+          );
+        }
 
         logger.log({
           level: "info",
