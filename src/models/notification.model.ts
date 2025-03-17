@@ -8,6 +8,7 @@ export enum NotificationType {
   CUSTOM_OFFER_CANCELLED = "CUSTOM_OFFER_CANCELLED",
   VENUE = "VENUE",
   SPACE = "SPACE",
+  UPCOMING_EVENT = "UPCOMING_EVENT",
 }
 
 export enum metaDataKey {
