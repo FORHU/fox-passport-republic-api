@@ -261,7 +261,7 @@ export default class EnquirySvc {
     } else {
       [totalItems, data] = await Promise.all([
         EnquirySvc.getTotalCountEnquiry(query),
-        EnquirySvc.getEnquiries(query, offset, limitNumber, censorPhoneNumber),
+        EnquirySvc.getEnquiries(query, offset, limitNumber, censorPhoneNumber, userId),
       ]);
     }
 
@@ -276,7 +276,7 @@ export default class EnquirySvc {
     if (query._id) {
       await NotificationSvc.updateNotification({ "metadata.enquiry_id": query._id, receiver: userId }, { read: true });
     }
-    return EnquiryRepo.getEnquiries(query, skip, limit, toggle_censor);
+    return EnquiryRepo.getEnquiries(query, skip, limit, toggle_censor, userId);
   }
 
   static getEnquiriesFromMicroservice(payload: any) {

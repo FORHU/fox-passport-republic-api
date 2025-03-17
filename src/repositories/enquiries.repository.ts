@@ -21,10 +21,31 @@ export default class EnquiryRepo {
     }
   }
 
-  static async getEnquiries(query: any, skip?: number, limit?: number, toggle_censor?: boolean) {
+  static async getEnquiries(query: any, skip?: number, limit?: number, toggle_censor?: boolean, userId?: ObjectId) {
     const pipeline = [];
 
     pipeline.push(
+      {
+        $lookup: {
+          from: "notifications",
+          localField: "_id",
+          foreignField: "metadata.enquiry_id",
+          pipeline: [{ $match: { receiver: userId, read: false } }, { $sort: { _id: -1 } }, { $limit: 1 }],
+          as: "unread_notifications",
+        },
+      },
+      {
+        $addFields: {
+          read: {
+            $cond: {
+              if: { $gt: [{ $size: "$unread_notifications" }, 0] },
+              then: false,
+              else: true,
+            },
+          },
+        },
+      },
+      { $unset: "unread_notifications" },
       {
         $lookup: {
           from: "venues",
@@ -132,6 +153,7 @@ export default class EnquiryRepo {
     pipeline.push({
       $project: {
         _id: 1,
+        read: 1,
         full_name: 1,
         date: 1,
         type: 1,
