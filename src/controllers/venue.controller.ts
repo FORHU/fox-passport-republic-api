@@ -6,16 +6,17 @@ import { ObjectId } from "mongodb";
 import { space_status } from "../models/space.model";
 import { user_role } from "../models/user.model";
 import { venue_status } from "../models/venue.models";
+import { verifyToken } from "../utils/auth";
+import { validateInvitedUserInformationSchema } from "../utils/organization-member/validation";
+import { handleErrorResponse, handleResponse } from "../utils/reponse";
+import { validateCreateVenueSchema, validateDeleteVenueSchema, validateGetVenueSchema, validateUpdateVenueSchema } from "../utils/venue/validation";
+
 import AdminSvc from "../services/admin.service";
 import BookingSvc from "../services/booking.service";
 import EnquirySvc from "../services/enquiries.service";
 import SpaceSvc from "../services/space.service";
 import UserSvc from "../services/user.service";
 import VenueSvc from "../services/venue.service";
-import { verifyToken } from "../utils/auth";
-import { validateInvitedUserInformationSchema } from "../utils/organization-member/validation";
-import { handleErrorResponse, handleResponse } from "../utils/reponse";
-import { validateCreateVenueSchema, validateDeleteVenueSchema, validateGetVenueSchema, validateUpdateVenueSchema } from "../utils/venue/validation";
 
 export default class VenueCtrl {
   /**
@@ -344,8 +345,6 @@ export default class VenueCtrl {
 
       const decodedToken = verifyToken(token);
       if (!decodedToken) return handleErrorResponse(res, {}, { code: "INVALID_TOKEN" });
-
-      const [venue] = await VenueSvc.getVenue({ _id: new ObjectId(decodedToken.venue_id) });
 
       const results = await AdminSvc.handleOwnerExistingTransfership(
         {
