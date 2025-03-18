@@ -22,4 +22,13 @@ export default class NotificationSvc {
     const result = await NotificationRepo.updateNotification(query, data);
     return result;
   }
+
+  static async deleteNotifications(query: any) {
+    try {
+      const result = await NotificationRepo.deleteNotifications(query);
+      return result;
+    } catch (error) {
+      throw error;
+    }
+  }
 }
