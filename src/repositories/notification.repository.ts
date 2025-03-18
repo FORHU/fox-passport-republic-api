@@ -74,4 +74,13 @@ export default class NotificationRepo {
       throw error;
     }
   }
+
+  static async deleteNotifications(query: any) {
+    try {
+      const result = await this.collection().deleteMany(query);
+      return result;
+    } catch (error) {
+      throw error;
+    }
+  }
 }

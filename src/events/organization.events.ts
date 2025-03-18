@@ -376,6 +376,42 @@ export default (io: Server) => {
       await MessageSvc.createMessage(messagePayload);
     });
 
+    // socket.on("notification_count", async (data: any) => {
+    //   try {
+    //     const { room_id } = data;
+    //     const user = socket.user;
+
+    //     if (!user) {
+    //       io.to(room_id).emit("notification_count", {
+    //         success: false,
+    //         code: "USER_NOT_AUTHENTICATED",
+    //         message: "User is not authenticated",
+    //       });
+    //       return;
+    //     }
+
+    //     const query = {
+    //       receiver: new ObjectId(user._id),
+    //       read: false,
+    //     };
+
+    //     const count = await NotificationSvc.getUnreadNotificationsCount(query);
+
+    //     io.to(room_id).emit("notification_count", {
+    //       success: true,
+    //       code: "NOTIFICATION_COUNT_FETCHED_SUCCESSFULLY",
+    //       data: count,
+    //     });
+    //   } catch (error) {
+    //     console.error("Error fetching notification count:", error);
+    //     socket.emit("notification_count", {
+    //       success: false,
+    //       code: "NOTIFICATION_COUNT_FETCH_FAILED",
+    //       message: "Failed to fetch notification count",
+    //     });
+    //   }
+    // });
+
     socket.on("disconnect", () => {
       // console.log("Client disconnected from organization namespace");
     });
