@@ -101,11 +101,10 @@ export default class BookingRepo {
             _id: { $arrayElemAt: ["$cancelled_user._id", 0] },
             role: { $arrayElemAt: ["$cancelled_user.role", 0] },
           },
-          // Conditionally project sensitive data based on session
           booker_user_first_name: {
             $cond: {
               if: { $eq: [session, false] },
-              then: "$$REMOVE", // Exclude if session is true
+              then: "$$REMOVE",
               else: { $arrayElemAt: ["$booker_user.first_name", 0] },
             },
           },
