@@ -89,6 +89,7 @@ export default class UserRepo {
           assigned_roles: 1,
           tenant: 1,
           user_roles: 1,
+          fully_verified: 1,
           stripe_account: "$stripe_account.status",
         },
       });
@@ -97,6 +98,16 @@ export default class UserRepo {
       return userData;
     } catch (error) {
       console.error("Error fetching user data:", error);
+      throw error;
+    }
+  }
+
+  static async updateManyUsers(query: any, data: any) {
+    try {
+      const result = await this.collection().updateMany(query, { $set: data });
+      await RedisUtil.invalidateByPrefix(PREFIX);
+      return result.modifiedCount > 0;
+    } catch (error) {
       throw error;
     }
   }
