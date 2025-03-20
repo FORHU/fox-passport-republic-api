@@ -158,10 +158,16 @@ export default class AuthSvc {
       };
     }
 
-    return await UserSvc.updateUser(query, {
-      status: user_status.ACTIVE,
-      otp: null,
-    });
+    let updateUser = null;
+
+    const userStripeAccount = await StripeAccountSvc.getAccount({ user: userId });
+    if (userStripeAccount && userStripeAccount.status === account_status.COMPLETED) {
+      updateUser = await UserRepo.updateUser({ _id: userId }, { status: user_status.ACTIVE, fully_verified: true, otp: null });
+    } else {
+      updateUser = await UserRepo.updateUser({ _id: userId }, { status: user_status.ACTIVE, otp: null });
+    }
+
+    return updateUser;
   }
 
   static async login(
