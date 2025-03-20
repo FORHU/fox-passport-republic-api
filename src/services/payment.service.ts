@@ -34,11 +34,13 @@ import CustomOfferSvc from "./custom-offer.service";
 import EnquirySvc from "./enquiries.service";
 import SpaceSvc from "./space.service";
 import StripeAccountSvc from "./stripe-account.service";
+import TodoRepo from "../repositories/stripe-account.repository";
 import StripeAccountTransactionSvc from "./stripe-account-transaction.service";
 import UserSvc from "./user.service";
 import VenueSvc from "./venue.service";
 import VenueSubscriptionSvc from "./venue-subscription.service";
 import UserRepo from "../repositories/user.repository";
+import { user_status } from "../models/user.model";
 
 export default class PaymentSvc {
   static createPayment(data: TPayment) {
@@ -53,12 +55,21 @@ export default class PaymentSvc {
     return PaymentRepo.updatePayment(query, data);
   }
 
-  static async handleWebhooks(event: any) {
+  static async handleWebhooks(event: any, userId: ObjectId) {
     switch (event.type) {
       case STRIPE_EVENTS.ACCOUNT_UPDATED:
         const account = await getAccount(event.account);
         if (account && account?.charges_enabled && account?.details_submitted) {
-          await StripeAccountSvc.updateAccount({ stripe_account_id: account?.id }, { status: account_status.COMPLETED, updatedAt: new Date() });
+          const updateStripeAccount = await StripeAccountSvc.updateAccount(
+            { stripe_account_id: account?.id },
+            { status: account_status.COMPLETED, updatedAt: new Date() },
+          );
+          if (updateStripeAccount) {
+            const userData = await UserRepo.getUser({ _id: userId });
+            if (userData && userData.status === user_status.ACTIVE) {
+              await UserRepo.updateUser({ _id: userId }, { fully_verified: true });
+            }
+          }
         }
         break;
       case STRIPE_EVENTS.PAYMENT_ATTACHED:
@@ -95,6 +106,7 @@ export default class PaymentSvc {
         break;
     }
   }
+
   static async processPayment(enquiry_id: string, user: any, enquiry: any, tenant?: any) {
     const venue_owner = new ObjectId(user._id as string);
 
