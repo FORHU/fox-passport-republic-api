@@ -6,6 +6,10 @@ export default class StripeAccountSvc {
     return StripeAccountRepo.getAccount(query);
   }
 
+  static getAccounts(query: any) {
+    return StripeAccountRepo.getAccounts(query);
+  }
+
   static createAccount(data: TStripeAccount) {
     return StripeAccountRepo.createAccount(data);
   }
