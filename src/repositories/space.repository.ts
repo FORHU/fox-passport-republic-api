@@ -33,6 +33,8 @@ export default class SpaceRepository {
     try {
       const pipeline = [];
 
+      query["venue.user.fully_verified"] = true;
+
       pipeline.push(
         {
           $lookup: {
@@ -261,6 +263,7 @@ export default class SpaceRepository {
                   last_name: "$venue.user.last_name",
                   email: "$venue.user.email",
                   phone_number: "$venue.user.phone_number",
+                  fully_verified: "$venue.user.fully_verified",
                 },
               },
             ],
@@ -338,7 +341,7 @@ export default class SpaceRepository {
   static async countPaginatedSpaces({ query, user_id, mark_as_favorite, startDate, endDate }: PaginationType) {
     try {
       const pipeline = [];
-
+      query["venue.user.fully_verified"] = true;
       // 1. Initial lookups
       pipeline.push(
         {
