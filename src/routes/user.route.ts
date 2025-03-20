@@ -9,5 +9,6 @@ router.get("/me", [sessionMiddleware, authenticateToken], AuthCtrl.getUser);
 router.patch("/:id", [sessionMiddleware, authenticateToken], AuthCtrl.updateUser);
 router.delete("/", [sessionMiddleware, authenticateToken], AuthCtrl.deleteUser);
 router.get("/onboarding-status/:user_id", [sessionMiddleware, authenticateToken], AuthCtrl.getOnboardingStatus);
+router.post("/migrate", AuthCtrl.migrateUsers);
 
 export default router;
