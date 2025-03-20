@@ -13,6 +13,10 @@ export default class TodoRepo {
     return this.collection().findOne(query);
   }
 
+  static getAccounts(query: any) {
+    return this.collection().find(query).toArray();
+  }
+
   static async createAccount(data: TStripeAccount) {
     return this.collection().insertOne(new MStripeAccount(data));
   }
