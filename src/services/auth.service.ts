@@ -14,6 +14,9 @@ import { USER_ROLES } from "../utils/constant";
 import { handleSendEmail } from "../utils/email.utils";
 import { generateOTP } from "../utils/helpers";
 import UserSvc from "./user.service";
+import TodoRepo from "../repositories/stripe-account.repository";
+import { account_status } from "../models/stripe-account.model";
+import StripeAccountSvc from "./stripe-account.service";
 
 export default class AuthSvc {
   static async registration(userData: TUser, is_invited?: boolean, device_payload?: DevicePayload, tenant?: any) {
@@ -363,14 +366,23 @@ export default class AuthSvc {
   static async verifyEmail(token: string) {
     try {
       const decodedToken = verifyToken(token);
-      const userId = new ObjectId(decodedToken.id as string);
+      const userId = new ObjectId(decodedToken._id);
       const userDetails = await UserRepo.getUser({ _id: userId, status: user_status.ACTIVE });
 
       if (userDetails) {
         throw new Error("EMAIL_ALREADY_VERIFIED");
       }
 
-      return await UserRepo.updateUser({ _id: userId }, { status: user_status.ACTIVE });
+      let updateUser = null;
+
+      const userStripeAccount = await StripeAccountSvc.getAccount({ user: userId });
+      if (userStripeAccount && userStripeAccount.status === account_status.COMPLETED) {
+        updateUser = await UserRepo.updateUser({ _id: userId }, { status: user_status.ACTIVE, fully_verified: true });
+      } else {
+        updateUser = await UserRepo.updateUser({ _id: userId }, { status: user_status.ACTIVE });
+      }
+
+      return updateUser;
     } catch (error) {
       if (error.message === "EMAIL_ALREADY_VERIFIED") {
         throw error;
