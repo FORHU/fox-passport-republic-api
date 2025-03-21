@@ -47,6 +47,7 @@ import VenueSvc from "./venue.service";
 import VenueSubscriptionSvc from "./venue-subscription.service";
 import UserRepo from "../repositories/user.repository";
 import { user_status } from "../models/user.model";
+import StripeAccountRepo from "../repositories/stripe-account.repository";
 
 export default class PaymentSvc {
   static createPayment(data: TPayment) {
@@ -61,7 +62,7 @@ export default class PaymentSvc {
     return PaymentRepo.updatePayment(query, data);
   }
 
-  static async handleWebhooks(event: any, userId: ObjectId) {
+  static async handleWebhooks(event: any) {
     switch (event.type) {
       case STRIPE_EVENTS.ACCOUNT_UPDATED:
         const account = await getAccount(event.account);
@@ -71,9 +72,10 @@ export default class PaymentSvc {
             { status: account_status.COMPLETED, updatedAt: new Date() },
           );
           if (updateStripeAccount) {
-            const userData = await UserSvc.getUser({ _id: userId });
-            if (userData.status === "ACTIVE") {
-              await UserSvc.updateUser({ _id: userId }, { fully_verified: true });
+            const stripeAccount = await StripeAccountRepo.getAccount({ stripe_account_id: account?.id });
+            const userDetails = await UserSvc.getUser({ _id: stripeAccount.user });
+            if (userDetails.status === "ACTIVE") {
+              await UserSvc.updateUser({ _id: userDetails._id }, { fully_verified: true });
             }
           }
         }

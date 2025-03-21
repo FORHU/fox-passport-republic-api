@@ -107,16 +107,14 @@ export default class PaymentCtrl {
   }
 
   static async handleAccountConnectWebhooks(req: Request, res: Response) {
-    const userId = new ObjectId(req?.user?._id);
     const event: any = await handleEvents({ payload: req.body }, "CONNECT_ACCOUNTS");
-    await PaymentSvc.handleWebhooks(event, userId);
+    await PaymentSvc.handleWebhooks(event);
     return handleResponse(res, {}, "PAYMENT_WEBHOOK");
   }
 
   static async handleAccountWebhooks(req: Request, res: Response) {
-    const userId = new ObjectId(req?.user?._id);
     const event: any = await handleEvents({ payload: req.body }, "ACCOUNTS");
-    await PaymentSvc.handleWebhooks(event, userId);
+    await PaymentSvc.handleWebhooks(event);
     return handleResponse(res, {}, "PAYMENT_WEBHOOK");
   }
 
