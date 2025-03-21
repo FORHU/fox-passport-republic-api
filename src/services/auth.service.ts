@@ -367,7 +367,8 @@ export default class AuthSvc {
   static async verifyEmail(token: string) {
     try {
       const decodedToken = verifyToken(token);
-      const userId = new ObjectId(decodedToken._id);
+
+      const userId = new ObjectId(decodedToken.id);
       const userDetails = await UserRepo.getUser({ _id: userId, status: user_status.ACTIVE });
 
       if (userDetails) {
