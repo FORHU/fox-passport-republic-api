@@ -544,10 +544,12 @@ export const formatDateTimeAsObject = (newDate: Date) => {
   };
 };
 
-export const accountVerification = async (userId: ObjectId) => {
-  const { is_email_verified, is_stripe_account_verified } = await UserSvc.getOnboardingStatus(String(userId));
-
-  const fully_verified = is_email_verified && is_stripe_account_verified;
-
-  return await UserRepo.updateUser({ _id: userId }, { fully_verified });
+export const accountVerification = async (userId: ObjectId, onboarding: Boolean) => {
+  if (!onboarding) {
+    const { is_email_verified, is_stripe_account_verified } = await UserSvc.getOnboardingStatus(String(userId));
+    const fully_verified = is_email_verified && is_stripe_account_verified;
+    return await UserRepo.updateUser({ _id: userId }, { fully_verified });
+  } else {
+    return await UserRepo.updateUser({ _id: userId }, { fully_verified: true });
+  }
 };
