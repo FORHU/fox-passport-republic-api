@@ -160,7 +160,7 @@ export default class AuthSvc {
 
     await accountVerification(new ObjectId(userId));
 
-    const result = await UserRepo.updateUser({ _id: userId }, { status: user_status.ACTIVE, otp: null });
+    const result = await UserRepo.updateUser({ _id: new ObjectId(userId) }, { status: user_status.ACTIVE, otp: null });
 
     return result;
   }
