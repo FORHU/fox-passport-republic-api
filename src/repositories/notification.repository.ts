@@ -35,6 +35,11 @@ export default class NotificationRepo {
               totalUnreadCount: [{ $count: "count" }],
               unreadCountsByType: [
                 {
+                  $match: {
+                    type: { $nin: ["SPACE", "VENUE"] },
+                  },
+                },
+                {
                   $group: {
                     _id: "$type",
                     count: { $sum: 1 },
