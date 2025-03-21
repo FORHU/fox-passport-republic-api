@@ -71,7 +71,7 @@ export default class PaymentSvc {
             { status: account_status.COMPLETED, updatedAt: new Date() },
           );
           if (updateStripeAccount) {
-            await accountVerification(new ObjectId(userId));
+            await accountVerification(new ObjectId(userId), true);
           }
         }
         break;
