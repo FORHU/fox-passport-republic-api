@@ -28,7 +28,6 @@ import { createPrice, createProduction } from "../utils/stripe";
 import SaleTransactionSvc from "./sale-transactions.service";
 import StripeProductSvc from "./stripe-product.service";
 import UserRolesSvc from "./user-roles.service";
-import UserRepo from "../repositories/user.repository";
 import { pushNotification } from "../utils/firebase/firebase.admin";
 import { metaDataKey, NotificationType } from "../models/notification.model";
 
@@ -102,7 +101,7 @@ export default class AdminSvc {
           { title: notificationTitle, body: notificationBody },
           {
             type: notificationType,
-            venue_id: data,
+            venue_id: String(data),
           },
           { notification: { sound: "default" } },
           { payload: { aps: { sound: "default" } } },
@@ -315,7 +314,7 @@ export default class AdminSvc {
             { title: notificationTitle, body: notificationBody },
             {
               type: notificationType,
-              venue_id: data,
+              space_id: String(data),
             },
             { notification: { sound: "default" } },
             { payload: { aps: { sound: "default" } } },
