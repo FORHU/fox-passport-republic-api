@@ -56,7 +56,7 @@ export const validateGetSpacesSchema = (data: any) => {
     most_popular: Joi.boolean().optional().allow(null),
     recently_listed: Joi.boolean().optional().allow(null),
     country: Joi.string().escapeHTML().optional().allow(null),
-    fully_verified: Joi.string().escapeHTML().optional().allow(null),
+    fully_verified: Joi.alternatives().try(Joi.boolean(), Joi.string().valid("true")).optional().allow(null),
   });
 
   return schema.validate(data);

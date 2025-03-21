@@ -13,7 +13,14 @@ import { account_transcation_status } from "../models/stripe-account-transaction
 import PaymentRepo from "../repositories/payment.respository";
 import { STRIPE_EVENTS } from "../utils/constant";
 import { extractTime } from "../utils/enquiries/helpers";
-import { convertCentsToDollars, convertDollarsToCents, convertToIsoDate, formatDateTimeToIso, sendTemplatedEmail } from "../utils/helpers";
+import {
+  accountVerification,
+  convertCentsToDollars,
+  convertDollarsToCents,
+  convertToIsoDate,
+  formatDateTimeToIso,
+  sendTemplatedEmail,
+} from "../utils/helpers";
 import { logger } from "../utils/logger";
 import { useMongoClient, useTransactionOptions } from "../utils/mongo";
 import { initReceiptQueueProcess } from "../utils/queues/receipt";
@@ -34,7 +41,6 @@ import CustomOfferSvc from "./custom-offer.service";
 import EnquirySvc from "./enquiries.service";
 import SpaceSvc from "./space.service";
 import StripeAccountSvc from "./stripe-account.service";
-import TodoRepo from "../repositories/stripe-account.repository";
 import StripeAccountTransactionSvc from "./stripe-account-transaction.service";
 import UserSvc from "./user.service";
 import VenueSvc from "./venue.service";
@@ -65,10 +71,7 @@ export default class PaymentSvc {
             { status: account_status.COMPLETED, updatedAt: new Date() },
           );
           if (updateStripeAccount) {
-            const userData = await UserRepo.getUser({ _id: userId });
-            if (userData && userData.status === user_status.ACTIVE) {
-              await UserRepo.updateUser({ _id: userId }, { fully_verified: true });
-            }
+            await accountVerification(new ObjectId(userId));
           }
         }
         break;

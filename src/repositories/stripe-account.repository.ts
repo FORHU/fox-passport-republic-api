@@ -4,7 +4,7 @@ import RedisUtil from "../utils/redis.util";
 
 const PREFIX_USER = "user";
 
-export default class TodoRepo {
+export default class StripeAccountRepo {
   static collection() {
     return getDB().collection("stripe-account");
   }

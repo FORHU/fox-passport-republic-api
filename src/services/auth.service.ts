@@ -12,7 +12,7 @@ import { DevicePayload } from "../types/admin";
 import { generateAccessToken, generateRefreshToken, generateVerificationToken, verifyToken } from "../utils/auth";
 import { USER_ROLES } from "../utils/constant";
 import { handleSendEmail } from "../utils/email.utils";
-import { generateOTP } from "../utils/helpers";
+import { accountVerification, generateOTP } from "../utils/helpers";
 import UserSvc from "./user.service";
 import TodoRepo from "../repositories/stripe-account.repository";
 import { account_status } from "../models/stripe-account.model";
@@ -158,16 +158,11 @@ export default class AuthSvc {
       };
     }
 
-    let updateUser = null;
+    await accountVerification(new ObjectId(userId));
 
-    const userStripeAccount = await StripeAccountSvc.getAccount({ user: userId });
-    if (userStripeAccount && userStripeAccount.status === account_status.COMPLETED) {
-      updateUser = await UserRepo.updateUser({ _id: userId }, { status: user_status.ACTIVE, fully_verified: true, otp: null });
-    } else {
-      updateUser = await UserRepo.updateUser({ _id: userId }, { status: user_status.ACTIVE, otp: null });
-    }
+    const result = await UserRepo.updateUser({ _id: userId }, { status: user_status.ACTIVE, otp: null });
 
-    return updateUser;
+    return result;
   }
 
   static async login(
@@ -379,16 +374,14 @@ export default class AuthSvc {
         throw new Error("EMAIL_ALREADY_VERIFIED");
       }
 
-      let updateUser = null;
+      await accountVerification(new ObjectId(userId));
 
-      const userStripeAccount = await StripeAccountSvc.getAccount({ user: userId });
-      if (userStripeAccount && userStripeAccount.status === account_status.COMPLETED) {
-        updateUser = await UserRepo.updateUser({ _id: userId }, { status: user_status.ACTIVE, fully_verified: true });
-      } else {
-        updateUser = await UserRepo.updateUser({ _id: userId }, { status: user_status.ACTIVE });
-      }
-
-      return updateUser;
+      return await UserRepo.updateUser(
+        { _id: userId },
+        {
+          status: user_status.ACTIVE,
+        },
+      );
     } catch (error) {
       if (error.message === "EMAIL_ALREADY_VERIFIED") {
         throw error;
