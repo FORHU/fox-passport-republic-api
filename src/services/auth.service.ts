@@ -158,7 +158,7 @@ export default class AuthSvc {
       };
     }
 
-    await accountVerification(new ObjectId(userId), false);
+    await accountVerification(new ObjectId(userId));
 
     const result = await UserRepo.updateUser({ _id: new ObjectId(userId) }, { status: user_status.ACTIVE, otp: null });
 
@@ -375,7 +375,7 @@ export default class AuthSvc {
         throw new Error("EMAIL_ALREADY_VERIFIED");
       }
 
-      await accountVerification(new ObjectId(userId), false);
+      await accountVerification(new ObjectId(userId));
 
       return await UserRepo.updateUser(
         { _id: userId },
