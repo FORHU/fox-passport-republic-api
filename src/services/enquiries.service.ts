@@ -17,9 +17,7 @@ import InboxSvc from "./inbox.service";
 import MessageSvc from "./message.services";
 import UserSvc from "./user.service";
 import VenueSvc from "./venue.service";
-import { NotificationStatusType, NotificationType, TNotications } from "../models/notification.model";
 import NotificationSvc from "./notification.service";
-import { initializeFirebaseAdmin } from "../utils/firebase/firebase.admin";
 
 export default class EnquirySvc {
   static async createEnquiry(data: TEnquiries, message: string, tenant?: any) {
@@ -92,7 +90,6 @@ export default class EnquirySvc {
     const senderId = new ObjectId(user?._id as string);
 
     const [_venue]: any = await VenueSvc.getVenue({ _id: _space.venue });
-    const receiverId = _venue?.user?._id;
     const room_id: string = generateRoomId();
 
     const formattedDate = dateFormat(date);
@@ -131,42 +128,6 @@ export default class EnquirySvc {
     };
 
     await MessageSvc.bulkCreateMessage([messagePayload, initialMessagePayload]);
-    const firebaseAdmin = initializeFirebaseAdmin();
-
-    const pushNotification = {
-      notification: {
-        title: "New Inquiry",
-        body: "You have a new inquiry to review.",
-      },
-      data: {
-        type: NotificationType.INQUIRY,
-        enquiryId: String(enquiryId),
-      },
-      android: {
-        notification: {
-          sound: "default",
-        },
-      },
-      apns: {
-        payload: {
-          aps: {
-            sound: "default",
-          },
-        },
-      },
-      topic: String(receiverId),
-    };
-
-    const notificationData: TNotications = {
-      sender: senderId,
-      receiver: receiverId,
-      metadata: { enquiry_id: enquiryId },
-      title: pushNotification.notification.title,
-      body: pushNotification.notification.body,
-      status: NotificationStatusType.UNREAD,
-    };
-
-    await Promise.all([NotificationSvc.createNotification(notificationData), firebaseAdmin.messaging().send(pushNotification)]);
 
     const enquiryData = {
       _id: enquiryId,
@@ -300,7 +261,7 @@ export default class EnquirySvc {
     } else {
       [totalItems, data] = await Promise.all([
         EnquirySvc.getTotalCountEnquiry(query),
-        EnquirySvc.getEnquiries(query, offset, limitNumber, censorPhoneNumber),
+        EnquirySvc.getEnquiries(query, offset, limitNumber, censorPhoneNumber, userId),
       ]);
     }
 
@@ -311,8 +272,11 @@ export default class EnquirySvc {
     return EnquiryRepo.countEnquiries(query);
   }
 
-  static getEnquiries(query: any, skip?: number, limit?: number, toggle_censor?: boolean) {
-    return EnquiryRepo.getEnquiries(query, skip, limit, toggle_censor);
+  static async getEnquiries(query: any, skip?: number, limit?: number, toggle_censor?: boolean, userId?: ObjectId) {
+    if (query._id) {
+      await NotificationSvc.updateNotification({ "metadata.enquiry_id": query._id, receiver: userId }, { read: true });
+    }
+    return EnquiryRepo.getEnquiries(query, skip, limit, toggle_censor, userId);
   }
 
   static getEnquiriesFromMicroservice(payload: any) {

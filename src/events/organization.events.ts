@@ -17,6 +17,7 @@ import { sendTemplatedEmail } from "../utils/helpers";
 import { logger } from "../utils/logger";
 import { metaDataKey, NotificationType } from "../models/notification.model";
 import { pushNotification } from "../utils/firebase/firebase.admin";
+import NotificationSvc from "../services/notification.service";
 
 interface AuthenticatedSocket extends Socket {
   user?: any;
@@ -87,7 +88,6 @@ export default (io: Server) => {
           attachments: attachmentFiles,
           createdAt: new Date().toISOString(),
         });
-        //save message by room_id
         const inbox: any = await InboxSvc.getInbox({ room_id });
 
         let enquiry = null;
@@ -110,6 +110,13 @@ export default (io: Server) => {
         const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
         const senderId = senderUser._id;
 
+        const tenSecondsAgo = new Date(Date.now() - 10 * 1000);
+        const existingNotification = await NotificationSvc.getOneNotification({
+          title: "New Inquiry",
+          createdAt: { $lte: tenSecondsAgo },
+          "metadata.enquiry_id": enquiry._id,
+        });
+
         const participants = {
           senderId,
           receiverId,
@@ -117,18 +124,28 @@ export default (io: Server) => {
         };
 
         const metadata = {
-          key: metaDataKey.ENQUIRY_ID,
-          value: String(enquiry._id),
+          [metaDataKey.ENQUIRY_ID]: enquiry._id,
         };
 
-        await pushNotification(
-          { title: sender_full_name, body: message },
-          { type: NotificationType.INQUIRY, enquiryId: String(enquiry._id) },
-          { notification: { sound: "default" } },
-          { payload: { aps: { sound: "default" } } },
-          participants,
-          metadata,
-        );
+        if (existingNotification) {
+          await pushNotification(
+            { title: sender_full_name, body: message },
+            { type: NotificationType.INQUIRY, enquiryId: String(enquiry._id) },
+            { notification: { sound: "default" } },
+            { payload: { aps: { sound: "default" } } },
+            participants,
+            metadata,
+          );
+        } else {
+          await pushNotification(
+            { title: "New Inquiry", body: "You have a new inquiry to review." },
+            { type: NotificationType.INQUIRY, enquiryId: String(enquiry._id) },
+            { notification: { sound: "default" } },
+            { payload: { aps: { sound: "default" } } },
+            participants,
+            metadata,
+          );
+        }
 
         logger.log({
           level: "info",
@@ -239,8 +256,8 @@ export default (io: Server) => {
       };
 
       const metadata = {
-        key: metaDataKey.CUSTOM_OFFER_ID,
-        value: String(custom_offer_id),
+        [metaDataKey.CUSTOM_OFFER_ID]: custom_offer_id,
+        [metaDataKey.ENQUIRY_ID]: enquiry._id,
       };
 
       await pushNotification(
@@ -274,8 +291,8 @@ export default (io: Server) => {
         };
 
         const metadata = {
-          key: metaDataKey.CUSTOM_OFFER_ID,
-          value: String(custom_offer_id),
+          [metaDataKey.CUSTOM_OFFER_ID]: custom_offer_id,
+          [metaDataKey.ENQUIRY_ID]: enquiry._id,
         };
 
         await pushNotification(
@@ -357,6 +374,41 @@ export default (io: Server) => {
         createdAt: new Date().toISOString(),
       });
       await MessageSvc.createMessage(messagePayload);
+    });
+
+    socket.on("notification_count", async () => {
+      try {
+        const user = socket.user;
+
+        if (!user) {
+          io.to(user._id).emit("notification_count", {
+            success: false,
+            code: "USER_NOT_AUTHENTICATED",
+            message: "User is not authenticated",
+          });
+          return;
+        }
+
+        const query = {
+          receiver: new ObjectId(user._id),
+          read: false,
+        };
+
+        const count = await NotificationSvc.getUnreadNotificationsCount(query);
+
+        io.to(user._id).emit("notification_count", {
+          success: true,
+          code: "NOTIFICATION_COUNT_FETCHED_SUCCESSFULLY",
+          data: count,
+        });
+      } catch (error) {
+        console.error("Error fetching notification count:", error);
+        socket.emit("notification_count", {
+          success: false,
+          code: "NOTIFICATION_COUNT_FETCH_FAILED",
+          message: "Failed to fetch notification count",
+        });
+      }
     });
 
     socket.on("disconnect", () => {

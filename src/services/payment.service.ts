@@ -13,7 +13,14 @@ import { account_transcation_status } from "../models/stripe-account-transaction
 import PaymentRepo from "../repositories/payment.respository";
 import { STRIPE_EVENTS } from "../utils/constant";
 import { extractTime } from "../utils/enquiries/helpers";
-import { convertCentsToDollars, convertDollarsToCents, convertToIsoDate, formatDateTimeToIso, sendTemplatedEmail } from "../utils/helpers";
+import {
+  accountVerification,
+  convertCentsToDollars,
+  convertDollarsToCents,
+  convertToIsoDate,
+  formatDateTimeToIso,
+  sendTemplatedEmail,
+} from "../utils/helpers";
 import { logger } from "../utils/logger";
 import { useMongoClient, useTransactionOptions } from "../utils/mongo";
 import { initReceiptQueueProcess } from "../utils/queues/receipt";
@@ -39,6 +46,8 @@ import UserSvc from "./user.service";
 import VenueSvc from "./venue.service";
 import VenueSubscriptionSvc from "./venue-subscription.service";
 import UserRepo from "../repositories/user.repository";
+import { user_status } from "../models/user.model";
+import StripeAccountRepo from "../repositories/stripe-account.repository";
 
 export default class PaymentSvc {
   static createPayment(data: TPayment) {
@@ -58,7 +67,17 @@ export default class PaymentSvc {
       case STRIPE_EVENTS.ACCOUNT_UPDATED:
         const account = await getAccount(event.account);
         if (account && account?.charges_enabled && account?.details_submitted) {
-          await StripeAccountSvc.updateAccount({ stripe_account_id: account?.id }, { status: account_status.COMPLETED, updatedAt: new Date() });
+          const updateStripeAccount = await StripeAccountSvc.updateAccount(
+            { stripe_account_id: account?.id },
+            { status: account_status.COMPLETED, updatedAt: new Date() },
+          );
+          if (updateStripeAccount) {
+            const stripeAccount = await StripeAccountRepo.getAccount({ stripe_account_id: account?.id });
+            const userDetails = await UserSvc.getUser({ _id: stripeAccount.user });
+            if (userDetails.status === "ACTIVE") {
+              await UserSvc.updateUser({ _id: userDetails._id }, { fully_verified: true });
+            }
+          }
         }
         break;
       case STRIPE_EVENTS.PAYMENT_ATTACHED:
@@ -95,6 +114,7 @@ export default class PaymentSvc {
         break;
     }
   }
+
   static async processPayment(enquiry_id: string, user: any, enquiry: any, tenant?: any) {
     const venue_owner = new ObjectId(user._id as string);
 

@@ -39,6 +39,7 @@ export const constructQuery = (params: any, startTime?: any, endTime?: any, filt
     start_date,
     tenant_code,
     tenant,
+    fully_verified,
   } = params;
   const query: any = {};
   const date = dayjs(start_date);
@@ -59,6 +60,10 @@ export const constructQuery = (params: any, startTime?: any, endTime?: any, filt
       },
     });
   };
+
+  if (fully_verified === true || fully_verified === "true") {
+    query["venue.user.fully_verified"] = true;
+  }
 
   if (mostPopularIds) {
     query._id = { $in: mostPopularIds.map((item: any) => new ObjectId(item._id)) };

@@ -4,6 +4,9 @@ import BookingSvc from "../../../services/booking.service";
 import EnquirySvc from "../../../services/enquiries.service";
 import { logger } from "../../../utils/logger";
 import { createQueue } from "../index";
+import NotificationSvc from "../../../services/notification.service";
+import { pushNotification } from "../../firebase/firebase.admin";
+import { metaDataKey, NotificationType } from "../../../models/notification.model";
 
 // Initialize the queue
 export const enquiryQueue = createQueue("process_enquiries");
@@ -47,12 +50,48 @@ enquiryQueue.process("process_enquiries", async (job: any, done: any) => {
       message: "[Enquiry status]: Process the current batch",
     });
     query["date.timestamp.end_date_time"].$lt = new Date(query["date.timestamp.end_date_time"].$lt);
+
+    const today = new Date();
+    const twoDaysBefore = new Date(today);
+    twoDaysBefore.setDate(today.getDate() - 2);
+
     const enquiries = await EnquirySvc.getEnquiries(query, offset, limit);
     const updatePromises = enquiries.map(async (enquiry) => {
       const [booking] = await BookingSvc.getBookings({ enquiry: enquiry._id }, 0, 10);
+
       if (booking) {
         await BookingSvc.updateBooking(booking._id, { status: newStatus });
       }
+
+      const existingNotification = await NotificationSvc.getOneNotification({
+        title: "Upcoming event",
+        "metadata.enquiry_id": enquiry._id,
+      });
+
+      if (booking.start_date >= twoDaysBefore && !existingNotification) {
+        const metadata = {
+          [metaDataKey.ENQUIRY_ID]: enquiry._id,
+        };
+
+        const receiverIds = [enquiry.user._id, enquiry.venue.user._id];
+        for (const receiverId of receiverIds) {
+          const participants = {
+            senderId: null,
+            receiverId,
+            userId: String(receiverId),
+          };
+
+          await pushNotification(
+            { title: "Upcoming event", body: "You have an upcoming event" },
+            { type: NotificationType.UPCOMING_EVENT, enquiryId: String(enquiry._id) },
+            { notification: { sound: "default" } },
+            { payload: { aps: { sound: "default" } } },
+            participants,
+            metadata,
+          );
+        }
+      }
+
       return EnquirySvc.updateEnquiry({ _id: enquiry._id }, { status: newStatus, updatedAt: new Date() });
     });
     await Promise.all(updatePromises);

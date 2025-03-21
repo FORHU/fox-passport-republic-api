@@ -118,8 +118,8 @@ export default class CustomOfferSvc {
             };
 
             const metadata = {
-              key: metaDataKey.CUSTOM_OFFER_ID,
-              value: String(_id),
+              [metaDataKey.CUSTOM_OFFER_ID]: _id,
+              [metaDataKey.ENQUIRY_ID]: enquiry._id,
             };
 
             pushNotification(

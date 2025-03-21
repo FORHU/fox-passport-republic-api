@@ -4,13 +4,17 @@ import RedisUtil from "../utils/redis.util";
 
 const PREFIX_USER = "user";
 
-export default class TodoRepo {
+export default class StripeAccountRepo {
   static collection() {
     return getDB().collection("stripe-account");
   }
 
   static getAccount(query: any) {
     return this.collection().findOne(query);
+  }
+
+  static getAccounts(query: any) {
+    return this.collection().find(query).toArray();
   }
 
   static async createAccount(data: TStripeAccount) {

@@ -39,6 +39,8 @@ import { initAddVenueQueue } from "../utils/queues/venue/add-venue.queue";
 import { validateUpdateRatingSchema } from "../utils/rating/validation";
 import { handleErrorResponse, handleResponse } from "../utils/reponse";
 import { initRemoveFileQueue } from "../utils/queues/files/file-remove-do";
+import StripeAccountSvc from "../services/stripe-account.service";
+import { account_status } from "../models/stripe-account.model";
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -49,6 +51,7 @@ export default class AdminCtrl {
       const _id = new ObjectId(req.params.venue_id);
       const { status } = req.body;
       const tenant = req?.tenant;
+      const adminId = new ObjectId(req?.user?._id);
 
       const { error } = validateUpdateVenueStatus(req.body);
       if (error) {
@@ -67,7 +70,7 @@ export default class AdminCtrl {
         await AdminSvc.updateAssociatedSpaces({ _id: { $in: associatedSpaceIds } }, { status: newStatus, updatedAt: new Date() }, tenant);
       }
 
-      const result = await AdminSvc.updateVenue(_id, status, req?.tenant);
+      const result = await AdminSvc.updateVenue(_id, status, req?.tenant, adminId);
       return handleResponse(res, result, "VENUE_UPDATED_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
@@ -103,7 +106,7 @@ export default class AdminCtrl {
     try {
       const query = { _id: new ObjectId(req.params.space_id) };
       const { status } = req.body;
-
+      const adminId = new ObjectId(req?.user?._id);
       const { error } = validateUpdateSpaceStatus(req.body);
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
@@ -114,7 +117,7 @@ export default class AdminCtrl {
         updatedAt: new Date(),
       };
 
-      const result = await AdminSvc.updateSpace(query, data, req?.tenant);
+      const result = await AdminSvc.updateSpace(query, data, req?.tenant, adminId);
       return handleResponse(res, result, "SPACE_UPDATED_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
@@ -603,6 +606,48 @@ export default class AdminCtrl {
       return handleResponse(res, {}, "REMOVE_DO_FILES_SUCCESSFULLY");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "INTERNAL_SERVER_ERROR" });
+    }
+  }
+
+  static async migrateUsers(req: Request, res: Response) {
+    try {
+      let userStripeAccountIds: ObjectId[] = [];
+
+      const userStripeAccounts = await StripeAccountSvc.getAccounts({ status: account_status.COMPLETED });
+      userStripeAccountIds = userStripeAccounts.map((account) => account.user);
+
+      const userStripeAccountIdsStr = userStripeAccountIds.map((id) => id.toString());
+
+      const activeUsers = await UserSvc.getUsers({ status: "ACTIVE" });
+      const activeUserIdsStr = activeUsers.map((user) => user._id.toString());
+
+      const inactivePendingUsers = await UserSvc.getUsers({ status: { $in: ["INACTIVE", "PENDING"] } });
+      const inactivePendingUserIds = inactivePendingUsers.map((user) => user._id);
+
+      const activeUsersWithStripe = activeUserIdsStr
+        .filter((userIdStr) => userStripeAccountIdsStr.includes(userIdStr))
+        .map((idStr) => new ObjectId(idStr));
+
+      const activeUsersWithoutStripe = activeUserIdsStr
+        .filter((userIdStr) => !userStripeAccountIdsStr.includes(userIdStr))
+        .map((idStr) => new ObjectId(idStr));
+
+      await UserSvc.updateManyUsers({ _id: { $in: activeUsersWithStripe } }, { fully_verified: true });
+
+      await UserSvc.updateManyUsers({ _id: { $in: inactivePendingUserIds } }, { fully_verified: false });
+
+      await UserSvc.updateManyUsers({ _id: { $in: activeUsersWithoutStripe } }, { fully_verified: false });
+
+      const result = {
+        verifiedActiveUsersWithStripe: activeUsersWithStripe.length,
+        unverifiedInactivePendingUsers: inactivePendingUserIds.length,
+        unverifiedActiveWithoutStripe: activeUsersWithoutStripe.length,
+      };
+
+      return handleResponse(res, result, "USER_VERIFICATION_MIGRATION_SUCCESSFUL");
+    } catch (error) {
+      console.error("Error migrating users:", error);
+      return handleErrorResponse(res, error, { code: "USER_VERIFICATION_MIGRATION_FAILED" });
     }
   }
 }

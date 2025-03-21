@@ -1,6 +1,6 @@
 import firebaseAdmin from "firebase-admin";
 import { FIREBASE_PRIVATE_KEY, FIREBASE_CLIENT_EMAIL, FIREBASE_PROJECT_ID } from "../../config";
-import { metaDataKey, NotificationStatusType, NotificationType, TNotications } from "../../models/notification.model";
+import { metaDataKey, NotificationType, TNotifications } from "../../models/notification.model";
 import { ObjectId } from "mongodb";
 import NotificationSvc from "../../services/notification.service";
 
@@ -48,10 +48,7 @@ type NotificationParticipants = {
   userId: string;
 };
 
-type NotificationMetadata = {
-  key: metaDataKey;
-  value: string;
-};
+type NotificationMetadata = Partial<Record<metaDataKey, ObjectId>>;
 
 export const pushNotification = async (
   notification: notification,
@@ -72,13 +69,14 @@ export const pushNotification = async (
       topic: participants.userId,
     };
 
-    const notificationData: TNotications = {
+    const notificationData: TNotifications = {
       sender: participants.senderId,
       receiver: participants.receiverId,
-      metadata: { [metadata.key]: metadata.value },
+      type: data.type,
+      metadata,
       title: notification.title,
       body: notification.body,
-      status: NotificationStatusType.UNREAD,
+      read: false,
     };
 
     await Promise.all([NotificationSvc.createNotification(notificationData), firebaseAdmin.messaging().send(pushNotification)]);

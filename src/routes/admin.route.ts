@@ -73,6 +73,9 @@ router.patch("/migrate-user-logs", [...ADMIN_MIDDLEWARE], AdminCtrl.migrateUserL
 //migrate user email
 router.patch("/migrate-user-email", [...ADMIN_MIDDLEWARE], AdminCtrl.migrateUserEmail);
 
+//migrate user fully verified
+router.post("/migrate", [...ADMIN_MIDDLEWARE], AdminCtrl.migrateUsers);
+
 //rating
 router.get("/ratings", [...ADMIN_MIDDLEWARE, tenantMiddleware], AdminCtrl.getRatings);
 router.patch("/rating/:rating_id", [...ADMIN_MIDDLEWARE], AdminCtrl.updateRating);

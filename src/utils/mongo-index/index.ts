@@ -1,4 +1,3 @@
-import { enquiryQueue } from "../queues/enquiries/enquries-status.queue";
 import { createBookingIndex } from "./booking";
 import { createFavoriteIndex } from "./favorite";
 import { createPricingIndex } from "./pricing";
@@ -6,6 +5,7 @@ import { createSpaceIndex } from "./space";
 import { createUserLogsIndex } from "./user-logs";
 import { createUserIndex } from "./users";
 import { createVenueIndex } from "./venue";
+import { createNotificationIndex } from "./notiifcation";
 
 export const InitializeCreateIndex = (db: any) => {
   return Promise.allSettled([
@@ -16,6 +16,7 @@ export const InitializeCreateIndex = (db: any) => {
     createFavoriteIndex(db),
     createPricingIndex(db),
     createUserLogsIndex(db),
+    createNotificationIndex(db),
   ]);
 };
 

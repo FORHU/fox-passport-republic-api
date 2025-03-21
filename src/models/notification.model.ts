@@ -1,51 +1,55 @@
 import { ObjectId } from "mongodb";
 
-export enum NotificationStatusType {
-  READ = "READ",
-  UNREAD = "UNREAD",
-}
-
 export enum NotificationType {
   INQUIRY = "INQUIRY",
   BOOKING_CONFIRMED = "BOOKING_CONFIRMED",
   BOOKING_CANCELLED = "BOOKING_CANCELLED",
   CUSTOM_OFFER = "CUSTOM_OFFER",
   CUSTOM_OFFER_CANCELLED = "CUSTOM_OFFER_CANCELLED",
+  VENUE = "VENUE",
+  SPACE = "SPACE",
+  UPCOMING_EVENT = "UPCOMING_EVENT",
 }
 
 export enum metaDataKey {
   ENQUIRY_ID = "enquiry_id",
   BOOKING_ID = "booking_id",
   CUSTOM_OFFER_ID = "custom_offer_id",
+  VENUE_ID = "venue_id",
+  SPACE_ID = "space_id",
 }
-export interface TNotications {
+export interface TNotifications {
   _id?: ObjectId;
   sender: ObjectId;
   receiver: ObjectId;
+  type?: NotificationType;
   metadata?: {
     enquiry_id?: ObjectId;
     booking_id?: ObjectId;
+    custom_offer_id?: ObjectId;
   };
   title?: string;
   body?: string;
-  status?: NotificationStatusType;
+  read?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;
   deletedBy?: ObjectId;
 }
 
-export class MNotications implements Partial<TNotications> {
+export class MNotifications implements Partial<TNotifications> {
   _id?: ObjectId;
   sender: ObjectId;
   receiver: ObjectId;
   title?: string;
+  type?: NotificationType;
   metadata?: {
     enquiry_id?: ObjectId;
     booking_id?: ObjectId;
+    custom_offer_id?: ObjectId;
   };
   body?: string;
-  status?: NotificationStatusType;
+  read?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;
@@ -57,22 +61,24 @@ export class MNotications implements Partial<TNotications> {
       sender,
       receiver,
       metadata,
+      type,
       title,
       body,
-      status,
+      read,
       createdAt = new Date(),
       updatedAt,
       deletedAt,
       deletedBy,
-    }: TNotications = {} as TNotications,
+    }: TNotifications = {} as TNotifications,
   ) {
     this._id = _id;
     this.sender = sender;
     this.receiver = receiver;
     this.metadata = metadata;
     this.title = title;
+    this.type = type;
     this.body = body;
-    this.status = status;
+    this.read = read;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
     this.deletedAt = deletedAt;

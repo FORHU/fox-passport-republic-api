@@ -32,7 +32,6 @@ import RatingSvc from "./rating.service";
 import UserSvc from "./user.service";
 import UserLogsSvc from "./user-logs.service";
 import VenueSvc from "./venue.service";
-import UserRepo from "../repositories/user.repository";
 
 const PREFIX = "spaces";
 const PREFIX_USER_LOGS = "user_logs";
@@ -54,7 +53,6 @@ export default class SpaceSvc {
         results.map(async (result: any) => {
           const [rating] = await RatingSvc.getOverAllRating(result._id.toString());
           if (!rating) return { ...result, rating: { averageRating: 0, totalRating: 0, totalReviews: 0 } };
-          // eslint-disable-next-line no-unused-vars
           const { details, ...ratingWithoutDetails } = rating;
           return { ...result, rating: ratingWithoutDetails };
         }),
@@ -146,13 +144,11 @@ export default class SpaceSvc {
       let updatedList = null;
 
       if (!cacheSpacePayload) {
-        // Fetch spaces from the database
         list = await this.getPaginatedSpaces(spacesPayload);
-        // Get pricing details for spaces
+
         const spaceIdList = list.map((s: any) => new ObjectId(s._id as string));
         const priceList = await PricingRepo.getPrices({ space_id: { $in: spaceIdList } });
 
-        // Transform pricing data
         const transformedPriceList: PricingData[] = priceList.map((price: any) => ({
           space_id: price.space_id.toString(),
           selected_pricing: price.selected_pricing || null,
@@ -279,14 +275,7 @@ export default class SpaceSvc {
     if (userRole !== "ADMIN" && [space_status.REQUIRES_CONSENT, space_status.PENDING].includes(status)) {
       throw new Error("Only ADMIN can set the status to PENDING or REQUIRES_CONSENT.");
     }
-    // if (name !== null && name !== undefined && name !== "") {
-    //   const space_name = await this.getSpace({ name: name });
-    //   if (space_name && String(space_name?._id) !== String(spaceId)) {
-    //     throw new Error("Space name already exists");
-    //   }
-    // }
 
-    //saving old files objectId
     const oldSpacePhoto = space.space_photo;
     const oldFloorPlan = space.floor_plan;
     const oldMenuPhoto = space.menu_photo;
@@ -299,7 +288,6 @@ export default class SpaceSvc {
       return array ? array.map((_id: string) => new ObjectId(_id)) : null;
     };
 
-    // eslint-disable-next-line no-unused-vars
     const updateQuestionData = async (data: any, existingData: any[]) => {
       if (data) {
         if (existingData && existingData.length > 0) {
@@ -311,7 +299,6 @@ export default class SpaceSvc {
         const result = await QuestionSvc.createQuestions(parsedData);
         const upsertedIds = result.upsertedIds;
 
-        // eslint-disable-next-line no-unused-vars
         return Object.entries(upsertedIds).map(([key, value]) => new ObjectId(value as string));
       }
     };
@@ -496,7 +483,6 @@ export default class SpaceSvc {
         venue = JSON.parse(cacheVenue);
       }
 
-      //venue = await VenueSvc.getVenue({ "address.country": params.location, status: "PUBLISHED" });
       const venueIds = venue.map((v: any) => new ObjectId(v._id));
 
       let spaceIds = null;
@@ -583,13 +569,11 @@ export default class SpaceSvc {
     const summarizedPricing = await getSummarizedPricing(transformedPriceList);
     const pricingMap = new Map(summarizedPricing.map((item: any) => [item.space_id, item]));
 
-    // Attach summarized pricing to spaces
-    // eslint-disable-next-line prefer-const
     updatedList = list.map((space: any) => ({
       ...space,
       pricing_summary: pricingMap.get(space._id.toString()) || null,
     }));
-    // {Section end}
+
     const result: any = {
       data: updatedList,
       total_pages: Math.ceil(list_count / limitNumber) || 0,
@@ -619,7 +603,6 @@ export default class SpaceSvc {
     const limitNumber = Number(limit);
     const skip = (pageNumber - 1) * limitNumber;
 
-    // checker of redis of count of spaces
     let list_count = null;
     const hashCountSpace = hashSearch(query);
     const cacheCountSpace = await RedisUtil.getCache(hashCountSpace, PREFIX_USER_LOGS);
@@ -630,7 +613,6 @@ export default class SpaceSvc {
       list_count = JSON.parse(cacheCountSpace);
     }
 
-    // checker of redis of lists of spaces
     let lists = null;
     const hashSpaceList = hashSearch({ query, pageNumber, limitNumber });
     const cacheSpaceList = await RedisUtil.getCache(hashSpaceList, PREFIX_USER_LOGS);
@@ -671,14 +653,12 @@ export default class SpaceSvc {
     let dayOfWeek: any;
     let filteredSpaces: any;
 
-    // Process dayOfWeek if only start_date is provided
     if (start_date && !start_time && !end_time) {
       const date = dayjs(start_date);
       dayOfWeek = date.format("dddd").toUpperCase();
       filteredSpaces = await processBookingsAndPricing(start_date, dayOfWeek);
     }
 
-    // Construct query
     const query = constructQuery(params, start_time, end_time, filteredSpaces);
     const pageNumber = parseInt(page.toString());
     const limitNumber = parseInt(limit.toString());
@@ -887,7 +867,6 @@ export default class SpaceSvc {
     }
   }
 
-  //not use methods
   static async deleteSpace(query: any, data: any, tenant?: any) {
     let message = null;
     try {

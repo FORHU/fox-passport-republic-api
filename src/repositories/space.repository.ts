@@ -33,7 +33,6 @@ export default class SpaceRepository {
     try {
       const pipeline = [];
 
-      // 1. Initial lookups
       pipeline.push(
         {
           $lookup: {
@@ -195,7 +194,6 @@ export default class SpaceRepository {
         },
       );
 
-      // 2. Filter by marked_as_favorite
       pipeline.push({
         $lookup: {
           from: "favorites",
@@ -221,7 +219,6 @@ export default class SpaceRepository {
         });
       }
 
-      // 3. Exclude spaces with bookings within the specified date range
       if (startDate && endDate) {
         pipeline.push({
           $match: {
@@ -243,87 +240,10 @@ export default class SpaceRepository {
         });
       }
 
-      // pipeline.push(
-      //   {
-      //     $unwind: {
-      //       path: "$space_photo",
-      //       preserveNullAndEmptyArrays: true,
-      //     },
-      //   },
-      //   {
-      //     $sort: {
-      //       "space_photo.createdAt": 1,
-      //     },
-      //   },
-      // {
-      //   $group: {
-      //     _id: "$_id",
-      //     space_photo: { $push: "$space_photo" },
-      //     name: { $first: "$name" },
-      //     type: { $first: "$type" },
-      //     representation: { $first: "$representation" },
-      //     description: { $first: "$description" },
-      //     venue: { $first: "$venue" },
-      //     venue_photo: { $first: "$venue_photo" },
-      //     floor_plan: { $first: "$floor_plan" },
-      //     capacity_layout: { $first: "$capacity_layout" },
-      //     guest_capacity: { $first: "$guest_capacity" },
-      //     marked_as_favorite: { $first: "$marked_as_favorite" },
-      //     features: { $first: "$features" },
-      //     keywords: { $first: "$keywords" },
-      //     pricing: { $first: "$pricing" },
-      //     status: { $first: "$status" },
-      //     form_steps: { $first: "$form_steps" },
-      //     createdAt: { $first: "$createdAt" },
-      //     updatedAt: { $first: "$updatedAt" },
-      //     deletedAt: { $first: "$deletedAt" },
-      //     deletedBy: { $first: "$deletedBy" },
-      //   },
-      // },
-      // {
-      //   $unwind: {
-      //     path: "$venue_photo",
-      //     preserveNullAndEmptyArrays: true,
-      //   },
-      // },
-      // {
-      //   $sort: {
-      //     "venue_photo.createdAt": 1,
-      //   },
-      // },
-      // {
-      //   $group: {
-      //     _id: "$_id",
-      //     space_photo: { $first: "$space_photo" },
-      //     venue_photo: { $push: "$venue_photo" },
-      //     name: { $first: "$name" },
-      //     type: { $first: "$type" },
-      //     representation: { $first: "$representation" },
-      //     description: { $first: "$description" },
-      //     venue: { $first: "$venue" },
-      //     floor_plan: { $first: "$floor_plan" },
-      //     capacity_layout: { $first: "$capacity_layout" },
-      //     guest_capacity: { $first: "$guest_capacity" },
-      //     marked_as_favorite: { $first: "$marked_as_favorite" },
-      //     features: { $first: "$features" },
-      //     keywords: { $first: "$keywords" },
-      //     pricing: { $first: "$pricing" },
-      //     status: { $first: "$status" },
-      //     form_steps: { $first: "$form_steps" },
-      //     createdAt: { $first: "$createdAt" },
-      //     updatedAt: { $first: "$updatedAt" },
-      //     deletedAt: { $first: "$deletedAt" },
-      //     deletedBy: { $first: "$deletedBy" },
-      //   },
-      // },
-      //);
-
-      // 4. Additional query filters
       if (Object.keys(query).length > 0) {
         pipeline.push({ $match: query });
       }
 
-      // 5. Final projection
       pipeline.push({
         $project: {
           _id: 1,
@@ -341,6 +261,7 @@ export default class SpaceRepository {
                   last_name: "$venue.user.last_name",
                   email: "$venue.user.email",
                   phone_number: "$venue.user.phone_number",
+                  fully_verified: "$venue.user.fully_verified",
                 },
               },
             ],
@@ -376,7 +297,6 @@ export default class SpaceRepository {
         },
       });
 
-      // 6. Sorting, skipping, and limiting
       pipeline.push({
         $addFields: {
           latestDate: { $max: ["$updatedAt", "$createdAt"] },

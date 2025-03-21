@@ -35,7 +35,7 @@ import {
 import EnquirySvc from "./enquiries.service";
 import PaymentSvc from "./payment.service";
 import PricingSvc from "./pricing.service";
-import { metaDataKey, NotificationStatusType, NotificationType, TNotications } from "../models/notification.model";
+import { metaDataKey, NotificationType } from "../models/notification.model";
 import { pushNotification } from "../utils/firebase/firebase.admin";
 
 type UpdateBookingOptions = {
@@ -53,7 +53,6 @@ const PREFIX = "bookings";
 
 export default class BookingSvc {
   static async createBooking(data: TBooking) {
-    //add toggle
     if (IS_BOOKING_MICROSERVICES) {
       return handleInitCreateBooking(data);
     }
@@ -284,7 +283,6 @@ export default class BookingSvc {
     return BookingRepo.getBookings(query, skip, limit, session);
   }
 
-  //microservices calls
   static fetchBookingsFromMicroservices(payload) {
     return handleInitGetBooking({ payload });
   }
@@ -337,7 +335,6 @@ export default class BookingSvc {
       new_start_date = `${parsedDate.format("YYYY-MM-DD")}T${from}:00Z`;
       new_end_date = `${parsedDate.format("YYYY-MM-DD")}T${to}:00Z`;
       const selectedSlot = { from, to };
-      // check if start_time or end_time is available in hire fee slot
       const isAvailable = isSlotWithinAvailableSlot(hireFeeDetails.slots, selectedSlot);
       if (!isAvailable) {
         return { data: { available: false }, message: "SPACE_IS_NOT_AVAILABLE" };
@@ -351,7 +348,6 @@ export default class BookingSvc {
           const start_date: any = `${parsedDate.format("YYYY-MM-DD")}T${start}:00Z`;
           const end_date: any = `${parsedDate.format("YYYY-MM-DD")}T${end}:00Z`;
 
-          // check if start_time or end_time is available in custom price
           isAvailableSlot = isSlotWithinAvailableSlot({ start: price.time.from, end: price.time.to }, { from: start, to: end });
           const existingBooking = await BookingSvc.existingBooking(
             new ObjectId(space),
@@ -363,7 +359,7 @@ export default class BookingSvc {
           if (isAvailableSlot && !existingBooking) {
             from = start;
             to = end;
-            break; // Exit the loop if a valid slot is found
+            break;
           }
         }
       }
@@ -424,10 +420,9 @@ export default class BookingSvc {
       receiverId,
       userId: String(receiverId),
     };
-
     const metadata = {
-      key: metaDataKey.BOOKING_ID,
-      value: String(booking_id),
+      [metaDataKey.BOOKING_ID]: booking_id,
+      [metaDataKey.ENQUIRY_ID]: enquiryData._id,
     };
 
     if (updateData.status === booking_status.CONFIRMED) {
