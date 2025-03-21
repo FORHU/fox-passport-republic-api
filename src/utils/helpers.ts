@@ -546,6 +546,6 @@ export const formatDateTimeAsObject = (newDate: Date) => {
 
 export const accountVerification = async (userId: ObjectId) => {
   const user = await UserSvc.getOnboardingStatus(String(userId));
-  const fully_verified = user.is_email_verified && user.is_stripe_account_verified;
+  const fully_verified = user?.is_email_verified && user?.is_stripe_account_verified;
   return await UserRepo.updateUser({ _id: userId }, { fully_verified });
 };
