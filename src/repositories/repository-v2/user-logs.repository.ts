@@ -11,6 +11,7 @@ export default class UserLogsV2Repo {
 
   static async handleGetMostPopularSpaces(query: Filter<any>, skip: number, limit: number) {
     const { space, venue, user_id, ...cleanedQuery } = query;
+
     const pipeline: any[] = [
       {
         $match: cleanedQuery,
@@ -94,6 +95,14 @@ export default class UserLogsV2Repo {
       },
     );
 
+    if (venue?.user) {
+      pipeline.push({
+        $match: {
+          "venueDetails.user": venue?.user,
+        },
+      });
+    }
+
     if (venue?.address?.country) {
       pipeline.push({
         $match: {
@@ -127,6 +136,21 @@ export default class UserLogsV2Repo {
       },
     });
 
+    pipeline.push({
+      $lookup: {
+        from: "users",
+        localField: "venueDetails.user",
+        foreignField: "_id",
+        as: "userData",
+      },
+    });
+
+    pipeline.push({
+      $set: {
+        userData: { $first: "$userData" },
+      },
+    });
+
     const projectPayload = {
       _id: 1,
       space_details_name: "$spaceDetails.name",
@@ -142,6 +166,14 @@ export default class UserLogsV2Repo {
         _id: "$venueDetails._id",
         name: "$venueDetails.name",
         address: "$venueDetails.address",
+        user: {
+          _id: "$userData._id",
+          first_name: "$userData.first_name",
+          last_name: "$userData.last_name",
+          email: "$userData.email",
+          status: "$userData.status",
+          fully_verified: "$userData.fully_verified",
+        },
       },
       pricing: 1,
       capacity_layout: "$capacity_layout",
@@ -183,6 +215,12 @@ export default class UserLogsV2Repo {
         $limit: limit,
       },
     );
+
+    pipeline.push({
+      $match: {
+        "venue.user.fully_verified": true,
+      },
+    });
 
     try {
       return this.collection().aggregate(pipeline).toArray();
