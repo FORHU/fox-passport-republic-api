@@ -13,7 +13,14 @@ import { account_transcation_status } from "../models/stripe-account-transaction
 import PaymentRepo from "../repositories/payment.respository";
 import { STRIPE_EVENTS } from "../utils/constant";
 import { extractTime } from "../utils/enquiries/helpers";
-import { convertCentsToDollars, convertDollarsToCents, convertToIsoDate, formatDateTimeToIso, sendTemplatedEmail } from "../utils/helpers";
+import {
+  accountVerification,
+  convertCentsToDollars,
+  convertDollarsToCents,
+  convertToIsoDate,
+  formatDateTimeToIso,
+  sendTemplatedEmail,
+} from "../utils/helpers";
 import { logger } from "../utils/logger";
 import { useMongoClient, useTransactionOptions } from "../utils/mongo";
 import { initReceiptQueueProcess } from "../utils/queues/receipt";
@@ -39,6 +46,7 @@ import UserSvc from "./user.service";
 import VenueSvc from "./venue.service";
 import VenueSubscriptionSvc from "./venue-subscription.service";
 import UserRepo from "../repositories/user.repository";
+import { user_status } from "../models/user.model";
 
 export default class PaymentSvc {
   static createPayment(data: TPayment) {
@@ -53,12 +61,18 @@ export default class PaymentSvc {
     return PaymentRepo.updatePayment(query, data);
   }
 
-  static async handleWebhooks(event: any) {
+  static async handleWebhooks(event: any, userId: ObjectId) {
     switch (event.type) {
       case STRIPE_EVENTS.ACCOUNT_UPDATED:
         const account = await getAccount(event.account);
         if (account && account?.charges_enabled && account?.details_submitted) {
-          await StripeAccountSvc.updateAccount({ stripe_account_id: account?.id }, { status: account_status.COMPLETED, updatedAt: new Date() });
+          const updateStripeAccount = await StripeAccountSvc.updateAccount(
+            { stripe_account_id: account?.id },
+            { status: account_status.COMPLETED, updatedAt: new Date() },
+          );
+          if (updateStripeAccount) {
+            await accountVerification(new ObjectId(userId));
+          }
         }
         break;
       case STRIPE_EVENTS.PAYMENT_ATTACHED:
@@ -95,6 +109,7 @@ export default class PaymentSvc {
         break;
     }
   }
+
   static async processPayment(enquiry_id: string, user: any, enquiry: any, tenant?: any) {
     const venue_owner = new ObjectId(user._id as string);
 

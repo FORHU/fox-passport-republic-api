@@ -261,6 +261,7 @@ export default class SpaceRepository {
                   last_name: "$venue.user.last_name",
                   email: "$venue.user.email",
                   phone_number: "$venue.user.phone_number",
+                  fully_verified: "$venue.user.fully_verified",
                 },
               },
             ],

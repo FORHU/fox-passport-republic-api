@@ -46,6 +46,7 @@ export type TUser = {
   social_link?: string;
   role?: user_role;
   organization?: ObjectId;
+  fully_verified?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;
@@ -75,6 +76,7 @@ export type TUserUpdateOptions = {
   role?: user_role;
   organization?: ObjectId;
   user_roles?: ObjectId[];
+  fully_verified?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;
@@ -102,6 +104,7 @@ export class MUser implements Partial<TUser> {
   social_link?: string;
   role?: user_role;
   organization?: ObjectId;
+  fully_verified?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;
@@ -132,6 +135,7 @@ export class MUser implements Partial<TUser> {
     otp,
     user_roles = [],
     organization,
+    fully_verified = false,
     createdAt = new Date(),
     updatedAt,
     deletedAt,
@@ -158,6 +162,7 @@ export class MUser implements Partial<TUser> {
     this.organization = organization;
     this.social_link = social_link;
     this.postal = postal;
+    this.fully_verified = fully_verified;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
     this.deletedAt = deletedAt;

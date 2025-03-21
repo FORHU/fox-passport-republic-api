@@ -15,6 +15,9 @@ import { CustomPrice, HireFee } from "../types/pricing";
 import { COUNTRY, CURRENCY_RATES } from "./constant";
 import { handleSendEmail } from "./email.utils";
 import { logger } from "./logger";
+import UserSvc from "../services/user.service";
+import UserRepo from "../repositories/user.repository";
+import { user_status } from "../models/user.model";
 
 dayjs.extend(customParseFormat);
 
@@ -539,4 +542,12 @@ export const formatDateTimeAsObject = (newDate: Date) => {
     from: formatTime(newDate),
     to: formatTime(newDate),
   };
+};
+
+export const accountVerification = async (userId: ObjectId) => {
+  const { is_email_verified, is_stripe_account_verified } = await UserSvc.getOnboardingStatus(String(userId));
+
+  const fully_verified = is_email_verified && is_stripe_account_verified;
+
+  return await UserRepo.updateUser({ _id: userId }, { fully_verified });
 };

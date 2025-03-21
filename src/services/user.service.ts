@@ -30,6 +30,10 @@ export default class UserSvc {
     return UserRepo.updateUser(query, updatedUserData);
   }
 
+  static async updateManyUsers(query: any, data: any) {
+    return UserRepo.updateManyUsers(query, data);
+  }
+
   static async getUser(query: any, lookups?: LookupFields[]) {
     return UserRepo.getUser(query, lookups);
   }
