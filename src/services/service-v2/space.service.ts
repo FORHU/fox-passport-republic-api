@@ -54,7 +54,7 @@ export default class SpaceSvc {
   }
 
   static async handleGetMostPopularSpaces(params: TMostPopular) {
-    const { page = 1, limit = 20, country, status, user_id, tenant_code, tenant } = params;
+    const { page = 1, limit = 20, country, status, user_id, tenant_code, tenant, fully_verified } = params;
 
     const supportedCountries = tenant?.config?.SUPPORTED_COUNTRIES || [];
 
@@ -65,6 +65,7 @@ export default class SpaceSvc {
       tenant,
       country,
       supportedCountries: supportedCountries,
+      fully_verified,
       ...(user_id && { user_id: new ObjectId(user_id) }),
     });
 
