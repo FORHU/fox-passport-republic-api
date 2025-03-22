@@ -648,7 +648,7 @@ export default class SpaceSvc {
   }
 
   static async getRecentlyListedSpaces({ params, user }: RequestWithParamsAndUser) {
-    const { page = 1, limit = 20, mark_as_favorite, start_date, start_time, end_time } = params as any;
+    const { page = 1, limit = 10, mark_as_favorite, start_date, start_time, end_time } = params as any;
 
     let dayOfWeek: any;
     let filteredSpaces: any;
