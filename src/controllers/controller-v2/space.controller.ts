@@ -29,7 +29,7 @@ export default class SpaceCtrl {
   }
 
   static async getMostPopularSpaces(req: Request, res: Response) {
-    const { limit = 12, page = 1, location = "SG", status, fully_verified } = req.query;
+    const { limit = 10, page = 1, location = "SG", status, fully_verified } = req.query;
     const user_id = req?.user?._id;
     const { error } = validateGetSpacesSchema({
       limit,
