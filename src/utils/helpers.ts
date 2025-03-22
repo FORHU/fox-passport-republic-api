@@ -504,7 +504,7 @@ export const stringToArray = (str: string | undefined, defaultValues: string[] =
 export const tenantBuildQuery = ({ status, tenant_code, tenant, country, supportedCountries, user_id, action, fully_verified }: QueryParams): any => {
   return {
     ...(action && { action }),
-    ...(status && { space: status }),
+    ...(status && { status }),
     venue: {
       ...(tenant?.config?.country
         ? { address: { country: tenant.config.country } }
