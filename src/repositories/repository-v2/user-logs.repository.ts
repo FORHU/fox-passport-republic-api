@@ -10,8 +10,8 @@ export default class UserLogsV2Repo {
   }
 
   static async handleGetMostPopularSpaces(query: Filter<any>, skip: number, limit: number) {
-    const { space, venue, user_id, ...cleanedQuery } = query;
-
+    const { space, venue, user_id, fully_verified, ...cleanedQuery } = query;
+    console.log(cleanedQuery);
     const pipeline: any[] = [
       {
         $match: cleanedQuery,
@@ -205,6 +205,14 @@ export default class UserLogsV2Repo {
       status: "$spaceDetails.status",
     };
 
+    if (venue["venue.user.fully_verified"] === "true" || venue["venue.user.fully_verified"] === true) {
+      pipeline.push({
+        $match: {
+          "userData.fully_verified": true,
+        },
+      });
+    }
+
     pipeline.push(...createSpacesProject(projectPayload));
 
     pipeline.push(
@@ -230,11 +238,9 @@ export default class UserLogsV2Repo {
     }
   }
 
-  static async countGetMostPopularSpaces(query: Filter<TUserLogs>) {
-    const {
-      // eslint-disable-next-line no-unused-vars
-      query: { venue, space, user_id, ...cleanedQuery },
-    } = query;
+  static async countGetMostPopularSpaces(input: Filter<TUserLogs>) {
+    const { query } = input;
+    const { space, venue, ...cleanedQuery } = query;
 
     const pipeline: any[] = [
       {
@@ -289,6 +295,14 @@ export default class UserLogsV2Repo {
       },
     );
 
+    if (venue?.user) {
+      pipeline.push({
+        $match: {
+          "venueDetails.user": venue?.user,
+        },
+      });
+    }
+
     if (venue?.address?.country) {
       pipeline.push({
         $match: {
@@ -305,11 +319,33 @@ export default class UserLogsV2Repo {
       });
     }
 
-    // Add the count stage
+    pipeline.push({
+      $lookup: {
+        from: "users",
+        localField: "venueDetails.user",
+        foreignField: "_id",
+        as: "userData",
+      },
+    });
+
+    pipeline.push({
+      $set: {
+        userData: { $first: "$userData" },
+      },
+    });
+
+    if (venue["venue.user.fully_verified"] === "true" || venue["venue.user.fully_verified"] === true) {
+      pipeline.push({
+        $match: {
+          "userData.fully_verified": true,
+        },
+      });
+    }
+
     pipeline.push({
       $count: "totalCount",
     });
-
+    console.log(JSON.stringify(pipeline));
     const result = await this.collection().aggregate(pipeline).toArray();
     return result[0]?.totalCount || 0;
   }

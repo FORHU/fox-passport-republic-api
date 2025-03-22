@@ -501,7 +501,7 @@ export const stringToArray = (str: string | undefined, defaultValues: string[] =
   return (str?.split(",") ?? defaultValues).map((item) => item.trim());
 };
 
-export const tenantBuildQuery = ({ status, tenant_code, tenant, country, supportedCountries, user_id, action }: QueryParams): any => {
+export const tenantBuildQuery = ({ status, tenant_code, tenant, country, supportedCountries, user_id, action, fully_verified }: QueryParams): any => {
   return {
     ...(action && { action }),
     ...(status && { space: status }),
@@ -511,6 +511,7 @@ export const tenantBuildQuery = ({ status, tenant_code, tenant, country, support
         : country && supportedCountries.includes(country)
           ? { address: { country } }
           : { tenant: tenant_code }),
+      ...(fully_verified !== undefined && { "venue.user.fully_verified": fully_verified }),
     },
     ...(user_id && { user_id }),
   };

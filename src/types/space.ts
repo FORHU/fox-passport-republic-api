@@ -6,6 +6,7 @@ export interface TMostPopular {
   user_id?: string;
   tenant?: any;
   tenant_code?: string;
+  fully_verified?: boolean;
 }
 
 export interface TSpaceProjectPayload {
