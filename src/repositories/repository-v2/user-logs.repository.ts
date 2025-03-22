@@ -10,8 +10,8 @@ export default class UserLogsV2Repo {
   }
 
   static async handleGetMostPopularSpaces(query: Filter<any>, skip: number, limit: number) {
-    const { space, venue, user_id, fully_verified, ...cleanedQuery } = query;
-    console.log(cleanedQuery);
+    const { status, venue, user_id, fully_verified, ...cleanedQuery } = query;
+
     const pipeline: any[] = [
       {
         $match: cleanedQuery,
@@ -73,10 +73,10 @@ export default class UserLogsV2Repo {
       },
     ];
 
-    if (space) {
+    if (status) {
       pipeline.push({
         $match: {
-          "spaceDetails.status": space,
+          "spaceDetails.status": status,
         },
       });
     }
@@ -224,12 +224,6 @@ export default class UserLogsV2Repo {
       },
     );
 
-    pipeline.push({
-      $match: {
-        "venue.user.fully_verified": true,
-      },
-    });
-
     try {
       return this.collection().aggregate(pipeline).toArray();
     } catch (error) {
@@ -240,7 +234,7 @@ export default class UserLogsV2Repo {
 
   static async countGetMostPopularSpaces(input: Filter<TUserLogs>) {
     const { query } = input;
-    const { space, venue, ...cleanedQuery } = query;
+    const { status, venue, user_id, fully_verified, ...cleanedQuery } = query;
 
     const pipeline: any[] = [
       {
@@ -270,10 +264,10 @@ export default class UserLogsV2Repo {
       },
     );
 
-    if (space) {
+    if (status) {
       pipeline.push({
         $match: {
-          "spaceDetails.status": space,
+          "spaceDetails.status": status,
         },
       });
     }
@@ -345,7 +339,7 @@ export default class UserLogsV2Repo {
     pipeline.push({
       $count: "totalCount",
     });
-    console.log(JSON.stringify(pipeline));
+
     const result = await this.collection().aggregate(pipeline).toArray();
     return result[0]?.totalCount || 0;
   }
