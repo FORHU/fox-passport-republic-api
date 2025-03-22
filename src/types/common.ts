@@ -59,4 +59,5 @@ export interface QueryParams {
   supportedCountries?: string[];
   user_id?: ObjectId;
   action?: string;
+  fully_verified?: boolean;
 }
