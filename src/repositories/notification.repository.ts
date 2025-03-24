@@ -27,6 +27,7 @@ export default class NotificationRepo {
 
   static async getUnreadNotificationsCount(query: any) {
     try {
+      query.type = { $nin: ["SPACE", "VENUE"] };
       const result = await this.collection()
         .aggregate([
           { $match: query },
@@ -34,11 +35,6 @@ export default class NotificationRepo {
             $facet: {
               totalUnreadCount: [{ $count: "count" }],
               unreadCountsByType: [
-                {
-                  $match: {
-                    type: { $nin: ["SPACE", "VENUE"] },
-                  },
-                },
                 {
                   $group: {
                     _id: "$type",
