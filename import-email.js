@@ -34,6 +34,7 @@ try {
     "venue-deletion-request.html",
     "venue-for-approval.html",
     "venue-suspension.html",
+    "verification-reminder.html",
     "space-deletion-request.html",
     "request-venue-transfer-owner.html",
   ];
