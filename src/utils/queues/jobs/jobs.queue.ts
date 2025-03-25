@@ -147,7 +147,7 @@ export const startVenueOwnerMemberCronJob = async () => {
 
 export const startAccountVerificationReminderCronJob = async () => {
   try {
-    const job = new CronJob("0 0 1,15 * *", async () => {
+    const job = new CronJob("0 * * * *", async () => {
       logger.log({
         level: "info",
         message: `Running the scheduled task for account verification reminder...`,
