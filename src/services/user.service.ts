@@ -101,8 +101,8 @@ export default class UserSvc {
     }
   }
 
-  static async getUsers(query: any) {
-    return UserRepo.getUsers(query);
+  static async getUsers(query: any, offset?: number, limit?: number) {
+    return UserRepo.getUsers(query, offset, limit);
   }
 
   static async getOnboardingStatus(userId: string) {
