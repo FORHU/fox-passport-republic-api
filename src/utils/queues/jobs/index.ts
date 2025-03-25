@@ -1,4 +1,11 @@
-import { startAdminMemberCronJob, startCronJob, startPaymentCronJob, startStripeEmailCronJob, startVenueOwnerMemberCronJob } from "./jobs.queue";
+import {
+  startAdminMemberCronJob,
+  startCronJob,
+  startPaymentCronJob,
+  startStripeEmailCronJob,
+  startVenueOwnerMemberCronJob,
+  startAccountVerificationReminderCronJob,
+} from "./jobs.queue";
 
 export const startJobs = () => {
   startCronJob();
@@ -6,4 +13,5 @@ export const startJobs = () => {
   startStripeEmailCronJob();
   startAdminMemberCronJob();
   startVenueOwnerMemberCronJob();
+  startAccountVerificationReminderCronJob();
 };
