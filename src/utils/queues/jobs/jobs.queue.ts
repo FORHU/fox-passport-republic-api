@@ -9,6 +9,7 @@ import { initPaymentQueueProcess } from "../payment/payment.queue";
 import { initStripeEmailProcess } from "../stripe/stripe.email";
 import { initAdminMemberQueue } from "../suspension/admin-team-member.queue";
 import { initVenueOwnerMemberQueue } from "../suspension/venue-owner-member.queue";
+import { initVerificationReminderQueue } from "../user/verification-reminder";
 
 export const startCronJob = async () => {
   try {
@@ -139,6 +140,32 @@ export const startVenueOwnerMemberCronJob = async () => {
     logger.log({
       level: "info",
       message: `Failed to start venue owner team member queue::: ${JSON.stringify(error)}`,
+    });
+    throw error;
+  }
+};
+
+export const startAccountVerificationReminderCronJob = async () => {
+  try {
+    const job = new CronJob("0 0 1,15 * *", async () => {
+      logger.log({
+        level: "info",
+        message: `Running the scheduled task for account verification reminder...`,
+      });
+      try {
+        await initVerificationReminderQueue();
+      } catch (error) {
+        logger.log({
+          level: "info",
+          message: `Failed to process reminder in cron job:: ${JSON.stringify(error)}`,
+        });
+      }
+    });
+    job.start();
+  } catch (error) {
+    logger.log({
+      level: "info",
+      message: `Failed to start reminder queue::: ${JSON.stringify(error)}`,
     });
     throw error;
   }
