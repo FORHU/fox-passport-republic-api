@@ -175,55 +175,64 @@ export default class UserRepo {
     }
   }
 
-  static async getUsers(query: any) {
+  static async getUsers(query: any, offset?: number, limit?: number) {
     try {
-      const users = await this.collection()
-        .aggregate([
-          {
-            $lookup: {
-              from: "stripe-account",
-              localField: "_id",
-              foreignField: "user",
-              as: "stripe_account",
-            },
+      const pipeline: any[] = [
+        {
+          $lookup: {
+            from: "stripe-account",
+            localField: "_id",
+            foreignField: "user",
+            as: "stripe_account",
           },
-          {
-            $unwind: {
-              path: "$stripe_account",
-              preserveNullAndEmptyArrays: true,
-            },
+        },
+        {
+          $unwind: {
+            path: "$stripe_account",
+            preserveNullAndEmptyArrays: true,
           },
-          {
-            $project: {
-              _id: 1,
-              first_name: 1,
-              last_name: 1,
-              phone_number: 1,
-              date_of_birth: 1,
-              profile_picture: 1,
-              origin: 1,
-              company_name: 1,
-              country: 1,
-              zip_code: 1,
-              email: 1,
-              username: 1,
-              password: 1,
-              role: 1,
-              status: 1,
-              organization: 1,
-              social_link: 1,
-              postal: 1,
-              createdAt: 1,
-              updatedAt: 1,
-              deletedAt: 1,
-              deletedBy: 1,
-              venue_name: 1,
-              stripe_account: "$stripe_account.status",
-            },
+        },
+        { $match: query },
+        {
+          $project: {
+            _id: 1,
+            first_name: 1,
+            last_name: 1,
+            phone_number: 1,
+            date_of_birth: 1,
+            profile_picture: 1,
+            origin: 1,
+            company_name: 1,
+            country: 1,
+            zip_code: 1,
+            email: 1,
+            username: 1,
+            password: 1,
+            role: 1,
+            status: 1,
+            organization: 1,
+            social_link: 1,
+            postal: 1,
+            createdAt: 1,
+            updatedAt: 1,
+            deletedAt: 1,
+            deletedBy: 1,
+            venue_name: 1,
+            fully_verified: 1,
+            stripe_account: "$stripe_account.status",
           },
-          { $match: query },
-        ])
-        .toArray();
+        },
+      ];
+
+      if (offset) {
+        pipeline.push({ $skip: offset });
+      }
+
+      if (limit) {
+        pipeline.push({ $limit: limit });
+      }
+
+      const users = await this.collection().aggregate(pipeline).toArray();
 
       return users;
     } catch (error) {
