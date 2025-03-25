@@ -314,7 +314,8 @@ export default class AdminSvc {
             { title: notificationTitle, body: notificationBody },
             {
               type: notificationType,
-              space_id: String(data),
+              space_id: String(space_data._id),
+              venue_id: String(space_data.venue._id),
             },
             { notification: { sound: "default" } },
             { payload: { aps: { sound: "default" } } },
