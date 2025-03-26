@@ -13,8 +13,16 @@ export default class StripeAccountRepo {
     return this.collection().findOne(query);
   }
 
-  static getAccounts(query: any) {
-    return this.collection().find(query).toArray();
+  static getAccounts(query: any, skip?: number, limit?: number) {
+    const pipeline = [
+      {
+        $match: query,
+      },
+      ...(skip ? [{ $skip: skip }] : []),
+      ...(limit ? [{ $limit: limit }] : []),
+    ];
+
+    return this.collection().aggregate(pipeline).toArray();
   }
 
   static async createAccount(data: TStripeAccount) {

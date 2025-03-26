@@ -8,6 +8,9 @@ import UserSvc from "../../../services/user.service";
 import { sendTemplatedEmail } from "../../helpers";
 import { SUPPORT_EMAIL } from "../../../config";
 import { TENANT_CONFIGS } from "../../constant";
+import StripeAccountSvc from "../../../services/stripe-account.service";
+import { account_status } from "../../../models/stripe-account.model";
+import { ObjectId } from "mongodb";
 
 const currentDate = new Date();
 
@@ -42,26 +45,72 @@ verificationReminderQueue.process("process_verification_reminder", async (job: a
     const { query, offset, limit, tenant } = job.data;
     logger.log({
       level: "info",
-      message: "[verification reminder]: Process the current batch",
+      message: "[verification reminder]: Processing the current batch",
     });
 
     const tenantConfig = TENANT_CONFIGS[tenant];
 
     const users = await UserSvc.getUsers(query, offset, limit);
+    const userIds = users.map((user) => user._id.toString());
+    const userIdsToObjectIds = userIds.map((id) => new ObjectId(id));
 
-    for (const user of users) {
-      sendTemplatedEmail({
-        subject: "Verification Reminder",
-        email_data: {
-          email: user?.email,
-          first_name: user?.first_name?.replace(/_/g, " ") || "Venue Owner",
-        },
-        template_name: "verification-reminder.html",
-        support_email: SUPPORT_EMAIL,
-        email_credentials: tenantConfig.email_credentials,
-        tenant: tenantConfig.name,
+    const userStripeAccounts = await StripeAccountSvc.getAccounts({ user: { $in: userIdsToObjectIds } }, offset, limit);
+
+    const userStripeMap = new Map(userStripeAccounts.map((acc) => [acc.user.toString(), acc.status]));
+
+    const processEmails = () => {
+      return users.map((user) => ({
+        email: user?.email,
+        first_name: user?.first_name?.replace(/_/g, " ") || "Venue Owner",
+        stripe_status: userStripeMap.get(user._id.toString()) || "NONE",
+        user_status: user.status,
+      }));
+    };
+
+    const emailList = processEmails();
+
+    const pendingUserPendingStripe = emailList.filter(
+      (user) => user.user_status === user_status.PENDING && (user.stripe_status === "PENDING" || user.stripe_status === "NONE"),
+    );
+
+    const pendingUserCompletedStripe = emailList.filter(
+      (user) => user.user_status === user_status.PENDING && user.stripe_status === account_status.COMPLETED,
+    );
+
+    const activeUserPendingStripe = emailList.filter(
+      (user) => user.user_status === user_status.ACTIVE && (user.stripe_status === "PENDING" || user.stripe_status === "NONE"),
+    );
+
+    const sendVerificationEmails = (usersToEmail: any[], category: string) => {
+      const categoryMessages: Record<string, string[]> = {
+        pendingUserPendingStripe: ["Email Verification", "Stripe Onboarding"],
+        pendingUserCompletedStripe: ["Email Verification"],
+        activeUserPendingStripe: ["Stripe Onboarding"],
+      };
+
+      const messages = categoryMessages[category] || [];
+
+      usersToEmail.forEach((user) => {
+        const verificationMessage = messages.length ? messages.map((msg) => `- ${msg}`).join("<br>") : "";
+
+        sendTemplatedEmail({
+          subject: "Verification Reminder",
+          email_data: {
+            email: user.email,
+            first_name: user.first_name,
+            verification_message: verificationMessage,
+          },
+          template_name: "verification-reminder.html",
+          support_email: SUPPORT_EMAIL,
+          email_credentials: tenantConfig.email_credentials,
+          tenant: tenantConfig.name,
+        });
       });
-    }
+    };
+
+    sendVerificationEmails(pendingUserPendingStripe, "pendingUserPendingStripe");
+    sendVerificationEmails(pendingUserCompletedStripe, "pendingUserCompletedStripe");
+    sendVerificationEmails(activeUserPendingStripe, "activeUserPendingStripe");
 
     done();
   } catch (error: any) {
