@@ -6,8 +6,8 @@ export default class StripeAccountSvc {
     return StripeAccountRepo.getAccount(query);
   }
 
-  static getAccounts(query: any) {
-    return StripeAccountRepo.getAccounts(query);
+  static getAccounts(query: any, skip?: number, limit?: number) {
+    return StripeAccountRepo.getAccounts(query, skip, limit);
   }
 
   static createAccount(data: TStripeAccount) {
