@@ -84,4 +84,7 @@ router.patch("/rating/:rating_id", [...ADMIN_MIDDLEWARE], AdminCtrl.updateRating
 
 router.patch("/remove-do-files", [...ADMIN_MIDDLEWARE], AdminCtrl.removeDoFiles);
 
+// announcement
+router.post("/announcement", [...ADMIN_MIDDLEWARE], AdminCtrl.createAnnouncement);
+
 export default router;
