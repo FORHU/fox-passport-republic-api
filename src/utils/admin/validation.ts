@@ -1,3 +1,4 @@
+import { TAnnouncement } from "../../models/announcement.model";
 import { enquiry_status } from "../../models/enquiries.model";
 import { space_status } from "../../models/space.model";
 import { venue_status } from "../../models/venue.models";
@@ -78,5 +79,16 @@ export const validateVenueTransfer = (data: any) => {
     email: Joi.string().escapeHTML().required(),
   });
 
+  return schema.validate(data);
+};
+
+export const validateAnnouncementSchema = (data: TAnnouncement) => {
+  const schema = Joi.object({
+    attachment: Joi.string().escapeHTML().optional().allow(null, ""),
+    title: Joi.string().escapeHTML().optional().allow(null, ""),
+    description: Joi.string().escapeHTML().optional().allow(null, ""),
+    active: Joi.boolean().optional(),
+    validUntil: Joi.date().optional().allow(null, ""),
+  });
   return schema.validate(data);
 };
