@@ -662,6 +662,11 @@ export default class AdminCtrl {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
 
+      const { attachment } = req.body;
+      if (attachment) {
+        req.body.attachment = new ObjectId(attachment);
+      }
+
       const result = await AnnouncementSvc.createAnnouncement(req.body);
       return handleResponse(res, result, "ANNOUNCEMENT_CREATION_SUCCESSFUL");
     } catch (error) {
