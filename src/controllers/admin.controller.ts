@@ -682,9 +682,10 @@ export default class AdminCtrl {
       const pageNumber = parseInt(page as string);
       const limitNumber = parseInt(limit as string);
 
-      const query: any = {
-        ...(typeof _id === "string" && { _id: new ObjectId(_id) }),
-      };
+      const query: any = {};
+      if (_id) {
+        query._id = new ObjectId(_id as string);
+      }
 
       const result = await AnnouncementSvc.getAnnouncements(query, pageNumber, limitNumber);
       return handleResponse(res, result, "ANNOUNCEMENT_FETCH_SUCCESSFUL");
