@@ -668,4 +668,29 @@ export default class AdminCtrl {
       return handleErrorResponse(res, error, { code: "ANNOUNCEMENT_CREATION_FAILED" });
     }
   }
+
+  static async getAnnouncements(req: Request, res: Response) {
+    try {
+      const { error } = validateAnnouncementSchema(req.query);
+
+      if (error) {
+        return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
+      }
+
+      const { _id, page = 1, limit = 10 } = req.query;
+
+      const pageNumber = parseInt(page as string);
+      const limitNumber = parseInt(limit as string);
+
+      const query: any = {};
+      if (_id) {
+        query._id = new ObjectId(_id as string);
+      }
+
+      const result = await AnnouncementSvc.getAnnouncements(query, pageNumber, limitNumber);
+      return handleResponse(res, result, "ANNOUNCEMENT_FETCH_SUCCESSFUL");
+    } catch (error) {
+      return handleErrorResponse(res, error, { code: "ANNOUNCEMENT_FETCH_FAILED" });
+    }
+  }
 }

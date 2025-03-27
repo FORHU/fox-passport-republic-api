@@ -84,11 +84,14 @@ export const validateVenueTransfer = (data: any) => {
 
 export const validateAnnouncementSchema = (data: TAnnouncement) => {
   const schema = Joi.object({
+    _id: Joi.string().escapeHTML().optional().allow(null, ""),
     attachment: Joi.string().escapeHTML().optional().allow(null, ""),
     title: Joi.string().escapeHTML().optional().allow(null, ""),
     description: Joi.string().escapeHTML().optional().allow(null, ""),
     active: Joi.boolean().optional(),
     validUntil: Joi.date().optional().allow(null, ""),
+    page: Joi.number().optional().allow(null, ""),
+    limit: Joi.number().optional().allow(null, ""),
   });
   return schema.validate(data);
 };
