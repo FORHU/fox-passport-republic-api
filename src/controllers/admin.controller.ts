@@ -19,6 +19,7 @@ import UserSvc from "../services/user.service";
 import VenueSvc from "../services/venue.service";
 import { constructEnquiryQuery, parseWorkbook, validateSheetsData } from "../utils/admin/helpers";
 import {
+  validateAnnouncementSchema,
   validateGetSpaceSchema,
   validateGetVenueSchema,
   validateUpdateSpaceStatus,
@@ -41,6 +42,8 @@ import { handleErrorResponse, handleResponse } from "../utils/reponse";
 import { initRemoveFileQueue } from "../utils/queues/files/file-remove-do";
 import StripeAccountSvc from "../services/stripe-account.service";
 import { account_status } from "../models/stripe-account.model";
+import { TAnnouncement } from "../models/announcement.model";
+import AnnouncementSvc from "../services/announcement.service";
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -648,6 +651,21 @@ export default class AdminCtrl {
     } catch (error) {
       console.error("Error migrating users:", error);
       return handleErrorResponse(res, error, { code: "USER_VERIFICATION_MIGRATION_FAILED" });
+    }
+  }
+
+  static async createAnnouncement(req: Request, res: Response) {
+    try {
+      const { error } = validateAnnouncementSchema(req.body);
+
+      if (error) {
+        return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
+      }
+
+      const result = await AnnouncementSvc.createAnnouncement(req.body);
+      return handleResponse(res, result, "ANNOUNCEMENT_CREATION_SUCCESSFUL");
+    } catch (error) {
+      return handleErrorResponse(res, error, { code: "ANNOUNCEMENT_CREATION_FAILED" });
     }
   }
 }
