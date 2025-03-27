@@ -29,4 +29,8 @@ export default class AnnouncementRepo {
   static async getAnnouncement(query: any) {
     return await this.collection().findOne(query);
   }
+
+  static async updateAnnouncement(query: any, data: TAnnouncement) {
+    return await this.collection().updateOne(query, { $set: data });
+  }
 }

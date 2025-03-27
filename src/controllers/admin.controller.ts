@@ -662,6 +662,11 @@ export default class AdminCtrl {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
 
+      const { attachment } = req.body;
+      if (attachment) {
+        req.body.attachment = new ObjectId(attachment);
+      }
+
       const result = await AnnouncementSvc.createAnnouncement(req.body);
       return handleResponse(res, result, "ANNOUNCEMENT_CREATION_SUCCESSFUL");
     } catch (error) {
@@ -691,6 +696,26 @@ export default class AdminCtrl {
       return handleResponse(res, result, "ANNOUNCEMENT_FETCH_SUCCESSFUL");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "ANNOUNCEMENT_FETCH_FAILED" });
+    }
+  }
+
+  static async updateAnnouncement(req: Request, res: Response) {
+    try {
+      const _id = new ObjectId(req.params.id);
+      const announcement = await AnnouncementSvc.getAnnouncement({ _id });
+      if (!announcement) {
+        return handleErrorResponse(res, {}, { code: "DOCUMENT_ID_DOES_NOT_EXIST" });
+      }
+
+      const { error } = validateAnnouncementSchema(req.body);
+      if (error) {
+        return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
+      }
+
+      const result = await AnnouncementSvc.updateAnnouncement({ _id }, req.body);
+      return handleResponse(res, result, "ANNOUNCEMENT_UPDATE_SUCCESSFUL");
+    } catch (error) {
+      return handleErrorResponse(res, error, { code: "ANNOUNCEMENT_UPDATE_FAILED" });
     }
   }
 }

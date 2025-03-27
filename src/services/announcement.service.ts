@@ -13,4 +13,8 @@ export default class AnnouncementSvc {
   static async getAnnouncement(query: any) {
     return await AnnouncementRepo.getAnnouncement(query);
   }
+
+  static async updateAnnouncement(query: any, data: TAnnouncement) {
+    return await AnnouncementRepo.updateAnnouncement(query, data);
+  }
 }
