@@ -1,4 +1,4 @@
-import { TAnnouncement } from "../../models/announcement.model";
+import { TAnnouncement, targetType } from "../../models/announcement.model";
 import { enquiry_status } from "../../models/enquiries.model";
 import { space_status } from "../../models/space.model";
 import { venue_status } from "../../models/venue.models";
@@ -90,8 +90,14 @@ export const validateAnnouncementSchema = (data: TAnnouncement) => {
     description: Joi.string().escapeHTML().optional().allow(null, ""),
     active: Joi.boolean().optional(),
     validUntil: Joi.date().optional().allow(null, ""),
+    target: Joi.string()
+      .valid(...Object.values(targetType))
+      .optional()
+      .allow(null, ""),
     page: Joi.number().optional().allow(null, ""),
     limit: Joi.number().optional().allow(null, ""),
+    search: Joi.string().escapeHTML().optional().allow(null, ""),
+    sort: Joi.number().optional().allow(null, ""),
   });
   return schema.validate(data);
 };
