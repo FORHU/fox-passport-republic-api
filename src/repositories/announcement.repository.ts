@@ -17,6 +17,16 @@ export default class AnnouncementRepo {
     const pipeline = [
       { $match: query },
       { $project: { attachment: 1, title: 1, description: 1, active: 1, target: 1 } },
+      {
+        $lookup: {
+          from: "files",
+          localField: "attachment",
+          pipeline: [{ $project: { _id: 1, filename: 1, contentType: 1, path: 1 } }],
+          foreignField: "_id",
+          as: "attachment",
+        },
+      },
+      { $set: { attachment: { $first: "$attachment" } } },
       { $sort: { _id: sort } },
       { $skip: skip },
       { $limit: limit },
