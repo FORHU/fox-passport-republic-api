@@ -44,6 +44,7 @@ import StripeAccountSvc from "../services/stripe-account.service";
 import { account_status } from "../models/stripe-account.model";
 import { TAnnouncement } from "../models/announcement.model";
 import AnnouncementSvc from "../services/announcement.service";
+import { constructQuery } from "../utils/announcement/helpers";
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -682,17 +683,15 @@ export default class AdminCtrl {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
 
-      const { _id, page = 1, limit = 10 } = req.query;
+      const { sort = 1, page = 1, limit = 10, ..._query } = req.query;
 
       const pageNumber = parseInt(page as string);
       const limitNumber = parseInt(limit as string);
+      const sortNumber = parseInt(sort as string);
 
-      const query: any = {};
-      if (_id) {
-        query._id = new ObjectId(_id as string);
-      }
+      const query = constructQuery(_query);
 
-      const result = await AnnouncementSvc.getAnnouncements(query, pageNumber, limitNumber);
+      const result = await AnnouncementSvc.getAnnouncements(query, pageNumber, limitNumber, sortNumber);
       return handleResponse(res, result, "ANNOUNCEMENT_FETCH_SUCCESSFUL");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "ANNOUNCEMENT_FETCH_FAILED" });
