@@ -11,10 +11,17 @@ export default class AnnouncementRepo {
     return await this.collection().insertOne(new MAnnouncement(data));
   }
 
-  static async getAnnouncements(query: any, page: number, limit: number) {
+  static async getAnnouncements(query: any, page?: number, limit?: number, sort?: number) {
     const skip = (page - 1) * limit;
 
-    const pipeline = [{ $match: query }, { $project: { attachment: 1, title: 1, description: 1, active: 1 } }, { $skip: skip }, { $limit: limit }];
+    const pipeline = [
+      { $match: query },
+      { $project: { attachment: 1, title: 1, description: 1, active: 1, target: 1 } },
+      { $sort: { _id: sort } },
+      { $skip: skip },
+      { $limit: limit },
+    ];
+
     const total_documents = await this.collection().countDocuments(query);
     const result = await this.collection().aggregate(pipeline).toArray();
 

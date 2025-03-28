@@ -6,8 +6,8 @@ export default class AnnouncementSvc {
     return await AnnouncementRepo.createAnnouncement(data);
   }
 
-  static async getAnnouncements(query: any, page: number, limit: number) {
-    return await AnnouncementRepo.getAnnouncements(query, page, limit);
+  static async getAnnouncements(query: any, page?: number, limit?: number, sort?: number) {
+    return await AnnouncementRepo.getAnnouncements(query, page, limit, sort);
   }
 
   static async getAnnouncement(query: any) {
