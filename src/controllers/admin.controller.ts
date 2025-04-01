@@ -42,7 +42,6 @@ import { handleErrorResponse, handleResponse } from "../utils/reponse";
 import { initRemoveFileQueue } from "../utils/queues/files/file-remove-do";
 import StripeAccountSvc from "../services/stripe-account.service";
 import { account_status } from "../models/stripe-account.model";
-import { TAnnouncement } from "../models/announcement.model";
 import AnnouncementSvc from "../services/announcement.service";
 import { constructQuery } from "../utils/announcement/helpers";
 
@@ -715,6 +714,27 @@ export default class AdminCtrl {
       return handleResponse(res, result, "ANNOUNCEMENT_UPDATE_SUCCESSFUL");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "ANNOUNCEMENT_UPDATE_FAILED" });
+    }
+  }
+
+  static async deleteAnnouncement(req: Request, res: Response) {
+    try {
+      const _id = new ObjectId(req.params.id);
+      const userId = new ObjectId(req?.user?._id);
+      const announcement = await AnnouncementSvc.getAnnouncement({ _id });
+      if (!announcement) {
+        return handleErrorResponse(res, {}, { code: "DOCUMENT_ID_DOES_NOT_EXIST" });
+      }
+
+      const deleteData = {
+        deletedAt: new Date(),
+        deletedBy: userId,
+      };
+
+      const result = await AnnouncementSvc.updateAnnouncement({ _id }, deleteData);
+      return handleResponse(res, result, "ANNOUNCEMENT_DELETE_SUCCESSFUL");
+    } catch (error) {
+      return handleErrorResponse(res, error, { code: "ANNOUNCEMENT_DELETE_FAILED" });
     }
   }
 }
