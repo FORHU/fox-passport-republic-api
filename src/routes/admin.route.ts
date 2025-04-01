@@ -88,5 +88,6 @@ router.patch("/remove-do-files", [...ADMIN_MIDDLEWARE], AdminCtrl.removeDoFiles)
 router.get("/announcements", [...ADMIN_MIDDLEWARE], AdminCtrl.getAnnouncements);
 router.post("/announcements", [...ADMIN_MIDDLEWARE], AdminCtrl.createAnnouncement);
 router.patch("/announcements/:id", [...ADMIN_MIDDLEWARE], AdminCtrl.updateAnnouncement);
+router.delete("/announcements/:id", [...ADMIN_MIDDLEWARE], AdminCtrl.deleteAnnouncement);
 
 export default router;
