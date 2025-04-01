@@ -2,7 +2,7 @@
 /* eslint-disable no-useless-catch */
 import { ObjectId } from "mongodb";
 
-import { MUser, TUser, user_role } from "../models/user.model";
+import { MUser, TUser } from "../models/user.model";
 import { LookupFields } from "../types/common";
 import { lookupMap } from "../utils/lookup";
 import { getDB } from "../utils/mongo";
