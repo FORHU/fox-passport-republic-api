@@ -14,10 +14,10 @@ import { USER_ROLES } from "../utils/constant";
 import { handleSendEmail } from "../utils/email.utils";
 import { accountVerification, generateOTP } from "../utils/helpers";
 import UserSvc from "./user.service";
-import TodoRepo from "../repositories/stripe-account.repository";
-import { account_status } from "../models/stripe-account.model";
-import StripeAccountSvc from "./stripe-account.service";
 import { generateRoomId } from "../utils/inbox.utils";
+import RedisUtil from "../utils/redis.util";
+
+const PREFIX = "user";
 
 export default class AuthSvc {
   static async registration(userData: TUser, is_invited?: boolean, device_payload?: DevicePayload, tenant?: any) {
@@ -84,6 +84,8 @@ export default class AuthSvc {
         venues: [],
       });
     }
+
+    await RedisUtil.invalidateByPrefix(PREFIX);
 
     return {
       user_id: user._id,
@@ -211,6 +213,7 @@ export default class AuthSvc {
       await Promise.all([
         UserRepo.createOrUpdateRoomId(user._id, room_id),
         AuthRepo.updateToken({ device_id: device_payload?.device_id }, updateTokenPayload, { upsert: true }),
+        RedisUtil.invalidateByPrefix(PREFIX),
       ]);
 
       return {
