@@ -17,6 +17,7 @@ import UserSvc from "./user.service";
 import TodoRepo from "../repositories/stripe-account.repository";
 import { account_status } from "../models/stripe-account.model";
 import StripeAccountSvc from "./stripe-account.service";
+import { generateRoomId } from "../utils/inbox.utils";
 
 export default class AuthSvc {
   static async registration(userData: TUser, is_invited?: boolean, device_payload?: DevicePayload, tenant?: any) {
@@ -197,6 +198,7 @@ export default class AuthSvc {
 
       const accessToken = generateAccessToken(payload);
       const refreshToken = generateRefreshToken(payload);
+      const room_id = generateRoomId();
 
       const updateTokenPayload = {
         user: user._id,
@@ -206,7 +208,10 @@ export default class AuthSvc {
         ...device_payload,
       };
 
-      await AuthRepo.updateToken({ device_id: device_payload?.device_id }, updateTokenPayload, { upsert: true });
+      await Promise.all([
+        UserRepo.createOrUpdateRoomId(user._id, room_id),
+        AuthRepo.updateToken({ device_id: device_payload?.device_id }, updateTokenPayload, { upsert: true }),
+      ]);
 
       return {
         refreshToken,
