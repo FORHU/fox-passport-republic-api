@@ -55,6 +55,7 @@ export type TUser = {
   user_roles?: ObjectId[];
   otp?: user_otp;
   tenant?: string;
+  room_id?: string;
 };
 
 export type TUserUpdateOptions = {
@@ -84,6 +85,7 @@ export type TUserUpdateOptions = {
   status?: user_status;
   otp?: user_otp;
   tenant?: string;
+  room_id?: string;
 };
 
 export class MUser implements Partial<TUser> {
@@ -113,6 +115,7 @@ export class MUser implements Partial<TUser> {
   otp?: user_otp;
   user_roles?: ObjectId[];
   tenant?: string;
+  room_id?: string;
 
   constructor({
     _id = new ObjectId(),
@@ -141,6 +144,7 @@ export class MUser implements Partial<TUser> {
     deletedAt,
     deletedBy,
     tenant,
+    room_id,
   }: Partial<TUser> = {}) {
     this._id = _id;
     this.first_name = first_name;
@@ -168,6 +172,7 @@ export class MUser implements Partial<TUser> {
     this.deletedAt = deletedAt;
     this.deletedBy = deletedBy;
     this.tenant = tenant;
+    this.room_id = room_id;
   }
 
   hashPassword(password: string): string {

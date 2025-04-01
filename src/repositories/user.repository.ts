@@ -371,4 +371,8 @@ export default class UserRepo {
       throw error;
     }
   }
+
+  static async createOrUpdateRoomId(_id: ObjectId, room_id: string) {
+    await this.collection().updateOne({ _id }, { $set: { room_id } }, { upsert: true });
+  }
 }
