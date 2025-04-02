@@ -39,26 +39,17 @@ export default (io: Server) => {
 
   //FOR NOTIFICATIONS
   const notificationNamespace = io.of("/notifications");
+
+  // Apply authentication middleware to notifications namespace
+  notificationNamespace.use(authenticateTokenAndStatus);
   notificationNamespace.on("connection", (socket: AuthenticatedSocket) => {
     socket.on("join_notifications", (data: any) => {
       const { room_id } = data;
-      console.log(`User ${room_id} joined notifications room`);
-      socket.join(room_id);
-      socket.emit("join_room", room_id);
+      socket.emit("join_room", { success: true, room_id });
     });
     socket.on("notification_count", async () => {
       try {
         const user = socket.user;
-
-        if (!user) {
-          io.to(user._id).emit("notification_count", {
-            success: false,
-            code: "USER_NOT_AUTHENTICATED",
-            message: "User is not authenticated",
-          });
-          return;
-        }
-
         const query = {
           receiver: new ObjectId(user._id as string),
           read: false,
@@ -67,7 +58,6 @@ export default (io: Server) => {
         const userData = await UserSvc.getUser({ _id: new ObjectId(user._id as string) });
         const roomId = userData?.room_id;
         const count = await NotificationSvc.getUnreadNotificationsCount(query);
-
         io.to(roomId).emit("notification_count", {
           success: true,
           code: "NOTIFICATION_COUNT_FETCHED_SUCCESSFULLY",
