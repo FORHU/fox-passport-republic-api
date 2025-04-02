@@ -2,7 +2,7 @@
 /* eslint-disable no-useless-catch */
 import { ObjectId } from "mongodb";
 
-import { MUser, TUser, user_role } from "../models/user.model";
+import { MUser, TUser } from "../models/user.model";
 import { LookupFields } from "../types/common";
 import { lookupMap } from "../utils/lookup";
 import { getDB } from "../utils/mongo";
@@ -91,6 +91,7 @@ export default class UserRepo {
           user_roles: 1,
           fully_verified: 1,
           stripe_account: "$stripe_account.status",
+          room_id: 1,
         },
       });
       const [userData] = await this.collection().aggregate(pipeline).toArray();
@@ -220,6 +221,7 @@ export default class UserRepo {
             venue_name: 1,
             fully_verified: 1,
             stripe_account: "$stripe_account.status",
+            room_id: 1,
           },
         },
       ];
