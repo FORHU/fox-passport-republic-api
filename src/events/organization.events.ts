@@ -37,43 +37,6 @@ export default (io: Server) => {
     });
   });
 
-  //FOR NOTIFICATIONS
-  const notificationNamespace = io.of("/notifications");
-
-  // Apply authentication middleware to notifications namespace
-  notificationNamespace.use(authenticateTokenAndStatus);
-  notificationNamespace.on("connection", (socket: AuthenticatedSocket) => {
-    socket.on("join_notifications", (data: any) => {
-      const { room_id } = data;
-      socket.emit("join_room", { success: true, room_id });
-    });
-    socket.on("notification_count", async () => {
-      try {
-        const user = socket.user;
-        const query = {
-          receiver: new ObjectId(user._id as string),
-          read: false,
-        };
-
-        const userData = await UserSvc.getUser({ _id: new ObjectId(user._id as string) });
-        const roomId = userData?.room_id;
-        const count = await NotificationSvc.getUnreadNotificationsCount(query);
-        io.to(roomId).emit("notification_count", {
-          success: true,
-          code: "NOTIFICATION_COUNT_FETCHED_SUCCESSFULLY",
-          data: count,
-        });
-      } catch (error) {
-        console.error("Error fetching notification count:", error);
-        socket.emit("notification_count", {
-          success: false,
-          code: "NOTIFICATION_COUNT_FETCH_FAILED",
-          message: "Failed to fetch notification count",
-        });
-      }
-    });
-  });
-
   io.on("connection", (socket: AuthenticatedSocket) => {
     if (socket.user) {
       // console.log("Authenticated user:", socket.user);
@@ -95,6 +58,7 @@ export default (io: Server) => {
         level: "info",
         message: `PAYLOAD_SEND_MESSAGE_TO_ROOM: ${JSON.stringify(data)}`,
       });
+
       if (socket.user) {
         const lookups: LookupFields[] = [
           {
@@ -146,6 +110,14 @@ export default (io: Server) => {
         const senderUser = isVenueOrAdminRole ? enquiry.venue.user : enquiry.user;
         const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
         const senderId = senderUser._id;
+
+        //TO NOTIFY USER FOR UNREAD NOTIFICATION COUNT
+        const notification = await NotificationSvc.getNotificationByRoomId(receiverId);
+        io.to(notification?.room_id).emit("notification_count", {
+          success: true,
+          code: "NOTIFICATION_COUNT_FETCHED_SUCCESSFULLY",
+          data: notification?.count,
+        });
 
         const tenSecondsAgo = new Date(Date.now() - 10 * 1000);
         const existingNotification = await NotificationSvc.getOneNotification({
