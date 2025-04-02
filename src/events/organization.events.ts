@@ -394,9 +394,11 @@ export default (io: Server) => {
           read: false,
         };
 
+        const userData = await UserSvc.getUser({ _id: new ObjectId(user._id) });
+        const roomId = userData?.room_id;
         const count = await NotificationSvc.getUnreadNotificationsCount(query);
 
-        io.to(user._id).emit("notification_count", {
+        io.to(roomId).emit("notification_count", {
           success: true,
           code: "NOTIFICATION_COUNT_FETCHED_SUCCESSFULLY",
           data: count,
