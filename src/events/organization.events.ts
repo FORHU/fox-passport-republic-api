@@ -4,20 +4,20 @@ import { Server, Socket } from "socket.io";
 import { CC_SUPPORT_EMAIL, IS_ENQUIRY_MICROSERVICES } from "../config";
 import authenticateTokenAndStatus from "../middleware/authenticate-socket";
 import { enquiry_status } from "../models/enquiries.model";
+import { metaDataKey, NotificationType } from "../models/notification.model";
 import { user_role } from "../models/user.model";
 import CustomOfferSvc from "../services/custom-offer.service";
 import EnquirySvc from "../services/enquiries.service";
 import FileSvc from "../services/file.service";
 import InboxSvc from "../services/inbox.service";
 import MessageSvc from "../services/message.services";
+import NotificationSvc from "../services/notification.service";
 import UserSvc from "../services/user.service";
 import VenueSvc from "../services/venue.service";
 import { LookupFields } from "../types/common";
+import { pushNotification } from "../utils/firebase/firebase.admin";
 import { sendTemplatedEmail } from "../utils/helpers";
 import { logger } from "../utils/logger";
-import { metaDataKey, NotificationType } from "../models/notification.model";
-import { pushNotification } from "../utils/firebase/firebase.admin";
-import NotificationSvc from "../services/notification.service";
 
 interface AuthenticatedSocket extends Socket {
   user?: any;
@@ -33,6 +33,53 @@ export default (io: Server) => {
       } else {
         console.log("Socket authenticated successfully:", socket.user);
         next(); // Proceed with socket connection
+      }
+    });
+  });
+
+  //FOR NOTIFICATIONS
+  const notificationNamespace = io.of("/notifications");
+  notificationNamespace.on("connection", (socket: AuthenticatedSocket) => {
+    socket.on("join_notifications", (data: any) => {
+      const { room_id } = data;
+      console.log(`User ${room_id} joined notifications room`);
+      socket.join(room_id);
+      socket.emit("join_room", room_id);
+    });
+    socket.on("notification_count", async () => {
+      try {
+        const user = socket.user;
+
+        if (!user) {
+          io.to(user._id).emit("notification_count", {
+            success: false,
+            code: "USER_NOT_AUTHENTICATED",
+            message: "User is not authenticated",
+          });
+          return;
+        }
+
+        const query = {
+          receiver: new ObjectId(user._id as string),
+          read: false,
+        };
+
+        const userData = await UserSvc.getUser({ _id: new ObjectId(user._id as string) });
+        const roomId = userData?.room_id;
+        const count = await NotificationSvc.getUnreadNotificationsCount(query);
+
+        io.to(roomId).emit("notification_count", {
+          success: true,
+          code: "NOTIFICATION_COUNT_FETCHED_SUCCESSFULLY",
+          data: count,
+        });
+      } catch (error) {
+        console.error("Error fetching notification count:", error);
+        socket.emit("notification_count", {
+          success: false,
+          code: "NOTIFICATION_COUNT_FETCH_FAILED",
+          message: "Failed to fetch notification count",
+        });
       }
     });
   });
@@ -374,43 +421,6 @@ export default (io: Server) => {
         createdAt: new Date().toISOString(),
       });
       await MessageSvc.createMessage(messagePayload);
-    });
-
-    socket.on("notification_count", async () => {
-      try {
-        const user = socket.user;
-
-        if (!user) {
-          io.to(user._id).emit("notification_count", {
-            success: false,
-            code: "USER_NOT_AUTHENTICATED",
-            message: "User is not authenticated",
-          });
-          return;
-        }
-
-        const query = {
-          receiver: new ObjectId(user._id),
-          read: false,
-        };
-
-        const userData = await UserSvc.getUser({ _id: new ObjectId(user._id) });
-        const roomId = userData?.room_id;
-        const count = await NotificationSvc.getUnreadNotificationsCount(query);
-
-        io.to(roomId).emit("notification_count", {
-          success: true,
-          code: "NOTIFICATION_COUNT_FETCHED_SUCCESSFULLY",
-          data: count,
-        });
-      } catch (error) {
-        console.error("Error fetching notification count:", error);
-        socket.emit("notification_count", {
-          success: false,
-          code: "NOTIFICATION_COUNT_FETCH_FAILED",
-          message: "Failed to fetch notification count",
-        });
-      }
     });
 
     socket.on("disconnect", () => {
