@@ -111,14 +111,6 @@ export default (io: Server) => {
         const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
         const senderId = senderUser._id;
 
-        //TO NOTIFY USER FOR UNREAD NOTIFICATION COUNT
-        const notification = await NotificationSvc.getNotificationByRoomId(receiverId);
-        io.to(notification?.room_id).emit("notification_count", {
-          success: true,
-          code: "NOTIFICATION_COUNT_FETCHED_SUCCESSFULLY",
-          data: notification?.count,
-        });
-
         const tenSecondsAgo = new Date(Date.now() - 10 * 1000);
         const existingNotification = await NotificationSvc.getOneNotification({
           title: "New Inquiry",
@@ -155,6 +147,14 @@ export default (io: Server) => {
             metadata,
           );
         }
+
+        //TO NOTIFY USER FOR UNREAD NOTIFICATION COUNT
+        const notification = await NotificationSvc.getNotificationByRoomId(receiverId);
+        io.to(notification?.room_id).emit("notification_count", {
+          success: true,
+          code: "NOTIFICATION_COUNT_FETCHED_SUCCESSFULLY",
+          data: notification?.count,
+        });
 
         logger.log({
           level: "info",
