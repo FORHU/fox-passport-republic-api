@@ -85,8 +85,9 @@ router.patch("/rating/:rating_id", [...ADMIN_MIDDLEWARE], AdminCtrl.updateRating
 router.patch("/remove-do-files", [...ADMIN_MIDDLEWARE], AdminCtrl.removeDoFiles);
 
 // announcement
-router.get("/announcements", [...ADMIN_MIDDLEWARE], AdminCtrl.getAnnouncements);
+router.get("/announcements", [sessionMiddleware, authenticateToken], AdminCtrl.getAnnouncements);
 router.post("/announcements", [...ADMIN_MIDDLEWARE], AdminCtrl.createAnnouncement);
+router.post("/announcement-logs", [sessionMiddleware, authenticateToken], AdminCtrl.createAnnouncementLog);
 router.patch("/announcements/:id", [...ADMIN_MIDDLEWARE], AdminCtrl.updateAnnouncement);
 router.delete("/announcements/:id", [...ADMIN_MIDDLEWARE], AdminCtrl.deleteAnnouncement);
 
