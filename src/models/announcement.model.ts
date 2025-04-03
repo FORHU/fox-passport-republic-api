@@ -32,14 +32,28 @@ export class MAnnouncement implements Partial<TAnnouncement> {
   deletedAt?: Date;
   deletedBy?: ObjectId;
 
-  constructor({ _id, attachment, title, description, active, validUntil, target, createdAt, updatedAt, deletedAt, deletedBy } = {} as TAnnouncement) {
-    this._id = _id ?? new ObjectId();
+  constructor(
+    {
+      _id = new ObjectId(),
+      attachment,
+      title,
+      description,
+      active,
+      validUntil,
+      target,
+      createdAt = new Date(),
+      updatedAt,
+      deletedAt,
+      deletedBy,
+    } = {} as TAnnouncement,
+  ) {
+    this._id = _id;
     this.attachment = attachment;
     this.title = title;
     this.description = description;
-    this.active = active ?? true;
+    this.active = active;
     this.validUntil = validUntil;
-    this.target = target ?? targetType.ALL;
+    this.target = target;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
     this.deletedAt = deletedAt;

@@ -683,6 +683,7 @@ export default class AdminCtrl {
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
+      req.query.user = req?.user?._id;
 
       const { sort = 1, page = 1, limit = 10, ..._query } = req.query;
 
