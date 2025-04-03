@@ -19,6 +19,7 @@ import UserSvc from "../services/user.service";
 import VenueSvc from "../services/venue.service";
 import { constructEnquiryQuery, parseWorkbook, validateSheetsData } from "../utils/admin/helpers";
 import {
+  validateAnnouncementLogSchema,
   validateAnnouncementSchema,
   validateGetSpaceSchema,
   validateGetVenueSchema,
@@ -44,6 +45,7 @@ import StripeAccountSvc from "../services/stripe-account.service";
 import { account_status } from "../models/stripe-account.model";
 import AnnouncementSvc from "../services/announcement.service";
 import { constructQuery } from "../utils/announcement/helpers";
+import AnnouncementLogSvc from "../services/announcement-log.service";
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -687,7 +689,6 @@ export default class AdminCtrl {
       const pageNumber = parseInt(page as string);
       const limitNumber = parseInt(limit as string);
       const sortNumber = parseInt(sort as string);
-
       const query = constructQuery(_query);
 
       const result = await AnnouncementSvc.getAnnouncements(query, pageNumber, limitNumber, sortNumber);
@@ -739,6 +740,24 @@ export default class AdminCtrl {
       return handleResponse(res, result, "ANNOUNCEMENT_DELETE_SUCCESSFUL");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "ANNOUNCEMENT_DELETE_FAILED" });
+    }
+  }
+
+  static async createAnnouncementLog(req: Request, res: Response) {
+    try {
+      const { error } = validateAnnouncementLogSchema(req.body);
+      if (error) {
+        return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
+      }
+
+      req.body.user = new ObjectId(req?.user?._id);
+      req.body.viewed = true;
+
+      const result = await AnnouncementLogSvc.createAnnouncementLog(req.body);
+
+      return handleResponse(res, result, "ANNOUNCEMENT_LOG_CREATE_SUCCESSFUL");
+    } catch (error) {
+      return handleErrorResponse(res, error, { code: "ANNOUNCEMENT_LOG_CREATE_FAILED" });
     }
   }
 }

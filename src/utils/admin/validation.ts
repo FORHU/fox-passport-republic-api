@@ -1,3 +1,5 @@
+import { join } from "path";
+import { TAnnouncementLog } from "../../models/announcement-log.model";
 import { TAnnouncement, targetType } from "../../models/announcement.model";
 import { enquiry_status } from "../../models/enquiries.model";
 import { space_status } from "../../models/space.model";
@@ -82,6 +84,8 @@ export const validateVenueTransfer = (data: any) => {
   return schema.validate(data);
 };
 
+const targetValues = Object.values(targetType).join("|");
+
 export const validateAnnouncementSchema = (data: TAnnouncement) => {
   const schema = Joi.object({
     _id: Joi.string().escapeHTML().optional().allow(null, ""),
@@ -91,13 +95,31 @@ export const validateAnnouncementSchema = (data: TAnnouncement) => {
     active: Joi.boolean().optional(),
     validUntil: Joi.date().optional().allow(null, ""),
     target: Joi.string()
-      .valid(...Object.values(targetType))
+      .custom((value, helpers) => {
+        if (!value) return value;
+        const values = value.split(",").map((v: string) => v.trim());
+        const invalidValues = values.filter((v: string) => !targetValues.includes(v));
+        if (invalidValues.length) {
+          return helpers.error("any.invalid", { message: `Invalid target values: ${invalidValues.join(", ")}` });
+        }
+
+        return value;
+      })
       .optional()
       .allow(null, ""),
     page: Joi.number().optional().allow(null, ""),
     limit: Joi.number().optional().allow(null, ""),
     search: Joi.string().escapeHTML().optional().allow(null, ""),
     sort: Joi.number().optional().allow(null, ""),
+  });
+  return schema.validate(data);
+};
+
+export const validateAnnouncementLogSchema = (data: TAnnouncementLog) => {
+  const schema = Joi.object({
+    _id: Joi.string().escapeHTML().optional().allow(null, ""),
+    announcement: Joi.string().escapeHTML().optional().allow(null, ""),
+    viewed: Joi.boolean().optional().allow(null, ""),
   });
   return schema.validate(data);
 };
