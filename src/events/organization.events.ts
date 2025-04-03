@@ -277,6 +277,13 @@ export default (io: Server) => {
         participants,
         metadata,
       );
+
+      const notification = await NotificationSvc.getNotificationByRoomId(receiverId);
+      io.to(notification?.room_id).emit("notification_count", {
+        success: true,
+        code: "NOTIFICATION_COUNT_FETCHED_SUCCESSFULLY",
+        data: notification?.count,
+      });
     });
 
     socket.on("custom_offer_status", async (data: any) => {
