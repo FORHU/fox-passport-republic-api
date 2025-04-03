@@ -107,6 +107,7 @@ export const validateAnnouncementSchema = (data: TAnnouncement) => {
       })
       .optional()
       .allow(null, ""),
+    viewed: Joi.boolean().optional(),
     page: Joi.number().optional().allow(null, ""),
     limit: Joi.number().optional().allow(null, ""),
     search: Joi.string().escapeHTML().optional().allow(null, ""),

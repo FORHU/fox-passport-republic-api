@@ -14,9 +14,10 @@ export default class AnnouncementRepo {
   static async getAnnouncements(query: any, page?: number, limit?: number, sort?: number) {
     const skip = (page - 1) * limit;
 
+    const { "announcement_log.user": announcementLogUser, ..._query } = query;
+
     const pipeline = [
-      { $match: query },
-      { $project: { attachment: 1, title: 1, description: 1, active: 1, target: 1 } },
+      { $project: { attachment: 1, title: 1, description: 1, active: 1, target: 1, deletedAt: 1 } },
       {
         $lookup: {
           from: "files",
@@ -27,13 +28,29 @@ export default class AnnouncementRepo {
         },
       },
       { $set: { attachment: { $first: "$attachment" } } },
+      {
+        $lookup: {
+          from: "announcement-logs",
+          localField: "_id",
+          foreignField: "announcement",
+          pipeline: [{ $match: { user: announcementLogUser } }, { $project: { _id: 0, viewed: 1 } }],
+          as: "viewed",
+        },
+      },
+      {
+        $set: {
+          viewed: { $ifNull: [{ $first: "$viewed.viewed" }, false] },
+        },
+      },
+      { $match: _query },
+      { $unset: "deletedAt" },
       { $sort: { _id: sort } },
       { $skip: skip },
       { $limit: limit },
     ];
 
-    const total_documents = await this.collection().countDocuments(query);
     const result = await this.collection().aggregate(pipeline).toArray();
+    const total_documents = result.length;
 
     return {
       data: result,
