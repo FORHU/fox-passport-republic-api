@@ -710,6 +710,10 @@ export default class AdminCtrl {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
 
+      if (req?.body?.attachment) {
+        req.body.attachment = new ObjectId(req.body.attachment);
+      }
+
       const result = await AnnouncementSvc.updateAnnouncement({ _id }, req.body);
       return handleResponse(res, result, "ANNOUNCEMENT_UPDATE_SUCCESSFUL");
     } catch (error) {
