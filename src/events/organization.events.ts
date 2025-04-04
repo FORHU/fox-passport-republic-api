@@ -211,6 +211,21 @@ export default (io: Server) => {
       }
     });
 
+    socket.on("notification_count", async (data: { custom_offer_id: string }) => {
+      const { custom_offer_id } = data;
+      const [customOffer]: any = await CustomOfferSvc.getCustomOffer({ _id: new ObjectId(custom_offer_id as string) });
+      const [enquiry] = await EnquirySvc.getEnquiries({ "inbox._id": customOffer.inbox }, 0, 1);
+      const isVenueOrAdminRole = [user_role.VENUE_OWNER, user_role.ADMIN].includes(socket.user.role);
+      const receiverId = isVenueOrAdminRole ? enquiry.user._id : enquiry.venue.user._id;
+
+      const notification = await NotificationSvc.getNotificationByRoomId(receiverId);
+      io.to(notification?.room_id).emit("notification_count", {
+        success: true,
+        code: "NOTIFICATION_COUNT_FETCHED_SUCCESSFULLY",
+        data: notification?.count,
+      });
+    });
+
     socket.on("generate_custom_offer", async (data: any) => {
       const { room_id, custom_offer_id, message } = data;
       const [customOffer]: any = await CustomOfferSvc.getCustomOffer({ _id: new ObjectId(custom_offer_id as string) });
@@ -240,6 +255,7 @@ export default (io: Server) => {
       };
 
       const sender = await UserSvc.getUser({ _id: new ObjectId(socket.user._id as string) });
+      console.log({ sender });
       io.to(room_id).emit("send_message_to_room", {
         room_id,
         key: "CUSTOM_OFFER_SENT",
@@ -279,6 +295,7 @@ export default (io: Server) => {
       );
 
       const notification = await NotificationSvc.getNotificationByRoomId(receiverId);
+      console.log({ notification, receiverId, messages: "GENERATE_CUSTOM_OFFER" });
       io.to(notification?.room_id).emit("notification_count", {
         success: true,
         code: "NOTIFICATION_COUNT_FETCHED_SUCCESSFULLY",
