@@ -159,12 +159,11 @@ export default class EnquiriesCtrl {
         return handleResponse(res, microserviceResponse, "ENQUIRY_UPDATED_SUCCESSFULLY");
       }
       const result = await EnquirySvc.updateEnquiry({ _id: enquiry_id }, updatedData, req?.tenant);
-
-      if (result.modifiedCount === 0) {
+      if (!result) {
         return handleErrorResponse(res, new Error("No enquiries were updated"), { code: "UPDATE_FAILED" });
       }
-
-      return handleResponse(res, result, "ENQUIRY_UPDATED_SUCCESSFULLY");
+      const responseMessage = result.modifiedCount === 0 ? "NO_ENQUIRIES_UPDATED" : "ENQUIRY_UPDATED_SUCCESSFULLY";
+      return handleResponse(res, result, responseMessage);
     } catch (error) {
       logger.log({
         level: "info",
