@@ -18,9 +18,11 @@ import MessageSvc from "./message.services";
 import UserSvc from "./user.service";
 import VenueSvc from "./venue.service";
 import NotificationSvc from "./notification.service";
+import { pushNotification } from "../utils/firebase/firebase.admin";
+import { metaDataKey, NotificationType } from "../models/notification.model";
 
 export default class EnquirySvc {
-  static async createEnquiry(data: TEnquiries, message: string, tenant?: any) {
+  static async createEnquiry(data: TEnquiries, message: string, tenant?: any, senderId?: ObjectId, receiverId?: ObjectId) {
     let result = null;
     if (IS_ENQUIRY_MICROSERVICES) {
       result = handleInitCreateEnquiry(data);
@@ -45,6 +47,25 @@ export default class EnquirySvc {
 
     const userDataSender = await UserRepo.getUser({ _id: data.user });
     const spaceData = await SpaceRepository.getSpace({ _id: data.space });
+
+    const participants = {
+      senderId,
+      receiverId,
+      userId: String(receiverId),
+    };
+
+    const metadata = {
+      [metaDataKey.ENQUIRY_ID]: data._id,
+    };
+
+    await pushNotification(
+      { title: "New Inquiry", body: "You have a new inquiry to review." },
+      { type: NotificationType.INQUIRY, enquiryId: String(data._id) },
+      { notification: { sound: "default" } },
+      { payload: { aps: { sound: "default" } } },
+      participants,
+      metadata,
+    );
 
     for (const userRecipient of userRecipients) {
       const recipientFirstName = userRecipient?.first_name?.replace(/_/g, " ") || "Venue Owner";
@@ -90,6 +111,7 @@ export default class EnquirySvc {
     const senderId = new ObjectId(user?._id as string);
 
     const [_venue]: any = await VenueSvc.getVenue({ _id: _space.venue });
+    const receiverId = _venue?.user?._id;
     const room_id: string = generateRoomId();
 
     const formattedDate = dateFormat(date);
@@ -146,7 +168,7 @@ export default class EnquirySvc {
       inbox: inbox.insertedId,
     };
 
-    return await this.createEnquiry(enquiryData, message, tenant);
+    return await this.createEnquiry(enquiryData, message, tenant, senderId, receiverId);
   }
 
   static async updateEnquiry(query: any, data: any, tenant?: any) {
