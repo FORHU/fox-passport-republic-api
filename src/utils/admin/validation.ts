@@ -112,6 +112,7 @@ export const validateAnnouncementSchema = (data: TAnnouncement) => {
     limit: Joi.number().optional().allow(null, ""),
     search: Joi.string().escapeHTML().optional().allow(null, ""),
     sort: Joi.number().optional().allow(null, ""),
+    active_only: Joi.boolean(),
   });
   return schema.validate(data);
 };
