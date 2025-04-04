@@ -111,10 +111,8 @@ export default (io: Server) => {
         const sender_full_name = `${senderUser.first_name} ${senderUser.last_name}`;
         const senderId = senderUser._id;
 
-        const tenSecondsAgo = new Date(Date.now() - 10 * 1000);
         const existingNotification = await NotificationSvc.getOneNotification({
           title: "New Inquiry",
-          createdAt: { $lte: tenSecondsAgo },
           "metadata.enquiry_id": enquiry._id,
         });
 
@@ -131,15 +129,6 @@ export default (io: Server) => {
         if (existingNotification) {
           await pushNotification(
             { title: sender_full_name, body: message },
-            { type: NotificationType.INQUIRY, enquiryId: String(enquiry._id) },
-            { notification: { sound: "default" } },
-            { payload: { aps: { sound: "default" } } },
-            participants,
-            metadata,
-          );
-        } else {
-          await pushNotification(
-            { title: "New Inquiry", body: "You have a new inquiry to review." },
             { type: NotificationType.INQUIRY, enquiryId: String(enquiry._id) },
             { notification: { sound: "default" } },
             { payload: { aps: { sound: "default" } } },
