@@ -13,14 +13,13 @@ export default class AnnouncementRepo {
 
   static async getAnnouncements(query: any, page?: number, limit?: number, sort?: number) {
     const skip = (page - 1) * limit;
-
     const { "announcement_log.user": announcementLogUser, $text, ..._query } = query;
 
     const pipeline = [];
 
     if ($text) pipeline.push({ $match: { $text } });
 
-    pipeline.push(
+    const sharedStages = [
       {
         $project: {
           attachment: 1,
@@ -57,29 +56,32 @@ export default class AnnouncementRepo {
       },
       { $match: _query },
       { $unset: "deletedAt" },
-      { $sort: { _id: sort } },
-      { $skip: skip },
-      { $limit: limit },
-    );
+    ];
+
+    pipeline.push(...sharedStages, { $sort: { _id: sort } }, { $skip: skip }, { $limit: limit });
+    const countPipeline = [...($text ? [{ $match: { $text: $text } }] : []), ...sharedStages, { $count: "total" }];
 
     let result = await this.collection().aggregate(pipeline).toArray();
+    let countResult = await this.collection().aggregate(countPipeline).toArray();
+    let total_documents = countResult[0]?.total || 0;
 
     if (result.length === 0 && $text) {
       const regex = { $regex: $text.$search, $options: "i" };
 
-      const fallbackPipeline = [
-        {
-          $match: {
-            $or: [{ title: regex }, { description: regex }],
-          },
+      const regexMatch = {
+        $match: {
+          $or: [{ title: regex }, { description: regex }],
+          ..._query,
         },
-        ...pipeline.slice(1), // everything after the initial match
-      ];
+      };
+
+      const fallbackPipeline = [regexMatch, ...sharedStages.slice(1), { $sort: { _id: sort } }, { $skip: skip }, { $limit: limit }];
+      const fallbackCountPipeline = [regexMatch, ...sharedStages.slice(1), { $count: "total" }];
 
       result = await this.collection().aggregate(fallbackPipeline).toArray();
+      countResult = await this.collection().aggregate(fallbackCountPipeline).toArray();
+      total_documents = countResult[0]?.total || 0;
     }
-
-    const total_documents = result.length;
 
     return {
       data: result,
