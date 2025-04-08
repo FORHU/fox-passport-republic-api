@@ -56,9 +56,12 @@ export default class VenueRepo {
   }
 
   static async getPaginatedVenues(query: any, skip: number, limit: number) {
+    const { $text, ..._query } = query;
     const pipeline = [];
 
-    pipeline.push(
+    if ($text) pipeline.push({ $match: { $text: $text } });
+
+    const sharedStages = [
       {
         $lookup: {
           from: "keywords",
@@ -137,13 +140,11 @@ export default class VenueRepo {
           preserveNullAndEmptyArrays: true,
         },
       },
-    );
 
-    pipeline.push({
-      $match: query,
-    });
+      {
+        $match: _query,
+      },
 
-    pipeline.push(
       {
         $unwind: {
           path: "$venue_photos",
@@ -194,57 +195,78 @@ export default class VenueRepo {
           deletedBy: { $first: "$deletedBy" },
         },
       },
-    );
 
-    pipeline.push({
-      $project: {
-        _id: 1,
-        name: 1,
-        representation: 1,
-        description: 1,
-        address: 1,
-        form_steps: 1,
-        keywords: 1,
-        cancellation_policy: {
-          $cond: {
-            if: { $gt: [{ $size: "$cancellation_policy" }, 0] },
-            then: { $arrayElemAt: ["$cancellation_policy", 0] },
-            else: null,
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          representation: 1,
+          description: 1,
+          address: 1,
+          form_steps: 1,
+          keywords: 1,
+          cancellation_policy: {
+            $cond: {
+              if: { $gt: [{ $size: "$cancellation_policy" }, 0] },
+              then: { $arrayElemAt: ["$cancellation_policy", 0] },
+              else: null,
+            },
           },
+          venue_photos: 1,
+          space_photos: 1,
+          user: { $arrayElemAt: ["$user", 0] },
+          foods_and_beverages: 1,
+          venue_details: 1,
+          organization: 1,
+          age_restriction: 1,
+          commission: 1,
+          rebate: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          deletedAt: 1,
+          deletedBy: 1,
+          status: 1,
+          payment_method: 1,
+          spaces: 1,
         },
-        venue_photos: 1,
-        space_photos: 1,
-        user: { $arrayElemAt: ["$user", 0] },
-        foods_and_beverages: 1,
-        venue_details: 1,
-        organization: 1,
-        age_restriction: 1,
-        commission: 1,
-        rebate: 1,
-        createdAt: 1,
-        updatedAt: 1,
-        deletedAt: 1,
-        deletedBy: 1,
-        status: 1,
-        payment_method: 1,
-        spaces: 1,
       },
-    });
-
-    pipeline.push({
-      $addFields: {
-        latestDate: { $max: ["$updatedAt", "$createdAt"] },
+      {
+        $addFields: {
+          latestDate: { $max: ["$updatedAt", "$createdAt"] },
+        },
       },
-    });
+    ];
 
-    pipeline.push({ $sort: { latestDate: -1 } });
-    pipeline.push({ $skip: skip }, { $limit: limit });
-    const result = await this.collection().aggregate(pipeline).toArray();
+    pipeline.push(...sharedStages, { $sort: { latestDate: -1 } }, { $skip: skip }, { $limit: limit });
+
+    let result = await this.collection().aggregate(pipeline).toArray();
+
+    if (result.length === 0 && $text) {
+      const regex = { $regex: $text.$search, $options: "i" };
+
+      const regexMatch = {
+        $match: {
+          $or: [{ name: regex }, { "spaces.name": regex }],
+          ..._query,
+        },
+      };
+
+      const fallbackPipeline = [regexMatch, ...sharedStages.slice(1), { $sort: { latestDate: -1 } }, { $skip: skip }, { $limit: limit }];
+
+      result = await this.collection().aggregate(fallbackPipeline).toArray();
+    }
+
     return result;
   }
 
   static async countVenues(query: any) {
-    const pipeline = [
+    const { $text, ..._query } = query;
+
+    const pipeline = [];
+
+    if ($text) pipeline.push({ $match: { $text: $text } });
+
+    const sharedStages = [
       {
         $lookup: {
           from: "keywords",
@@ -261,11 +283,28 @@ export default class VenueRepo {
           as: "spaces",
         },
       },
-      ...(Object.keys(query).length > 0 ? [{ $match: query }] : []),
+      ...(Object.keys(query).length > 0 ? [{ $match: _query }] : []),
       { $count: "total_count" },
     ];
 
-    const result = await this.collection().aggregate(pipeline).toArray();
+    pipeline.push(...sharedStages);
+
+    let result = await this.collection().aggregate(pipeline).toArray();
+
+    if (result.length === 0 && $text) {
+      const regex = { $regex: $text.$search, $options: "i" };
+
+      const regexMatch = {
+        $match: {
+          $or: [{ name: regex }, { "spaces.name": regex }],
+          ..._query,
+        },
+      };
+
+      const fallbackPipeline = [regexMatch, ...sharedStages.slice(1)];
+
+      result = await this.collection().aggregate(fallbackPipeline).toArray();
+    }
 
     if (result.length > 0 && result[0].total_count !== undefined) {
       return result[0].total_count;
