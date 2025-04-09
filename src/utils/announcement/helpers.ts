@@ -1,7 +1,7 @@
 import { ObjectId } from "mongodb";
 
 export const constructQuery = (params: any) => {
-  const { _id, search, target, user, viewed, active_only } = params;
+  const { _id, search, target, user, viewed, active_only, target_device } = params;
   const query: any = { deletedAt: null };
 
   if (_id) query._id = new ObjectId(_id);
@@ -13,6 +13,8 @@ export const constructQuery = (params: any) => {
   if (viewed) query.viewed = viewed === "true" || viewed === true ? true : false;
 
   if (active_only === "true" || active_only === true) query.active = true;
+
+  if (target_device) query.target_device = target_device;
 
   query["announcement_log.user"] = new ObjectId(user);
 
