@@ -5,6 +5,12 @@ export enum targetType {
   VENUE_OWNER = "VENUE_OWNERS_ONLY",
   USERS = "USERS_ONLY",
 }
+
+export enum targetDeviceType {
+  ALL = "ALL",
+  WEB = "WEB_ONLY",
+  MOBILE = "MOBILE_ONLY",
+}
 export interface TAnnouncement {
   _id?: ObjectId;
   attachment?: ObjectId;
@@ -13,6 +19,7 @@ export interface TAnnouncement {
   active?: boolean;
   validUntil?: Date;
   target?: targetType;
+  target_device?: targetDeviceType;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;
@@ -27,6 +34,7 @@ export class MAnnouncement implements Partial<TAnnouncement> {
   active?: boolean;
   validUntil: Date;
   target?: targetType;
+  target_device?: targetDeviceType;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;
@@ -41,6 +49,7 @@ export class MAnnouncement implements Partial<TAnnouncement> {
       active,
       validUntil,
       target,
+      target_device,
       createdAt = new Date(),
       updatedAt,
       deletedAt,
@@ -54,6 +63,7 @@ export class MAnnouncement implements Partial<TAnnouncement> {
     this.active = active;
     this.validUntil = validUntil;
     this.target = target;
+    this.target_device = target_device;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
     this.deletedAt = deletedAt;
