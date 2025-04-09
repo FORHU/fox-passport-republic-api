@@ -27,6 +27,7 @@ export default class AnnouncementRepo {
           description: 1,
           active: 1,
           target: 1,
+          target_device: 1,
           deletedAt: 1,
         },
       },

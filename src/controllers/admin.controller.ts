@@ -44,7 +44,6 @@ import { initRemoveFileQueue } from "../utils/queues/files/file-remove-do";
 import StripeAccountSvc from "../services/stripe-account.service";
 import { account_status } from "../models/stripe-account.model";
 import AnnouncementSvc from "../services/announcement.service";
-import { constructQuery } from "../utils/announcement/helpers";
 import AnnouncementLogSvc from "../services/announcement-log.service";
 
 const storage = multer.memoryStorage();
@@ -690,9 +689,8 @@ export default class AdminCtrl {
       const pageNumber = parseInt(page as string);
       const limitNumber = parseInt(limit as string);
       const sortNumber = parseInt(sort as string);
-      const query = constructQuery(_query);
 
-      const result = await AnnouncementSvc.getAnnouncements(query, pageNumber, limitNumber, sortNumber);
+      const result = await AnnouncementSvc.getAnnouncements(_query, pageNumber, limitNumber, sortNumber);
       return handleResponse(res, result, "ANNOUNCEMENT_FETCH_SUCCESSFUL");
     } catch (error) {
       return handleErrorResponse(res, error, { code: "ANNOUNCEMENT_FETCH_FAILED" });
