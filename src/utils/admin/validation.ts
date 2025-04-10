@@ -110,6 +110,48 @@ export const validateAnnouncementSchema = (data: TAnnouncement) => {
   return schema.validate(data);
 };
 
+const targetValues = Object.values(targetType).join("|");
+const targetDeviceValues = Object.values(targetDeviceType).join("|");
+
+export const validateGetAnnouncementSchema = (data: TAnnouncement) => {
+  const schema = Joi.object({
+    _id: Joi.string().escapeHTML().optional().allow(null, ""),
+    target: Joi.string()
+      .custom((value, helpers) => {
+        if (!value) return value;
+        const values = value.split(",").map((v: string) => v.trim());
+        const invalidValues = values.filter((v: string) => !targetValues.includes(v));
+        if (invalidValues.length) {
+          return helpers.error("any.invalid", { message: `Invalid target values: ${invalidValues.join(", ")}` });
+        }
+
+        return value;
+      })
+      .optional()
+      .allow(null, ""),
+    viewed: Joi.boolean().optional(),
+    page: Joi.number().optional().allow(null, ""),
+    limit: Joi.number().optional().allow(null, ""),
+    search: Joi.string().escapeHTML().optional().allow(null, ""),
+    sort: Joi.number().optional().allow(null, ""),
+    active_only: Joi.boolean(),
+    target_device: Joi.string()
+      .custom((value, helpers) => {
+        if (!value) return value;
+        const values = value.split(",").map((v: string) => v.trim());
+        const invalidValues = values.filter((v: string) => !targetDeviceValues.includes(v));
+        if (invalidValues.length) {
+          return helpers.error("any.invalid", { message: `Invalid target values: ${invalidValues.join(", ")}` });
+        }
+
+        return value;
+      })
+      .optional()
+      .allow(null, ""),
+  });
+  return schema.validate(data);
+};
+
 export const validateAnnouncementLogSchema = (data: TAnnouncementLog) => {
   const schema = Joi.object({
     _id: Joi.string().escapeHTML().optional().allow(null, ""),
