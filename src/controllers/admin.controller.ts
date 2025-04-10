@@ -21,6 +21,7 @@ import { constructEnquiryQuery, parseWorkbook, validateSheetsData } from "../uti
 import {
   validateAnnouncementLogSchema,
   validateAnnouncementSchema,
+  validateGetAnnouncementSchema,
   validateGetSpaceSchema,
   validateGetVenueSchema,
   validateUpdateSpaceStatus,
@@ -677,7 +678,7 @@ export default class AdminCtrl {
 
   static async getAnnouncements(req: Request, res: Response) {
     try {
-      const { error } = validateAnnouncementSchema(req.query);
+      const { error } = validateGetAnnouncementSchema(req.query);
 
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
