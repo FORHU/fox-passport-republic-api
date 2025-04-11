@@ -153,7 +153,7 @@ export default class EnquiriesCtrl {
         return handleErrorResponse(res, error, { code: "VALIDATION_FAILED" });
       }
 
-      const updatedData = { status };
+      const updatedData = { status, updatedAt: new Date() };
       if (IS_ENQUIRY_MICROSERVICES) {
         const microserviceResponse = await EnquirySvc.updateEnquiriesFromMicroservice(enquiry_id, updatedData);
         return handleResponse(res, microserviceResponse, "ENQUIRY_UPDATED_SUCCESSFULLY");
