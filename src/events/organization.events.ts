@@ -291,8 +291,18 @@ export default (io: Server) => {
 
     socket.on("custom_offer_status", async (data: any) => {
       const { room_id, custom_offer_id, message = null, key } = data;
-      const [customOffer]: any = await CustomOfferSvc.getCustomOffer({ _id: new ObjectId(custom_offer_id as string) });
-      const [enquiry] = await EnquirySvc.getEnquiries({ "inbox._id": customOffer.inbox }, 0, 1);
+
+      let enquiry = null;
+      let customOffer = null;
+
+      if (!custom_offer_id && key === "ARCHIVED") {
+        [enquiry] = await EnquirySvc.getEnquiries({ "inbox.room_id": room_id }, 0, 1);
+        const [existingCustomOffer] = await CustomOfferSvc.getCustomOffer({ "enquiry._id": enquiry._id });
+        if (existingCustomOffer) await CustomOfferSvc.updateCustomOffer(existingCustomOffer._id, { status: "ARCHIVE" });
+      } else {
+        [customOffer] = await CustomOfferSvc.getCustomOffer({ _id: new ObjectId(custom_offer_id as string) });
+        [enquiry] = await EnquirySvc.getEnquiries({ "inbox._id": customOffer.inbox }, 0, 1);
+      }
 
       const isVenueOrAdminRole = [user_role.VENUE_OWNER, user_role.ADMIN].includes(socket.user.role);
       const receiverId = isVenueOrAdminRole ? enquiry.user._id : enquiry.venue.user._id;
@@ -309,14 +319,25 @@ export default (io: Server) => {
           userId: String(receiverId),
         };
 
-        const metadata = {
-          [metaDataKey.CUSTOM_OFFER_ID]: custom_offer_id,
-          [metaDataKey.ENQUIRY_ID]: enquiry._id,
-        };
+        const isArchived = !custom_offer_id && key === "ARCHIVED";
+
+        const notificationTitle = isArchived ? "Enquiry Updated" : "Custom Offer Updated";
+
+        const notificationBody = isArchived
+          ? `You're enquiry was archived by ${sender_full_name}`
+          : `You're custom offer was updated by ${sender_full_name}`;
+
+        const notificationData = isArchived
+          ? { type: NotificationType.INQUIRY, enquiryId: String(enquiry._id) }
+          : { type: NotificationType.CUSTOM_OFFER, customOfferId: String(custom_offer_id), enquiryId: String(enquiry._id) };
+
+        const metadata = isArchived
+          ? { [metaDataKey.ENQUIRY_ID]: enquiry._id }
+          : { [metaDataKey.CUSTOM_OFFER_ID]: custom_offer_id, [metaDataKey.ENQUIRY_ID]: enquiry._id };
 
         await pushNotification(
-          { title: "Custom Offer Updated", body: `You're custom offer was updated by ${sender_full_name}` },
-          { type: NotificationType.CUSTOM_OFFER, customOfferId: String(custom_offer_id), enquiryId: String(enquiry._id) },
+          { title: notificationTitle, body: notificationBody },
+          notificationData,
           { notification: { sound: "default" } },
           { payload: { aps: { sound: "default" } } },
           participants,
@@ -332,28 +353,29 @@ export default (io: Server) => {
       }
 
       const messagePayload: any = {
-        inbox: customOffer?.inbox,
+        inbox: customOffer?.inbox ?? enquiry?.inbox?._id,
         key,
         room_id,
         sender: new ObjectId(socket?.user?._id as string),
         generated_content: {
           payment_computation: {
-            venue_computation: customOffer?.venue_computation,
-            user_computation: customOffer?.user_computation,
+            venue_computation: customOffer?.venue_computation ?? "No custom offer computation",
+            user_computation: customOffer?.user_computation ?? "No custom offer computation",
           },
           message,
-          guests: customOffer?.guests,
-          event_date: customOffer?.date?.date,
-          timeFrom: customOffer?.date?.from,
-          timeTo: customOffer?.date?.to,
-          event_type: customOffer?.enquiry?.type,
-          space_name: customOffer?.space?.name,
-          venue_name: customOffer?.venue?.name,
-          currency: customOffer?.currency,
+          guests: customOffer?.guests ?? enquiry?.guests,
+          event_date: customOffer?.date?.date ?? enquiry?.date?.date,
+          timeFrom: customOffer?.date?.from ?? enquiry?.date?.from,
+          timeTo: customOffer?.date?.to ?? enquiry?.date?.to,
+          event_type: customOffer?.enquiry?.type ?? enquiry?.type,
+          space_name: customOffer?.space?.name ?? enquiry?.space?.name,
+          venue_name: customOffer?.venue?.name ?? enquiry?.venue?.name,
+          currency: customOffer?.currency ?? "No custom offer currency",
         },
         admin_generated: true,
         createdAt: new Date(),
       };
+
       const sender = await UserSvc.getUser({ _id: new ObjectId(socket.user._id as string) });
       io.to(room_id).emit("send_message_to_room", {
         room_id,

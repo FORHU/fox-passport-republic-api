@@ -173,7 +173,6 @@ export default class EnquirySvc {
 
   static async updateEnquiry(query: any, data: any, tenant?: any) {
     const result = await EnquiryRepo.updateEnquiry(query, data);
-    if (data.status === "ARCHIVED") return result;
 
     const [customOfferData] = await CustomOfferRepo.getCustomOffer({ "enquiry._id": query._id });
     if (!customOfferData) {

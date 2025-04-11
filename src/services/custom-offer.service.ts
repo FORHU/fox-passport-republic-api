@@ -95,7 +95,7 @@ export default class CustomOfferSvc {
     }
   }
 
-  static async updateCustomOffer(_id: ObjectId, data: any, offer: any, tenant?: any, userRole?: any) {
+  static async updateCustomOffer(_id: ObjectId, data: any, offer?: any, tenant?: any, userRole?: any) {
     try {
       let user_recipient: any = null;
       const updatedOffer = await CustomOfferRepo.updateCustomOffer(_id, data);
