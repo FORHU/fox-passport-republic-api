@@ -11,6 +11,7 @@ export enum targetDeviceType {
   WEB = "WEB_ONLY",
   MOBILE = "MOBILE_ONLY",
 }
+
 export interface TAnnouncement {
   _id?: ObjectId;
   attachment?: ObjectId;
@@ -20,6 +21,7 @@ export interface TAnnouncement {
   validUntil?: Date;
   target?: targetType;
   target_device?: targetDeviceType;
+  tenant?: string;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;
@@ -35,6 +37,7 @@ export class MAnnouncement implements Partial<TAnnouncement> {
   validUntil: Date;
   target?: targetType;
   target_device?: targetDeviceType;
+  tenant?: string;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;
@@ -50,6 +53,7 @@ export class MAnnouncement implements Partial<TAnnouncement> {
       validUntil,
       target,
       target_device,
+      tenant,
       createdAt = new Date(),
       updatedAt,
       deletedAt,
@@ -64,6 +68,7 @@ export class MAnnouncement implements Partial<TAnnouncement> {
     this.validUntil = validUntil;
     this.target = target;
     this.target_device = target_device;
+    this.tenant = tenant;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
     this.deletedAt = deletedAt;
