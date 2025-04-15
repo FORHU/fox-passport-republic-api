@@ -1,7 +1,7 @@
 import { ObjectId } from "mongodb";
 
 export const constructQuery = (params: any) => {
-  const { _id, search, target, user, viewed, active_only, target_device } = params;
+  const { _id, search, target, user, viewed, active_only, target_device, tenant } = params;
   const query: any = { deletedAt: null };
 
   const _target = ["ALL", "VENUE_OWNERS_ONLY", "USERS_ONLY"];
@@ -19,6 +19,8 @@ export const constructQuery = (params: any) => {
 
   if (target_device)
     query.target_device = target_device !== "ALL" ? { $in: target_device.split(",").map((t: string) => t.trim()) } : { $in: targetDevice };
+
+  if (tenant) query.tenant = tenant;
 
   query["announcement_log.user"] = new ObjectId(user);
 

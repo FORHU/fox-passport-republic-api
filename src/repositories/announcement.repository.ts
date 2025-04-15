@@ -28,6 +28,7 @@ export default class AnnouncementRepo {
           active: 1,
           target: 1,
           target_device: 1,
+          tenant: 1,
           deletedAt: 1,
         },
       },
@@ -56,7 +57,7 @@ export default class AnnouncementRepo {
         },
       },
       { $match: _query },
-      { $unset: "deletedAt" },
+      { $unset: ["deletedAt", "tenant"] },
     ];
 
     pipeline.push(...sharedStages, { $sort: { _id: sort } }, { $skip: skip }, { $limit: limit });

@@ -659,10 +659,13 @@ export default class AdminCtrl {
   static async createAnnouncement(req: Request, res: Response) {
     try {
       const { error } = validateAnnouncementSchema(req.body);
+      const tenantCode = req?.tenant?.code;
 
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
+
+      req.body.tenant = tenantCode;
 
       const { attachment } = req.body;
       if (attachment) {
@@ -679,11 +682,14 @@ export default class AdminCtrl {
   static async getAnnouncements(req: Request, res: Response) {
     try {
       const { error } = validateGetAnnouncementSchema(req.query);
+      const tenantCode = req?.tenant?.code;
 
       if (error) {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
+
       req.query.user = req?.user?._id;
+      req.query.tenant = tenantCode;
 
       const { sort = 1, page = 1, limit = 10, ..._query } = req.query;
 
@@ -711,9 +717,7 @@ export default class AdminCtrl {
         return handleErrorResponse(res, error, { code: "VALIDATION_ERROR" });
       }
 
-      if (req?.body?.attachment) {
-        req.body.attachment = new ObjectId(req.body.attachment);
-      }
+      if (req?.body?.attachment) req.body.attachment = new ObjectId(req.body.attachment);
 
       const result = await AnnouncementSvc.updateAnnouncement({ _id }, req.body);
       return handleResponse(res, result, "ANNOUNCEMENT_UPDATE_SUCCESSFUL");
