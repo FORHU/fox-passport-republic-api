@@ -56,10 +56,17 @@ export default class VenueRepo {
   }
 
   static async getPaginatedVenues(query: any, skip: number, limit: number) {
-    const { $text, ..._query } = query;
+    let { $text, ..._query } = query;
     const pipeline = [];
 
     if ($text) pipeline.push({ $match: { $text: $text } });
+
+    const statusFilter = _query.status;
+
+    if (statusFilter?.$in?.includes("FOR_TRANSACTION_CLOSING")) {
+      _query["spaces.status"] = { $in: statusFilter.$in };
+      delete _query.status;
+    }
 
     const sharedStages = [
       {
@@ -140,11 +147,6 @@ export default class VenueRepo {
           preserveNullAndEmptyArrays: true,
         },
       },
-
-      {
-        $match: _query,
-      },
-
       {
         $unwind: {
           path: "$venue_photos",
@@ -195,7 +197,6 @@ export default class VenueRepo {
           deletedBy: { $first: "$deletedBy" },
         },
       },
-
       {
         $project: {
           _id: 1,
@@ -231,6 +232,9 @@ export default class VenueRepo {
         },
       },
       {
+        $match: _query,
+      },
+      {
         $addFields: {
           latestDate: { $max: ["$updatedAt", "$createdAt"] },
         },
@@ -251,8 +255,7 @@ export default class VenueRepo {
         },
       };
 
-      const fallbackPipeline = [regexMatch, ...sharedStages.slice(1), { $sort: { latestDate: -1 } }, { $skip: skip }, { $limit: limit }];
-
+      const fallbackPipeline = [...sharedStages.slice(1), regexMatch, { $sort: { latestDate: -1 } }, { $skip: skip }, { $limit: limit }];
       result = await this.collection().aggregate(fallbackPipeline).toArray();
     }
 
