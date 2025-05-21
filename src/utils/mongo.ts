@@ -13,7 +13,7 @@ export const connectToMongo = async () => {
   await client.connect();
   db = client.db(MONGO_DB);
   mongoClient = client;
-  // await InitializeCreateIndex(db);
+  await InitializeCreateIndex(db);
 };
 
 export const getDB = () => {
