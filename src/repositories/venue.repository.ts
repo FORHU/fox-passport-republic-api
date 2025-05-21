@@ -191,6 +191,7 @@ export default class VenueRepo {
           rebate: { $first: "$rebate" },
           payment_method: { $first: "$payment_method" },
           spaces: { $push: "$spaces" },
+          tenant: { $first: "$tenant" },
           createdAt: { $first: "$createdAt" },
           updatedAt: { $first: "$updatedAt" },
           deletedAt: { $first: "$deletedAt" },
@@ -229,6 +230,7 @@ export default class VenueRepo {
           status: 1,
           payment_method: 1,
           spaces: 1,
+          tenant: 1,
         },
       },
       {
