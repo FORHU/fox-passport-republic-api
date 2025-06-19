@@ -478,7 +478,7 @@ export default class AdminCtrl {
       return handleErrorResponse(res, {}, { code: "INVALID_VENUE_STATUS" });
     }
 
-    const user = await UserSvc.getUser({ _id: venue.user });
+    const user = await UserSvc.getUser({ _id: venue.user._id });
 
     const payload_user = {
       email: user.email,
