@@ -61,6 +61,7 @@ export default class AdminSvc {
       const date_submitted = formatDate(venue_data.updatedAt);
 
       let emailStatus = null;
+      let emailMessage = "";
 
       if ([venue_status.PUBLISHED, venue_status.REJECTED, venue_status.SUSPENDED].includes(status as venue_status)) {
         const participants = {
@@ -87,11 +88,13 @@ export default class AdminSvc {
             notificationTitle = "Venue Rejected";
             notificationBody = "Your venue did not meet the requirements.";
             notificationType = NotificationType.VENUE;
+            break;
 
           case venue_status.SUSPENDED:
             notificationTitle = "Venue Suspended";
             notificationBody = "Your venue has been suspended.";
             notificationType = NotificationType.VENUE;
+            break;
 
           default:
             return `Unknown venue status ${status}`;
@@ -114,14 +117,18 @@ export default class AdminSvc {
             ? `${tenant?.config?.name}: Venue Approved`
             : status === venue_status.REJECTED
               ? `${tenant?.config?.name} Venue Submission Status`
-              : `${tenant?.config?.name} Venue Suspension Notice`;
+              : status === venue_status.SUSPENDED
+                ? `${tenant?.config?.name} Venue Suspension Notice`
+                : null;
 
         const template_name =
           status === venue_status.PUBLISHED
             ? "venue-approved.html"
             : status === venue_status.REJECTED
               ? "venue-declined.html"
-              : "venue-suspension.html";
+              : status === venue_status.SUSPENDED
+                ? "venue-suspension.html"
+                : null;
 
         const email_type = subject;
 
@@ -167,10 +174,11 @@ export default class AdminSvc {
           await EmailLogsRepo.createEmailLog(email_logs_data);
         }
 
-        return `Email sent successfully to: ${venue_data.venue.user.email}`;
+        emailMessage = `Email sent successfully to: ${venue_data.venue.user.email}`;
       }
 
-      return await AdminRepo.updateVenue(data, status);
+      const result = await AdminRepo.updateVenue(data, status);
+      return { result, emailMessage };
     } catch (error) {
       console.error("Error in updateVenue:", error);
       throw error;
@@ -252,9 +260,8 @@ export default class AdminSvc {
       const [space_data] = await SpaceRepository.getPaginatedSpaces({ query: query, skip: 0, limit: 1, user_id: null });
 
       const userSpace = space_data.venue.user;
-      if (!userSpace || !userSpace.email?.trim()) {
-        throw new Error("User for space does not exist or has no email.");
-      }
+
+      if (!userSpace || !userSpace.email?.trim()) throw new Error("User for space does not exist or has no email.");
 
       let emailMessage = "";
 
@@ -289,19 +296,22 @@ export default class AdminSvc {
               notificationTitle = "Space Rejected";
               notificationBody = "Your space did not meet the requirements.";
               notificationType = NotificationType.SPACE;
+              break;
 
             case space_status.SUSPENDED:
               notificationTitle = "Space Suspended";
               notificationBody = "Your space has been suspended.";
               notificationType = NotificationType.SPACE;
+              break;
 
             case space_status.DELETED:
               notificationTitle = "Space Deleted";
               notificationBody = "Your space has been deleted";
               notificationType = NotificationType.SPACE;
+              break;
 
             default:
-              return `Unknown space status ${status}`;
+              return `Unknown space status ${data.status}`;
           }
 
           await pushNotification(
@@ -324,7 +334,9 @@ export default class AdminSvc {
                 ? `${tenant?.config?.name}: Space Submission Status`
                 : data.status === space_status.DELETED
                   ? `${tenant?.config?.name}: Space Submission Status`
-                  : `${tenant?.config?.name}: Space Suspension Notice`;
+                  : data.status === space_status.SUSPENDED
+                    ? `${tenant?.config?.name}: Space Suspension Notice`
+                    : null;
 
           const template_name =
             data.status === space_status.PUBLISHED
@@ -333,7 +345,9 @@ export default class AdminSvc {
                 ? "space-declined.html"
                 : data.status === space_status.DELETED
                   ? "space-declined.html"
-                  : "space-suspension.html";
+                  : data.status === space_status.SUSPENDED
+                    ? "space-suspension.html"
+                    : null;
 
           sendTemplatedEmail({
             subject,
