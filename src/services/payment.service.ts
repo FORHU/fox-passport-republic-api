@@ -178,15 +178,16 @@ export default class PaymentSvc {
       };
 
       const stripeAccount = await StripeAccountSvc.getAccount({ user: enquiry.venue.user._id });
-
+      const [country_settings] = await CountrySettingSvc.getCountrySetting({ cca2: enquiry?.venue?.address?.country || "SG" });
+      const commission = enquiry?.venue?.commission || country_settings?.commission || 0.15;
       const accountPaymentTransactionPayload: any = {
         stripe_account: stripeAccount?._id,
         payment: paymentId,
-        enquiry: enquiry._id,
-        venue: enquiry.venue._id,
-        venue_owner: enquiry.venue.user._id,
-        space: enquiry.space._id,
-        amount: convertCentsToDollars(paymentIntent.amount) - convertCentsToDollars(paymentIntent.amount) * 0.15,
+        enquiry: enquiry?._id,
+        venue: enquiry?.venue?._id,
+        venue_owner: enquiry?.venue?.user?._id,
+        space: enquiry?.space?._id,
+        amount: convertCentsToDollars(paymentIntent?.amount) - convertCentsToDollars(paymentIntent?.amount) * commission,
       };
 
       const counter_receipt = await CounterSvc.generateCounter({ type: CounterType.RECEIPT });
