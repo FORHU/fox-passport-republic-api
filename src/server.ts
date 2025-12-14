@@ -1,23 +1,19 @@
+import server from "./app";
 import { PORT } from "./config";
-import { connectToMongo } from "./utils/mongo";
 import { logger } from "./utils/logger";
+import { connectToMongo } from "./utils/mongo";
 
 connectToMongo()
   .then(() => {
-    logger.log({
-      level: "info",
-      message: "Connected to MongoDB.",
-    });
+    logger.log({ level: "info", message: "Connected to MongoDB" });
 
-    const app = require("./app").default;
-
-    app.listen(PORT, () => {
+    server.listen(PORT || 3000, () => {
       logger.log({
         level: "info",
-        message: `Server is running on http://localhost:${PORT}`,
+        message: `Server is running on http://localhost:${PORT || 3000}`,
       });
     });
   })
   .catch((err) => {
-    console.log(err);
+    console.error("MongoDB connection error:", err);
   });

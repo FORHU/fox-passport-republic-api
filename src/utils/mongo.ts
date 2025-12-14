@@ -32,3 +32,10 @@ export const useTransactionOptions: TransactionOptions = {
   readConcern: { level: "local" },
   writeConcern: { w: "majority" },
 };
+
+export const closeDB = async () => {
+  if (mongoClient) {
+    await mongoClient.close();
+    console.log("MongoDB connection closed");
+  }
+};

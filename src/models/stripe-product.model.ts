@@ -15,7 +15,7 @@ export type TStripeProduction = {
   product_name: string;
   product_id: string;
   prices: STRIPEPRICES[];
-  status: string;
+  status?: string;
   tenant?: string;
   active?: Boolean;
   description: string;

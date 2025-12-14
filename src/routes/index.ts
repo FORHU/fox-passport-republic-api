@@ -14,9 +14,11 @@ import invoiceRoutes from "./invoice.route";
 import keywordRoutes from "./keywords.route";
 import messageRoutes from "./message-inbox.route";
 import messageTemplateRoutes from "./message-template.route";
+import notificationsRoutes from "./notification.route";
 import organizationRoutes from "./organization-member.route";
 import paymentRoutes from "./payment.route";
 import paymentTransaction from "./payment-transaction.route";
+import placeRoutes from "./place.route";
 import ratingRoutes from "./rating.route";
 import receiptRoutes from "./receipt.route";
 import requestsRoutes from "./requests.route";
@@ -26,11 +28,9 @@ import subscriptionRoutes from "./subscription.route";
 import todoRoutes from "./todo.route";
 import userRoutes from "./user.route";
 import AuthV2Routes from "./v2-routes/auth.routes";
-import venueRoutes from "./venue.route";
 import spaceV2Routes from "./v2-routes/space.route";
 import venueV2Routes from "./v2-routes/venue.route";
-import placeRoutes from "./place.route";
-import notificationsRoutes from "./notification.route";
+import venueRoutes from "./venue.route";
 
 const router = express.Router();
 
