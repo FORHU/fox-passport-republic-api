@@ -1,0 +1,122 @@
+import { prisma } from "../utils/prisma";
+
+export default class AuthRepo {
+
+
+  static async createUser(data: {
+    email: string;
+    password: string;
+    username: string;
+    name?: string;
+    mobileNumber?: string;
+    otpCode?: string;
+    otpExpiry?: Date;
+  }) {
+    return prisma.user.create({
+      data: {
+        email: data.email,
+        password: data.password,
+        username: data.username,
+        name: data.name,
+        mobileNumber: data.mobileNumber,
+        provider: null,
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        name: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  static async findUserByEmail(email: string) {
+    return prisma.user.findUnique({
+      where: {
+        email,
+      },
+    });
+  }
+
+  static async updateUserLoginStatus(userId: string) {
+    return prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        lastLoginAt: new Date(),
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        name: true,
+        lastLoginAt: true,
+      },
+    });
+  }
+
+  // static async createSession(data: {
+  //   userId: string;
+  //   refreshToken: string;
+  //   expiresAt: Date;
+  // }) {
+  //   return prisma.session.create({
+  //     data: {
+  //       ...data,
+  //     },
+  //   });
+  // }
+
+  // static async findValidSession(refreshToken: string) {
+  //   return prisma.session.findFirst({
+  //     where: {
+  //       refreshToken,
+  //       expiresAt: {
+  //         gt: new Date(),
+  //       },
+  //     },
+  //     include: {
+  //       user: true,
+  //     },
+  //   });
+  // }
+
+  static async findUserById(userId: string) {
+    return prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+    });
+  }
+
+  static async findUserByUsername(username: string) {
+    return prisma.user.findUnique({
+      where: {
+        username,
+      },
+    });
+  }
+
+  static async updateUser(userId: string, data: any) {
+    return prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: data,
+    });
+  }
+  static async getAuthUser(userId: string) {
+    return prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+      },
+    });
+  }
+}
