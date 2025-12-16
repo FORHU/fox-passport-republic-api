@@ -22,6 +22,12 @@ app.use(
 
 app.use(express.json());
 
+// ADD THIS REQUEST LOGGER
+app.use((req, res, next) => {
+    console.log(`📨 ${req.method} ${req.path}`);
+    next();
+});
+
 // Set up rate limiting middleware
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -46,6 +52,5 @@ export const io = new Server(server, {
         credentials: true,
     },
 });
-
 
 export default server;

@@ -39,8 +39,8 @@ export default class AuthSvc {
         const hashedPassword = `${salt}:${hash}`;
 
         // GENERATE OTP
-        const otp = generateOTP(); // "582941"
-        const otpExpiry = getOTPExpiry(); // 5 minutes from now
+       // const otp = generateOTP(); // "582941"
+        //const otpExpiry = getOTPExpiry(); // 5 minutes from now
 
         // Create user with OTP
         const user = await AuthRepo.createUser({
@@ -49,25 +49,25 @@ export default class AuthSvc {
             username: data.username,
             name: data.name,
             mobileNumber: data.mobileNumber,
-            otpCode: otp, // Save OTP
-            otpExpiry: otpExpiry, // Save expiry
+          //  otpCode: otp, // Save OTP
+           // otpExpiry: otpExpiry, // Save expiry
         });
 
         // Send verification email with OTP
-        try {
-            sendTemplatedEmail({
-                subject: `Verify Your Email Address`,
-                email_data: {
-                    email: user.email,
-                    OTP_CODE: otp.toString(),
-                },
-                template_name: "verification-email.html",
-            });
-        } catch (error) {
-            console.error("Failed to send verification email:", error);
-            // Still log to console as backup
-            console.log(`Backup - OTP for ${user.email}: ${otp}`);
-        }
+        // try {
+        //     sendTemplatedEmail({
+        //         subject: `Verify Your Email Address`,
+        //         email_data: {
+        //             email: user.email,
+        //             OTP_CODE: otp.toString(),
+        //         },
+        //         template_name: "verification-email.html",
+        //     });
+        // } catch (error) {
+        //     console.error("Failed to send verification email:", error);
+        //     // Still log to console as backup
+        //     console.log(`Backup - OTP for ${user.email}: ${otp}`);
+        // }
 
         // Generate tokens
         const accessToken = jwt.sign({ userId: user.id }, ACCESS_TOKEN_SECRET, {
@@ -120,13 +120,14 @@ export default class AuthSvc {
     }
 
     static async login({
-        email,
+        username,
         password,
     }: {
-        email: string;
+        username: string;
         password: string;
     }) {
-        const user = await AuthRepo.findUserByEmail(email);
+        const user = await AuthRepo.findUserByEmail(username);
+        console.log('+++++++++',user);
         if (!user) {
             throw "Invalid credentials";
         }
@@ -140,7 +141,7 @@ export default class AuthSvc {
         if (storedHash !== hash) {
             throw "Invalid credentials";
         }
-
+        
         // Update login status
         await AuthRepo.updateUserLoginStatus(user.id);
 

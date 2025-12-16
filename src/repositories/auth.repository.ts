@@ -31,10 +31,10 @@ export default class AuthRepo {
     });
   }
 
-  static async findUserByEmail(email: string) {
+  static async findUserByEmail(username: string) {
     return prisma.user.findUnique({
       where: {
-        email,
+        username,
       },
     });
   }

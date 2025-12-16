@@ -47,20 +47,20 @@ export default class AuthCtrl {
     }
 
     static async login(req: Request, res: Response) {
-        const { email, password } = req.body;
+        const { username, password } = req.body;
 
         const schema = Joi.object({
-            email: Joi.string().email().required(),
+            username: Joi.string().required(),
             password: Joi.string().required()
         });
 
-        const { error } = schema.validate({ email, password });
+        const { error } = schema.validate({ username, password });
         if (error) {
             return res.status(400).json({ message: error.message });
         }
 
         try {
-            const result = await AuthSvc.login({ email, password });
+            const result = await AuthSvc.login({ username, password });
             return res.json(result);
         } catch (error: any) {
             console.error('Login error:', error);
