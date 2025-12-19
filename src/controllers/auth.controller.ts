@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import AuthSvc from "../services/auth.service";
+import AuthRepo from "../repositories/auth.repository";
 
 export default class AuthCtrl {
     static async register(req: Request, res: Response) {
@@ -21,7 +22,7 @@ export default class AuthCtrl {
 
         try {
             const user = await AuthSvc.register({ email, password, username, name, mobileNumber });
-            return res.status(201).json({ message: "User created successfully", user });
+            return res.status(201).json({ message: "User registered successfully", user });
         } catch (error: any) {
             return res.status(400).json({ message: error.message || error });
         }
@@ -64,7 +65,18 @@ export default class AuthCtrl {
             return res.json(result);
         } catch (error: any) {
             console.error('Login error:', error);
-            return res.status(401).json({ message: error.message || error });
+            return res.status(401).json({ message:
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                error.message || error });
         }
     }
 

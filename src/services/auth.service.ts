@@ -88,12 +88,10 @@ export default class AuthSvc {
         // });
 
         return {
-            user: {
                 id: user.id,
                 email: user.email,
                 username: user.username,
                 name: user.name,
-            },
             accessToken,
             refreshToken,
             message:
