@@ -18,4 +18,5 @@ model User {
   provider     String?
   mobileNumber String?
   nationality  String?
+  isVerified   Boolean   @default(false)
 }
