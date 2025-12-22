@@ -56,3 +56,4 @@ export default class UsersSvc {
     return UsersRepo.deleteUser(id);
   }
 }
+
