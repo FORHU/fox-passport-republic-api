@@ -1,26 +1,29 @@
-import UsersRepo from "../repositories/users.repository";
 import bcrypt from "bcrypt";
+import UsersRepo from "../repositories/users.repository";
+import { UserRole } from "@prisma/client";
 
 export default class UsersSvc {
-  // READ ALL
+  // GET ALL USERS
   static async getAllUsers() {
     return UsersRepo.getAllUsers();
   }
 
-  // READ ONE
+  // GET USER BY ID
   static async getUserById(id: string) {
     const user = await UsersRepo.getUserById(id);
-    if (!user) throw new Error("User not found");
+    if (!user) {
+      throw new Error("User not found");
+    }
     return user;
   }
 
-  // CREATE
+  // CREATE USER
   static async createUser(data: {
     email: string;
     username: string;
     password: string;
-    name?: string;
-    role?: string;
+    name: string;
+    role?: UserRole;
   }) {
     const existingUser = await UsersRepo.getUserByEmail(data.email);
     if (existingUser) throw new Error("Email already exists");
@@ -40,20 +43,22 @@ export default class UsersSvc {
       email: string;
       username: string;
       password: string;
-      role?: string;
-      name?: string;
+      role: UserRole;
+      name: string;
+      isActive: boolean;
     }>
   ) {
-    if (data.password) {
-      data.password = await bcrypt.hash(data.password, 10);
-    }
+    const user = await UsersRepo.getUserById(id);
+    if (!user) throw new Error("User not found");
 
     return UsersRepo.updateUser(id, data);
   }
 
   // DELETE
   static async deleteUser(id: string) {
+    const user = await UsersRepo.getUserById(id);
+    if (!user) throw new Error("User not found");
+
     return UsersRepo.deleteUser(id);
   }
 }
-

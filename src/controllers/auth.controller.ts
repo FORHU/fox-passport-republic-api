@@ -11,7 +11,7 @@ export default class AuthCtrl {
             email: Joi.string().email().required(),
             password: Joi.string().min(6).required(),
             username: Joi.string().required(),
-            name: Joi.string().optional(),
+            name: Joi.string().required(),
             mobileNumber: Joi.string().optional()
         });
 
@@ -65,18 +65,20 @@ export default class AuthCtrl {
             return res.json(result);
         } catch (error: any) {
             console.error('Login error:', error);
-            return res.status(401).json({ message:
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                error.message || error });
+            return res.status(401).json({
+                message:
+
+
+
+
+
+
+
+
+
+
+                    error.message || error
+            });
         }
     }
 

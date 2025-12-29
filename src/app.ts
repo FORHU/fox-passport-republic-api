@@ -3,6 +3,7 @@ import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import router from "./routes";
+import eventRoutes from "./routes/event.routes";
 import { isDev } from "./config";
 import setup from "./setup";
 import cors from "cors";
@@ -39,6 +40,9 @@ if (!isDev) app.use(limiter);
 // Set up security headers
 app.use(helmet());
 app.disable("x-powered-by");
+
+// Initialize setup
+setup();
 
 // Use router for routing
 app.use("/api", router);

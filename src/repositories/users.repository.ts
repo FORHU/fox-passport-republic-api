@@ -1,4 +1,5 @@
 import { prisma } from "../utils/prisma";
+import { UserRole } from "@prisma/client";
 
 export default class UsersRepo {
   // READ ALL
@@ -33,8 +34,8 @@ export default class UsersRepo {
     email: string;
     username: string; // ✅ REQUIRED
     password: string;
-    role?: string;
-    name?: string;
+    role?: UserRole;
+    name: string; // ✅ REQUIRED - matches Prisma schema
   }) {
     return prisma.user.create({
       data,
@@ -55,7 +56,7 @@ export default class UsersRepo {
       email: string;
       username: string;
       password: string;
-      role: string;
+      role: UserRole;
       name: string;
       isActive: boolean;
     }>

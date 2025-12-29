@@ -7,7 +7,7 @@ export default class AuthRepo {
     email: string;
     password: string;
     username: string;
-    name?: string;
+    name: string;
     mobileNumber?: string;
     otpCode?: string;
     otpExpiry?: Date;
@@ -18,8 +18,7 @@ export default class AuthRepo {
         password: data.password,
         username: data.username,
         name: data.name,
-        mobileNumber: data.mobileNumber,
-        provider: null,
+        phone: data.mobileNumber,
       },
       select: {
         id: true,
@@ -45,14 +44,13 @@ export default class AuthRepo {
         id: userId,
       },
       data: {
-        lastLoginAt: new Date(),
+        // lastLoginAt field doesn't exist in schema, removing for now
       },
       select: {
         id: true,
         email: true,
         username: true,
         name: true,
-        lastLoginAt: true,
       },
     });
   }
