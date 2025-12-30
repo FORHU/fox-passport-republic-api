@@ -4,7 +4,6 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import router from "./routes";
 import { isDev } from "./config";
-import setup from "./setup";
 import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -13,41 +12,40 @@ const app = express();
 
 app.set("trust proxy", 1);
 
+// UPDATED: Specific origin is required for credentials: true
 app.use(
     cors({
-        origin: "*",
+        origin: "http://localhost:3000",
         credentials: true,
     })
 );
 
 app.use(express.json());
 
-// ADD THIS REQUEST LOGGER
+// Request Logger
 app.use((req, res, next) => {
     console.log(`📨 ${req.method} ${req.path}`);
     next();
 });
 
-// Set up rate limiting middleware
+// Rate Limiter
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 1000, // limit each IP to 100 requests per windowMs
+    windowMs: 15 * 60 * 1000, 
+    max: 1000, 
 });
 
 if (!isDev) app.use(limiter);
 
-// Set up security headers
 app.use(helmet());
 app.disable("x-powered-by");
 
-// Use router for routing
 app.use("/api", router);
 
 const server = createServer(app);
 
 export const io = new Server(server, {
     cors: {
-        origin: "*",
+        origin: "http://localhost:3000", 
         methods: ["GET", "POST"],
         credentials: true,
     },

@@ -1,8 +1,7 @@
 // src/server.ts
-import app from "./app";
-
+import server from "./app"; // Renamed from 'app' to 'server' for clarity
 import { PORT } from "./config";
 
-app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+server.listen(PORT, () => {
+    console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
