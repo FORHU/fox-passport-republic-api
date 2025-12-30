@@ -172,13 +172,14 @@ model EventImage {
 }
 
 model Category {
-  id               String    @id @default(uuid())
+  id               String   @id @default(uuid())
   name             String
-  slug             String    @unique
+  slug             String   @unique
   description      String?
+  icon             String?
   parentCategoryId String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   // Relations
   parentCategory Category?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id], onDelete: SetNull)

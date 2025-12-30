@@ -5,6 +5,7 @@ const router = express.Router();
 
 // Event CRUD routes
 router.get("/", EventCtrl.getAllEvents);
+router.get("/by-category/:slug", EventCtrl.getEventsByCategorySlug);
 router.get("/:id", EventCtrl.getEventById);
 router.post("/create", EventCtrl.createEvent);
 router.post("/create-complete", EventCtrl.createCompleteEvent);
