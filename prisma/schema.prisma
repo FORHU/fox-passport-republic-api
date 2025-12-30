@@ -60,6 +60,7 @@ model User {
   @@index([email])
   @@index([username])
   @@index([role])
+  @@map("users")
 }
 
 model Event {
@@ -90,6 +91,7 @@ model Event {
   @@index([status])
   @@index([isPublished])
   @@index([createdAt])
+  @@map("events")
 }
 
 model EventDetails {
@@ -116,6 +118,7 @@ model EventDetails {
   @@index([startDatetime])
   @@index([city])
   @@index([country])
+  @@map("event_details")
 }
 
 model EventPricing {
@@ -135,6 +138,7 @@ model EventPricing {
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId])
+  @@map("event_pricing")
 }
 
 model EventAvailability {
@@ -152,6 +156,7 @@ model EventAvailability {
 
   @@index([eventId])
   @@index([availableDate])
+  @@map("event_availability")
 }
 
 model EventImage {
@@ -169,16 +174,17 @@ model EventImage {
 
   @@index([eventId])
   @@index([isPrimary])
+  @@map("event_images")
 }
 
 model Category {
-  id               String    @id @default(uuid())
+  id               String   @id @default(uuid())
   name             String
-  slug             String    @unique
+  slug             String   @unique
   description      String?
   parentCategoryId String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   // Relations
   parentCategory Category?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id], onDelete: SetNull)
@@ -187,6 +193,7 @@ model Category {
 
   @@index([slug])
   @@index([parentCategoryId])
+  @@map("categories")
 }
 
 model Booking {
@@ -212,6 +219,7 @@ model Booking {
   @@index([bookingStatus])
   @@index([confirmationCode])
   @@index([createdAt])
+  @@map("bookings")
 }
 
 model BookingAttendee {
@@ -233,6 +241,7 @@ model BookingAttendee {
   @@index([bookingId])
   @@index([ticketCode])
   @@index([checkedIn])
+  @@map("booking_attendees")
 }
 
 model Payment {
@@ -252,6 +261,7 @@ model Payment {
   @@index([bookingId])
   @@index([transactionId])
   @@index([paymentStatus])
+  @@map("payments")
 }
 
 model Review {
@@ -272,6 +282,7 @@ model Review {
   @@index([eventId])
   @@index([userId])
   @@index([rating])
+  @@map("reviews")
 }
 
 model Favorite {
@@ -287,4 +298,5 @@ model Favorite {
   @@unique([userId, eventId])
   @@index([userId])
   @@index([eventId])
+  @@map("favorites")
 }
