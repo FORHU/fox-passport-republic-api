@@ -45,7 +45,7 @@ model User {
   phone        String?
   profileImage String?
   dateOfBirth  DateTime?
-  role         UserRole  @default(user)
+  role         UserRole  @default(user) // ADDED: Role for RBAC
   isHost       Boolean   @default(false)
   isVerified   Boolean   @default(false)
   createdAt    DateTime  @default(now())
@@ -68,13 +68,13 @@ model Event {
   categoryId   String?
   title        String
   description  String
-  status       EventStatus @default(draft)
+  status       EventStatus @default(draft) // CHANGED: Using enum
   maxAttendees Int?
   isPublished  Boolean     @default(false)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  // Relations
+  // Relations with CASCADE delete
   host         User                @relation("HostEvents", fields: [hostId], references: [id], onDelete: Cascade)
   category     Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   details      EventDetails?
@@ -93,8 +93,8 @@ model Event {
 }
 
 model EventDetails {
-  id                 String   @id @default(uuid())
-  eventId            String   @unique
+  id                 String    @id @default(uuid())
+  eventId            String    @unique
   locationAddress    String
   city               String
   state              String
@@ -107,8 +107,8 @@ model EventDetails {
   requirements       String?
   cancellationPolicy String?
   itineraryJson      String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime  @default(now()) // ADDED
+  updatedAt          DateTime  @updatedAt // ADDED
 
   // Relations
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -128,8 +128,8 @@ model EventPricing {
   pricingTiers      Json?
   earlyBirdDiscount Json?
   earlyBirdDeadline DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt         DateTime  @default(now()) // ADDED
+  updatedAt         DateTime  @updatedAt // ADDED
 
   // Relations
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -144,8 +144,8 @@ model EventAvailability {
   availableSlots Int
   bookedSlots    Int
   isAvailable    Boolean
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now()) // ADDED
+  updatedAt      DateTime @updatedAt // ADDED
 
   // Relations
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -162,7 +162,7 @@ model EventImage {
   displayOrder Int?
   isPrimary    Boolean  @default(false)
   uploadedAt   DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  updatedAt    DateTime @updatedAt // ADDED
 
   // Relations
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -174,11 +174,11 @@ model EventImage {
 model Category {
   id               String    @id @default(uuid())
   name             String
-  slug             String    @unique
+  slug             String    @unique // ADDED: unique constraint
   description      String?
   parentCategoryId String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime  @default(now()) // ADDED
+  updatedAt        DateTime  @updatedAt // ADDED
 
   // Relations
   parentCategory Category?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id], onDelete: SetNull)
@@ -195,13 +195,13 @@ model Booking {
   userId           String
   numberOfTickets  Int
   totalAmount      Decimal
-  bookingStatus    BookingStatus @default(pending)
+  bookingStatus    BookingStatus @default(pending) // CHANGED: Using enum
   confirmationCode String        @unique
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   specialRequests  String?
 
-  // Relations
+  // Relations - Use Restrict to prevent deletion of user/event with active bookings
   user      User              @relation(fields: [userId], references: [id], onDelete: Restrict)
   event     Event             @relation(fields: [eventId], references: [id], onDelete: Restrict)
   attendees BookingAttendee[]
@@ -224,8 +224,8 @@ model BookingAttendee {
   ticketCode  String    @unique
   checkedIn   Boolean   @default(false)
   checkInTime DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime  @default(now()) // ADDED
+  updatedAt   DateTime  @updatedAt // ADDED
 
   // Relations
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
@@ -241,7 +241,7 @@ model Payment {
   amount          Decimal
   currency        String
   paymentMethod   String
-  paymentStatus   PaymentStatus @default(pending)
+  paymentStatus   PaymentStatus @default(pending) // CHANGED: Using enum
   transactionId   String        @unique
   paymentDate     DateTime      @default(now())
   gatewayResponse String?
@@ -268,7 +268,7 @@ model Review {
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, eventId])
+  @@unique([userId, eventId]) // ADDED: Prevent duplicate reviews
   @@index([eventId])
   @@index([userId])
   @@index([rating])
@@ -284,7 +284,7 @@ model Favorite {
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, eventId])
+  @@unique([userId, eventId]) // ADDED: Prevent duplicate favorites
   @@index([userId])
   @@index([eventId])
 }

@@ -15,7 +15,7 @@ export default class AuthSvc {
         email: string;
         password: string;
         username: string;
-        name?: string;
+        name: string;
         mobileNumber?: string;
     }) {
         // Check if user already exists
@@ -39,7 +39,7 @@ export default class AuthSvc {
         const hashedPassword = `${salt}:${hash}`;
 
         // GENERATE OTP
-       // const otp = generateOTP(); // "582941"
+        // const otp = generateOTP(); // "582941"
         //const otpExpiry = getOTPExpiry(); // 5 minutes from now
 
         // Create user with OTP
@@ -49,8 +49,8 @@ export default class AuthSvc {
             username: data.username,
             name: data.name,
             mobileNumber: data.mobileNumber,
-          //  otpCode: otp, // Save OTP
-           // otpExpiry: otpExpiry, // Save expiry
+            //  otpCode: otp, // Save OTP
+            // otpExpiry: otpExpiry, // Save expiry
         });
 
         // Send verification email with OTP
@@ -70,12 +70,22 @@ export default class AuthSvc {
         // }
 
         // Generate tokens
-        const accessToken = jwt.sign({ userId: user.id }, ACCESS_TOKEN_SECRET, {
+        const accessToken = jwt.sign(
+            {
+                userId: user.id,
+                role: "user", // New users default to 'user' role
+                email: user.email
+            },
+            ACCESS_TOKEN_SECRET, {
             expiresIn: ACCESS_TOKEN_EXPIRY as any,
         });
 
         const refreshToken = jwt.sign(
-            { userId: user.id },
+            {
+                userId: user.id,
+                role: "user",
+                email: user.email
+            },
             REFRESH_TOKEN_SECRET,
             { expiresIn: "7d" }
         );
@@ -88,12 +98,10 @@ export default class AuthSvc {
         // });
 
         return {
-            user: {
-                id: user.id,
-                email: user.email,
-                username: user.username,
-                name: user.name,
-            },
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            name: user.name,
             accessToken,
             refreshToken,
             message:
@@ -127,7 +135,7 @@ export default class AuthSvc {
         password: string;
     }) {
         const user = await AuthRepo.findUserByEmail(username);
-        console.log('+++++++++',user);
+        console.log('+++++++++', user);
         if (!user) {
             throw "Invalid credentials";
         }
@@ -141,17 +149,27 @@ export default class AuthSvc {
         if (storedHash !== hash) {
             throw "Invalid credentials";
         }
-        
+
         // Update login status
         await AuthRepo.updateUserLoginStatus(user.id);
 
-        // Generate tokens
-        const accessToken = jwt.sign({ userId: user.id }, ACCESS_TOKEN_SECRET, {
+        // Generate tokens with role
+        const accessToken = jwt.sign(
+            {
+                userId: user.id,
+                role: user.role,
+                email: user.email
+            },
+            ACCESS_TOKEN_SECRET, {
             expiresIn: ACCESS_TOKEN_EXPIRY as any,
         });
 
         const refreshToken = jwt.sign(
-            { userId: user.id },
+            {
+                userId: user.id,
+                role: user.role,
+                email: user.email
+            },
             REFRESH_TOKEN_SECRET,
             { expiresIn: "7d" }
         );
@@ -195,9 +213,13 @@ export default class AuthSvc {
                 throw "User not found";
             }
 
-            // Generate new access token
+            // Generate new access token with role
             const accessToken = jwt.sign(
-                { userId: user.id },
+                {
+                    userId: user.id,
+                    role: user.role,
+                    email: user.email
+                },
                 ACCESS_TOKEN_SECRET,
                 { expiresIn: ACCESS_TOKEN_EXPIRY as any }
             );
@@ -298,7 +320,7 @@ export default class AuthSvc {
         if (!user) {
             throw new Error("User not found");
         }
-        
+
         const otp = generateOTP();
         const otpExpiry = getOTPExpiry();
 
@@ -323,7 +345,7 @@ export default class AuthSvc {
             message: "New verification code sent to your email",
         };
     }
-    static async getAuthUser(userId: string){
+    static async getAuthUser(userId: string) {
         return AuthRepo.getAuthUser(userId);
     }
 }

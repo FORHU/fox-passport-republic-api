@@ -3,6 +3,7 @@ import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import router from "./routes";
+import eventRoutes from "./routes/event.routes";
 import { isDev } from "./config";
 import cors from "cors";
 import { createServer } from "http";
@@ -38,6 +39,9 @@ if (!isDev) app.use(limiter);
 
 app.use(helmet());
 app.disable("x-powered-by");
+
+// Initialize setup
+setup();
 
 app.use("/api", router);
 
