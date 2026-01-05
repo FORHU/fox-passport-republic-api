@@ -95,15 +95,17 @@ export default class BookingRepo {
         });
     }
 
-    // CREATE
+    // CREATE (now supports optional fields for draft bookings)
     static async createBooking(data: {
         eventId: string;
         userId: string;
-        numberOfTickets: number;
-        totalAmount: number;
-        bookingStatus: BookingStatus;
+        numberOfTickets?: number;        // CHANGED: Made optional
+        totalAmount?: number;            // CHANGED: Made optional
+        bookingStatus?: BookingStatus;   // CHANGED: Made optional
         confirmationCode: string;
         specialRequests?: string;
+        currentStep?: number;            // NEW: Track booking step
+        expiresAt?: Date;                // NEW: Expiry for drafts
     }) {
         return prisma.booking.create({
             data: {
@@ -111,9 +113,11 @@ export default class BookingRepo {
                 userId: data.userId,
                 numberOfTickets: data.numberOfTickets,
                 totalAmount: data.totalAmount,
-                bookingStatus: data.bookingStatus,
+                bookingStatus: data.bookingStatus || BookingStatus.draft,
                 confirmationCode: data.confirmationCode,
                 specialRequests: data.specialRequests,
+                currentStep: data.currentStep || 1,
+                expiresAt: data.expiresAt,
             },
             include: {
                 user: true,
@@ -122,7 +126,7 @@ export default class BookingRepo {
         });
     }
 
-    // UPDATE
+    // UPDATE (now supports currentStep and expiresAt)
     static async updateBooking(
         id: string,
         data: Partial<{
@@ -130,6 +134,8 @@ export default class BookingRepo {
             totalAmount: number;
             bookingStatus: BookingStatus;
             specialRequests: string;
+            currentStep: number;         // NEW
+            expiresAt: Date | null;      // NEW (can be null to remove expiry)
         }>
     ) {
         return prisma.booking.update({
@@ -224,6 +230,18 @@ export default class BookingRepo {
             },
             orderBy: {
                 createdAt: "desc",
+            },
+        });
+    }
+
+    // NEW: Delete expired draft bookings (for cleanup job)
+    static async deleteExpiredDrafts() {
+        return prisma.booking.deleteMany({
+            where: {
+                bookingStatus: BookingStatus.draft,
+                expiresAt: {
+                    lt: new Date(), // Less than current time
+                },
             },
         });
     }

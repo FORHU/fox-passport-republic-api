@@ -8,6 +8,7 @@ import reviewRoutes from "./review.routes";
 import favoriteRoutes from "./favorite.routes";
 import paymentRoutes from "./payment.routes";
 import bookingAttendeeRoutes from "./bookingAttendee.routes";
+import clientBookingRoutes from "./clientBooking.routes";  // ← CHECK THIS LINE
 
 const router = express.Router();
 
@@ -27,6 +28,7 @@ router.use("/v1/categories", categoryRoutes);
 
 // Bookings & Attendees
 router.use("/v1/bookings", bookingRoutes);
+router.use("/v1/client/bookings", clientBookingRoutes);  // ← CHECK THIS LINE
 router.use("/v1/attendees", bookingAttendeeRoutes);
 
 // Payments

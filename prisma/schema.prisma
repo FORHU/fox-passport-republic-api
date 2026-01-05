@@ -23,6 +23,7 @@ enum EventStatus {
 }
 
 enum BookingStatus {
+  draft // NEW: for multi-step booking in progress
   pending
   confirmed
   cancelled
@@ -200,10 +201,12 @@ model Booking {
   id               String        @id @default(uuid())
   eventId          String
   userId           String
-  numberOfTickets  Int
-  totalAmount      Decimal
-  bookingStatus    BookingStatus @default(pending)
+  numberOfTickets  Int? // CHANGED: Made optional for draft bookings
+  totalAmount      Decimal? // CHANGED: Made optional for draft bookings
+  bookingStatus    BookingStatus @default(draft) // CHANGED: Default to draft
   confirmationCode String        @unique
+  currentStep      Int           @default(1) // NEW: Track booking progress (1-4)
+  expiresAt        DateTime? // NEW: Expiry time for draft bookings (30 mins)
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   specialRequests  String?
@@ -219,6 +222,7 @@ model Booking {
   @@index([bookingStatus])
   @@index([confirmationCode])
   @@index([createdAt])
+  @@index([expiresAt]) // NEW: For cleanup queries
   @@map("bookings")
 }
 
