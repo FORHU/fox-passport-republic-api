@@ -4,14 +4,14 @@ import { EventStatus } from "@prisma/client";
 export default class EventRepo {
   // READ ALL with filters
   static async getAllEvents(filters?: {
-    hostId?: string;
+    foxerId?: string;
     categoryId?: string;
     status?: EventStatus;
     isPublished?: boolean;
   }) {
     return prisma.event.findMany({
       where: {
-        ...(filters?.hostId && { hostId: filters.hostId }),
+        ...(filters?.foxerId && { foxerId: filters.foxerId }),
         ...(filters?.categoryId && { categoryId: filters.categoryId }),
         ...(filters?.status && { status: filters.status }),
         ...(filters?.isPublished !== undefined && {
@@ -20,7 +20,8 @@ export default class EventRepo {
       },
       select: {
         id: true,
-        hostId: true,
+        foxerId: true,
+        venueId: true,
         categoryId: true,
         title: true,
         description: true,
@@ -29,7 +30,7 @@ export default class EventRepo {
         isPublished: true,
         createdAt: true,
         updatedAt: true,
-        host: {
+        foxer: {
           select: {
             id: true,
             name: true,
@@ -68,7 +69,8 @@ export default class EventRepo {
       },
       select: {
         id: true,
-        hostId: true,
+        foxerId: true,
+        venueId: true,
         categoryId: true,
         title: true,
         description: true,
@@ -77,7 +79,7 @@ export default class EventRepo {
         isPublished: true,
         createdAt: true,
         updatedAt: true,
-        host: {
+        foxer: {
           select: {
             id: true,
             name: true,
@@ -130,7 +132,7 @@ export default class EventRepo {
     return prisma.event.findUnique({
       where: { id },
       include: {
-        host: {
+        foxer: {
           select: {
             id: true,
             name: true,
@@ -139,6 +141,7 @@ export default class EventRepo {
             profileImage: true,
           },
         },
+        venue: true,
         category: true,
         details: true,
         pricing: true,
@@ -170,7 +173,8 @@ export default class EventRepo {
 
   // CREATE
   static async createEvent(data: {
-    hostId: string;
+    foxerId: string;
+    venueId?: string;
     categoryId?: string;
     title: string;
     description: string;
@@ -180,7 +184,8 @@ export default class EventRepo {
   }) {
     return prisma.event.create({
       data: {
-        hostId: data.hostId,
+        foxerId: data.foxerId,
+        venueId: data.venueId,
         categoryId: data.categoryId,
         title: data.title,
         description: data.description,
@@ -189,7 +194,7 @@ export default class EventRepo {
         isPublished: data.isPublished,
       },
       include: {
-        host: {
+        foxer: {
           select: {
             id: true,
             name: true,
@@ -197,6 +202,7 @@ export default class EventRepo {
             email: true,
           },
         },
+        venue: true,
         category: true,
       },
     });
@@ -218,7 +224,7 @@ export default class EventRepo {
       where: { id },
       data,
       include: {
-        host: {
+        foxer: {
           select: {
             id: true,
             name: true,
@@ -226,6 +232,7 @@ export default class EventRepo {
             email: true,
           },
         },
+        venue: true,
         category: true,
         details: true,
         pricing: true,
@@ -352,12 +359,12 @@ export default class EventRepo {
     return !!event;
   }
 
-  // Check if user is host of event
-  static async isEventHost(eventId: string, userId: string) {
+  // Check if user is foxer of event
+  static async isEventFoxer(eventId: string, userId: string) {
     const event = await prisma.event.findFirst({
       where: {
         id: eventId,
-        hostId: userId,
+        foxerId: userId,
       },
       select: { id: true },
     });

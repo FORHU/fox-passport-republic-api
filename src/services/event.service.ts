@@ -42,7 +42,7 @@ export default class EventSvc {
     }
 
     return EventRepo.createEvent({
-      hostId: data.hostId,
+      foxerId: data.hostId,
       categoryId: data.categoryId,
       title: data.title,
       description: data.description,
@@ -161,7 +161,7 @@ export default class EventSvc {
     }
 
     // Check if user is the host (authorization)
-    const isHost = await EventRepo.isEventHost(id, userId);
+    const isHost = await EventRepo.isEventFoxer(id, userId);
     if (!isHost) {
       throw new Error("Unauthorized: You can only update your own events");
     }
@@ -189,7 +189,7 @@ export default class EventSvc {
     }>
   ) {
     // Check if user is the host
-    const isHost = await EventRepo.isEventHost(eventId, userId);
+    const isHost = await EventRepo.isEventFoxer(eventId, userId);
     if (!isHost) {
       throw new Error("Unauthorized: You can only update your own events");
     }
@@ -206,7 +206,7 @@ export default class EventSvc {
     }
 
     // Check if user is the host (authorization)
-    const isHost = await EventRepo.isEventHost(id, userId);
+    const isHost = await EventRepo.isEventFoxer(id, userId);
     if (!isHost) {
       throw new Error("Unauthorized: You can only delete your own events");
     }
@@ -226,7 +226,7 @@ export default class EventSvc {
     }
   ) {
     // Check if user is the host
-    const isHost = await EventRepo.isEventHost(eventId, userId);
+    const isHost = await EventRepo.isEventFoxer(eventId, userId);
     if (!isHost) {
       throw new Error(
         "Unauthorized: You can only add images to your own events"

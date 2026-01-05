@@ -11,6 +11,7 @@ datasource db {
 enum UserRole {
   user
   host
+  foxer
   admin
   super_admin
 }
@@ -20,6 +21,13 @@ enum EventStatus {
   active
   cancelled
   completed
+}
+
+enum VenueStatus {
+  draft
+  active
+  inactive
+  under_maintenance
 }
 
 enum BookingStatus {
@@ -47,12 +55,14 @@ model User {
   dateOfBirth  DateTime?
   role         UserRole  @default(user)
   isHost       Boolean   @default(false)
+  isFoxer      Boolean   @default(false)
   isVerified   Boolean   @default(false)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime? @updatedAt
 
   // Relations
-  events    Event[]    @relation("HostEvents")
+  venues    Venue[]   @relation("HostVenues")
+  events    Event[]    @relation("FoxerEvents")
   bookings  Booking[]
   reviews   Review[]
   favorites Favorite[]
@@ -62,9 +72,108 @@ model User {
   @@index([role])
 }
 
+// Venues created by Hosts
+model Venue {
+  id           String       @id @default(uuid())
+  hostId       String
+  categoryId   String?
+  name         String
+  description  String
+  venueType    String       // hotel, land, hall, outdoor space, etc.
+  capacity     Int?
+  status       VenueStatus  @default(draft)
+  isPublished  Boolean      @default(false)
+  address      String
+  city         String
+  state        String
+  country      String
+  latitude     Decimal?
+  longitude    Decimal?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  // Relations
+  host         User         @relation("HostVenues", fields: [hostId], references: [id], onDelete: Cascade)
+  category     Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  amenities    VenueAmenity[]
+  pricing      VenuePricing[]
+  images       VenueImage[]
+  reviews      VenueReview[]
+  events       Event[]      // Events using this venue
+
+  @@index([hostId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([isPublished])
+  @@index([city])
+  @@index([createdAt])
+}
+
+model VenueAmenity {
+  id        String   @id @default(uuid())
+  venueId   String
+  name      String   // WiFi, Parking, Kitchen, etc.
+  icon      String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId])
+}
+
+model VenuePricing {
+  id            String   @id @default(uuid())
+  venueId       String
+  pricePerDay   Decimal
+  pricePerHour  Decimal?
+  currency      String   @default("PHP")
+  minHours      Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId])
+}
+
+model VenueImage {
+  id           String   @id @default(uuid())
+  venueId      String
+  imageUrl     String
+  altText      String?
+  displayOrder Int?
+  isPrimary    Boolean  @default(false)
+  uploadedAt   DateTime @default(now())
+
+  // Relations
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId])
+  @@index([isPrimary])
+}
+
+model VenueReview {
+  id        String   @id @default(uuid())
+  venueId   String
+  userId    String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId])
+  @@index([userId])
+}
+
+// Events created by Foxers (using Venues)
 model Event {
   id           String      @id @default(uuid())
-  hostId       String
+  foxerId      String      // Foxer who created the event
+  venueId      String?     // Optional: Link to venue if using one
   categoryId   String?
   title        String
   description  String
@@ -75,7 +184,8 @@ model Event {
   updatedAt    DateTime    @updatedAt
 
   // Relations
-  host         User                @relation("HostEvents", fields: [hostId], references: [id], onDelete: Cascade)
+  foxer        User                @relation("FoxerEvents", fields: [foxerId], references: [id], onDelete: Cascade)
+  venue        Venue?              @relation(fields: [venueId], references: [id], onDelete: SetNull)
   category     Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   details      EventDetails?
   pricing      EventPricing[]
@@ -85,7 +195,8 @@ model Event {
   bookings     Booking[]
   favorites    Favorite[]
 
-  @@index([hostId])
+  @@index([foxerId])
+  @@index([venueId])
   @@index([categoryId])
   @@index([status])
   @@index([isPublished])
@@ -184,6 +295,7 @@ model Category {
   // Relations
   parentCategory Category?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id], onDelete: SetNull)
   subCategories  Category[] @relation("CategoryHierarchy")
+  venues         Venue[]
   events         Event[]
 
   @@index([slug])
