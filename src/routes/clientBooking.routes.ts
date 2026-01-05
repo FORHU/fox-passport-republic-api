@@ -3,24 +3,33 @@ import ClientBookingCtrl from "../controllers/clientBooking.controller";
 
 const router = express.Router();
 
-// ========== CLIENT BOOKING FLOW ==========
-// Public endpoints for clients to book events
+console.log("í¿¢ Client booking routes loaded!");
 
-// Browse events
+// ========== SPECIFIC ROUTES FIRST ==========
+// (Must come BEFORE any /:bookingId routes)
+
+router.get("/test", (req, res) => {
+    res.json({ 
+        success: true, 
+        message: "Client booking routes are working!",
+        timestamp: new Date()
+    });
+});
+
 router.get("/events", ClientBookingCtrl.getAvailableEvents);
+router.get("/my-bookings", ClientBookingCtrl.getMyBookings);
+router.get("/code/:confirmationCode", ClientBookingCtrl.getBookingByCode);
 
-// Multi-step booking flow
-router.post("/start", ClientBookingCtrl.startBooking);                                    // Step 1: Start booking
-router.post("/:bookingId/tickets", ClientBookingCtrl.selectTickets);                      // Step 2: Select tickets
-router.post("/:bookingId/customer-info", ClientBookingCtrl.addCustomerInfo);              // Step 3: Add info
-router.post("/:bookingId/confirm", ClientBookingCtrl.confirmBooking);                     // Step 4: Confirm
+// ========== BOOKING FLOW ==========
 
-// View bookings
-router.get("/my-bookings", ClientBookingCtrl.getMyBookings);                              // Get all user bookings
-router.get("/:bookingId", ClientBookingCtrl.getBookingDetails);                           // Get specific booking
-router.get("/code/:confirmationCode", ClientBookingCtrl.getBookingByCode);                // Lookup by code
+router.post("/start", ClientBookingCtrl.startBooking);
+router.post("/:bookingId/tickets", ClientBookingCtrl.selectTickets);
+router.post("/:bookingId/customer-info", ClientBookingCtrl.addCustomerInfo);
+router.post("/:bookingId/confirm", ClientBookingCtrl.confirmBooking);
+router.post("/:bookingId/cancel", ClientBookingCtrl.cancelBooking);
 
-// Manage bookings
-router.post("/:bookingId/cancel", ClientBookingCtrl.cancelBooking);                       // Cancel booking
+// ========== DYNAMIC ROUTE (MUST BE LAST) ==========
+
+router.get("/:bookingId", ClientBookingCtrl.getBookingDetails);
 
 export default router;
