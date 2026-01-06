@@ -6,7 +6,7 @@ export default class VenueController {
   // Create a new venue
   static async createVenue(req: Request, res: Response) {
     try {
-      const hostId = req.body.userId || (req as any).user?.id; // Get from auth middleware
+      const hostId = req.body.userId || (req as any).user?.userId; // Get from auth middleware
 
       if (!hostId) {
         return res.status(401).json({
@@ -15,9 +15,12 @@ export default class VenueController {
         });
       }
 
+      // Remove userId from body before passing to service (Venue model uses hostId, not userId)
+      const { userId, ...venueData } = req.body;
+
       const venue = await VenueService.createVenue({
         hostId,
-        ...req.body,
+        ...venueData,
       });
 
       return res.status(201).json({
@@ -47,7 +50,8 @@ export default class VenueController {
 
       // Extract query parameters
       if (req.query.hostId) filters.hostId = req.query.hostId as string;
-      if (req.query.categoryId) filters.categoryId = req.query.categoryId as string;
+      if (req.query.categoryId)
+        filters.categoryId = req.query.categoryId as string;
       if (req.query.city) filters.city = req.query.city as string;
       if (req.query.status) filters.status = req.query.status as VenueStatus;
       if (req.query.isPublished !== undefined) {
@@ -116,7 +120,7 @@ export default class VenueController {
   static async updateVenue(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const hostId = req.body.userId || (req as any).user?.id; // Get from auth middleware
+      const hostId = req.body.userId || (req as any).user?.userId; // Get from auth middleware
 
       if (!hostId) {
         return res.status(401).json({
@@ -138,8 +142,8 @@ export default class VenueController {
         error.message === "Venue not found"
           ? 404
           : error.message.includes("Unauthorized")
-          ? 403
-          : 400;
+            ? 403
+            : 400;
 
       return res.status(statusCode).json({
         success: false,
@@ -152,7 +156,7 @@ export default class VenueController {
   static async deleteVenue(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const hostId = req.body.userId || (req as any).user?.id; // Get from auth middleware
+      const hostId = req.body.userId || (req as any).user?.userId; // Get from auth middleware
 
       if (!hostId) {
         return res.status(401).json({
@@ -173,8 +177,8 @@ export default class VenueController {
         error.message === "Venue not found"
           ? 404
           : error.message.includes("Unauthorized")
-          ? 403
-          : 400;
+            ? 403
+            : 400;
 
       return res.status(statusCode).json({
         success: false,
@@ -187,7 +191,7 @@ export default class VenueController {
   static async addAmenity(req: Request, res: Response) {
     try {
       const { venueId } = req.params;
-      const hostId = req.body.userId || (req as any).user?.id; // Get from auth middleware
+      const hostId = req.body.userId || (req as any).user?.userId; // Get from auth middleware
 
       if (!hostId) {
         return res.status(401).json({
@@ -218,7 +222,7 @@ export default class VenueController {
   static async removeAmenity(req: Request, res: Response) {
     try {
       const { amenityId } = req.params;
-      const hostId = req.body.userId || (req as any).user?.id; // Get from auth middleware
+      const hostId = req.body.userId || (req as any).user?.userId; // Get from auth middleware
 
       if (!hostId) {
         return res.status(401).json({
@@ -239,8 +243,8 @@ export default class VenueController {
         error.message === "Amenity not found"
           ? 404
           : error.message.includes("Unauthorized")
-          ? 403
-          : 400;
+            ? 403
+            : 400;
 
       return res.status(statusCode).json({
         success: false,
@@ -253,7 +257,7 @@ export default class VenueController {
   static async addImage(req: Request, res: Response) {
     try {
       const { venueId } = req.params;
-      const hostId = req.body.userId || (req as any).user?.id; // Get from auth middleware
+      const hostId = req.body.userId || (req as any).user?.userId; // Get from auth middleware
 
       if (!hostId) {
         return res.status(401).json({
@@ -284,7 +288,7 @@ export default class VenueController {
   static async removeImage(req: Request, res: Response) {
     try {
       const { imageId } = req.params;
-      const hostId = req.body.userId || (req as any).user?.id; // Get from auth middleware
+      const hostId = req.body.userId || (req as any).user?.userId; // Get from auth middleware
 
       if (!hostId) {
         return res.status(401).json({
@@ -305,8 +309,8 @@ export default class VenueController {
         error.message === "Image not found"
           ? 404
           : error.message.includes("Unauthorized")
-          ? 403
-          : 400;
+            ? 403
+            : 400;
 
       return res.status(statusCode).json({
         success: false,
