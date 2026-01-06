@@ -1,14 +1,14 @@
 import express from "express";
-import authRoute from "./auth.route";
-import usersRoute from "./users.route";
-import eventRoutes from "./event.routes";
-import categoryRoutes from "./category.routes";
-import bookingRoutes from "./booking.routes";
-import reviewRoutes from "./review.routes";
-import favoriteRoutes from "./favorite.routes";
-import paymentRoutes from "./payment.routes";
-import bookingAttendeeRoutes from "./bookingAttendee.routes";
-import clientBookingRoutes from "./clientBooking.routes";  // Already imported ✅
+import authRoute from "../routes/auth.route";
+import usersRoute from "../routes/users.route";
+import eventRoutes from "../routes/event.routes";
+import categoryRoutes from "../routes/category.routes";
+import bookingRoutes from "../routes/booking.routes";
+import reviewRoutes from "../routes/review.routes";
+import favoriteRoutes from "../routes/favorite.routes";
+import paymentRoutes from "../routes/payment.routes";
+import bookingAttendeeRoutes from "../routes/bookingAttendee.routes";
+import clientBookingRoutes from "../routes/clientBooking.routes";
 
 const router = express.Router();
 

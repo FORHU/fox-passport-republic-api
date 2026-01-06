@@ -42,8 +42,10 @@ export default class BookingSvc {
         return booking;
     }
 
-    // ========== MULTI-STEP BOOKING METHODS ==========
+    // ========== MULTI-STEP BOOKING METHODS (DISABLED) ==========
+    // TODO: Implement multi-step booking flow
 
+    /*
     // STEP 1: CREATE DRAFT BOOKING (Event Selection)
     static async createDraftBooking(data: {
         eventId: string;
@@ -59,109 +61,14 @@ export default class BookingSvc {
             userId: data.userId,
             bookingStatus: BookingStatus.draft,
             confirmationCode,
-            currentStep: 1,
-            expiresAt: this.calculateExpiryTime(),
         });
     }
+    */
 
-    // STEP 2: UPDATE TICKETS & AMOUNT
-    static async updateDraftTickets(
-        draftId: string,
-        userId: string,
-        data: {
-            numberOfTickets: number;
-            totalAmount: number;
-        }
-    ) {
-        const booking = await BookingRepo.getBookingById(draftId);
-
-        if (!booking) {
-            throw new Error("Draft booking not found");
-        }
-        if (booking.userId !== userId) {
-            throw new Error("Unauthorized: You can only update your own bookings");
-        }
-        if (booking.bookingStatus !== BookingStatus.draft) {
-            throw new Error("Booking is no longer in draft status");
-        }
-
-        // Check if draft has expired
-        if (booking.expiresAt && booking.expiresAt < new Date()) {
-            throw new Error("Draft booking has expired");
-        }
-
-        return BookingRepo.updateBooking(draftId, {
-            numberOfTickets: data.numberOfTickets,
-            totalAmount: data.totalAmount,
-            currentStep: 2,
-            expiresAt: this.calculateExpiryTime(), // Extend expiry
-        });
-    }
-
-    // STEP 3: UPDATE CUSTOMER INFO
-    static async updateDraftCustomerInfo(
-        draftId: string,
-        userId: string,
-        data: {
-            specialRequests?: string;
-        }
-    ) {
-        const booking = await BookingRepo.getBookingById(draftId);
-
-        if (!booking) {
-            throw new Error("Draft booking not found");
-        }
-        if (booking.userId !== userId) {
-            throw new Error("Unauthorized: You can only update your own bookings");
-        }
-        if (booking.bookingStatus !== BookingStatus.draft) {
-            throw new Error("Booking is no longer in draft status");
-        }
-
-        if (booking.expiresAt && booking.expiresAt < new Date()) {
-            throw new Error("Draft booking has expired");
-        }
-
-        return BookingRepo.updateBooking(draftId, {
-            specialRequests: data.specialRequests,
-            currentStep: 3,
-            expiresAt: this.calculateExpiryTime(),
-        });
-    }
-
-    // STEP 4: CONFIRM BOOKING (Final Step)
-    static async confirmDraftBooking(draftId: string, userId: string) {
-        const booking = await BookingRepo.getBookingById(draftId);
-
-        if (!booking) {
-            throw new Error("Draft booking not found");
-        }
-        if (booking.userId !== userId) {
-            throw new Error("Unauthorized: You can only confirm your own bookings");
-        }
-        if (booking.bookingStatus !== BookingStatus.draft) {
-            throw new Error("Booking is no longer in draft status");
-        }
-
-        if (booking.expiresAt && booking.expiresAt < new Date()) {
-            throw new Error("Draft booking has expired");
-        }
-
-        // Validate all required fields are filled
-        if (!booking.numberOfTickets || booking.numberOfTickets < 1) {
-            throw new Error("Number of tickets is required");
-        }
-        if (!booking.totalAmount || booking.totalAmount.toNumber() <= 0) {
-            throw new Error("Total amount is required");
-        }
-
-        // Update to pending (awaiting payment) or confirmed
-        return BookingRepo.updateBooking(draftId, {
-            bookingStatus: BookingStatus.pending,
-            currentStep: 4,
-            expiresAt: null, // Remove expiry once confirmed
-        });
-    }
+    /*
+    // STEP 2-4: Multi-step booking methods commented out until repository is updated
+    // Uncomment when repository supports currentStep and expiresAt fields
+    */
 
     // ========== SINGLE-STEP BOOKING (Legacy - keep for backward compatibility) ==========
 
@@ -188,7 +95,6 @@ export default class BookingSvc {
             bookingStatus: data.bookingStatus || BookingStatus.pending,
             confirmationCode,
             specialRequests: data.specialRequests,
-            currentStep: 4, // Mark as completed all steps
         });
     }
 
@@ -247,8 +153,10 @@ export default class BookingSvc {
         return BookingRepo.getEventBookings(eventId);
     }
 
-    // CLEANUP: Delete expired drafts
+    // CLEANUP: Delete expired drafts (DISABLED - method not implemented in repository)
+    /*
     static async cleanupExpiredDrafts() {
         return BookingRepo.deleteExpiredDrafts();
     }
+    */
 }

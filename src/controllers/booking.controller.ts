@@ -96,8 +96,10 @@ export default class BookingController {
         }
     }
 
-    // ========== MULTI-STEP BOOKING ENDPOINTS ==========
+    // ========== MULTI-STEP BOOKING ENDPOINTS (DISABLED) ==========
+    // TODO: Implement multi-step booking flow
 
+    /*
     // STEP 1: CREATE DRAFT BOOKING
     static async createDraftBooking(req: Request, res: Response) {
         try {
@@ -282,6 +284,7 @@ export default class BookingController {
             });
         }
     }
+    */
 
     // ========== SINGLE-STEP BOOKING (Legacy) ==========
 

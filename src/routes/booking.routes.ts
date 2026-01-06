@@ -3,11 +3,14 @@ import BookingCtrl from "../controllers/booking.controller";
 
 const router = express.Router();
 
-// ========== MULTI-STEP BOOKING ROUTES ==========
+// ========== MULTI-STEP BOOKING ROUTES (DISABLED) ==========
+// TODO: Uncomment when multi-step booking is implemented
+/*
 router.post("/draft", BookingCtrl.createDraftBooking);                    // Step 1: Create draft
 router.patch("/:id/tickets", BookingCtrl.updateDraftTickets);             // Step 2: Update tickets
 router.patch("/:id/customer-info", BookingCtrl.updateDraftCustomerInfo);  // Step 3: Customer info
 router.post("/:id/confirm", BookingCtrl.confirmDraftBooking);             // Step 4: Confirm booking
+*/
 
 // ========== STANDARD BOOKING CRUD ROUTES ==========
 router.get("/", BookingCtrl.getAllBookings);

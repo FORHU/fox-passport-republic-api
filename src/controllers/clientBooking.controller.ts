@@ -47,6 +47,10 @@ export default class ClientBookingController {
         }
     }
 
+    // ========== MULTI-STEP BOOKING FLOW (DISABLED) ==========
+    // TODO: Implement multi-step booking flow
+
+    /*
     // STEP 1: START BOOKING (CREATE DRAFT)
     static async startBooking(req: Request, res: Response) {
         try {
@@ -312,6 +316,7 @@ export default class ClientBookingController {
             });
         }
     }
+    */
 
     // GET BOOKING DETAILS (for client to view their booking)
     static async getBookingDetails(req: Request, res: Response) {
@@ -356,11 +361,9 @@ export default class ClientBookingController {
                     id: booking.id,
                     confirmationCode: booking.confirmationCode,
                     bookingStatus: booking.bookingStatus,
-                    currentStep: booking.currentStep,
                     numberOfTickets: booking.numberOfTickets,
                     totalAmount: booking.totalAmount,
                     specialRequests: booking.specialRequests,
-                    expiresAt: booking.expiresAt,
                     createdAt: booking.createdAt,
                     event: {
                         id: booking.event.id,
