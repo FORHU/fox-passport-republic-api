@@ -4,7 +4,7 @@ services:
     container_name: local_postgres
     environment:
       POSTGRES_USER: admin
-      POSTGRES_PASSWORD: mypassword
+      POSTGRES_PASSWORD: admin123
       POSTGRES_DB: foxpassportrepublic
     ports:
       - "5432:5432"
@@ -15,9 +15,9 @@ services:
   redis:
     image: redis:7
     container_name: local_redis
+    command: [ "redis-server", "--appendonly", "yes" ]
     ports:
       - "6379:6379"
-    command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redisdata:/data
     restart: unless-stopped

@@ -8,7 +8,7 @@ import reviewRoutes from "./review.routes";
 import favoriteRoutes from "./favorite.routes";
 import paymentRoutes from "./payment.routes";
 import bookingAttendeeRoutes from "./bookingAttendee.routes";
-import clientBookingRoutes from "./clientBooking.routes";  // ← CHECK THIS LINE
+import venueRoutes from "./venue.routes";
 
 const router = express.Router();
 
@@ -22,8 +22,9 @@ router.get("/v1", (_, res) => {
 router.use("/v1/auth", authRoute);
 router.use("/v1/users", usersRoute);
 
-// Events & Categories
+// Events, Venues & Categories
 router.use("/v1/events", eventRoutes);
+router.use("/v1/venues", venueRoutes);
 router.use("/v1/categories", categoryRoutes);
 
 // Bookings & Attendees
