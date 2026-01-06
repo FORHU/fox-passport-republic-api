@@ -191,6 +191,8 @@ export default class AuthSvc {
         email: user.email,
         username: user.username,
         name: user.name,
+        role: (user as any).role || "user",
+        isHost: (user as any).isHost || false,
       },
     };
   }
