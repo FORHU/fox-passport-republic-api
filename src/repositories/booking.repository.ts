@@ -2,247 +2,229 @@ import { prisma } from "../utils/prisma";
 import { BookingStatus } from "@prisma/client";
 
 export default class BookingRepo {
-    // READ ALL with filters
-    static async getAllBookings(filters?: {
-        userId?: string;
-        eventId?: string;
-        bookingStatus?: BookingStatus;
-    }) {
-        return prisma.booking.findMany({
-            where: {
-                ...(filters?.userId && { userId: filters.userId }),
-                ...(filters?.eventId && { eventId: filters.eventId }),
-                ...(filters?.bookingStatus && { bookingStatus: filters.bookingStatus }),
+  // READ ALL with filters
+  static async getAllBookings(filters?: {
+    userId?: string;
+    eventId?: string;
+    bookingStatus?: BookingStatus;
+  }) {
+    return prisma.booking.findMany({
+      where: {
+        ...(filters?.userId && { userId: filters.userId }),
+        ...(filters?.eventId && { eventId: filters.eventId }),
+        ...(filters?.bookingStatus && { bookingStatus: filters.bookingStatus }),
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        event: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            status: true,
+            foxer: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
             },
-            include: {
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                        phone: true,
-                    },
-                },
-                event: {
-                    select: {
-                        id: true,
-                        title: true,
-                        description: true,
-                        status: true,
-                        host: {
-                            select: {
-                                id: true,
-                                name: true,
-                                email: true,
-                            },
-                        },
-                    },
-                },
-                attendees: true,
-                payments: true,
-            },
-            orderBy: {
-                createdAt: "desc",
-            },
-        });
-    }
+          },
+        },
+        attendees: true,
+        payments: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+  }
 
-    // READ ONE by ID
-    static async getBookingById(id: string) {
-        return prisma.booking.findUnique({
-            where: { id },
-            include: {
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                        phone: true,
-                    },
-                },
-                event: {
-                    include: {
-                        host: {
-                            select: {
-                                id: true,
-                                name: true,
-                                email: true,
-                            },
-                        },
-                        details: true,
-                    },
-                },
-                attendees: true,
-                payments: true,
+  // READ ONE by ID
+  static async getBookingById(id: string) {
+    return prisma.booking.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        event: {
+          include: {
+            foxer: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
             },
-        });
-    }
+            details: true,
+          },
+        },
+        attendees: true,
+        payments: true,
+      },
+    });
+  }
 
-    // READ ONE by Confirmation Code
-    static async getBookingByConfirmationCode(confirmationCode: string) {
-        return prisma.booking.findUnique({
-            where: { confirmationCode },
-            include: {
-                user: true,
-                event: {
-                    include: {
-                        details: true,
-                    },
-                },
-                attendees: true,
-                payments: true,
-            },
-        });
-    }
+  // READ ONE by Confirmation Code
+  static async getBookingByConfirmationCode(confirmationCode: string) {
+    return prisma.booking.findUnique({
+      where: { confirmationCode },
+      include: {
+        user: true,
+        event: {
+          include: {
+            details: true,
+          },
+        },
+        attendees: true,
+        payments: true,
+      },
+    });
+  }
 
-    // CREATE (now supports optional fields for draft bookings)
-    static async createBooking(data: {
-        eventId: string;
-        userId: string;
-        numberOfTickets?: number;        // CHANGED: Made optional
-        totalAmount?: number;            // CHANGED: Made optional
-        bookingStatus?: BookingStatus;   // CHANGED: Made optional
-        confirmationCode: string;
-        specialRequests?: string;
-        currentStep?: number;            // NEW: Track booking step
-        expiresAt?: Date;                // NEW: Expiry for drafts
-    }) {
-        return prisma.booking.create({
-            data: {
-                eventId: data.eventId,
-                userId: data.userId,
-                numberOfTickets: data.numberOfTickets,
-                totalAmount: data.totalAmount,
-                bookingStatus: data.bookingStatus || BookingStatus.draft,
-                confirmationCode: data.confirmationCode,
-                specialRequests: data.specialRequests,
-                currentStep: data.currentStep || 1,
-                expiresAt: data.expiresAt,
-            },
-            include: {
-                user: true,
-                event: true,
-            },
-        });
-    }
+  // CREATE
+  static async createBooking(data: {
+    eventId: string;
+    userId: string;
+    numberOfTickets: number;
+    totalAmount: number;
+    bookingStatus: BookingStatus;
+    confirmationCode: string;
+    specialRequests?: string;
+  }) {
+    return prisma.booking.create({
+      data: {
+        eventId: data.eventId,
+        userId: data.userId,
+        numberOfTickets: data.numberOfTickets,
+        totalAmount: data.totalAmount,
+        bookingStatus: data.bookingStatus,
+        confirmationCode: data.confirmationCode,
+        specialRequests: data.specialRequests,
+      },
+      include: {
+        user: true,
+        event: true,
+      },
+    });
+  }
 
-    // UPDATE (now supports currentStep and expiresAt)
-    static async updateBooking(
-        id: string,
-        data: Partial<{
-            numberOfTickets: number;
-            totalAmount: number;
-            bookingStatus: BookingStatus;
-            specialRequests: string;
-            currentStep: number;         // NEW
-            expiresAt: Date | null;      // NEW (can be null to remove expiry)
-        }>
-    ) {
-        return prisma.booking.update({
-            where: { id },
-            data,
-            include: {
-                user: true,
-                event: true,
-                attendees: true,
-                payments: true,
-            },
-        });
-    }
+  // UPDATE
+  static async updateBooking(
+    id: string,
+    data: Partial<{
+      numberOfTickets: number;
+      totalAmount: number;
+      bookingStatus: BookingStatus;
+      specialRequests: string;
+    }>
+  ) {
+    return prisma.booking.update({
+      where: { id },
+      data,
+      include: {
+        user: true,
+        event: true,
+        attendees: true,
+        payments: true,
+      },
+    });
+  }
 
-    // DELETE (Cancel)
-    static async deleteBooking(id: string) {
-        return prisma.booking.delete({
-            where: { id },
-        });
-    }
+  // DELETE (Cancel)
+  static async deleteBooking(id: string) {
+    return prisma.booking.delete({
+      where: { id },
+    });
+  }
 
-    // Check if booking exists
-    static async bookingExists(id: string) {
-        const booking = await prisma.booking.findUnique({
-            where: { id },
-            select: { id: true },
-        });
-        return !!booking;
-    }
+  // Check if booking exists
+  static async bookingExists(id: string) {
+    const booking = await prisma.booking.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    return !!booking;
+  }
 
-    // Check if user owns booking
-    static async isBookingOwner(bookingId: string, userId: string) {
-        const booking = await prisma.booking.findFirst({
-            where: {
-                id: bookingId,
-                userId: userId,
-            },
-            select: { id: true },
-        });
-        return !!booking;
-    }
+  // Check if user owns booking
+  static async isBookingOwner(bookingId: string, userId: string) {
+    const booking = await prisma.booking.findFirst({
+      where: {
+        id: bookingId,
+        userId: userId,
+      },
+      select: { id: true },
+    });
+    return !!booking;
+  }
 
-    // Check if confirmation code exists
-    static async confirmationCodeExists(confirmationCode: string) {
-        const booking = await prisma.booking.findUnique({
-            where: { confirmationCode },
-            select: { id: true },
-        });
-        return !!booking;
-    }
+  // Check if confirmation code exists
+  static async confirmationCodeExists(confirmationCode: string) {
+    const booking = await prisma.booking.findUnique({
+      where: { confirmationCode },
+      select: { id: true },
+    });
+    return !!booking;
+  }
 
-    // Get user bookings
-    static async getUserBookings(userId: string) {
-        return prisma.booking.findMany({
-            where: { userId },
-            include: {
-                event: {
-                    include: {
-                        details: true,
-                        images: {
-                            where: {
-                                isPrimary: true,
-                            },
-                            take: 1,
-                        },
-                    },
-                },
-                attendees: true,
-                payments: true,
+  // Get user bookings
+  static async getUserBookings(userId: string) {
+    return prisma.booking.findMany({
+      where: { userId },
+      include: {
+        event: {
+          include: {
+            details: true,
+            images: {
+              where: {
+                isPrimary: true,
+              },
+              take: 1,
             },
-            orderBy: {
-                createdAt: "desc",
-            },
-        });
-    }
+          },
+        },
+        attendees: true,
+        payments: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+  }
 
-    // Get event bookings (for event host)
-    static async getEventBookings(eventId: string) {
-        return prisma.booking.findMany({
-            where: { eventId },
-            include: {
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                        phone: true,
-                    },
-                },
-                attendees: true,
-                payments: true,
-            },
-            orderBy: {
-                createdAt: "desc",
-            },
-        });
-    }
-
-    // NEW: Delete expired draft bookings (for cleanup job)
-    static async deleteExpiredDrafts() {
-        return prisma.booking.deleteMany({
-            where: {
-                bookingStatus: BookingStatus.draft,
-                expiresAt: {
-                    lt: new Date(), // Less than current time
-                },
-            },
-        });
-    }
+  // Get event bookings (for event host)
+  static async getEventBookings(eventId: string) {
+    return prisma.booking.findMany({
+      where: { eventId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        attendees: true,
+        payments: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+  }
 }
