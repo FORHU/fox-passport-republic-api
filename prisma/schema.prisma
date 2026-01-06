@@ -31,6 +31,7 @@ enum VenueStatus {
 }
 
 enum BookingStatus {
+  draft // NEW: for multi-step booking in progress
   pending
   confirmed
   cancelled
@@ -70,6 +71,7 @@ model User {
   @@index([email])
   @@index([username])
   @@index([role])
+  @@map("users")
 }
 
 // Venues created by Hosts
@@ -201,6 +203,7 @@ model Event {
   @@index([status])
   @@index([isPublished])
   @@index([createdAt])
+  @@map("events")
 }
 
 model EventDetails {
@@ -227,6 +230,7 @@ model EventDetails {
   @@index([startDatetime])
   @@index([city])
   @@index([country])
+  @@map("event_details")
 }
 
 model EventPricing {
@@ -246,6 +250,7 @@ model EventPricing {
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId])
+  @@map("event_pricing")
 }
 
 model EventAvailability {
@@ -263,6 +268,7 @@ model EventAvailability {
 
   @@index([eventId])
   @@index([availableDate])
+  @@map("event_availability")
 }
 
 model EventImage {
@@ -280,6 +286,7 @@ model EventImage {
 
   @@index([eventId])
   @@index([isPrimary])
+  @@map("event_images")
 }
 
 model Category {
@@ -300,16 +307,19 @@ model Category {
 
   @@index([slug])
   @@index([parentCategoryId])
+  @@map("categories")
 }
 
 model Booking {
   id               String        @id @default(uuid())
   eventId          String
   userId           String
-  numberOfTickets  Int
-  totalAmount      Decimal
-  bookingStatus    BookingStatus @default(pending)
+  numberOfTickets  Int? // CHANGED: Made optional for draft bookings
+  totalAmount      Decimal? // CHANGED: Made optional for draft bookings
+  bookingStatus    BookingStatus @default(draft) // CHANGED: Default to draft
   confirmationCode String        @unique
+  currentStep      Int           @default(1) // NEW: Track booking progress (1-4)
+  expiresAt        DateTime? // NEW: Expiry time for draft bookings (30 mins)
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   specialRequests  String?
@@ -325,6 +335,8 @@ model Booking {
   @@index([bookingStatus])
   @@index([confirmationCode])
   @@index([createdAt])
+  @@index([expiresAt]) // NEW: For cleanup queries
+  @@map("bookings")
 }
 
 model BookingAttendee {
@@ -346,6 +358,7 @@ model BookingAttendee {
   @@index([bookingId])
   @@index([ticketCode])
   @@index([checkedIn])
+  @@map("booking_attendees")
 }
 
 model Payment {
@@ -365,6 +378,7 @@ model Payment {
   @@index([bookingId])
   @@index([transactionId])
   @@index([paymentStatus])
+  @@map("payments")
 }
 
 model Review {
@@ -385,6 +399,7 @@ model Review {
   @@index([eventId])
   @@index([userId])
   @@index([rating])
+  @@map("reviews")
 }
 
 model Favorite {
@@ -400,4 +415,5 @@ model Favorite {
   @@unique([userId, eventId])
   @@index([userId])
   @@index([eventId])
+  @@map("favorites")
 }

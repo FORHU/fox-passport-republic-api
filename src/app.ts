@@ -45,6 +45,7 @@ app.disable("x-powered-by");
 setup();
 
 app.use("/api", router);
+console.log("✅ Main router mounted"); // ← ADD THIS
 
 const server = createServer(app);
 

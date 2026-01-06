@@ -29,6 +29,7 @@ router.use("/v1/categories", categoryRoutes);
 
 // Bookings & Attendees
 router.use("/v1/bookings", bookingRoutes);
+router.use("/v1/client/bookings", clientBookingRoutes);  // ← CHECK THIS LINE
 router.use("/v1/attendees", bookingAttendeeRoutes);
 
 // Payments

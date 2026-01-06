@@ -96,6 +96,195 @@ export default class BookingController {
         }
     }
 
+    // ========== MULTI-STEP BOOKING ENDPOINTS ==========
+
+    // STEP 1: CREATE DRAFT BOOKING
+    static async createDraftBooking(req: Request, res: Response) {
+        try {
+            const schema = Joi.object({
+                eventId: Joi.string().uuid().required(),
+                userId: Joi.string().uuid().required(),
+            });
+
+            const { error, value } = schema.validate(req.body);
+            if (error) {
+                return res.status(400).json({ message: error.message });
+            }
+
+            const draft = await BookingSvc.createDraftBooking(value);
+            return res.status(201).json({
+                success: true,
+                message: "Draft booking created. Please complete the remaining steps.",
+                data: draft,
+                nextStep: 2,
+            });
+        } catch (error: any) {
+            console.error("Create draft booking error:", error);
+            return res.status(500).json({
+                success: false,
+                message: error.message || "Failed to create draft booking",
+            });
+        }
+    }
+
+    // STEP 2: UPDATE TICKETS
+    static async updateDraftTickets(req: Request, res: Response) {
+        try {
+            const paramsSchema = Joi.object({
+                id: Joi.string().uuid().required(),
+            });
+
+            const { error: paramsError, value: params } = paramsSchema.validate(req.params);
+            if (paramsError) {
+                return res.status(400).json({ message: paramsError.message });
+            }
+
+            const bodySchema = Joi.object({
+                userId: Joi.string().uuid().required(),
+                numberOfTickets: Joi.number().integer().min(1).required(),
+                totalAmount: Joi.number().min(0).required(),
+            });
+
+            const { error: bodyError, value: body } = bodySchema.validate(req.body);
+            if (bodyError) {
+                return res.status(400).json({ message: bodyError.message });
+            }
+
+            const { userId, ...updateData } = body;
+            const booking = await BookingSvc.updateDraftTickets(params.id, userId, updateData);
+
+            return res.status(200).json({
+                success: true,
+                message: "Tickets updated successfully",
+                data: booking,
+                nextStep: 3,
+            });
+        } catch (error: any) {
+            console.error("Update draft tickets error:", error);
+            if (error.message === "Draft booking not found") {
+                return res.status(404).json({
+                    success: false,
+                    message: error.message,
+                });
+            }
+            if (error.message.includes("Unauthorized") || error.message.includes("expired")) {
+                return res.status(400).json({
+                    success: false,
+                    message: error.message,
+                });
+            }
+            return res.status(500).json({
+                success: false,
+                message: error.message || "Failed to update tickets",
+            });
+        }
+    }
+
+    // STEP 3: UPDATE CUSTOMER INFO
+    static async updateDraftCustomerInfo(req: Request, res: Response) {
+        try {
+            const paramsSchema = Joi.object({
+                id: Joi.string().uuid().required(),
+            });
+
+            const { error: paramsError, value: params } = paramsSchema.validate(req.params);
+            if (paramsError) {
+                return res.status(400).json({ message: paramsError.message });
+            }
+
+            const bodySchema = Joi.object({
+                userId: Joi.string().uuid().required(),
+                specialRequests: Joi.string().max(500).optional().allow(''),
+            });
+
+            const { error: bodyError, value: body } = bodySchema.validate(req.body);
+            if (bodyError) {
+                return res.status(400).json({ message: bodyError.message });
+            }
+
+            const { userId, ...updateData } = body;
+            const booking = await BookingSvc.updateDraftCustomerInfo(params.id, userId, updateData);
+
+            return res.status(200).json({
+                success: true,
+                message: "Customer information updated successfully",
+                data: booking,
+                nextStep: 4,
+            });
+        } catch (error: any) {
+            console.error("Update customer info error:", error);
+            if (error.message === "Draft booking not found") {
+                return res.status(404).json({
+                    success: false,
+                    message: error.message,
+                });
+            }
+            if (error.message.includes("Unauthorized") || error.message.includes("expired")) {
+                return res.status(400).json({
+                    success: false,
+                    message: error.message,
+                });
+            }
+            return res.status(500).json({
+                success: false,
+                message: error.message || "Failed to update customer info",
+            });
+        }
+    }
+
+    // STEP 4: CONFIRM BOOKING
+    static async confirmDraftBooking(req: Request, res: Response) {
+        try {
+            const paramsSchema = Joi.object({
+                id: Joi.string().uuid().required(),
+            });
+
+            const { error: paramsError, value: params } = paramsSchema.validate(req.params);
+            if (paramsError) {
+                return res.status(400).json({ message: paramsError.message });
+            }
+
+            const bodySchema = Joi.object({
+                userId: Joi.string().uuid().required(),
+            });
+
+            const { error: bodyError, value: body } = bodySchema.validate(req.body);
+            if (bodyError) {
+                return res.status(400).json({ message: bodyError.message });
+            }
+
+            const booking = await BookingSvc.confirmDraftBooking(params.id, body.userId);
+
+            return res.status(200).json({
+                success: true,
+                message: "Booking confirmed successfully! Payment pending.",
+                data: booking,
+            });
+        } catch (error: any) {
+            console.error("Confirm booking error:", error);
+            if (error.message === "Draft booking not found") {
+                return res.status(404).json({
+                    success: false,
+                    message: error.message,
+                });
+            }
+            if (error.message.includes("Unauthorized") ||
+                error.message.includes("expired") ||
+                error.message.includes("required")) {
+                return res.status(400).json({
+                    success: false,
+                    message: error.message,
+                });
+            }
+            return res.status(500).json({
+                success: false,
+                message: error.message || "Failed to confirm booking",
+            });
+        }
+    }
+
+    // ========== SINGLE-STEP BOOKING (Legacy) ==========
+
     // CREATE BOOKING
     static async createBooking(req: Request, res: Response) {
         try {
@@ -104,7 +293,7 @@ export default class BookingController {
                 userId: Joi.string().uuid().required(),
                 numberOfTickets: Joi.number().integer().min(1).required(),
                 totalAmount: Joi.number().min(0).required(),
-                bookingStatus: Joi.string().valid("pending", "confirmed", "cancelled", "completed").optional(),
+                bookingStatus: Joi.string().valid("draft", "pending", "confirmed", "cancelled", "completed").optional(),
                 specialRequests: Joi.string().max(500).optional(),
             });
 
@@ -144,7 +333,7 @@ export default class BookingController {
                 userId: Joi.string().uuid().required(),
                 numberOfTickets: Joi.number().integer().min(1).optional(),
                 totalAmount: Joi.number().min(0).optional(),
-                bookingStatus: Joi.string().valid("pending", "confirmed", "cancelled", "completed").optional(),
+                bookingStatus: Joi.string().valid("draft", "pending", "confirmed", "cancelled", "completed").optional(),
                 specialRequests: Joi.string().max(500).optional(),
             });
 
