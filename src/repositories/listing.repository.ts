@@ -1,5 +1,5 @@
 import { prisma } from "../utils/prisma";
-import { ListingStatus } from "@prisma/client";
+import { ListingStatus, ListingType } from "@prisma/client";
 
 export default class ListingRepo {
     // READ ALL with filters
@@ -7,7 +7,7 @@ export default class ListingRepo {
         hostId?: string;
         categoryId?: string;
         status?: ListingStatus;
-        type?: any; // Using any for now to avoid strict type issues before re-gen
+        type?: ListingType;
     }) {
         return prisma.listing.findMany({
             where: {
@@ -26,6 +26,7 @@ export default class ListingRepo {
                 roomType: true,
                 status: true,
                 type: true,
+                capacity: true,
                 maxAttendees: true,
                 createdAt: true,
                 updatedAt: true,
@@ -50,6 +51,10 @@ export default class ListingRepo {
                     },
                     take: 1,
                 },
+                location: true,
+                pricing: {
+                    take: 1
+                }
             },
             orderBy: {
                 createdAt: "desc",
@@ -113,8 +118,9 @@ export default class ListingRepo {
         description: string;
         propertyType?: string;
         roomType?: string;
-        status: ListingStatus;
-        type: any;
+        status?: ListingStatus;
+        type: ListingType;
+        capacity?: number;
         maxAttendees?: number;
     }) {
         return prisma.listing.create({
@@ -125,8 +131,9 @@ export default class ListingRepo {
                 description: data.description,
                 propertyType: data.propertyType,
                 roomType: data.roomType,
-                status: data.status,
+                status: data.status || ListingStatus.draft,
                 type: data.type,
+                capacity: data.capacity,
                 maxAttendees: data.maxAttendees,
             },
             include: {
@@ -153,7 +160,8 @@ export default class ListingRepo {
             propertyType: string;
             roomType: string;
             status: ListingStatus;
-            type: any;
+            type: ListingType;
+            capacity: number;
             maxAttendees: number;
         }>
     ) {
@@ -192,8 +200,12 @@ export default class ListingRepo {
         country: string;
         latitude?: number;
         longitude?: number;
+        startDatetime?: Date;
+        endDatetime?: Date;
+        durationMinutes?: number;
         requirements?: string;
         cancellationPolicy?: string;
+        itineraryJson?: string;
     }) {
         return prisma.listingLocation.create({
             data: {
@@ -204,8 +216,12 @@ export default class ListingRepo {
                 country: data.country,
                 latitude: data.latitude,
                 longitude: data.longitude,
+                startDatetime: data.startDatetime,
+                endDatetime: data.endDatetime,
+                durationMinutes: data.durationMinutes,
                 requirements: data.requirements,
                 cancellationPolicy: data.cancellationPolicy,
+                itineraryJson: data.itineraryJson,
             },
         });
     }
@@ -220,8 +236,12 @@ export default class ListingRepo {
             country: string;
             latitude: number;
             longitude: number;
+            startDatetime: Date;
+            endDatetime: Date;
+            durationMinutes: number;
             requirements: string;
             cancellationPolicy: string;
+            itineraryJson: string;
         }>
     ) {
         return prisma.listingLocation.update({
@@ -238,6 +258,8 @@ export default class ListingRepo {
         serviceFeePercent: number;
         taxPercent: number;
         pricingTiers?: any;
+        earlyBirdDiscount?: any;
+        earlyBirdDeadline?: Date;
     }) {
         return prisma.listingPricing.create({
             data: {
@@ -247,6 +269,8 @@ export default class ListingRepo {
                 serviceFeePercent: data.serviceFeePercent,
                 taxPercent: data.taxPercent,
                 pricingTiers: data.pricingTiers,
+                earlyBirdDiscount: data.earlyBirdDiscount,
+                earlyBirdDeadline: data.earlyBirdDeadline,
             },
         });
     }
@@ -289,5 +313,74 @@ export default class ListingRepo {
             select: { id: true },
         });
         return !!listing;
+    }
+
+    // GET LISTINGS BY CATEGORY SLUG
+    static async getListingsByCategorySlug(slug: string, status: ListingStatus = ListingStatus.published) {
+        return prisma.listing.findMany({
+            where: {
+                category: {
+                    slug: slug,
+                },
+                status: status,
+            },
+            select: {
+                id: true,
+                hostId: true,
+                categoryId: true,
+                title: true,
+                description: true,
+                status: true,
+                type: true,
+                capacity: true,
+                maxAttendees: true,
+                createdAt: true,
+                updatedAt: true,
+                host: {
+                    select: {
+                        id: true,
+                        name: true,
+                        username: true,
+                        email: true,
+                        profileImage: true,
+                    },
+                },
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                    },
+                },
+                location: {
+                    select: {
+                        streetAddress: true,
+                        city: true,
+                        state: true,
+                        country: true,
+                    },
+                },
+                pricing: {
+                    select: {
+                        basePrice: true,
+                        currency: true,
+                    },
+                    take: 1,
+                },
+                images: {
+                    orderBy: {
+                        orderIndex: "asc",
+                    },
+                },
+                reviews: {
+                    select: {
+                        rating: true,
+                    },
+                },
+            },
+            orderBy: {
+                createdAt: "desc",
+            },
+        });
     }
 }

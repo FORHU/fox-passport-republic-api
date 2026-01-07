@@ -136,11 +136,12 @@ model Listing {
   categoryId   String?
   title        String
   description  String
-  propertyType String? // From reference image
-  roomType     String? // From reference image
+  propertyType String? // e.g. hotel, land, hall, outdoor space
+  roomType     String? // retention of old field
   status       ListingStatus @default(draft)
   type         ListingType   @default(venue)
-  maxAttendees Int?
+  capacity     Int? // from Venue model
+  maxAttendees Int? // from Event model (similar to capacity)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -168,14 +169,14 @@ model Listing {
 model ListingLocation {
   id                 String    @id @default(uuid())
   listingId          String    @unique
-  streetAddress      String // From reference image
+  streetAddress      String
   city               String
   state              String?
   country            String
   latitude           Decimal?
   longitude          Decimal?
-  startDatetime      DateTime? // Retained for compatibility if needed
-  endDatetime        DateTime? // Retained for compatibility if needed
+  startDatetime      DateTime?
+  endDatetime        DateTime?
   durationMinutes    Int?
   requirements       String?
   cancellationPolicy String?
@@ -232,10 +233,10 @@ model ListingAvailability {
 model ListingImage {
   id          String   @id @default(uuid())
   listingId   String
-  url         String // From reference image
+  url         String
   altText     String?
-  orderIndex  Int? // From reference image (was displayOrder)
-  isThumbnail Boolean  @default(false) // From reference image (was isPrimary)
+  orderIndex  Int?
+  isThumbnail Boolean  @default(false)
   uploadedAt  DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -273,6 +274,7 @@ model Category {
   name             String
   slug             String   @unique
   description      String?
+  icon             String?
   parentCategoryId String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt

@@ -1,0 +1,5 @@
+﻿src/controllers/listing.controller.ts(397,41): error TS2339: Property 'getListingsByCategorySlug' does not exist on type 'typeof ListingSvc'.
+src/controllers/user.controller.ts(78,11): error TS2561: Object literal may only specify known properties, but 'isFoxer' does not exist in type 'UserSelect<DefaultArgs>'. Did you mean to write 'isFoxxer'?
+src/routes/event.routes.ts(2,23): error TS2307: Cannot find module '../controllers/event.controller' or its corresponding type declarations.
+src/routes/venue.routes.ts(2,29): error TS2307: Cannot find module '../controllers/venue.controller' or its corresponding type declarations.
+src/services/foxxer.service.ts(3,31): error TS2307: Cannot find module '../repositories/eventCategory.repository' or its corresponding type declarations.
