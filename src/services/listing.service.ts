@@ -229,4 +229,9 @@ export default class ListingSvc {
             ...data,
         });
     }
+
+    // GET LISTINGS BY CATEGORY SLUG
+    static async getListingsByCategorySlug(slug: string) {
+        return ListingRepo.getListingsByCategorySlug(slug);
+    }
 }

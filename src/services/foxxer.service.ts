@@ -1,20 +1,19 @@
 import FoxxerRepo from "../repositories/foxxer.repository";
 import FoxxerServiceRepo from "../repositories/foxxerService.repository";
-import EventCategoryRepo from "../repositories/eventCategory.repository";
+import CategoryRepo from "../repositories/category.repository";
 
 export default class FoxxerSvc {
-    // CATEGORIES
+    // CATEGORIES (Mapping to unified CategoryRepo)
     static async createCategory(data: any) {
-        return EventCategoryRepo.createCategory(data);
+        return CategoryRepo.createCategory(data);
     }
 
     static async getAllCategories() {
-        return EventCategoryRepo.getAllCategories();
+        return CategoryRepo.getAllCategories();
     }
 
     // FOXXER PROFILE
     static async upsertFoxxerProfile(userId: string, data: any) {
-        // Business logic could go here (e.g., verifying user exists)
         return FoxxerRepo.upsertFoxxerProfile(userId, data);
     }
 
@@ -24,7 +23,6 @@ export default class FoxxerSvc {
 
     // SERVICES
     static async createListingService(data: any) {
-        // Business logic: check if foxxer, listing, and category exist
         return FoxxerServiceRepo.createService(data);
     }
 
