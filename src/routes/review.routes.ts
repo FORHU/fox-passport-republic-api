@@ -6,7 +6,7 @@ const router = express.Router();
 // Review CRUD routes
 router.get("/", ReviewCtrl.getAllReviews);
 router.get("/:id", ReviewCtrl.getReviewById);
-router.get("/event/:eventId", ReviewCtrl.getEventReviews);
+router.get("/listing/:listingId", ReviewCtrl.getListingReviews);
 router.get("/user/:userId", ReviewCtrl.getUserReviews);
 router.post("/create", ReviewCtrl.createReview);
 router.put("/:id", ReviewCtrl.updateReview);

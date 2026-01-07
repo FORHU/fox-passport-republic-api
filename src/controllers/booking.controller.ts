@@ -8,7 +8,7 @@ export default class BookingController {
         try {
             const schema = Joi.object({
                 userId: Joi.string().uuid().optional(),
-                eventId: Joi.string().uuid().optional(),
+                listingId: Joi.string().uuid().optional(),
                 bookingStatus: Joi.string().optional(),
             });
 
@@ -102,7 +102,7 @@ export default class BookingController {
     static async createDraftBooking(req: Request, res: Response) {
         try {
             const schema = Joi.object({
-                eventId: Joi.string().uuid().required(),
+                listingId: Joi.string().uuid().required(),
                 userId: Joi.string().uuid().required(),
             });
 
@@ -141,7 +141,7 @@ export default class BookingController {
 
             const bodySchema = Joi.object({
                 userId: Joi.string().uuid().required(),
-                numberOfTickets: Joi.number().integer().min(1).required(),
+                guestCount: Joi.number().integer().min(1).required(),
                 totalAmount: Joi.number().min(0).required(),
             });
 
@@ -289,9 +289,9 @@ export default class BookingController {
     static async createBooking(req: Request, res: Response) {
         try {
             const schema = Joi.object({
-                eventId: Joi.string().uuid().required(),
+                listingId: Joi.string().uuid().required(),
                 userId: Joi.string().uuid().required(),
-                numberOfTickets: Joi.number().integer().min(1).required(),
+                guestCount: Joi.number().integer().min(1).required(),
                 totalAmount: Joi.number().min(0).required(),
                 bookingStatus: Joi.string().valid("draft", "pending", "confirmed", "cancelled", "completed").optional(),
                 specialRequests: Joi.string().max(500).optional(),
@@ -331,7 +331,7 @@ export default class BookingController {
 
             const bodySchema = Joi.object({
                 userId: Joi.string().uuid().required(),
-                numberOfTickets: Joi.number().integer().min(1).optional(),
+                guestCount: Joi.number().integer().min(1).optional(),
                 totalAmount: Joi.number().min(0).optional(),
                 bookingStatus: Joi.string().valid("draft", "pending", "confirmed", "cancelled", "completed").optional(),
                 specialRequests: Joi.string().max(500).optional(),
@@ -446,11 +446,11 @@ export default class BookingController {
         }
     }
 
-    // GET EVENT BOOKINGS
-    static async getEventBookings(req: Request, res: Response) {
+    // GET LISTING BOOKINGS
+    static async getListingBookings(req: Request, res: Response) {
         try {
             const paramsSchema = Joi.object({
-                eventId: Joi.string().uuid().required(),
+                listingId: Joi.string().uuid().required(),
             });
 
             const { error: paramsError, value: params } = paramsSchema.validate(req.params);
@@ -467,17 +467,17 @@ export default class BookingController {
                 return res.status(400).json({ message: queryError.message });
             }
 
-            const bookings = await BookingSvc.getEventBookings(params.eventId, query.userId);
+            const bookings = await BookingSvc.getListingBookings(params.listingId, query.userId);
             return res.status(200).json({
                 success: true,
                 count: bookings.length,
                 data: bookings,
             });
         } catch (error: any) {
-            console.error("Get event bookings error:", error);
+            console.error("Get listing bookings error:", error);
             return res.status(500).json({
                 success: false,
-                message: error.message || "Failed to fetch event bookings",
+                message: error.message || "Failed to fetch listing bookings",
             });
         }
     }

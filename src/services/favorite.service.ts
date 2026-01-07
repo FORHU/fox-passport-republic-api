@@ -9,12 +9,12 @@ export default class FavoriteSvc {
     // ADD TO FAVORITES
     static async addFavorite(data: {
         userId: string;
-        eventId: string;
+        listingId: string;
     }) {
         // Check if already favorited
-        const alreadyFavorited = await FavoriteRepo.isFavorited(data.userId, data.eventId);
+        const alreadyFavorited = await FavoriteRepo.isFavorited(data.userId, data.listingId);
         if (alreadyFavorited) {
-            throw new Error("Event is already in favorites");
+            throw new Error("Listing is already in favorites");
         }
 
         return FavoriteRepo.addFavorite(data);
@@ -37,18 +37,18 @@ export default class FavoriteSvc {
         return FavoriteRepo.removeFavorite(id);
     }
 
-    // REMOVE FROM FAVORITES by Event ID
-    static async removeFavoriteByEvent(userId: string, eventId: string) {
-        const favorite = await FavoriteRepo.getFavoriteByUserAndEvent(userId, eventId);
+    // REMOVE FROM FAVORITES by Listing ID
+    static async removeFavoriteByListing(userId: string, listingId: string) {
+        const favorite = await FavoriteRepo.getFavoriteByUserAndListing(userId, listingId);
         if (!favorite) {
             throw new Error("Favorite not found");
         }
 
-        return FavoriteRepo.removeFavoriteByUserAndEvent(userId, eventId);
+        return FavoriteRepo.removeFavoriteByUserAndListing(userId, listingId);
     }
 
     // CHECK IF FAVORITED
-    static async isFavorited(userId: string, eventId: string) {
-        return FavoriteRepo.isFavorited(userId, eventId);
+    static async isFavorited(userId: string, listingId: string) {
+        return FavoriteRepo.isFavorited(userId, listingId);
     }
 }

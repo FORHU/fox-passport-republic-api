@@ -3,7 +3,6 @@ import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import router from "./routes";
-import eventRoutes from "./routes/event.routes";
 import { isDev } from "./config";
 import setup from "./setup";
 import cors from "cors";

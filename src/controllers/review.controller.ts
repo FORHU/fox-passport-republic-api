@@ -7,7 +7,7 @@ export default class ReviewController {
     static async getAllReviews(req: Request, res: Response) {
         try {
             const schema = Joi.object({
-                eventId: Joi.string().uuid().optional(),
+                listingId: Joi.string().uuid().optional(),
                 userId: Joi.string().uuid().optional(),
                 isVerifiedAttendee: Joi.boolean().optional(),
             });
@@ -68,7 +68,7 @@ export default class ReviewController {
     static async createReview(req: Request, res: Response) {
         try {
             const schema = Joi.object({
-                eventId: Joi.string().uuid().required(),
+                listingId: Joi.string().uuid().required(),
                 userId: Joi.string().uuid().required(),
                 rating: Joi.number().integer().min(1).max(5).required(),
                 comment: Joi.string().max(1000).optional(),
@@ -195,11 +195,11 @@ export default class ReviewController {
         }
     }
 
-    // GET EVENT REVIEWS
-    static async getEventReviews(req: Request, res: Response) {
+    // GET LISTING REVIEWS
+    static async getListingReviews(req: Request, res: Response) {
         try {
             const schema = Joi.object({
-                eventId: Joi.string().uuid().required(),
+                listingId: Joi.string().uuid().required(),
             });
 
             const { error, value } = schema.validate(req.params);
@@ -207,17 +207,17 @@ export default class ReviewController {
                 return res.status(400).json({ message: error.message });
             }
 
-            const reviews = await ReviewSvc.getEventReviews(value.eventId);
+            const reviews = await ReviewSvc.getListingReviews(value.listingId);
             return res.status(200).json({
                 success: true,
                 count: reviews.length,
                 data: reviews,
             });
         } catch (error: any) {
-            console.error("Get event reviews error:", error);
+            console.error("Get listing reviews error:", error);
             return res.status(500).json({
                 success: false,
-                message: error.message || "Failed to fetch event reviews",
+                message: error.message || "Failed to fetch listing reviews",
             });
         }
     }

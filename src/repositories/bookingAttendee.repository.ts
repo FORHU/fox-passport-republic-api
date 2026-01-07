@@ -14,7 +14,7 @@ export default class BookingAttendeeRepo {
             include: {
                 booking: {
                     include: {
-                        event: {
+                        listing: {
                             select: {
                                 id: true,
                                 title: true,
@@ -36,7 +36,7 @@ export default class BookingAttendeeRepo {
             include: {
                 booking: {
                     include: {
-                        event: true,
+                        listing: true,
                         user: {
                             select: {
                                 id: true,
@@ -57,9 +57,9 @@ export default class BookingAttendeeRepo {
             include: {
                 booking: {
                     include: {
-                        event: {
+                        listing: {
                             include: {
-                                details: true,
+                                location: true,
                             },
                         },
                     },
@@ -124,7 +124,7 @@ export default class BookingAttendeeRepo {
             include: {
                 booking: {
                     include: {
-                        event: {
+                        listing: {
                             select: {
                                 id: true,
                                 title: true,
@@ -147,7 +147,7 @@ export default class BookingAttendeeRepo {
             include: {
                 booking: {
                     include: {
-                        event: {
+                        listing: {
                             select: {
                                 id: true,
                                 title: true,
@@ -194,12 +194,12 @@ export default class BookingAttendeeRepo {
         });
     }
 
-    // Get event attendees
-    static async getEventAttendees(eventId: string) {
+    // Get listing attendees
+    static async getListingAttendees(listingId: string) {
         return prisma.bookingAttendee.findMany({
             where: {
                 booking: {
-                    eventId,
+                    listingId,
                 },
             },
             include: {

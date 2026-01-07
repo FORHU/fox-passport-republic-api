@@ -21,7 +21,7 @@ export default class CategoryRepo {
                 },
                 _count: {
                     select: {
-                        events: true,
+                        listings: true,
                     },
                 },
             },
@@ -38,9 +38,9 @@ export default class CategoryRepo {
             include: {
                 parentCategory: true,
                 subCategories: true,
-                events: {
+                listings: {
                     where: {
-                        isPublished: true,
+                        status: "published",
                     },
                     select: {
                         id: true,
@@ -52,7 +52,7 @@ export default class CategoryRepo {
                 },
                 _count: {
                     select: {
-                        events: true,
+                        listings: true,
                         subCategories: true,
                     },
                 },
@@ -69,7 +69,7 @@ export default class CategoryRepo {
                 subCategories: true,
                 _count: {
                     select: {
-                        events: true,
+                        listings: true,
                     },
                 },
             },
@@ -154,7 +154,7 @@ export default class CategoryRepo {
                 subCategories: true,
                 _count: {
                     select: {
-                        events: true,
+                        listings: true,
                     },
                 },
             },

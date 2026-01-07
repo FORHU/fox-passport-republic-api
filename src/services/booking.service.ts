@@ -1,8 +1,31 @@
 import BookingRepo from "../repositories/booking.repository";
+import BookingAttendeeRepo from "../repositories/bookingAttendee.repository";
+import PaymentRepo from "../repositories/payment.repository";
+import ListingRepo from "../repositories/listing.repository";
 import crypto from "crypto";
-import { BookingStatus } from "@prisma/client";
+import { BookingStatus, PaymentStatus } from "@prisma/client";
 
 export default class BookingSvc {
+    // CREATE MULTIPLE BOOKINGS (Admin/Batch)
+    static async createMultipleBookings(bookings: {
+        listingId: string;
+        userId: string;
+        guestCount: number;
+        totalAmount: number;
+        specialRequests?: string;
+    }[]) {
+        const createdBookings = [];
+        // Sequential creation to ensure unique confirmation codes
+        for (const bookingData of bookings) {
+            createdBookings.push(await this.createBooking(bookingData));
+        }
+        return createdBookings;
+    }
+
+    // Helper to generate ticket code
+    private static generateTicketCode(): string {
+        return `TIX-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+    }
     // Generate unique confirmation code
     static generateConfirmationCode(): string {
         return crypto.randomBytes(4).toString("hex").toUpperCase();
@@ -18,7 +41,7 @@ export default class BookingSvc {
     // GET ALL BOOKINGS
     static async getAllBookings(filters?: {
         userId?: string;
-        eventId?: string;
+        listingId?: string;
         bookingStatus?: BookingStatus;
     }) {
         return BookingRepo.getAllBookings(filters);
@@ -44,9 +67,9 @@ export default class BookingSvc {
 
     // ========== MULTI-STEP BOOKING METHODS ==========
 
-    // STEP 1: CREATE DRAFT BOOKING (Event Selection)
+    // STEP 1: CREATE DRAFT BOOKING (Listing Selection)
     static async createDraftBooking(data: {
-        eventId: string;
+        listingId: string;
         userId: string;
     }) {
         let confirmationCode = this.generateConfirmationCode();
@@ -55,7 +78,7 @@ export default class BookingSvc {
         }
 
         return BookingRepo.createBooking({
-            eventId: data.eventId,
+            listingId: data.listingId,
             userId: data.userId,
             bookingStatus: BookingStatus.draft,
             confirmationCode,
@@ -69,7 +92,7 @@ export default class BookingSvc {
         draftId: string,
         userId: string,
         data: {
-            numberOfTickets: number;
+            guestCount: number;
             totalAmount: number;
         }
     ) {
@@ -91,7 +114,7 @@ export default class BookingSvc {
         }
 
         return BookingRepo.updateBooking(draftId, {
-            numberOfTickets: data.numberOfTickets,
+            guestCount: data.guestCount,
             totalAmount: data.totalAmount,
             currentStep: 2,
             expiresAt: this.calculateExpiryTime(), // Extend expiry
@@ -148,14 +171,14 @@ export default class BookingSvc {
         }
 
         // Validate all required fields are filled
-        if (!booking.numberOfTickets || booking.numberOfTickets < 1) {
-            throw new Error("Number of tickets is required");
+        if (!booking.guestCount || booking.guestCount < 1) {
+            throw new Error("Guest count is required");
         }
         if (!booking.totalAmount || booking.totalAmount.toNumber() <= 0) {
             throw new Error("Total amount is required");
         }
 
-        // Update to pending (awaiting payment) or confirmed
+        // Update to pending (awaiting payment)
         return BookingRepo.updateBooking(draftId, {
             bookingStatus: BookingStatus.pending,
             currentStep: 4,
@@ -163,91 +186,139 @@ export default class BookingSvc {
         });
     }
 
-    // ========== SINGLE-STEP BOOKING (Legacy - keep for backward compatibility) ==========
+    // STEP 5: ADD ATTENDEES
+    static async addBookingAttendees(
+        bookingId: string,
+        userId: string,
+        attendees: {
+            firstName: string;
+            lastName: string;
+            email: string;
+            phone: string;
+        }[]
+    ) {
+        const booking = await BookingRepo.getBookingById(bookingId);
+        if (!booking) throw new Error("Booking not found");
+        if (booking.userId !== userId) throw new Error("Unauthorized");
 
-    // CREATE BOOKING (Old method - creates confirmed booking directly)
+        const createdAttendees = [];
+        for (const attendee of attendees) {
+            let ticketCode = this.generateTicketCode();
+            while (await BookingAttendeeRepo.ticketCodeExists(ticketCode)) {
+                ticketCode = this.generateTicketCode();
+            }
+
+            createdAttendees.push(
+                await BookingAttendeeRepo.createAttendee({
+                    bookingId,
+                    ...attendee,
+                    ticketCode,
+                })
+            );
+        }
+
+        return createdAttendees;
+    }
+
+    // STEP 6: PROCESS PAYMENT
+    static async processBookingPayment(
+        bookingId: string,
+        userId: string,
+        paymentData: {
+            amount: number;
+            currency: string;
+            paymentMethod: string;
+            transactionId: string;
+        }
+    ) {
+        const booking = await BookingRepo.getBookingById(bookingId);
+        if (!booking) throw new Error("Booking not found");
+        if (booking.userId !== userId) throw new Error("Unauthorized");
+        if (booking.bookingStatus !== BookingStatus.pending) {
+            throw new Error("Booking is not in pending status");
+        }
+
+        // Create payment record
+        const payment = await PaymentRepo.createPayment({
+            bookingId,
+            amount: paymentData.amount,
+            currency: paymentData.currency,
+            paymentMethod: paymentData.paymentMethod,
+            paymentStatus: PaymentStatus.completed,
+            transactionId: paymentData.transactionId,
+            gatewayResponse: JSON.stringify({ status: "success", simulated: true }),
+        });
+
+        // Update booking to confirmed
+        await BookingRepo.updateBooking(bookingId, {
+            bookingStatus: BookingStatus.confirmed,
+        });
+
+        return payment;
+    }
+
+    // ========== SINGLE-STEP BOOKING (Legacy) ==========
+
     static async createBooking(data: {
-        eventId: string;
+        listingId: string;
         userId: string;
-        numberOfTickets: number;
+        guestCount: number;
         totalAmount: number;
         bookingStatus?: BookingStatus;
         specialRequests?: string;
     }) {
-        // Generate unique confirmation code
         let confirmationCode = this.generateConfirmationCode();
         while (await BookingRepo.confirmationCodeExists(confirmationCode)) {
             confirmationCode = this.generateConfirmationCode();
         }
 
         return BookingRepo.createBooking({
-            eventId: data.eventId,
+            listingId: data.listingId,
             userId: data.userId,
-            numberOfTickets: data.numberOfTickets,
+            guestCount: data.guestCount,
             totalAmount: data.totalAmount,
             bookingStatus: data.bookingStatus || BookingStatus.pending,
             confirmationCode,
             specialRequests: data.specialRequests,
-            currentStep: 4, // Mark as completed all steps
+            currentStep: 4,
         });
     }
 
-    // UPDATE BOOKING
     static async updateBooking(
         id: string,
         userId: string,
         data: Partial<{
-            numberOfTickets: number;
+            guestCount: number;
             totalAmount: number;
             bookingStatus: BookingStatus;
             specialRequests: string;
         }>
     ) {
-        // Check if booking exists
         const exists = await BookingRepo.bookingExists(id);
-        if (!exists) {
-            throw new Error("Booking not found");
-        }
-
-        // Check if user owns the booking
+        if (!exists) throw new Error("Booking not found");
         const isOwner = await BookingRepo.isBookingOwner(id, userId);
-        if (!isOwner) {
-            throw new Error("Unauthorized: You can only update your own bookings");
-        }
+        if (!isOwner) throw new Error("Unauthorized");
 
         return BookingRepo.updateBooking(id, data);
     }
 
-    // DELETE BOOKING (Cancel)
     static async deleteBooking(id: string, userId: string) {
-        // Check if booking exists
         const exists = await BookingRepo.bookingExists(id);
-        if (!exists) {
-            throw new Error("Booking not found");
-        }
-
-        // Check if user owns the booking
+        if (!exists) throw new Error("Booking not found");
         const isOwner = await BookingRepo.isBookingOwner(id, userId);
-        if (!isOwner) {
-            throw new Error("Unauthorized: You can only cancel your own bookings");
-        }
+        if (!isOwner) throw new Error("Unauthorized");
 
         return BookingRepo.deleteBooking(id);
     }
 
-    // GET USER BOOKINGS
     static async getUserBookings(userId: string) {
         return BookingRepo.getUserBookings(userId);
     }
 
-    // GET EVENT BOOKINGS (for event host)
-    static async getEventBookings(eventId: string, userId: string) {
-        // You might want to add authorization check here to ensure
-        // only the event host can see bookings
-        return BookingRepo.getEventBookings(eventId);
+    static async getListingBookings(listingId: string, userId: string) {
+        return BookingRepo.getListingBookings(listingId);
     }
 
-    // CLEANUP: Delete expired drafts
     static async cleanupExpiredDrafts() {
         return BookingRepo.deleteExpiredDrafts();
     }

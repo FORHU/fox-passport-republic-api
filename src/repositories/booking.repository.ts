@@ -5,13 +5,13 @@ export default class BookingRepo {
     // READ ALL with filters
     static async getAllBookings(filters?: {
         userId?: string;
-        eventId?: string;
+        listingId?: string;
         bookingStatus?: BookingStatus;
     }) {
         return prisma.booking.findMany({
             where: {
                 ...(filters?.userId && { userId: filters.userId }),
-                ...(filters?.eventId && { eventId: filters.eventId }),
+                ...(filters?.listingId && { listingId: filters.listingId }),
                 ...(filters?.bookingStatus && { bookingStatus: filters.bookingStatus }),
             },
             include: {
@@ -23,7 +23,7 @@ export default class BookingRepo {
                         phone: true,
                     },
                 },
-                event: {
+                listing: {
                     select: {
                         id: true,
                         title: true,
@@ -60,7 +60,7 @@ export default class BookingRepo {
                         phone: true,
                     },
                 },
-                event: {
+                listing: {
                     include: {
                         host: {
                             select: {
@@ -69,7 +69,9 @@ export default class BookingRepo {
                                 email: true,
                             },
                         },
-                        details: true,
+                        location: true,
+                        pricing: true,
+                        availability: true,
                     },
                 },
                 attendees: true,
@@ -84,9 +86,11 @@ export default class BookingRepo {
             where: { confirmationCode },
             include: {
                 user: true,
-                event: {
+                listing: {
                     include: {
-                        details: true,
+                        location: true,
+                        pricing: true,
+                        availability: true,
                     },
                 },
                 attendees: true,
@@ -97,21 +101,21 @@ export default class BookingRepo {
 
     // CREATE (now supports optional fields for draft bookings)
     static async createBooking(data: {
-        eventId: string;
+        listingId: string;
         userId: string;
-        numberOfTickets?: number;        // CHANGED: Made optional
-        totalAmount?: number;            // CHANGED: Made optional
-        bookingStatus?: BookingStatus;   // CHANGED: Made optional
+        guestCount?: number;
+        totalAmount?: number;
+        bookingStatus?: BookingStatus;
         confirmationCode: string;
         specialRequests?: string;
-        currentStep?: number;            // NEW: Track booking step
-        expiresAt?: Date;                // NEW: Expiry for drafts
+        currentStep?: number;
+        expiresAt?: Date;
     }) {
         return prisma.booking.create({
             data: {
-                eventId: data.eventId,
+                listingId: data.listingId,
                 userId: data.userId,
-                numberOfTickets: data.numberOfTickets,
+                guestCount: data.guestCount,
                 totalAmount: data.totalAmount,
                 bookingStatus: data.bookingStatus || BookingStatus.draft,
                 confirmationCode: data.confirmationCode,
@@ -121,7 +125,7 @@ export default class BookingRepo {
             },
             include: {
                 user: true,
-                event: true,
+                listing: true,
             },
         });
     }
@@ -130,12 +134,12 @@ export default class BookingRepo {
     static async updateBooking(
         id: string,
         data: Partial<{
-            numberOfTickets: number;
+            guestCount: number;
             totalAmount: number;
             bookingStatus: BookingStatus;
             specialRequests: string;
-            currentStep: number;         // NEW
-            expiresAt: Date | null;      // NEW (can be null to remove expiry)
+            currentStep: number;
+            expiresAt: Date | null;
         }>
     ) {
         return prisma.booking.update({
@@ -143,7 +147,7 @@ export default class BookingRepo {
             data,
             include: {
                 user: true,
-                event: true,
+                listing: true,
                 attendees: true,
                 payments: true,
             },
@@ -192,12 +196,12 @@ export default class BookingRepo {
         return prisma.booking.findMany({
             where: { userId },
             include: {
-                event: {
+                listing: {
                     include: {
-                        details: true,
+                        location: true,
                         images: {
                             where: {
-                                isPrimary: true,
+                                isThumbnail: true,
                             },
                             take: 1,
                         },
@@ -212,10 +216,10 @@ export default class BookingRepo {
         });
     }
 
-    // Get event bookings (for event host)
-    static async getEventBookings(eventId: string) {
+    // Get listing bookings (for listing host)
+    static async getListingBookings(listingId: string) {
         return prisma.booking.findMany({
-            where: { eventId },
+            where: { listingId },
             include: {
                 user: {
                     select: {

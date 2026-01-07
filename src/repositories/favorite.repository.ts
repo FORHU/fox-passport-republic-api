@@ -6,7 +6,7 @@ export default class FavoriteRepo {
         return prisma.favorite.findMany({
             where: { userId },
             include: {
-                event: {
+                listing: {
                     include: {
                         host: {
                             select: {
@@ -18,11 +18,11 @@ export default class FavoriteRepo {
                         category: true,
                         images: {
                             where: {
-                                isPrimary: true,
+                                isThumbnail: true,
                             },
                             take: 1,
                         },
-                        details: true,
+                        location: true,
                     },
                 },
             },
@@ -35,15 +35,15 @@ export default class FavoriteRepo {
     // CREATE (Add to favorites)
     static async addFavorite(data: {
         userId: string;
-        eventId: string;
+        listingId: string;
     }) {
         return prisma.favorite.create({
             data: {
                 userId: data.userId,
-                eventId: data.eventId,
+                listingId: data.listingId,
             },
             include: {
-                event: {
+                listing: {
                     select: {
                         id: true,
                         title: true,
@@ -61,12 +61,12 @@ export default class FavoriteRepo {
         });
     }
 
-    // DELETE by userId and eventId
-    static async removeFavoriteByUserAndEvent(userId: string, eventId: string) {
+    // DELETE by userId and listingId
+    static async removeFavoriteByUserAndListing(userId: string, listingId: string) {
         return prisma.favorite.deleteMany({
             where: {
                 userId,
-                eventId,
+                listingId,
             },
         });
     }
@@ -80,24 +80,24 @@ export default class FavoriteRepo {
         return !!favorite;
     }
 
-    // Check if user favorited event
-    static async isFavorited(userId: string, eventId: string) {
+    // Check if user favorited listing
+    static async isFavorited(userId: string, listingId: string) {
         const favorite = await prisma.favorite.findFirst({
             where: {
                 userId,
-                eventId,
+                listingId,
             },
             select: { id: true },
         });
         return !!favorite;
     }
 
-    // Get favorite by userId and eventId
-    static async getFavoriteByUserAndEvent(userId: string, eventId: string) {
+    // Get favorite by userId and listingId
+    static async getFavoriteByUserAndListing(userId: string, listingId: string) {
         return prisma.favorite.findFirst({
             where: {
                 userId,
-                eventId,
+                listingId,
             },
         });
     }

@@ -3,13 +3,13 @@ import { prisma } from "../utils/prisma";
 export default class ReviewRepo {
     // READ ALL with filters
     static async getAllReviews(filters?: {
-        eventId?: string;
+        listingId?: string;
         userId?: string;
         isVerifiedAttendee?: boolean;
     }) {
         return prisma.review.findMany({
             where: {
-                ...(filters?.eventId && { eventId: filters.eventId }),
+                ...(filters?.listingId && { listingId: filters.listingId }),
                 ...(filters?.userId && { userId: filters.userId }),
                 ...(filters?.isVerifiedAttendee !== undefined && { isVerifiedAttendee: filters.isVerifiedAttendee }),
             },
@@ -22,7 +22,7 @@ export default class ReviewRepo {
                         profileImage: true,
                     },
                 },
-                event: {
+                listing: {
                     select: {
                         id: true,
                         title: true,
@@ -48,7 +48,7 @@ export default class ReviewRepo {
                         profileImage: true,
                     },
                 },
-                event: {
+                listing: {
                     select: {
                         id: true,
                         title: true,
@@ -61,7 +61,7 @@ export default class ReviewRepo {
 
     // CREATE
     static async createReview(data: {
-        eventId: string;
+        listingId: string;
         userId: string;
         rating: number;
         comment?: string;
@@ -69,7 +69,7 @@ export default class ReviewRepo {
     }) {
         return prisma.review.create({
             data: {
-                eventId: data.eventId,
+                listingId: data.listingId,
                 userId: data.userId,
                 rating: data.rating,
                 comment: data.comment,
@@ -83,7 +83,7 @@ export default class ReviewRepo {
                         username: true,
                     },
                 },
-                event: {
+                listing: {
                     select: {
                         id: true,
                         title: true,
@@ -112,7 +112,7 @@ export default class ReviewRepo {
                         username: true,
                     },
                 },
-                event: {
+                listing: {
                     select: {
                         id: true,
                         title: true,
@@ -150,10 +150,10 @@ export default class ReviewRepo {
         return !!review;
     }
 
-    // Get event reviews
-    static async getEventReviews(eventId: string) {
+    // Get listing reviews
+    static async getListingReviews(listingId: string) {
         return prisma.review.findMany({
-            where: { eventId },
+            where: { listingId },
             include: {
                 user: {
                     select: {
@@ -175,7 +175,7 @@ export default class ReviewRepo {
         return prisma.review.findMany({
             where: { userId },
             include: {
-                event: {
+                listing: {
                     select: {
                         id: true,
                         title: true,

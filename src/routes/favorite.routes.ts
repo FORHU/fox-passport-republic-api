@@ -8,6 +8,6 @@ router.get("/user/:userId", FavoriteCtrl.getUserFavorites);
 router.get("/check", FavoriteCtrl.checkFavorite);
 router.post("/add", FavoriteCtrl.addFavorite);
 router.delete("/:id", FavoriteCtrl.removeFavorite);
-router.delete("/remove/event", FavoriteCtrl.removeFavoriteByEvent);
+router.delete("/remove/listing", FavoriteCtrl.removeFavoriteByListing);
 
 export default router;

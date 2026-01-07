@@ -8,7 +8,7 @@ router.get("/", BookingAttendeeCtrl.getAllAttendees);
 router.get("/:id", BookingAttendeeCtrl.getAttendeeById);
 router.get("/ticket/:ticketCode", BookingAttendeeCtrl.getAttendeeByTicketCode);
 router.get("/booking/:bookingId", BookingAttendeeCtrl.getBookingAttendees);
-router.get("/event/:eventId", BookingAttendeeCtrl.getEventAttendees);
+router.get("/listing/:listingId", BookingAttendeeCtrl.getListingAttendees);
 router.post("/create", BookingAttendeeCtrl.createAttendee);
 router.put("/:id", BookingAttendeeCtrl.updateAttendee);
 router.put("/:id/checkin", BookingAttendeeCtrl.checkInAttendee);

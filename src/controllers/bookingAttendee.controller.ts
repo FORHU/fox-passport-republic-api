@@ -300,11 +300,11 @@ export default class BookingAttendeeController {
         }
     }
 
-    // GET EVENT ATTENDEES
-    static async getEventAttendees(req: Request, res: Response) {
+    // GET LISTING ATTENDEES
+    static async getListingAttendees(req: Request, res: Response) {
         try {
             const schema = Joi.object({
-                eventId: Joi.string().uuid().required(),
+                listingId: Joi.string().uuid().required(),
             });
 
             const { error, value } = schema.validate(req.params);
@@ -312,17 +312,17 @@ export default class BookingAttendeeController {
                 return res.status(400).json({ message: error.message });
             }
 
-            const attendees = await BookingAttendeeSvc.getEventAttendees(value.eventId);
+            const attendees = await BookingAttendeeSvc.getListingAttendees(value.listingId);
             return res.status(200).json({
                 success: true,
                 count: attendees.length,
                 data: attendees,
             });
         } catch (error: any) {
-            console.error("Get event attendees error:", error);
+            console.error("Get listing attendees error:", error);
             return res.status(500).json({
                 success: false,
-                message: error.message || "Failed to fetch event attendees",
+                message: error.message || "Failed to fetch listing attendees",
             });
         }
     }

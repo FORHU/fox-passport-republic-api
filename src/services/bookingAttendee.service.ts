@@ -113,8 +113,8 @@ export default class BookingAttendeeSvc {
         return BookingAttendeeRepo.getBookingAttendees(bookingId);
     }
 
-    // GET EVENT ATTENDEES
-    static async getEventAttendees(eventId: string) {
-        return BookingAttendeeRepo.getEventAttendees(eventId);
+    // GET LISTING ATTENDEES
+    static async getListingAttendees(listingId: string) {
+        return BookingAttendeeRepo.getListingAttendees(listingId);
     }
 }

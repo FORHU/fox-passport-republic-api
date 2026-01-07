@@ -35,7 +35,7 @@ export default class FavoriteController {
         try {
             const schema = Joi.object({
                 userId: Joi.string().uuid().required(),
-                eventId: Joi.string().uuid().required(),
+                listingId: Joi.string().uuid().required(),
             });
 
             const { error, value } = schema.validate(req.body);
@@ -46,7 +46,7 @@ export default class FavoriteController {
             const favorite = await FavoriteSvc.addFavorite(value);
             return res.status(201).json({
                 success: true,
-                message: "Event added to favorites",
+                message: "Listing added to favorites",
                 data: favorite,
             });
         } catch (error: any) {
@@ -89,7 +89,7 @@ export default class FavoriteController {
 
             return res.status(200).json({
                 success: true,
-                message: "Event removed from favorites",
+                message: "Listing removed from favorites",
             });
         } catch (error: any) {
             console.error("Remove favorite error:", error);
@@ -112,12 +112,12 @@ export default class FavoriteController {
         }
     }
 
-    // REMOVE FROM FAVORITES by Event ID
-    static async removeFavoriteByEvent(req: Request, res: Response) {
+    // REMOVE FROM FAVORITES by Listing ID
+    static async removeFavoriteByListing(req: Request, res: Response) {
         try {
             const schema = Joi.object({
                 userId: Joi.string().uuid().required(),
-                eventId: Joi.string().uuid().required(),
+                listingId: Joi.string().uuid().required(),
             });
 
             const { error, value } = schema.validate(req.body);
@@ -125,14 +125,14 @@ export default class FavoriteController {
                 return res.status(400).json({ message: error.message });
             }
 
-            await FavoriteSvc.removeFavoriteByEvent(value.userId, value.eventId);
+            await FavoriteSvc.removeFavoriteByListing(value.userId, value.listingId);
 
             return res.status(200).json({
                 success: true,
-                message: "Event removed from favorites",
+                message: "Listing removed from favorites",
             });
         } catch (error: any) {
-            console.error("Remove favorite by event error:", error);
+            console.error("Remove favorite by listing error:", error);
             if (error.message === "Favorite not found") {
                 return res.status(404).json({
                     success: false,
@@ -151,7 +151,7 @@ export default class FavoriteController {
         try {
             const schema = Joi.object({
                 userId: Joi.string().uuid().required(),
-                eventId: Joi.string().uuid().required(),
+                listingId: Joi.string().uuid().required(),
             });
 
             const { error, value } = schema.validate(req.query);
@@ -159,7 +159,7 @@ export default class FavoriteController {
                 return res.status(400).json({ message: error.message });
             }
 
-            const isFavorited = await FavoriteSvc.isFavorited(value.userId, value.eventId);
+            const isFavorited = await FavoriteSvc.isFavorited(value.userId, value.listingId);
             return res.status(200).json({
                 success: true,
                 data: { isFavorited },

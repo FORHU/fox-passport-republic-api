@@ -1,20 +1,20 @@
 import { prisma } from "../utils/prisma";
-import { EventStatus } from "@prisma/client";
+import { ListingStatus } from "@prisma/client";
 
-export default class EventRepo {
+export default class ListingRepo {
     // READ ALL with filters
-    static async getAllEvents(filters?: {
+    static async getAllListings(filters?: {
         hostId?: string;
         categoryId?: string;
-        status?: EventStatus;
-        isPublished?: boolean;
+        status?: ListingStatus;
+        type?: any; // Using any for now to avoid strict type issues before re-gen
     }) {
-        return prisma.event.findMany({
+        return prisma.listing.findMany({
             where: {
                 ...(filters?.hostId && { hostId: filters.hostId }),
                 ...(filters?.categoryId && { categoryId: filters.categoryId }),
                 ...(filters?.status && { status: filters.status }),
-                ...(filters?.isPublished !== undefined && { isPublished: filters.isPublished }),
+                ...(filters?.type && { type: filters.type }),
             },
             select: {
                 id: true,
@@ -22,9 +22,11 @@ export default class EventRepo {
                 categoryId: true,
                 title: true,
                 description: true,
+                propertyType: true,
+                roomType: true,
                 status: true,
+                type: true,
                 maxAttendees: true,
-                isPublished: true,
                 createdAt: true,
                 updatedAt: true,
                 host: {
@@ -44,7 +46,7 @@ export default class EventRepo {
                 },
                 images: {
                     where: {
-                        isPrimary: true,
+                        isThumbnail: true,
                     },
                     take: 1,
                 },
@@ -56,8 +58,8 @@ export default class EventRepo {
     }
 
     // READ ONE by ID with full details
-    static async getEventById(id: string) {
-        return prisma.event.findUnique({
+    static async getListingById(id: string) {
+        return prisma.listing.findUnique({
             where: { id },
             include: {
                 host: {
@@ -70,13 +72,18 @@ export default class EventRepo {
                     },
                 },
                 category: true,
-                details: true,
+                location: true,
                 pricing: true,
                 availability: true,
                 images: {
                     orderBy: {
-                        displayOrder: "asc",
+                        orderIndex: "asc",
                     },
+                },
+                amenities: {
+                    include: {
+                        amenity: true
+                    }
                 },
                 reviews: {
                     include: {
@@ -99,24 +106,28 @@ export default class EventRepo {
     }
 
     // CREATE
-    static async createEvent(data: {
+    static async createListing(data: {
         hostId: string;
         categoryId?: string;
         title: string;
         description: string;
-        status: EventStatus;
+        propertyType?: string;
+        roomType?: string;
+        status: ListingStatus;
+        type: any;
         maxAttendees?: number;
-        isPublished?: boolean;
     }) {
-        return prisma.event.create({
+        return prisma.listing.create({
             data: {
                 hostId: data.hostId,
                 categoryId: data.categoryId,
                 title: data.title,
                 description: data.description,
+                propertyType: data.propertyType,
+                roomType: data.roomType,
                 status: data.status,
+                type: data.type,
                 maxAttendees: data.maxAttendees,
-                isPublished: data.isPublished,
             },
             include: {
                 host: {
@@ -133,18 +144,20 @@ export default class EventRepo {
     }
 
     // UPDATE
-    static async updateEvent(
+    static async updateListing(
         id: string,
         data: Partial<{
             categoryId: string;
             title: string;
             description: string;
-            status: EventStatus;
+            propertyType: string;
+            roomType: string;
+            status: ListingStatus;
+            type: any;
             maxAttendees: number;
-            isPublished: boolean;
         }>
     ) {
-        return prisma.event.update({
+        return prisma.listing.update({
             where: { id },
             data,
             include: {
@@ -157,140 +170,124 @@ export default class EventRepo {
                     },
                 },
                 category: true,
-                details: true,
+                location: true,
                 pricing: true,
             },
         });
     }
 
     // DELETE
-    static async deleteEvent(id: string) {
-        return prisma.event.delete({
+    static async deleteListing(id: string) {
+        return prisma.listing.delete({
             where: { id },
         });
     }
 
-    // CREATE EVENT DETAILS
-    static async createEventDetails(data: {
-        eventId: string;
-        locationAddress: string;
+    // CREATE LISTING LOCATION
+    static async createListingLocation(data: {
+        listingId: string;
+        streetAddress: string;
         city: string;
-        state: string;
+        state?: string;
         country: string;
         latitude?: number;
         longitude?: number;
-        startDatetime: Date;
-        endDatetime: Date;
-        durationMinutes?: number;
         requirements?: string;
         cancellationPolicy?: string;
-        itineraryJson?: string;
     }) {
-        return prisma.eventDetails.create({
+        return prisma.listingLocation.create({
             data: {
-                eventId: data.eventId,
-                locationAddress: data.locationAddress,
+                listingId: data.listingId,
+                streetAddress: data.streetAddress,
                 city: data.city,
                 state: data.state,
                 country: data.country,
                 latitude: data.latitude,
                 longitude: data.longitude,
-                startDatetime: data.startDatetime,
-                endDatetime: data.endDatetime,
-                durationMinutes: data.durationMinutes,
                 requirements: data.requirements,
                 cancellationPolicy: data.cancellationPolicy,
-                itineraryJson: data.itineraryJson,
             },
         });
     }
 
-    // UPDATE EVENT DETAILS
-    static async updateEventDetails(
-        eventId: string,
+    // UPDATE LISTING LOCATION
+    static async updateListingLocation(
+        listingId: string,
         data: Partial<{
-            locationAddress: string;
+            streetAddress: string;
             city: string;
             state: string;
             country: string;
             latitude: number;
             longitude: number;
-            startDatetime: Date;
-            endDatetime: Date;
-            durationMinutes: number;
             requirements: string;
             cancellationPolicy: string;
-            itineraryJson: string;
         }>
     ) {
-        return prisma.eventDetails.update({
-            where: { eventId },
+        return prisma.listingLocation.update({
+            where: { listingId },
             data,
         });
     }
 
-    // CREATE EVENT PRICING
-    static async createEventPricing(data: {
-        eventId: string;
+    // CREATE LISTING PRICING
+    static async createListingPricing(data: {
+        listingId: string;
         basePrice: number;
         currency: string;
         serviceFeePercent: number;
         taxPercent: number;
         pricingTiers?: any;
-        earlyBirdDiscount?: any;
-        earlyBirdDeadline?: Date;
     }) {
-        return prisma.eventPricing.create({
+        return prisma.listingPricing.create({
             data: {
-                eventId: data.eventId,
+                listingId: data.listingId,
                 basePrice: data.basePrice,
                 currency: data.currency,
                 serviceFeePercent: data.serviceFeePercent,
                 taxPercent: data.taxPercent,
                 pricingTiers: data.pricingTiers,
-                earlyBirdDiscount: data.earlyBirdDiscount,
-                earlyBirdDeadline: data.earlyBirdDeadline,
             },
         });
     }
 
-    // ADD EVENT IMAGE
-    static async addEventImage(data: {
-        eventId: string;
-        imageUrl: string;
+    // ADD LISTING IMAGE
+    static async addListingImage(data: {
+        listingId: string;
+        url: string;
         altText?: string;
-        displayOrder?: number;
-        isPrimary?: boolean;
+        orderIndex?: number;
+        isThumbnail?: boolean;
     }) {
-        return prisma.eventImage.create({
+        return prisma.listingImage.create({
             data: {
-                eventId: data.eventId,
-                imageUrl: data.imageUrl,
+                listingId: data.listingId,
+                url: data.url,
                 altText: data.altText,
-                displayOrder: data.displayOrder,
-                isPrimary: data.isPrimary,
+                orderIndex: data.orderIndex,
+                isThumbnail: data.isThumbnail || false,
             },
         });
     }
 
-    // Check if event exists
-    static async eventExists(id: string) {
-        const event = await prisma.event.findUnique({
+    // Check if listing exists
+    static async listingExists(id: string) {
+        const listing = await prisma.listing.findUnique({
             where: { id },
             select: { id: true },
         });
-        return !!event;
+        return !!listing;
     }
 
-    // Check if user is host of event
-    static async isEventHost(eventId: string, userId: string) {
-        const event = await prisma.event.findFirst({
+    // Check if user is host of listing
+    static async isListingHost(listingId: string, userId: string) {
+        const listing = await prisma.listing.findFirst({
             where: {
-                id: eventId,
+                id: listingId,
                 hostId: userId,
             },
             select: { id: true },
         });
-        return !!event;
+        return !!listing;
     }
 }

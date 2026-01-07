@@ -87,7 +87,7 @@ export const optionalAuth = (
  * @param roles - Array of allowed roles
  * 
  * @example
- * router.delete('/:id', authenticate, requireRole(['admin', 'super_admin']), deleteEvent)
+ * router.delete('/:id', authenticate, requireRole(['admin', 'super_admin']), deleteListing)
  */
 export const requireRole = (roles: string[]) => {
     return (req: Request, res: Response, next: NextFunction) => {

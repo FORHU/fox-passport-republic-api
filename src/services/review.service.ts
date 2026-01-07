@@ -3,7 +3,7 @@ import ReviewRepo from "../repositories/review.repository";
 export default class ReviewSvc {
     // GET ALL REVIEWS
     static async getAllReviews(filters?: {
-        eventId?: string;
+        listingId?: string;
         userId?: string;
         isVerifiedAttendee?: boolean;
     }) {
@@ -21,7 +21,7 @@ export default class ReviewSvc {
 
     // CREATE REVIEW
     static async createReview(data: {
-        eventId: string;
+        listingId: string;
         userId: string;
         rating: number;
         comment?: string;
@@ -81,9 +81,9 @@ export default class ReviewSvc {
         return ReviewRepo.deleteReview(id);
     }
 
-    // GET EVENT REVIEWS
-    static async getEventReviews(eventId: string) {
-        return ReviewRepo.getEventReviews(eventId);
+    // GET LISTING REVIEWS
+    static async getListingReviews(listingId: string) {
+        return ReviewRepo.getListingReviews(listingId);
     }
 
     // GET USER REVIEWS

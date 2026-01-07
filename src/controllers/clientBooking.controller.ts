@@ -5,8 +5,8 @@ import BookingSvc from "../services/booking.service";
 export default class ClientBookingController {
     // ========== PUBLIC CLIENT BOOKING ENDPOINTS ==========
 
-    // GET AVAILABLE EVENTS FOR BOOKING
-    static async getAvailableEvents(req: Request, res: Response) {
+    // GET AVAILABLE LISTINGS FOR BOOKING
+    static async getAvailableListings(req: Request, res: Response) {
         try {
             const schema = Joi.object({
                 city: Joi.string().optional(),
@@ -24,13 +24,11 @@ export default class ClientBookingController {
                 });
             }
 
-            // This would need an EventService method to get available events
-            // For now, returning a placeholder response
             return res.status(200).json({
                 success: true,
-                message: "Available events retrieved successfully",
+                message: "Available listings retrieved successfully",
                 data: {
-                    events: [],
+                    listings: [],
                     pagination: {
                         page: value.page,
                         limit: value.limit,
@@ -39,10 +37,10 @@ export default class ClientBookingController {
                 }
             });
         } catch (error: any) {
-            console.error("Get available events error:", error);
+            console.error("Get available listings error:", error);
             return res.status(500).json({
                 success: false,
-                message: error.message || "Failed to fetch available events",
+                message: error.message || "Failed to fetch available listings",
             });
         }
     }
@@ -51,7 +49,7 @@ export default class ClientBookingController {
     static async startBooking(req: Request, res: Response) {
         try {
             const schema = Joi.object({
-                eventId: Joi.string().uuid().required(),
+                listingId: Joi.string().uuid().required(),
                 userId: Joi.string().uuid().required(),
             });
 
@@ -73,7 +71,7 @@ export default class ClientBookingController {
                     confirmationCode: draft.confirmationCode,
                     currentStep: draft.currentStep,
                     expiresAt: draft.expiresAt,
-                    event: draft.event,
+                    listing: draft.listing,
                 },
                 nextStep: {
                     step: 2,
@@ -107,7 +105,7 @@ export default class ClientBookingController {
 
             const bodySchema = Joi.object({
                 userId: Joi.string().uuid().required(),
-                numberOfTickets: Joi.number().integer().min(1).max(10).required(),
+                guestCount: Joi.number().integer().min(1).max(10).required(),
                 totalAmount: Joi.number().min(0).required(),
             });
 
@@ -120,7 +118,22 @@ export default class ClientBookingController {
             }
 
             const { userId, ...ticketData } = body;
-            const booking = await BookingSvc.updateDraftTickets(
+
+            // PRICE VALIDATION
+            const bookingForValidation = await BookingSvc.getBookingById(params.bookingId);
+            const listing = bookingForValidation.listing;
+            if (listing && listing.pricing && listing.pricing.length > 0) {
+                const basePrice = listing.pricing[0].basePrice.toNumber();
+                const expectedAmount = basePrice * body.guestCount;
+                if (Math.abs(expectedAmount - body.totalAmount) > 0.01) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Price mismatch. Expected ${expectedAmount}, got ${body.totalAmount}`
+                    });
+                }
+            }
+
+            const updatedBooking = await BookingSvc.updateDraftTickets(
                 params.bookingId,
                 userId,
                 ticketData
@@ -130,15 +143,15 @@ export default class ClientBookingController {
                 success: true,
                 message: "Tickets selected successfully",
                 data: {
-                    bookingId: booking.id,
-                    numberOfTickets: booking.numberOfTickets,
-                    totalAmount: booking.totalAmount,
-                    currentStep: booking.currentStep,
-                    expiresAt: booking.expiresAt,
+                    bookingId: updatedBooking.id,
+                    guestCount: updatedBooking.guestCount,
+                    totalAmount: updatedBooking.totalAmount,
+                    currentStep: updatedBooking.currentStep,
+                    expiresAt: updatedBooking.expiresAt,
                 },
                 nextStep: {
                     step: 3,
-                    endpoint: `/api/client/bookings/${booking.id}/customer-info`,
+                    endpoint: `/api/client/bookings/${updatedBooking.id}/attendees`,
                     method: "POST"
                 }
             });
@@ -167,7 +180,59 @@ export default class ClientBookingController {
         }
     }
 
-    // STEP 3: ADD CUSTOMER INFORMATION
+    // STEP 3: ADD ATTENDEE INFORMATION
+    static async addAttendees(req: Request, res: Response) {
+        try {
+            const paramsSchema = Joi.object({
+                bookingId: Joi.string().uuid().required(),
+            });
+
+            const { error: paramsError, value: params } = paramsSchema.validate(req.params);
+            if (paramsError) {
+                return res.status(400).json({ success: false, message: paramsError.message });
+            }
+
+            const bodySchema = Joi.object({
+                userId: Joi.string().uuid().required(),
+                attendees: Joi.array().items(Joi.object({
+                    firstName: Joi.string().required(),
+                    lastName: Joi.string().required(),
+                    email: Joi.string().email().required(),
+                    phone: Joi.string().required(),
+                })).min(1).required(),
+            });
+
+            const { error: bodyError, value: body } = bodySchema.validate(req.body);
+            if (bodyError) {
+                return res.status(400).json({ success: false, message: bodyError.message });
+            }
+
+            const attendees = await BookingSvc.addBookingAttendees(
+                params.bookingId,
+                body.userId,
+                body.attendees
+            );
+
+            return res.status(201).json({
+                success: true,
+                message: "Attendee information added successfully",
+                data: attendees,
+                nextStep: {
+                    step: 4,
+                    endpoint: `/api/client/bookings/${params.bookingId}/customer-info`,
+                    method: "POST"
+                }
+            });
+        } catch (error: any) {
+            console.error("Add attendees error:", error);
+            return res.status(500).json({
+                success: false,
+                message: error.message || "Failed to add attendees",
+            });
+        }
+    }
+
+    // STEP 4: ADD CUSTOMER INFORMATION
     static async addCustomerInfo(req: Request, res: Response) {
         try {
             const paramsSchema = Joi.object({
@@ -212,7 +277,7 @@ export default class ClientBookingController {
                     expiresAt: booking.expiresAt,
                 },
                 nextStep: {
-                    step: 4,
+                    step: 5,
                     endpoint: `/api/client/bookings/${booking.id}/confirm`,
                     method: "POST"
                 }
@@ -235,7 +300,7 @@ export default class ClientBookingController {
         }
     }
 
-    // STEP 4: CONFIRM BOOKING
+    // STEP 5: CONFIRM BOOKING
     static async confirmBooking(req: Request, res: Response) {
         try {
             const paramsSchema = Joi.object({
@@ -269,19 +334,19 @@ export default class ClientBookingController {
 
             return res.status(200).json({
                 success: true,
-                message: "Booking confirmed successfully!",
+                message: "Booking confirmed successfully! Please proceed to payment.",
                 data: {
                     bookingId: booking.id,
                     confirmationCode: booking.confirmationCode,
                     bookingStatus: booking.bookingStatus,
-                    numberOfTickets: booking.numberOfTickets,
+                    guestCount: booking.guestCount,
                     totalAmount: booking.totalAmount,
                     specialRequests: booking.specialRequests,
-                    event: booking.event,
+                    listing: booking.listing,
                     user: booking.user,
                 },
                 nextStep: {
-                    step: 5,
+                    step: 6,
                     message: "Proceed to payment",
                     endpoint: `/api/client/bookings/${booking.id}/payment`,
                     method: "POST"
@@ -313,7 +378,53 @@ export default class ClientBookingController {
         }
     }
 
-    // GET BOOKING DETAILS (for client to view their booking)
+    // STEP 6: PROCESS PAYMENT
+    static async processPayment(req: Request, res: Response) {
+        try {
+            const paramsSchema = Joi.object({
+                bookingId: Joi.string().uuid().required(),
+            });
+
+            const { error: paramsError, value: params } = paramsSchema.validate(req.params);
+            if (paramsError) {
+                return res.status(400).json({ success: false, message: paramsError.message });
+            }
+
+            const bodySchema = Joi.object({
+                userId: Joi.string().uuid().required(),
+                amount: Joi.number().required(),
+                currency: Joi.string().default("USD"),
+                paymentMethod: Joi.string().required(),
+                transactionId: Joi.string().required(),
+            });
+
+            const { error: bodyError, value: body } = bodySchema.validate(req.body);
+            if (bodyError) {
+                return res.status(400).json({ success: false, message: bodyError.message });
+            }
+
+            const { userId, ...paymentData } = body;
+            const payment = await BookingSvc.processBookingPayment(
+                params.bookingId,
+                userId,
+                paymentData
+            );
+
+            return res.status(200).json({
+                success: true,
+                message: "Payment processed successfully. Your booking is now confirmed.",
+                data: payment
+            });
+        } catch (error: any) {
+            console.error("Process payment error:", error);
+            return res.status(500).json({
+                success: false,
+                message: error.message || "Failed to process payment",
+            });
+        }
+    }
+
+    // GET BOOKING DETAILS
     static async getBookingDetails(req: Request, res: Response) {
         try {
             const paramsSchema = Joi.object({
@@ -342,7 +453,6 @@ export default class ClientBookingController {
 
             const booking = await BookingSvc.getBookingById(params.bookingId);
 
-            // Verify user owns this booking
             if (booking.userId !== query.userId) {
                 return res.status(403).json({
                     success: false,
@@ -357,29 +467,27 @@ export default class ClientBookingController {
                     confirmationCode: booking.confirmationCode,
                     bookingStatus: booking.bookingStatus,
                     currentStep: booking.currentStep,
-                    numberOfTickets: booking.numberOfTickets,
+                    guestCount: booking.guestCount,
                     totalAmount: booking.totalAmount,
                     specialRequests: booking.specialRequests,
                     expiresAt: booking.expiresAt,
                     createdAt: booking.createdAt,
-                    event: {
-                        id: booking.event.id,
-                        title: booking.event.title,
-                        description: booking.event.description,
-                        details: booking.event.details,
+                    listing: {
+                        id: booking.listing.id,
+                        title: booking.listing.title,
+                        description: booking.listing.description,
+                        location: booking.listing.location,
                     }
                 }
             });
         } catch (error: any) {
             console.error("Get booking details error:", error);
-
             if (error.message === "Booking not found") {
                 return res.status(404).json({
                     success: false,
                     message: error.message,
                 });
             }
-
             return res.status(500).json({
                 success: false,
                 message: error.message || "Failed to fetch booking details",
@@ -387,119 +495,7 @@ export default class ClientBookingController {
         }
     }
 
-    // GET BOOKING BY CONFIRMATION CODE (for clients to lookup their booking)
-    static async getBookingByCode(req: Request, res: Response) {
-        try {
-            const paramsSchema = Joi.object({
-                confirmationCode: Joi.string().required(),
-            });
-
-            const { error: paramsError, value: params } = paramsSchema.validate(req.params);
-            if (paramsError) {
-                return res.status(400).json({
-                    success: false,
-                    message: paramsError.message
-                });
-            }
-
-            const booking = await BookingSvc.getBookingByConfirmationCode(params.confirmationCode);
-
-            return res.status(200).json({
-                success: true,
-                data: {
-                    id: booking.id,
-                    confirmationCode: booking.confirmationCode,
-                    bookingStatus: booking.bookingStatus,
-                    numberOfTickets: booking.numberOfTickets,
-                    totalAmount: booking.totalAmount,
-                    specialRequests: booking.specialRequests,
-                    createdAt: booking.createdAt,
-                    event: {
-                        title: booking.event.title,
-                        details: booking.event.details,
-                    },
-                    user: {
-                        name: booking.user.name,
-                        email: booking.user.email,
-                    }
-                }
-            });
-        } catch (error: any) {
-            console.error("Get booking by code error:", error);
-
-            if (error.message === "Booking not found") {
-                return res.status(404).json({
-                    success: false,
-                    message: "No booking found with this confirmation code",
-                });
-            }
-
-            return res.status(500).json({
-                success: false,
-                message: error.message || "Failed to fetch booking",
-            });
-        }
-    }
-
-    // CANCEL BOOKING (for clients)
-    static async cancelBooking(req: Request, res: Response) {
-        try {
-            const paramsSchema = Joi.object({
-                bookingId: Joi.string().uuid().required(),
-            });
-
-            const { error: paramsError, value: params } = paramsSchema.validate(req.params);
-            if (paramsError) {
-                return res.status(400).json({
-                    success: false,
-                    message: paramsError.message
-                });
-            }
-
-            const bodySchema = Joi.object({
-                userId: Joi.string().uuid().required(),
-                reason: Joi.string().max(500).optional(),
-            });
-
-            const { error: bodyError, value: body } = bodySchema.validate(req.body);
-            if (bodyError) {
-                return res.status(400).json({
-                    success: false,
-                    message: bodyError.message
-                });
-            }
-
-            await BookingSvc.deleteBooking(params.bookingId, body.userId);
-
-            return res.status(200).json({
-                success: true,
-                message: "Booking cancelled successfully",
-            });
-        } catch (error: any) {
-            console.error("Cancel booking error:", error);
-
-            if (error.message === "Booking not found") {
-                return res.status(404).json({
-                    success: false,
-                    message: error.message,
-                });
-            }
-
-            if (error.message.includes("Unauthorized")) {
-                return res.status(403).json({
-                    success: false,
-                    message: error.message,
-                });
-            }
-
-            return res.status(500).json({
-                success: false,
-                message: error.message || "Failed to cancel booking",
-            });
-        }
-    }
-
-    // GET USER'S ALL BOOKINGS
+    // GET MY BOOKINGS
     static async getMyBookings(req: Request, res: Response) {
         try {
             const querySchema = Joi.object({
@@ -517,25 +513,24 @@ export default class ClientBookingController {
 
             const bookings = await BookingSvc.getUserBookings(value.userId);
 
-            // Filter by status if provided
             const filteredBookings = value.status
-                ? bookings.filter(b => b.bookingStatus === value.status)
+                ? bookings.filter((b: any) => b.bookingStatus === value.status)
                 : bookings;
 
             return res.status(200).json({
                 success: true,
                 count: filteredBookings.length,
-                data: filteredBookings.map(booking => ({
+                data: filteredBookings.map((booking: any) => ({
                     id: booking.id,
                     confirmationCode: booking.confirmationCode,
                     bookingStatus: booking.bookingStatus,
-                    numberOfTickets: booking.numberOfTickets,
+                    guestCount: booking.guestCount,
                     totalAmount: booking.totalAmount,
                     createdAt: booking.createdAt,
-                    event: {
-                        id: booking.event.id,
-                        title: booking.event.title,
-                        details: booking.event.details,
+                    listing: {
+                        id: booking.listing.id,
+                        title: booking.listing.title,
+                        location: booking.listing.location,
                     }
                 }))
             });
@@ -544,6 +539,89 @@ export default class ClientBookingController {
             return res.status(500).json({
                 success: false,
                 message: error.message || "Failed to fetch your bookings",
+            });
+        }
+    }
+
+    // GET BOOKING BY CODE
+    static async getBookingByCode(req: Request, res: Response) {
+        try {
+            const schema = Joi.object({
+                confirmationCode: Joi.string().required(),
+            });
+
+            const { error, value } = schema.validate(req.params);
+            if (error) {
+                return res.status(400).json({ success: false, message: error.message });
+            }
+
+            const booking = await BookingSvc.getBookingByConfirmationCode(value.confirmationCode);
+
+            return res.status(200).json({
+                success: true,
+                data: {
+                    id: booking.id,
+                    confirmationCode: booking.confirmationCode,
+                    bookingStatus: booking.bookingStatus,
+                    guestCount: booking.guestCount,
+                    totalAmount: booking.totalAmount,
+                    listing: {
+                        id: booking.listing.id,
+                        title: booking.listing.title,
+                        location: booking.listing.location,
+                    }
+                }
+            });
+        } catch (error: any) {
+            console.error("Get booking by code error:", error);
+            if (error.message === "Booking not found") {
+                return res.status(404).json({ success: false, message: error.message });
+            }
+            return res.status(500).json({
+                success: false,
+                message: error.message || "Failed to fetch booking",
+            });
+        }
+    }
+
+    // CANCEL BOOKING
+    static async cancelBooking(req: Request, res: Response) {
+        try {
+            const paramsSchema = Joi.object({
+                bookingId: Joi.string().uuid().required(),
+            });
+
+            const { error: paramsError, value: params } = paramsSchema.validate(req.params);
+            if (paramsError) {
+                return res.status(400).json({ success: false, message: paramsError.message });
+            }
+
+            const bodySchema = Joi.object({
+                userId: Joi.string().uuid().required(),
+            });
+
+            const { error: bodyError, value: body } = bodySchema.validate(req.body);
+            if (bodyError) {
+                return res.status(400).json({ success: false, message: bodyError.message });
+            }
+
+            await BookingSvc.deleteBooking(params.bookingId, body.userId);
+
+            return res.status(200).json({
+                success: true,
+                message: "Booking cancelled successfully",
+            });
+        } catch (error: any) {
+            console.error("Cancel booking error:", error);
+            if (error.message === "Booking not found") {
+                return res.status(404).json({ success: false, message: error.message });
+            }
+            if (error.message.includes("Unauthorized")) {
+                return res.status(403).json({ success: false, message: error.message });
+            }
+            return res.status(500).json({
+                success: false,
+                message: error.message || "Failed to cancel booking",
             });
         }
     }

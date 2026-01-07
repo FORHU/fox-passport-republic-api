@@ -3,33 +3,21 @@ import ClientBookingCtrl from "../controllers/clientBooking.controller";
 
 const router = express.Router();
 
-console.log("í¿¢ Client booking routes loaded!");
-
-// ========== SPECIFIC ROUTES FIRST ==========
-// (Must come BEFORE any /:bookingId routes)
-
-router.get("/test", (req, res) => {
-    res.json({ 
-        success: true, 
-        message: "Client booking routes are working!",
-        timestamp: new Date()
-    });
-});
-
-router.get("/events", ClientBookingCtrl.getAvailableEvents);
+// Public routes for client booking flow
+router.get("/listings", ClientBookingCtrl.getAvailableListings);
 router.get("/my-bookings", ClientBookingCtrl.getMyBookings);
-router.get("/code/:confirmationCode", ClientBookingCtrl.getBookingByCode);
-
-// ========== BOOKING FLOW ==========
-
+router.get("/code/:confirmationCode", ClientBookingCtrl.getBookingByCode); // Legacy/Alternative
 router.post("/start", ClientBookingCtrl.startBooking);
+
+// Multi-step booking paths
 router.post("/:bookingId/tickets", ClientBookingCtrl.selectTickets);
+router.post("/:bookingId/attendees", ClientBookingCtrl.addAttendees);
 router.post("/:bookingId/customer-info", ClientBookingCtrl.addCustomerInfo);
 router.post("/:bookingId/confirm", ClientBookingCtrl.confirmBooking);
-router.post("/:bookingId/cancel", ClientBookingCtrl.cancelBooking);
+router.post("/:bookingId/payment", ClientBookingCtrl.processPayment);
 
-// ========== DYNAMIC ROUTE (MUST BE LAST) ==========
-
+// Booking management
 router.get("/:bookingId", ClientBookingCtrl.getBookingDetails);
+router.post("/:bookingId/cancel", ClientBookingCtrl.cancelBooking);
 
 export default router;

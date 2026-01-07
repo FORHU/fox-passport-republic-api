@@ -15,11 +15,23 @@ enum UserRole {
   super_admin
 }
 
-enum EventStatus {
+enum ListingStatus {
   draft
-  active
-  cancelled
-  completed
+  pending_review
+  action_required
+  published
+  hidden
+  suspended
+  archived
+  banned
+}
+
+enum ListingType {
+  venue
+  equipment
+  catering
+  service
+  event
 }
 
 enum BookingStatus {
@@ -47,16 +59,18 @@ model User {
   profileImage String?
   dateOfBirth  DateTime?
   role         UserRole  @default(user)
+  isFoxxer     Boolean   @default(false)
   isHost       Boolean   @default(false)
   isVerified   Boolean   @default(false)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime? @updatedAt
 
   // Relations
-  events    Event[]    @relation("HostEvents")
-  bookings  Booking[]
-  reviews   Review[]
-  favorites Favorite[]
+  listings      Listing[]      @relation("HostListings")
+  foxxerProfile FoxxerProfile?
+  bookings      Booking[]
+  reviews       Review[]
+  favorites     Favorite[]
 
   @@index([email])
   @@index([username])
@@ -64,67 +78,122 @@ model User {
   @@map("users")
 }
 
-model Event {
-  id           String      @id @default(uuid())
-  hostId       String
-  categoryId   String?
-  title        String
-  description  String
-  status       EventStatus @default(draft)
-  maxAttendees Int?
-  isPublished  Boolean     @default(false)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+model FoxxerProfile {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  bio          String?
+  skills       String?
+  rating       Decimal? @default(0)
+  totalReviews Int      @default(0)
+  isAvailable  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Relations
-  host         User                @relation("HostEvents", fields: [hostId], references: [id], onDelete: Cascade)
-  category     Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  details      EventDetails?
-  pricing      EventPricing[]
-  availability EventAvailability[]
-  images       EventImage[]
-  reviews      Review[]
-  bookings     Booking[]
-  favorites    Favorite[]
+  user     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  services ListingFoxxerService[]
 
-  @@index([hostId])
-  @@index([categoryId])
-  @@index([status])
-  @@index([isPublished])
-  @@index([createdAt])
-  @@map("events")
+  @@map("foxxer_profiles")
 }
 
-model EventDetails {
+model EventCategory {
+  id      String  @id @default(uuid())
+  name    String
+  slug    String  @unique
+  iconUrl String?
+
+  // Relations
+  foxxerServices ListingFoxxerService[]
+
+  @@map("event_categories")
+}
+
+model ListingFoxxerService {
   id                 String   @id @default(uuid())
-  eventId            String   @unique
-  locationAddress    String
-  city               String
-  state              String
-  country            String
-  latitude           Decimal?
-  longitude          Decimal?
-  startDatetime      DateTime
-  endDatetime        DateTime
-  durationMinutes    Int?
-  requirements       String?
-  cancellationPolicy String?
-  itineraryJson      String?
+  foxxerId           String
+  listingId          String
+  categoryId         String
+  serviceName        String
+  serviceDescription String?
+  price              Decimal
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
   // Relations
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  foxxer   FoxxerProfile @relation(fields: [foxxerId], references: [id], onDelete: Cascade)
+  listing  Listing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  category EventCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
-  @@index([startDatetime])
-  @@index([city])
-  @@index([country])
-  @@map("event_details")
+  @@index([foxxerId])
+  @@index([listingId])
+  @@index([categoryId])
+  @@map("listing_foxxer_services")
 }
 
-model EventPricing {
+model Listing {
+  id           String        @id @default(uuid())
+  hostId       String
+  categoryId   String?
+  title        String
+  description  String
+  propertyType String? // From reference image
+  roomType     String? // From reference image
+  status       ListingStatus @default(draft)
+  type         ListingType   @default(venue)
+  maxAttendees Int?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // Relations
+  host                  User                   @relation("HostListings", fields: [hostId], references: [id], onDelete: Cascade)
+  category              Category?              @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  location              ListingLocation?
+  pricing               ListingPricing[]
+  availability          ListingAvailability[]
+  images                ListingImage[]
+  amenities             ListingAmenity[]
+  reviews               Review[]
+  bookings              Booking[]
+  favorites             Favorite[]
+  listingFoxxerServices ListingFoxxerService[]
+
+  @@index([hostId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  @@map("listings")
+}
+
+model ListingLocation {
+  id                 String    @id @default(uuid())
+  listingId          String    @unique
+  streetAddress      String // From reference image
+  city               String
+  state              String?
+  country            String
+  latitude           Decimal?
+  longitude          Decimal?
+  startDatetime      DateTime? // Retained for compatibility if needed
+  endDatetime        DateTime? // Retained for compatibility if needed
+  durationMinutes    Int?
+  requirements       String?
+  cancellationPolicy String?
+  itineraryJson      String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([city])
+  @@index([country])
+  @@map("listing_locations")
+}
+
+model ListingPricing {
   id                String    @id @default(uuid())
-  eventId           String
+  listingId         String
   basePrice         Decimal
   currency          String
   serviceFeePercent Decimal
@@ -136,15 +205,15 @@ model EventPricing {
   updatedAt         DateTime  @updatedAt
 
   // Relations
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
-  @@index([eventId])
-  @@map("event_pricing")
+  @@index([listingId])
+  @@map("listing_pricing")
 }
 
-model EventAvailability {
+model ListingAvailability {
   id             String   @id @default(uuid())
-  eventId        String
+  listingId      String
   availableDate  DateTime
   availableSlots Int
   bookedSlots    Int
@@ -153,29 +222,50 @@ model EventAvailability {
   updatedAt      DateTime @updatedAt
 
   // Relations
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
-  @@index([eventId])
+  @@index([listingId])
   @@index([availableDate])
-  @@map("event_availability")
+  @@map("listing_availability")
 }
 
-model EventImage {
-  id           String   @id @default(uuid())
-  eventId      String
-  imageUrl     String
-  altText      String?
-  displayOrder Int?
-  isPrimary    Boolean  @default(false)
-  uploadedAt   DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+model ListingImage {
+  id          String   @id @default(uuid())
+  listingId   String
+  url         String // From reference image
+  altText     String?
+  orderIndex  Int? // From reference image (was displayOrder)
+  isThumbnail Boolean  @default(false) // From reference image (was isPrimary)
+  uploadedAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
-  @@index([eventId])
-  @@index([isPrimary])
-  @@map("event_images")
+  @@index([listingId])
+  @@index([isThumbnail])
+  @@map("listing_images")
+}
+
+model Amenity {
+  id        String           @id @default(uuid())
+  name      String           @unique
+  iconUrl   String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  listings  ListingAmenity[]
+
+  @@map("amenities")
+}
+
+model ListingAmenity {
+  listingId String
+  amenityId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  amenity   Amenity @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([listingId, amenityId])
+  @@map("listing_amenities")
 }
 
 model Category {
@@ -190,7 +280,7 @@ model Category {
   // Relations
   parentCategory Category?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id], onDelete: SetNull)
   subCategories  Category[] @relation("CategoryHierarchy")
-  events         Event[]
+  listings       Listing[]
 
   @@index([slug])
   @@index([parentCategoryId])
@@ -199,30 +289,30 @@ model Category {
 
 model Booking {
   id               String        @id @default(uuid())
-  eventId          String
+  listingId        String
   userId           String
-  numberOfTickets  Int? // CHANGED: Made optional for draft bookings
-  totalAmount      Decimal? // CHANGED: Made optional for draft bookings
-  bookingStatus    BookingStatus @default(draft) // CHANGED: Default to draft
+  guestCount       Int?
+  totalAmount      Decimal?
+  bookingStatus    BookingStatus @default(draft)
   confirmationCode String        @unique
-  currentStep      Int           @default(1) // NEW: Track booking progress (1-4)
-  expiresAt        DateTime? // NEW: Expiry time for draft bookings (30 mins)
+  currentStep      Int           @default(1)
+  expiresAt        DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   specialRequests  String?
 
   // Relations
   user      User              @relation(fields: [userId], references: [id], onDelete: Restrict)
-  event     Event             @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  listing   Listing           @relation(fields: [listingId], references: [id], onDelete: Restrict)
   attendees BookingAttendee[]
   payments  Payment[]
 
   @@index([userId])
-  @@index([eventId])
+  @@index([listingId])
   @@index([bookingStatus])
   @@index([confirmationCode])
   @@index([createdAt])
-  @@index([expiresAt]) // NEW: For cleanup queries
+  @@index([expiresAt])
   @@map("bookings")
 }
 
@@ -270,7 +360,7 @@ model Payment {
 
 model Review {
   id                 String   @id @default(uuid())
-  eventId            String
+  listingId          String
   userId             String
   rating             Int
   comment            String?
@@ -279,28 +369,28 @@ model Review {
   isVerifiedAttendee Boolean  @default(false)
 
   // Relations
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, eventId])
-  @@index([eventId])
+  @@unique([userId, listingId])
+  @@index([listingId])
   @@index([userId])
   @@index([rating])
   @@map("reviews")
 }
 
 model Favorite {
-  id      String   @id @default(uuid())
-  userId  String
-  eventId String
-  savedAt DateTime @default(now())
+  id        String   @id @default(uuid())
+  userId    String
+  listingId String
+  savedAt   DateTime @default(now())
 
   // Relations
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, eventId])
+  @@unique([userId, listingId])
   @@index([userId])
-  @@index([eventId])
+  @@index([listingId])
   @@map("favorites")
 }

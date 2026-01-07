@@ -13,7 +13,7 @@ router.post("/:id/confirm", BookingCtrl.confirmDraftBooking);             // Ste
 router.get("/", BookingCtrl.getAllBookings);
 router.get("/confirmation/:code", BookingCtrl.getBookingByConfirmationCode);  // MOVED UP to avoid conflict
 router.get("/user/:userId", BookingCtrl.getUserBookings);
-router.get("/event/:eventId", BookingCtrl.getEventBookings);
+router.get("/listing/:listingId", BookingCtrl.getListingBookings);
 router.get("/:id", BookingCtrl.getBookingById);                              // MOVED DOWN to avoid conflict
 router.post("/create", BookingCtrl.createBooking);                           // Single-step booking (legacy)
 router.put("/:id", BookingCtrl.updateBooking);
