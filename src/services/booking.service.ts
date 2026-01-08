@@ -3,7 +3,7 @@ import BookingAttendeeRepo from "../repositories/bookingAttendee.repository";
 import PaymentRepo from "../repositories/payment.repository";
 import ListingRepo from "../repositories/listing.repository";
 import crypto from "crypto";
-import { BookingStatus, PaymentStatus } from "@prisma/client";
+import { BookingStatus, PaymentStatus, BookingType } from "@prisma/client";
 
 export default class BookingSvc {
     // CREATE MULTIPLE BOOKINGS (Admin/Batch)
@@ -43,6 +43,7 @@ export default class BookingSvc {
         userId?: string;
         listingId?: string;
         bookingStatus?: BookingStatus;
+        type?: BookingType;
     }) {
         return BookingRepo.getAllBookings(filters);
     }
@@ -71,6 +72,8 @@ export default class BookingSvc {
     static async createDraftBooking(data: {
         listingId: string;
         userId: string;
+        type?: BookingType;
+        foxxerServiceId?: string;
     }) {
         let confirmationCode = this.generateConfirmationCode();
         while (await BookingRepo.confirmationCodeExists(confirmationCode)) {
@@ -80,6 +83,8 @@ export default class BookingSvc {
         return BookingRepo.createBooking({
             listingId: data.listingId,
             userId: data.userId,
+            type: data.type || BookingType.standard,
+            foxxerServiceId: data.foxxerServiceId,
             bookingStatus: BookingStatus.draft,
             confirmationCode,
             currentStep: 1,

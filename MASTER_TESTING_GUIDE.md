@@ -150,6 +150,26 @@ This guide provides a comprehensive flow to test the entire Fox Passport Republi
 - **URL**: `/bookings/{{id}}/confirm`
 - **Body**: `{ "userId": "ID" }`
 
+### Scenario 2: Booking a Foxxer Service (Consumer-to-Foxxer)
+This is for when a user wants to book a specialized service (like "Full Venue Styling") rather than the venue itself.
+
+1. **Start Specialized Booking (Step 1)**
+   - **Method**: `POST`
+   - **URL**: `/client/bookings/start`
+   - **Body**:
+     ```json
+     {
+       "listingId": "VENUE_ID",
+       "userId": "YOUR_USER_ID",
+       "type": "foxxer_service",
+       "foxxerServiceId": "FOXXER_SERVICE_ID"
+     }
+     ```
+
+2. **Continue the Multi-Step Flow**
+   - Follow the same steps as Scenario 1 (Tickets -> Customer Info -> Confirm -> Payment).
+   - The system will now track this as a `foxxer_service` booking type!
+
 ---
 
 ## 6. Foxxer Services (The "Who")

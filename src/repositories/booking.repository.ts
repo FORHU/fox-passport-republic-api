@@ -1,5 +1,5 @@
 import { prisma } from "../utils/prisma";
-import { BookingStatus } from "@prisma/client";
+import { BookingStatus, BookingType } from "@prisma/client";
 
 export default class BookingRepo {
     // READ ALL with filters
@@ -7,12 +7,14 @@ export default class BookingRepo {
         userId?: string;
         listingId?: string;
         bookingStatus?: BookingStatus;
+        type?: BookingType;
     }) {
         return prisma.booking.findMany({
             where: {
                 ...(filters?.userId && { userId: filters.userId }),
                 ...(filters?.listingId && { listingId: filters.listingId }),
                 ...(filters?.bookingStatus && { bookingStatus: filters.bookingStatus }),
+                ...(filters?.type && { type: filters.type }),
             },
             include: {
                 user: {
@@ -40,6 +42,7 @@ export default class BookingRepo {
                 },
                 attendees: true,
                 payments: true,
+                foxxerService: true,
             },
             orderBy: {
                 createdAt: "desc",
@@ -103,9 +106,11 @@ export default class BookingRepo {
     static async createBooking(data: {
         listingId: string;
         userId: string;
+        foxxerServiceId?: string;
         guestCount?: number;
         totalAmount?: number;
         bookingStatus?: BookingStatus;
+        type?: BookingType;
         confirmationCode: string;
         specialRequests?: string;
         currentStep?: number;
@@ -115,9 +120,11 @@ export default class BookingRepo {
             data: {
                 listingId: data.listingId,
                 userId: data.userId,
+                foxxerServiceId: data.foxxerServiceId,
                 guestCount: data.guestCount,
                 totalAmount: data.totalAmount,
                 bookingStatus: data.bookingStatus || BookingStatus.draft,
+                type: data.type || BookingType.standard,
                 confirmationCode: data.confirmationCode,
                 specialRequests: data.specialRequests,
                 currentStep: data.currentStep || 1,
@@ -126,6 +133,7 @@ export default class BookingRepo {
             include: {
                 user: true,
                 listing: true,
+                foxxerService: true,
             },
         });
     }
@@ -137,6 +145,8 @@ export default class BookingRepo {
             guestCount: number;
             totalAmount: number;
             bookingStatus: BookingStatus;
+            type: BookingType;
+            foxxerServiceId: string;
             specialRequests: string;
             currentStep: number;
             expiresAt: Date | null;
@@ -148,6 +158,7 @@ export default class BookingRepo {
             include: {
                 user: true,
                 listing: true,
+                foxxerService: true,
                 attendees: true,
                 payments: true,
             },

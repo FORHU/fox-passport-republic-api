@@ -51,6 +51,8 @@ export default class ClientBookingController {
             const schema = Joi.object({
                 listingId: Joi.string().uuid().required(),
                 userId: Joi.string().uuid().required(),
+                type: Joi.string().valid("standard", "foxxer_service").optional(),
+                foxxerServiceId: Joi.string().uuid().optional(),
             });
 
             const { error, value } = schema.validate(req.body);
@@ -71,7 +73,7 @@ export default class ClientBookingController {
                     confirmationCode: draft.confirmationCode,
                     currentStep: draft.currentStep,
                     expiresAt: draft.expiresAt,
-                    listing: draft.listing,
+                    listing: draft.listing as any,
                 },
                 nextStep: {
                     step: 2,
@@ -342,8 +344,8 @@ export default class ClientBookingController {
                     guestCount: booking.guestCount,
                     totalAmount: booking.totalAmount,
                     specialRequests: booking.specialRequests,
-                    listing: booking.listing,
-                    user: booking.user,
+                    listing: (booking as any).listing,
+                    user: (booking as any).user,
                 },
                 nextStep: {
                     step: 6,
