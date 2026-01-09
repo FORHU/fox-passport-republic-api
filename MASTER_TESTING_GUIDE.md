@@ -3,13 +3,13 @@
 This guide provides a comprehensive flow to test the entire Fox Passport Republic API, including the unified Listing model, specialized types (Venues, Chairs, Food), and the multi-step booking process.
 
 ## Base URL
-`http://localhost:3002/api/v1`
+`http://localmayor:3002/api/v1`
 
 ---
 
 ## 1. Authentication & Setup
 
-### A. Register a Host/Foxxer
+### A. Register a mayor/Foxxer
 - **Method**: `POST`
 - **URL**: `/auth/register`
 - **Body**:
@@ -19,7 +19,7 @@ This guide provides a comprehensive flow to test the entire Fox Passport Republi
     "password": "password123",
     "name": "Alex Foxxer",
     "username": "afoxxer",
-    "role": "host"
+    "role": "mayor"
 }
 ```
 
@@ -74,7 +74,7 @@ This guide provides a comprehensive flow to test the entire Fox Passport Republi
 - **Body**:
 ```json
 {
-    "hostId": "USER_ID",
+    "mayorId": "USER_ID",
     "title": "Garden Paradise Venue",
     "description": "A beautiful outdoor space for weddings.",
     "type": "venue",
@@ -94,7 +94,7 @@ This guide provides a comprehensive flow to test the entire Fox Passport Republi
 - **Body**:
 ```json
 {
-    "hostId": "USER_ID",
+    "mayorId": "USER_ID",
     "title": "Premium Gold Chairs",
     "description": "Elegant gold chairs for formal events.",
     "type": "equipment",
@@ -108,7 +108,7 @@ This guide provides a comprehensive flow to test the entire Fox Passport Republi
 - **Body**:
 ```json
 {
-    "hostId": "USER_ID",
+    "mayorId": "USER_ID",
     "title": "Royal Wedding Buffet",
     "description": "Exquisite 5-course catering service.",
     "type": "catering",
