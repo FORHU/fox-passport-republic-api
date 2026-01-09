@@ -14,7 +14,7 @@ DROP COLUMN "mobileNumber",
 DROP COLUMN "nationality",
 DROP COLUMN "provider",
 ADD COLUMN     "dateOfBirth" TIMESTAMP(3),
-ADD COLUMN     "isHost" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "isMayor" BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN     "phone" TEXT,
 ADD COLUMN     "profileImage" TEXT,
 ADD COLUMN     "updatedAt" TIMESTAMP(3),
@@ -23,7 +23,7 @@ ALTER COLUMN "name" SET NOT NULL;
 -- CreateTable
 CREATE TABLE "Event" (
     "id" TEXT NOT NULL,
-    "hostId" TEXT NOT NULL,
+    "mayorId" TEXT NOT NULL,
     "categoryId" TEXT,
     "title" TEXT NOT NULL,
     "description" TEXT NOT NULL,

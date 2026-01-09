@@ -6,7 +6,7 @@ const router = express.Router();
 // Public routes for client booking flow
 router.get("/listings", ClientBookingCtrl.getAvailableListings);
 router.get("/my-bookings", ClientBookingCtrl.getMyBookings);
-router.get("/code/:confirmationCode", ClientBookingCtrl.getBookingByCode); // Legacy/Alternative
+router.get("/code/:confirmationCode", ClientBookingCtrl.getBookingByCode);
 router.post("/start", ClientBookingCtrl.startBooking);
 
 // Multi-step booking paths

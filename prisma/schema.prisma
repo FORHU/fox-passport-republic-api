@@ -13,7 +13,7 @@ datasource db {
 
 enum UserRole {
   user
-  host
+  mayor
   foxxer
   admin
   super_admin
@@ -91,27 +91,116 @@ enum CancellationPolicy {
   non_refundable
 }
 
-enum Attendee CheckInStatus {
+enum AttendeeCheckInStatus {
   not_checked_in
   checked_in
 }
 
-/* ✅ NEW WEDDING ENUMS (SAFE) */
+//////////////////////////////////////
+// WEDDING ENUMS
+//////////////////////////////////////
 
 enum WeddingCategory {
-  wedding
+  wedding_and_commitments
 }
 
 enum WeddingVenueSubCategory {
-  church_wedding
-  civil_wedding
   garden_wedding
+  rooftop_wedding
   beach_wedding
-  destination_wedding
-  indoor_venue
-  outdoor_venue
-  reception_hall
-  intimate_micro_wedding
+  reception_wedding
+  church_wedding
+}
+
+//////////////////////////////////////
+// CELEBRATIONS ENUMS (LOCATION-BASED)
+//////////////////////////////////////
+
+enum CelebrationsCategory {
+  celebrations
+}
+
+enum CelebrationsLocationSubCategory {
+  birthday_party
+  baby_shower
+  bachelor_party
+  engagement_party
+  graduation_party
+  family_reunion
+  holiday_party
+  house_party
+  pool_party
+  garden_party
+  beach_party
+  rooftop_party
+}
+
+//////////////////////////////////////
+// PRIVATE EXPERIENCE ENUMS
+//////////////////////////////////////
+
+enum PrivateExperienceCategory {
+  private_experiences
+}
+
+enum PrivateExperienceSubCategory {
+  private_dining
+  private_celebrations
+  private_travel_and_retreats
+  private_entertainment
+  private_learning_and_workshops
+  private_wellness_and_lifestyle
+  private_adventure
+  private_cultural_and_immersive
+  private_corporate_and_business
+  ultra_private_invite_only
+}
+
+//////////////////////////////////////
+// POP-UP & SEASONAL EVENT ENUMS (NEW)
+//////////////////////////////////////
+
+// 1. Holiday & Festive Pop-Up Events
+enum HolidayFestivePopUpCategory {
+  holiday_and_festive_popups
+}
+
+enum HolidayFestivePopUpSubCategory {
+  christmas_popup_market
+  new_year_countdown_party
+  valentines_popup_dinner
+  holy_week_retreat
+  easter_family_activities
+  halloween_popup_party
+  all_saints_all_souls_memorial_event
+}
+
+// 2. Festival-Based Seasonal Events
+enum FestivalSeasonalEventCategory {
+  festival_based_seasonal_events
+}
+
+enum FestivalSeasonalEventSubCategory {
+  sinulog_themed_popup
+  ati_atihan_side_events
+  panagbenga_flower_festival_popup
+  kadayawan_cultural_event
+  pahiyas_art_food_popup
+  masskara_night_event
+}
+
+// 3. Retail & Lifestyle Pop-Ups
+enum RetailLifestylePopUpCategory {
+  retail_and_lifestyle_popups
+}
+
+enum RetailLifestylePopUpSubCategory {
+  local_brand_artisan_market
+  fashion_streetwear_popup
+  thrift_vintage_market
+  beauty_skincare_experience_booth
+  home_lifestyle_product_launch
+  limited_edition_product_drop
 }
 
 //////////////////////////////////////
@@ -119,152 +208,96 @@ enum WeddingVenueSubCategory {
 //////////////////////////////////////
 
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  password     String
-  name         String
-  username     String    @unique
-  phone        String?
-  profileImage String?
-  dateOfBirth  DateTime?
-  role         UserRole  @default(user)
-  isFoxxer     Boolean   @default(false)
-  isHost       Boolean   @default(false)
-  isVerified   Boolean   @default(false)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime? @updatedAt
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  username  String   @unique
+  role      UserRole @default(user)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  listings      Listing[]      @relation("HostListings")
-  foxxerProfile FoxxerProfile?
-  bookings      Booking[]
-  reviews       Review[]
-  favorites     Favorite[]
-
-  @@index([email])
-  @@index([username])
-  @@index([role])
-  @@map("users")
+  listings Listing[]
 }
 
 model FoxxerProfile {
-  id           String   @id @default(uuid())
-  userId       String   @unique
-  bio          String?
-  skills       String?
-  rating       Decimal? @default(0)
-  totalReviews Int      @default(0)
-  isAvailable  Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id     String @id @default(uuid())
+  userId String @unique
 
-  user     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  services ListingFoxxerService[]
-
-  @@map("foxxer_profiles")
+  user User @relation(fields: [userId], references: [id])
 }
 
 model EventCategory {
-  id      String  @id @default(uuid())
-  name    String
-  slug    String  @unique
-  iconUrl String?
-
-  foxxerServices ListingFoxxerService[]
-
-  @@map("event_categories")
-}
-
-model ListingFoxxerService {
-  id                 String   @id @default(uuid())
-  foxxerId           String
-  listingId          String
-  categoryId         String
-  serviceName        String
-  serviceDescription String?
-  price              Decimal
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  foxxer   FoxxerProfile @relation(fields: [foxxerId], references: [id], onDelete: Cascade)
-  listing  Listing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  category EventCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  bookings Booking[]
-
-  @@index([foxxerId])
-  @@index([listingId])
-  @@index([categoryId])
-  @@map("listing_foxxer_services")
+  id   String @id @default(uuid())
+  name String
+  slug String @unique
 }
 
 model Listing {
-  id           String        @id @default(uuid())
-  hostId       String
-  categoryId   String?
-  title        String
-  description  String
-  propertyType PropertyType?
-  roomType     RoomType?
-  status       ListingStatus @default(draft)
-  type         ListingType   @default(venue)
-  capacity     Int?
-  maxAttendees Int?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id          String        @id @default(uuid())
+  mayorId     String
+  categoryId  String?
+  title       String
+  description String
+  status      ListingStatus @default(draft)
+  type        ListingType   @default(venue)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
-  host                  User                   @relation("HostListings", fields: [hostId], references: [id], onDelete: Cascade)
-  category              Category?              @relation("Category", fields: [categoryId], references: [id], onDelete: SetNull)
-  location              ListingLocation?
-  pricing               ListingPricing[]
-  availability          ListingAvailability[]
-  images                ListingImage[]
-  amenities             ListingAmenity[]
-  reviews               Review[]
-  bookings              Booking[]
-  favorites             Favorite[]
-  listingFoxxerServices ListingFoxxerService[]
-
-  @@index([hostId])
-  @@index([categoryId])
-  @@index([status])
-  @@index([type])
-  @@index([createdAt])
-  @@map("listings")
-}
-model ListingLocation {
-
-}
-
-model ListingPricing {
-
-}
-
-model ListingAmenity {
-
-}
-
-model Review {
-
-}
-
-model Booking {
-
-}
-
-model Favorite {
-
+  mayor    User      @relation(fields: [mayorId], references: [id])
+  category Category? @relation(fields: [categoryId], references: [id])
 }
 
 model Category {
-
+  id   String @id @default(uuid())
+  name String
+  slug String @unique
 }
 
-model ListingImage {
+model ListingLocation {
+  id        String @id @default(uuid())
+  listingId String @unique
+}
 
+model ListingPricing {
+  id        String @id @default(uuid())
+  listingId String
 }
 
 model ListingAvailability {
-
+  id        String @id @default(uuid())
+  listingId String
 }
 
+model ListingImage {
+  id        String @id @default(uuid())
+  listingId String
+  url       String
+}
 
-/* REST OF MODELS UNCHANGED */
+model ListingAmenity {
+  listingId String
+  amenityId String
+
+  @@id([listingId, amenityId])
+}
+
+model Review {
+  id        String @id @default(uuid())
+  listingId String
+  userId    String
+  rating    Int
+}
+
+model Booking {
+  id        String        @id @default(uuid())
+  listingId String
+  userId    String
+  status    BookingStatus @default(draft)
+}
+
+model Favorite {
+  id        String @id @default(uuid())
+  userId    String
+  listingId String
+}
