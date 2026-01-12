@@ -14,7 +14,8 @@ datasource db {
 enum UserRole {
   user
   mayor
-  foxxer
+  host
+  foxer
   admin
   super_admin
 }
@@ -65,7 +66,7 @@ enum BookingStatus {
 
 enum BookingType {
   standard
-  foxxer_service
+  foxer_service
 }
 
 enum PaymentStatus {
@@ -208,23 +209,36 @@ enum RetailLifestylePopUpSubCategory {
 //////////////////////////////////////
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  username  String   @unique
-  role      UserRole @default(user)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(uuid())
+  email        String   @unique
+  password     String
+  name         String
+  username     String   @unique
+  phone        String?
+  profileImage String?
+  isHost       Boolean  @default(false)
+  isVerified   Boolean  @default(false)
+  isFoxer      Boolean  @default(false)
+  role         UserRole @default(user)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  listings Listing[]
+  listings     Listing[]
+  foxerProfile FoxerProfile?
+  bookings     Booking[]
+  favorites    Favorite[]
+  reviews      Review[]
 }
 
-model FoxxerProfile {
-  id     String @id @default(uuid())
-  userId String @unique
+model FoxerProfile {
+  id          String  @id @default(uuid())
+  userId      String  @unique
+  bio         String?
+  skills      String? // Comma separated string or Json
+  isAvailable Boolean @default(true)
 
-  user User @relation(fields: [userId], references: [id])
+  user     User                  @relation(fields: [userId], references: [id])
+  services ListingFoxerService[]
 }
 
 model EventCategory {
@@ -234,70 +248,206 @@ model EventCategory {
 }
 
 model Listing {
-  id          String        @id @default(uuid())
-  mayorId     String
-  categoryId  String?
-  title       String
-  description String
-  status      ListingStatus @default(draft)
-  type        ListingType   @default(venue)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id           String        @id @default(uuid())
+  hostId       String
+  categoryId   String?
+  title        String
+  description  String
+  propertyType String?
+  roomType     String?
+  status       ListingStatus @default(draft)
+  type         ListingType   @default(venue)
+  capacity     Int?
+  maxAttendees Int?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  mayor    User      @relation(fields: [mayorId], references: [id])
-  category Category? @relation(fields: [categoryId], references: [id])
+  host          User                  @relation(fields: [hostId], references: [id])
+  category      Category?             @relation(fields: [categoryId], references: [id])
+  foxerServices ListingFoxerService[]
+  bookings      Booking[]
+  favorites     Favorite[]
+  location      ListingLocation?
+  pricing       ListingPricing[]
+  availability  ListingAvailability[]
+  images        ListingImage[]
+  amenities     ListingAmenity[]
+  reviews       Review[]
 }
 
 model Category {
-  id   String @id @default(uuid())
-  name String
-  slug String @unique
+  id               String  @id @default(uuid())
+  name             String
+  slug             String  @unique
+  description      String?
+  parentCategoryId String?
+
+  listings       Listing[]
+  foxerServices  ListingFoxerService[]
+  parentCategory Category?             @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id])
+  subCategories  Category[]            @relation("CategoryHierarchy")
 }
 
 model ListingLocation {
-  id        String @id @default(uuid())
-  listingId String @unique
+  id                 String    @id @default(uuid())
+  listingId          String    @unique
+  streetAddress      String
+  city               String
+  state              String?
+  country            String
+  latitude           Float?
+  longitude          Float?
+  startDatetime      DateTime?
+  endDatetime        DateTime?
+  durationMinutes    Int?
+  requirements       String?
+  cancellationPolicy String?
+  itineraryJson      String? // Store as JSON string or Json type
+
+  listing Listing @relation(fields: [listingId], references: [id])
 }
 
 model ListingPricing {
-  id        String @id @default(uuid())
-  listingId String
+  id                String    @id @default(uuid())
+  listingId         String
+  basePrice         Float
+  currency          String    @default("PHP")
+  serviceFeePercent Float?
+  taxPercent        Float?
+  pricingTiers      Json?
+  earlyBirdDiscount Json?
+  earlyBirdDeadline DateTime?
+
+  listing Listing @relation(fields: [listingId], references: [id])
 }
 
 model ListingAvailability {
-  id        String @id @default(uuid())
+  id        String  @id @default(uuid())
   listingId String
+  listing   Listing @relation(fields: [listingId], references: [id])
 }
 
 model ListingImage {
-  id        String @id @default(uuid())
-  listingId String
-  url       String
+  id          String  @id @default(uuid())
+  listingId   String
+  url         String
+  altText     String?
+  orderIndex  Int?
+  isThumbnail Boolean @default(false)
+
+  listing Listing @relation(fields: [listingId], references: [id])
 }
 
 model ListingAmenity {
   listingId String
   amenityId String
+  listing   Listing @relation(fields: [listingId], references: [id])
+  amenity   Amenity @relation(fields: [amenityId], references: [id])
 
   @@id([listingId, amenityId])
 }
 
 model Review {
-  id        String @id @default(uuid())
-  listingId String
-  userId    String
-  rating    Int
+  id                 String   @id @default(uuid())
+  listingId          String
+  userId             String
+  rating             Int
+  comment            String?
+  isVerifiedAttendee Boolean  @default(false)
+  createdAt          DateTime @default(now())
+
+  listing Listing @relation(fields: [listingId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
 }
 
 model Booking {
-  id        String        @id @default(uuid())
-  listingId String
-  userId    String
-  status    BookingStatus @default(draft)
+  id               String        @id @default(uuid())
+  listingId        String
+  userId           String
+  status           BookingStatus @default(draft)
+  type             BookingType   @default(standard)
+  confirmationCode String        @unique
+  guestCount       Int?
+  totalAmount      Float?
+  specialRequests  String?
+  currentStep      Int           @default(1)
+  expiresAt        DateTime?
+  foxerServiceId   String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  user         User                 @relation(fields: [userId], references: [id])
+  listing      Listing              @relation(fields: [listingId], references: [id])
+  foxerService ListingFoxerService? @relation(fields: [foxerServiceId], references: [id])
+  attendees    BookingAttendee[]
+  payments     Payment[]
+}
+
+model ListingFoxerService {
+  id                 String   @id @default(uuid())
+  foxerId            String
+  listingId          String
+  categoryId         String
+  serviceName        String
+  serviceDescription String?
+  price              Float
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  foxer    FoxerProfile @relation(fields: [foxerId], references: [id])
+  listing  Listing      @relation(fields: [listingId], references: [id])
+  category Category     @relation(fields: [categoryId], references: [id])
+  bookings Booking[]
 }
 
 model Favorite {
-  id        String @id @default(uuid())
+  id        String   @id @default(uuid())
   userId    String
   listingId String
+  savedAt   DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id])
+  listing Listing @relation(fields: [listingId], references: [id])
+}
+
+model BookingAttendee {
+  id          String    @id @default(uuid())
+  bookingId   String
+  firstName   String
+  lastName    String
+  email       String
+  phone       String
+  ticketCode  String    @unique
+  checkedIn   Boolean   @default(false)
+  checkInTime DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  bookingId       String
+  amount          Float
+  currency        String
+  paymentMethod   String
+  paymentStatus   PaymentStatus
+  paymentDate     DateTime      @default(now())
+  transactionId   String?       @unique
+  gatewayResponse String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+}
+
+model Amenity {
+  id   String  @id @default(uuid())
+  name String
+  icon String?
+
+  listings ListingAmenity[]
 }

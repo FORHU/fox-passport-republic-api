@@ -38,7 +38,8 @@ export default class UserController {
 
       return res.status(200).json({
         success: true,
-        message: "You are now a host! Please log in again to refresh your session.",
+        message:
+          "You are now a host! Please log in again to refresh your session.",
         data: updatedUser,
       });
     } catch (error: any) {
@@ -75,7 +76,7 @@ export default class UserController {
           profileImage: true,
           role: true,
           isHost: true,
-          isFoxxer: true,
+          isFoxer: true,
           isVerified: true,
           createdAt: true,
         },
