@@ -1,17 +1,17 @@
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
-export default class FoxxerServiceRepo {
+export default class FoxerServiceRepo {
     // CREATE SERVICE LINK
     static async createService(data: {
-        foxxerId: string;
+        foxerId: string;
         listingId: string;
         categoryId: string;
         serviceName: string;
         serviceDescription?: string;
         price: number;
     }) {
-        return prisma.listingFoxxerService.create({
+        return prisma.listingFoxerService.create({
             data: {
                 ...data,
                 price: data.price
@@ -21,10 +21,10 @@ export default class FoxxerServiceRepo {
 
     // GET SERVICES BY LISTING
     static async getServicesByListing(listingId: string) {
-        return prisma.listingFoxxerService.findMany({
+        return prisma.listingFoxerService.findMany({
             where: { listingId },
             include: {
-                foxxer: {
+                foxer: {
                     include: {
                         user: {
                             select: {
@@ -41,7 +41,7 @@ export default class FoxxerServiceRepo {
 
     // DELETE SERVICE
     static async deleteService(id: string) {
-        return prisma.listingFoxxerService.delete({
+        return prisma.listingFoxerService.delete({
             where: { id }
         });
     }

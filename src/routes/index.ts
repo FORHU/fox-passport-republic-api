@@ -9,15 +9,15 @@ import favoriteRoutes from "./favorite.routes";
 import paymentRoutes from "./payment.routes";
 import bookingAttendeeRoutes from "./bookingAttendee.routes";
 import clientBookingRoutes from "./clientBooking.routes";
-import foxxerRoutes from "./foxxer.routes";
+import foxerRoutes from "./foxer.routes";
 import specializedRoutes from "./specialized.routes";
 
 const router = express.Router();
 
 router.get("/v1", (_, res) => {
-    res.json({
-        message: "Welcome to my API",
-    });
+  res.json({
+    message: "Welcome to my API",
+  });
 });
 
 // Authentication & Users
@@ -39,7 +39,7 @@ router.use("/v1/payments", paymentRoutes);
 // Reviews & Favorites
 router.use("/v1/reviews", reviewRoutes);
 router.use("/v1/favorites", favoriteRoutes);
-router.use("/v1/foxxers", foxxerRoutes);
+router.use("/v1/foxers", foxerRoutes);
 router.use("/v1", specializedRoutes);
 
 export default router;
