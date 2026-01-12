@@ -282,6 +282,14 @@ model Category {
   description      String?
   parentCategoryId String?
 
+  // Design / Presentation
+  image     String?
+  tagline   String?
+  gradient  String? // Tailwind gradient class
+  spotLabel String? // "Limited Time", "Exclusive"
+  spotColor String? // "text-accent", etc.
+  icon      String? // Lucide icon name (e.g. "Gem", "Music")
+
   listings       Listing[]
   foxerServices  ListingFoxerService[]
   parentCategory Category?             @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id])
