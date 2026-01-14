@@ -23,7 +23,7 @@ export default class UserController {
       const updatedUser = await prisma.user.update({
         where: { id: userId },
         data: {
-          role: "host",
+          role: "mayor",
           isHost: true,
         },
         select: {

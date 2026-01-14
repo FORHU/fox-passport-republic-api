@@ -20,7 +20,7 @@ export default class VenueSvc {
     }
 
     static async createVenue(data: {
-        mayorId: string;
+        hostId: string;
         name: string;
         description: string;
         type: VenueType;

@@ -1,6 +1,6 @@
 import express from "express";
 import VenueCtrl from "../controllers/venue.controller";
-import { authenticate } from "../middlewares/auth.middleware";
+import { authenticate } from "../middleware/auth.middleware";
 
 const router = express.Router();
 

@@ -25,7 +25,7 @@ export default class PaymentRepo {
                         event: {
                             select: {
                                 id: true,
-                                eventName: true,
+                                name: true,
                             },
                         },
                     },

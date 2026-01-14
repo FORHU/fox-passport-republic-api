@@ -42,7 +42,7 @@ export default class BookingAttendeeRepo {
                         event: {
                             select: {
                                 id: true,
-                                eventName: true,
+                                name: true,
                             },
                         },
                     },
@@ -170,5 +170,52 @@ export default class BookingAttendeeRepo {
                 firstName: 'asc'
             }
         });
+    }
+
+    // Get all attendees with filters
+    static async getAllAttendees(filters?: {
+        bookingId?: string;
+        checkedIn?: boolean;
+    }) {
+        const where: any = {};
+        if (filters?.bookingId) where.bookingId = filters.bookingId;
+        if (filters?.checkedIn !== undefined) where.checkedIn = filters.checkedIn;
+
+        return prisma.bookingAttendee.findMany({
+            where,
+            include: {
+                booking: {
+                    include: {
+                        event: true,
+                    },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+    }
+
+    // Check if ticket code exists
+    static async ticketCodeExists(ticketCode: string) {
+        const attendee = await prisma.bookingAttendee.findUnique({
+            where: { ticketCode },
+        });
+        return !!attendee;
+    }
+
+    // Check in by ticket code
+    static async checkInByTicketCode(ticketCode: string) {
+        return prisma.bookingAttendee.update({
+            where: { ticketCode },
+            data: {
+                checkedIn: true,
+                checkInTime: new Date(),
+            },
+        });
+    }
+
+    // Get listing attendees (renamed to event attendees)
+    static async getListingAttendees(listingId: string) {
+        // This method is deprecated, use getEventAttendees instead
+        return this.getEventAttendees(listingId);
     }
 }

@@ -4,21 +4,21 @@ import { VenueStatus, VenueType } from "@prisma/client";
 export default class VenueRepo {
     // READ ALL
     static async getAllVenues(filters?: {
-        mayorId?: string;
+        hostId?: string;
         type?: VenueType;
         city?: string;
         status?: VenueStatus;
     }) {
         return prisma.venue.findMany({
             where: {
-                ...(filters?.mayorId && { mayorId: filters.mayorId }),
+                ...(filters?.hostId && { hostId: filters.hostId }),
                 ...(filters?.type && { type: filters.type }),
                 ...(filters?.city && { city: filters.city }),
                 ...(filters?.status && { status: filters.status }),
             },
             include: {
-                images: true,
-                mayor: {
+                venueImages: true,
+                host: {
                     select: {
                         id: true,
                         name: true,
@@ -37,13 +37,12 @@ export default class VenueRepo {
         return prisma.venue.findUnique({
             where: { id },
             include: {
-                images: true,
-                mayor: {
+                venueImages: true,
+                host: {
                     select: {
                         id: true,
                         name: true,
                         email: true,
-                        phone: true,
                     },
                 },
                 events: {
@@ -57,7 +56,7 @@ export default class VenueRepo {
 
     // CREATE
     static async createVenue(data: {
-        mayorId: string;
+        hostId: string;
         name: string;
         description: string;
         type: VenueType;
@@ -66,12 +65,10 @@ export default class VenueRepo {
         city: string;
         state?: string;
         country: string;
-        latitude?: number;
-        longitude?: number;
     }) {
         return prisma.venue.create({
             data: {
-                mayorId: data.mayorId,
+                hostId: data.hostId,
                 name: data.name,
                 description: data.description,
                 type: data.type,
@@ -80,8 +77,6 @@ export default class VenueRepo {
                 city: data.city,
                 state: data.state,
                 country: data.country,
-                latitude: data.latitude,
-                longitude: data.longitude,
                 status: VenueStatus.draft,
             },
         });
@@ -93,7 +88,7 @@ export default class VenueRepo {
             where: { id },
             data,
             include: {
-                images: true,
+                venueImages: true,
             },
         });
     }
@@ -121,7 +116,7 @@ export default class VenueRepo {
         const venue = await prisma.venue.findFirst({
             where: {
                 id: venueId,
-                mayorId: userId,
+                hostId: userId,
             },
         });
         return !!venue;

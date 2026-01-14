@@ -22,7 +22,7 @@ export default class EventSvc {
     static async createEvent(data: {
         venueId: string;
         organizerId: string;
-        eventName: string;
+        name: string;
         description: string;
         eventType: EventType;
         startDatetime: Date;
@@ -46,14 +46,14 @@ export default class EventSvc {
         return EventRepo.updateEvent(id, data);
     }
 
-    static async addAssetToEvent(eventId: string, userId: string, assetId: string, quantity: number, pricePerUnit: number) {
+    static async addAssetToEvent(eventId: string, userId: string, assetId: string, quantity: number) {
         // Check ownership
         const event = await EventRepo.getEventById(eventId);
         if (!event) throw new Error("Event not found");
         if (event.organizerId !== userId) { // Or check if venue mayor? For now assume organizer builds the event
             throw new Error("Unauthorized");
         }
-        return EventRepo.addAssetToEvent(eventId, assetId, quantity, pricePerUnit);
+        return EventRepo.addAssetToEvent(eventId, assetId, quantity);
     }
 
     static async addServiceToEvent(eventId: string, userId: string, serviceId: string, agreedPrice: number) {
