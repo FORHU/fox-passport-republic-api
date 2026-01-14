@@ -1,4 +1,10 @@
-import { UserRole, ListingStatus, BookingStatus, PaymentStatus } from "@prisma/client";
+import {
+    UserRole,
+    VenueStatus,
+    EventStatus,
+    BookingStatus,
+    PaymentStatus
+} from "@prisma/client";
 
 export interface JWTUser {
     id: string;
@@ -7,4 +13,4 @@ export interface JWTUser {
     isHost: boolean;
 }
 
-export { UserRole, ListingStatus, BookingStatus, PaymentStatus };
+export { UserRole, VenueStatus, EventStatus, BookingStatus, PaymentStatus };
