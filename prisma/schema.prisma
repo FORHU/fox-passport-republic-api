@@ -71,19 +71,78 @@ model Asset {
   ownerId      String
   name         String
   description  String
-  category     AssetCategory
-  storageType  StorageType
-  quantity     Int
-  condition    AssetCondition
-  pricePerUnit Float
-  currency     String         @default("PHP")
-  status       AssetStatus    @default(available)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  propertyType String?
+  roomType     String?
+  status       ListingStatus @default(draft)
+  type         ListingType   @default(venue)
+  capacity     Int?
+  maxAttendees Int?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  owner       User         @relation("AssetOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  eventAssets EventAsset[]
-  images      AssetImage[]
+  host          User                  @relation(fields: [hostId], references: [id])
+  category      Category?             @relation(fields: [categoryId], references: [id])
+  foxerServices ListingFoxerService[]
+  bookings      Booking[]
+  favorites     Favorite[]
+  location      ListingLocation?
+  pricing       ListingPricing[]
+  availability  ListingAvailability[]
+  images        ListingImage[]
+  amenities     ListingAmenity[]
+  reviews       Review[]
+}
+
+model Category {
+  id               String  @id @default(uuid())
+  name             String
+  slug             String  @unique
+  description      String?
+  parentCategoryId String?
+
+  listings       Listing[]
+  foxerServices  ListingFoxerService[]
+  parentCategory Category?             @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id])
+  subCategories  Category[]            @relation("CategoryHierarchy")
+}
+
+model ListingLocation {
+  id                 String    @id @default(uuid())
+  listingId          String    @unique
+  streetAddress      String
+  city               String
+  state              String?
+  country            String
+  latitude           Float?
+  longitude          Float?
+  startDatetime      DateTime?
+  endDatetime        DateTime?
+  durationMinutes    Int?
+  requirements       String?
+  cancellationPolicy String?
+  itineraryJson      String? // Store as JSON string or Json type
+
+  listing Listing @relation(fields: [listingId], references: [id])
+}
+
+model ListingPricing {
+  id                String    @id @default(uuid())
+  listingId         String
+  basePrice         Float
+  currency          String    @default("PHP")
+  serviceFeePercent Float?
+  taxPercent        Float?
+  pricingTiers      Json?
+  earlyBirdDiscount Json?
+  earlyBirdDeadline DateTime?
+
+  listing Listing @relation(fields: [listingId], references: [id])
+}
+
+model ListingAvailability {
+  id        String  @id @default(uuid())
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id])
 }
 
 model AssetImage {
