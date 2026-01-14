@@ -19,7 +19,7 @@ export default class EventRepo {
             include: {
                 venue: {
                     include: {
-                        images: true
+                        venueImages: true
                     }
                 },
                 eventAssets: {
@@ -52,7 +52,7 @@ export default class EventRepo {
             include: {
                 venue: {
                     include: {
-                        images: true
+                        venueImages: true
                     }
                 },
                 eventAssets: {
@@ -92,7 +92,7 @@ export default class EventRepo {
             data: {
                 venueId: data.venueId,
                 organizerId: data.organizerId,
-                name: data.eventName,
+                name: data.name,
                 description: data.description,
                 eventType: data.eventType,
                 startDatetime: data.startDatetime,
@@ -114,13 +114,12 @@ export default class EventRepo {
     }
 
     // Link Asset to Event
-    static async addAssetToEvent(eventId: string, assetId: string, quantity: number, pricePerUnit: number) {
+    static async addAssetToEvent(eventId: string, assetId: string, quantity: number) {
         return prisma.eventAsset.create({
             data: {
                 eventId,
                 assetId,
-                quantity,
-                pricePerUnit
+                quantity
             }
         });
     }

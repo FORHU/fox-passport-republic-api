@@ -1,0 +1,1 @@
+﻿src/repositories/booking.repository.ts(102,17): error TS2353: Object literal may only specify known properties, and 'currentStep' does not exist in type 'Without<BookingCreateInput, BookingUncheckedCreateInput> & BookingUncheckedCreateInput'.

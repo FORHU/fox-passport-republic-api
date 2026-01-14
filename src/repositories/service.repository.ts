@@ -4,27 +4,24 @@ import { ServiceStatus, ServiceCategory } from "@prisma/client";
 export default class ServiceRepo {
     // READ ALL
     static async getAllServices(filters?: {
-        foxerId?: string;
+        ownerId?: string;
         category?: ServiceCategory;
         status?: ServiceStatus;
     }) {
         return prisma.service.findMany({
             where: {
-                ...(filters?.foxerId && { foxerId: filters.foxerId }),
+                ...(filters?.ownerId && { ownerId: filters.ownerId }),
                 ...(filters?.category && { category: filters.category }),
                 ...(filters?.status && { status: filters.status }),
             },
             include: {
-                foxer: {
-                    include: {
-                        user: {
-                            select: {
-                                name: true,
-                                id: true
-                            }
-                        }
-                    }
-                }
+                owner: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    },
+                },
             },
         });
     }

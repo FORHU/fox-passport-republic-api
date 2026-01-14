@@ -15,16 +15,16 @@ model User {
   name         String
   username     String?  @unique
   profileImage String?
+  phone        String?
   role         UserRole @default(user)
 
   isVerified Boolean @default(false)
-  isHost     Boolean @default(false) // For Mayors
+  isHost     Boolean @default(false)
   isFoxer    Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   ownedVenues     Venue[]    @relation("VenueHost")
   ownedAssets     Asset[]    @relation("AssetOwner")
   organizedEvents Event[]    @relation("EventOrganizer")
@@ -32,7 +32,7 @@ model User {
   passport        Passport?
   reviews         Review[]
   favorites       Favorite[]
-  services        Service[]
+  services        Service[]  @relation("ServiceOwner")
 }
 
 model Venue {
@@ -52,8 +52,6 @@ model Venue {
 
   host        User         @relation("VenueHost", fields: [hostId], references: [id], onDelete: Cascade)
   events      Event[]
-  images      VenueImage[]
-  venueImages VenueImage[]
   venueImages VenueImage[]
 }
 
@@ -65,10 +63,7 @@ model VenueImage {
   orderIndex  Int?
   isThumbnail Boolean @default(false)
 
-  venue Venue @relation("VenueImage", fields: [venueId], references: [id], onDelete: Cascade)
-  // venue Venue @relation(fields: [venueId], references: [id])
-  venue Venue @relation(fields: [venueId], references: [id])
-  venue Venue @relation(fields: [venueId], references: [id])
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
 }
 
 model Asset {
@@ -167,19 +162,21 @@ model EventService {
 }
 
 model Booking {
-  id              String        @id @default(uuid())
-  eventId         String
-  userId          String
-  guestCount      Int
-  totalAmount     Float
-  stampsEarned    Int           @default(0)
-  status          BookingStatus @default(pending)
-  specialRequests String?
-  start           DateTime      @default(now())
-  end             DateTime      @default(now())
-  expiresAt       DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id               String        @id @default(uuid())
+  eventId          String
+  userId           String
+  guestCount       Int
+  totalAmount      Float
+  confirmationCode String?       @unique
+  stampsEarned     Int           @default(0)
+  currentStep      Int?          @default(1)
+  status           BookingStatus @default(pending)
+  specialRequests  String?
+  start            DateTime      @default(now())
+  end              DateTime      @default(now())
+  expiresAt        DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
   event     Event             @relation(fields: [eventId], references: [id])
   user      User              @relation("UserBookings", fields: [userId], references: [id])
@@ -204,14 +201,17 @@ model Payment {
 }
 
 model BookingAttendee {
-  id        String   @id @default(uuid())
-  bookingId String
-  firstName String
-  lastName  String
-  email     String?
-  phone     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String    @id @default(uuid())
+  bookingId   String
+  firstName   String
+  lastName    String
+  email       String?
+  phone       String?
+  ticketCode  String    @unique
+  checkedIn   Boolean   @default(false)
+  checkInTime DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }

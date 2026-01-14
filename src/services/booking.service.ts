@@ -211,7 +211,11 @@ export default class BookingSvc {
       }
     }
 
-    return BookingRepo.getBookingById(booking.id);
+    const result = await BookingRepo.getBookingById(booking.id);
+    if (!result) {
+      throw new Error("Failed to retrieve created booking");
+    }
+    return result;
   }
 
   // UPDATE BOOKING
