@@ -22,10 +22,10 @@ export default class PaymentRepo {
                                 email: true,
                             },
                         },
-                        listing: {
+                        event: {
                             select: {
                                 id: true,
-                                title: true,
+                                eventName: true,
                             },
                         },
                     },
@@ -45,7 +45,7 @@ export default class PaymentRepo {
                 booking: {
                     include: {
                         user: true,
-                        listing: true,
+                        event: true,
                     },
                 },
             },
@@ -60,7 +60,7 @@ export default class PaymentRepo {
                 booking: {
                     include: {
                         user: true,
-                        listing: true,
+                        event: true,
                     },
                 },
             },
