@@ -59,7 +59,7 @@ export default class EventRepo {
                     include: {
                         asset: {
                             include: {
-                                images: true
+                                assetImages: true
                             }
                         }
                     }

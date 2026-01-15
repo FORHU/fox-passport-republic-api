@@ -27,6 +27,7 @@ model User {
 
   ownedVenues     Venue[]    @relation("VenueHost")
   ownedAssets     Asset[]    @relation("AssetOwner")
+  hostedAssets    Asset[]    @relation("AssetHost")
   organizedEvents Event[]    @relation("EventOrganizer")
   bookings        Booking[]  @relation("UserBookings")
   passport        Passport?
@@ -67,30 +68,24 @@ model VenueImage {
 }
 
 model Asset {
-  id           String         @id @default(uuid())
+  id           String   @id @default(uuid())
   ownerId      String
+  hostId       String
+  categoryId   String?
   name         String
   description  String
   propertyType String?
   roomType     String?
-  status       ListingStatus @default(draft)
-  type         ListingType   @default(venue)
   capacity     Int?
   maxAttendees Int?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  host          User                  @relation(fields: [hostId], references: [id])
-  category      Category?             @relation(fields: [categoryId], references: [id])
-  foxerServices ListingFoxerService[]
-  bookings      Booking[]
-  favorites     Favorite[]
-  location      ListingLocation?
-  pricing       ListingPricing[]
-  availability  ListingAvailability[]
-  images        ListingImage[]
-  amenities     ListingAmenity[]
-  reviews       Review[]
+  owner       User         @relation("AssetOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  host        User         @relation("AssetHost", fields: [hostId], references: [id])
+  category    Category?    @relation(fields: [categoryId], references: [id])
+  eventAssets EventAsset[]
+  assetImages AssetImage[]
 }
 
 model Category {
@@ -100,49 +95,9 @@ model Category {
   description      String?
   parentCategoryId String?
 
-  listings       Listing[]
-  foxerServices  ListingFoxerService[]
-  parentCategory Category?             @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id])
-  subCategories  Category[]            @relation("CategoryHierarchy")
-}
-
-model ListingLocation {
-  id                 String    @id @default(uuid())
-  listingId          String    @unique
-  streetAddress      String
-  city               String
-  state              String?
-  country            String
-  latitude           Float?
-  longitude          Float?
-  startDatetime      DateTime?
-  endDatetime        DateTime?
-  durationMinutes    Int?
-  requirements       String?
-  cancellationPolicy String?
-  itineraryJson      String? // Store as JSON string or Json type
-
-  listing Listing @relation(fields: [listingId], references: [id])
-}
-
-model ListingPricing {
-  id                String    @id @default(uuid())
-  listingId         String
-  basePrice         Float
-  currency          String    @default("PHP")
-  serviceFeePercent Float?
-  taxPercent        Float?
-  pricingTiers      Json?
-  earlyBirdDiscount Json?
-  earlyBirdDeadline DateTime?
-
-  listing Listing @relation(fields: [listingId], references: [id])
-}
-
-model ListingAvailability {
-  id        String  @id @default(uuid())
-  listingId String
-  listing   Listing @relation(fields: [listingId], references: [id])
+  assets         Asset[]
+  parentCategory Category?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id])
+  subCategories  Category[] @relation("CategoryHierarchy")
 }
 
 model AssetImage {
