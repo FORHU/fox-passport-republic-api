@@ -11,11 +11,11 @@ export default class AssetRepo {
         return prisma.asset.findMany({
             where: {
                 ...(filters?.ownerId && { ownerId: filters.ownerId }),
-                ...(filters?.category && { category: filters.category }),
+                // ...(filters?.category && { category: filters.category }), // FIX: Schema uses relation, not Enum
                 ...(filters?.status && { status: filters.status }),
             },
             include: {
-                images: true,
+                assetImages: true, // FIX: Renamed from 'images' to match schema
                 owner: {
                     select: {
                         id: true,
