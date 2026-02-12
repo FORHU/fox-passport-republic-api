@@ -89,11 +89,19 @@ model Asset {
 }
 
 model Category {
-  id               String  @id @default(uuid())
+  id               String   @id @default(uuid())
   name             String
-  slug             String  @unique
+  slug             String   @unique
   description      String?
+  icon             String?
+  image            String?
+  tagline          String?
+  gradient         String?
+  spotLabel        String?
+  spotColor        String?
   parentCategoryId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   assets         Asset[]
   parentCategory Category?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id])
