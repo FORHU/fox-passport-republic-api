@@ -33,7 +33,7 @@ export default class CategoryRepo {
         },
         _count: {
           select: {
-            listings: true,
+            subCategories: true,
           },
         },
       },
@@ -50,21 +50,8 @@ export default class CategoryRepo {
       include: {
         parentCategory: true,
         subCategories: true,
-        listings: {
-          where: {
-            status: "published",
-          },
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            status: true,
-            createdAt: true,
-          },
-        },
         _count: {
           select: {
-            listings: true,
             subCategories: true,
           },
         },
@@ -81,7 +68,7 @@ export default class CategoryRepo {
         subCategories: true,
         _count: {
           select: {
-            listings: true,
+            subCategories: true,
           },
         },
       },
@@ -166,7 +153,7 @@ export default class CategoryRepo {
         subCategories: true,
         _count: {
           select: {
-            listings: true,
+            subCategories: true,
           },
         },
       },
