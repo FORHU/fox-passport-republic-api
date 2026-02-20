@@ -9,7 +9,7 @@ datasource db {
 
 // MODELS
 model User {
-  id           String   @id @default(uuid())
+  id           Int      @id @default(autoincrement())
   email        String   @unique
   password     String
   name         String
@@ -20,6 +20,8 @@ model User {
 
   isVerified Boolean @default(false)
   isHost     Boolean @default(false)
+  isMayor    Boolean @default(false)
+  isInvestor Boolean @default(false)
   isFoxer    Boolean @default(false)
 
   createdAt DateTime @default(now())
@@ -34,11 +36,13 @@ model User {
   reviews         Review[]
   favorites       Favorite[]
   services        Service[]  @relation("ServiceOwner")
+
+  @@map("users")
 }
 
 model Venue {
-  id          String      @id @default(uuid())
-  hostId      String
+  id          Int         @id @default(autoincrement())
+  hostId      Int
   name        String
   description String
   type        VenueType
@@ -54,24 +58,28 @@ model Venue {
   host        User         @relation("VenueHost", fields: [hostId], references: [id], onDelete: Cascade)
   events      Event[]
   venueImages VenueImage[]
+
+  @@map("venues")
 }
 
 model VenueImage {
-  id          String  @id @default(uuid())
-  venueId     String
+  id          Int     @id @default(autoincrement())
+  venueId     Int
   url         String
   altText     String?
   orderIndex  Int?
   isThumbnail Boolean @default(false)
 
   venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@map("venue_images")
 }
 
 model Asset {
-  id           String   @id @default(uuid())
-  ownerId      String
-  hostId       String
-  categoryId   String?
+  id           Int      @id @default(autoincrement())
+  ownerId      Int
+  hostId       Int
+  categoryId   Int?
   name         String
   description  String
   propertyType String?
@@ -86,34 +94,40 @@ model Asset {
   category    Category?    @relation(fields: [categoryId], references: [id])
   eventAssets EventAsset[]
   assetImages AssetImage[]
+
+  @@map("assets")
 }
 
 model Category {
-  id               String  @id @default(uuid())
+  id               Int     @id @default(autoincrement())
   name             String
   slug             String  @unique
   description      String?
-  parentCategoryId String?
+  parentCategoryId Int?
 
   assets         Asset[]
   parentCategory Category?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id])
   subCategories  Category[] @relation("CategoryHierarchy")
+
+  @@map("categories")
 }
 
 model AssetImage {
-  id          String  @id @default(uuid())
-  assetId     String
+  id          Int     @id @default(autoincrement())
+  assetId     Int
   url         String
   altText     String?
   orderIndex  Int?
   isThumbnail Boolean @default(false)
 
   asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@map("asset_images")
 }
 
 model Service {
-  id          String          @id @default(uuid())
-  ownerId     String
+  id          Int             @id @default(autoincrement())
+  ownerId     Int
   name        String
   description String
   category    ServiceCategory
@@ -124,12 +138,14 @@ model Service {
 
   owner         User           @relation("ServiceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   eventServices EventService[]
+
+  @@map("services")
 }
 
 model Event {
-  id            String      @id @default(uuid())
-  venueId       String
-  organizerId   String
+  id            Int         @id @default(autoincrement())
+  venueId       Int
+  organizerId   Int
   name          String
   description   String
   eventType     EventType
@@ -147,38 +163,42 @@ model Event {
   eventAssets   EventAsset[]
   eventServices EventService[]
   bookings      Booking[]
+
+  @@map("events")
 }
 
 // Join table: Event <-> Asset (many-to-many)
 model EventAsset {
-  id       String @id @default(uuid())
-  eventId  String
-  assetId  String
+  id       Int @id @default(autoincrement())
+  eventId  Int
+  assetId  Int
   quantity Int
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, assetId])
+  @@map("event_assets")
 }
 
 // Join table: Event <-> Service (many-to-many)
 model EventService {
-  id          String @id @default(uuid())
-  eventId     String
-  serviceId   String
+  id          Int   @id @default(autoincrement())
+  eventId     Int
+  serviceId   Int
   agreedPrice Float
 
   event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
   service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, serviceId])
+  @@map("event_services")
 }
 
 model Booking {
-  id               String        @id @default(uuid())
-  eventId          String
-  userId           String
+  id               Int           @id @default(autoincrement())
+  eventId          Int
+  userId           Int
   guestCount       Int
   totalAmount      Float
   confirmationCode String?       @unique
@@ -196,11 +216,13 @@ model Booking {
   user      User              @relation("UserBookings", fields: [userId], references: [id])
   payments  Payment[]
   attendees BookingAttendee[]
+
+  @@map("bookings")
 }
 
 model Payment {
-  id              String        @id @default(uuid())
-  bookingId       String
+  id              Int           @id @default(autoincrement())
+  bookingId       Int
   amount          Float
   currency        String
   paymentMethod   String
@@ -212,11 +234,13 @@ model Payment {
   updatedAt       DateTime      @updatedAt
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
 }
 
 model BookingAttendee {
-  id          String    @id @default(uuid())
-  bookingId   String
+  id          Int       @id @default(autoincrement())
+  bookingId   Int
   firstName   String
   lastName    String
   email       String?
@@ -228,11 +252,13 @@ model BookingAttendee {
   updatedAt   DateTime  @updatedAt
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("booking_attendees")
 }
 
 model Passport {
-  id           String   @id @default(uuid())
-  userId       String   @unique
+  id           Int      @id @default(autoincrement())
+  userId       Int      @unique
   totalStamps  Int      @default(0)
   totalMileage Int      @default(0)
   level        Int      @default(1)
@@ -244,10 +270,10 @@ model Passport {
 }
 
 model Review {
-  id                 String   @id @default(uuid())
-  venueId            String?
-  eventId            String?
-  userId             String
+  id                 Int      @id @default(autoincrement())
+  venueId            Int?
+  eventId            Int?
+  userId             Int
   rating             Int
   comment            String?
   isVerifiedAttendee Boolean  @default(false)
@@ -255,18 +281,22 @@ model Review {
   updatedAt          DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id])
+
+  @@map("reviews")
 }
 
 model Favorite {
-  id        String   @id @default(uuid())
-  userId    String
-  venueId   String?
-  eventId   String?
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  venueId   Int?
+  eventId   Int?
   savedAt   DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("favorites")
 }
 
 // ENUMS

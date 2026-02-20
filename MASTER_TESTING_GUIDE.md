@@ -3,7 +3,7 @@
 This guide provides a comprehensive flow to test the entire Fox Passport Republic API, including the unified Listing model, specialized types (Venues, Chairs, Food), and the multi-step booking process.
 
 ## Base URL
-`http://localmayor:3002/api/v1`
+`http://localhost:3002/api/v1`
 
 ---
 
@@ -48,6 +48,7 @@ This guide provides a comprehensive flow to test the entire Fox Passport Republi
     "name": "Wedding",
     "slug": "wedding",
     "iconUrl": "https://example.com/wedding.png"
+    
 }
 ```
 

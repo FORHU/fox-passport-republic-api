@@ -134,7 +134,7 @@ export default class AuthSvc {
     username: string;
     password: string;
   }) {
-    const user = await AuthRepo.findUserByEmail(username);
+    const user = await AuthRepo.findUserByUsername(username);
     console.log("+++++++++", user);
     if (!user) {
       throw "Invalid credentials";
