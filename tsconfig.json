@@ -108,5 +108,5 @@
         "src",
         "prisma/**/*.ts",
         "types/**/*.d.ts"
-    ],
+, "prisma.config.ts"    ],
 }
