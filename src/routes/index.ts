@@ -7,6 +7,7 @@ import eventRoutes from "./event.routes";
 import bookingRoutes from "./booking.routes";
 import bookingAttendeeRoutes from "./bookingAttendee.routes";
 import paymentRoutes from "./payment.routes";
+import categoryRoutes from "./category.routes";
 // import reviewRoutes from "./review.routes"; 
 // import favoriteRoutes from "./favorite.routes";
 
@@ -27,6 +28,7 @@ router.use("/v1/events", eventRoutes);
 router.use("/v1/bookings", bookingRoutes);
 router.use("/v1/attendees", bookingAttendeeRoutes);
 router.use("/v1/payments", paymentRoutes);
+router.use("/v1/categories", categoryRoutes);
 
 // Temporarily disabled until updated
 // router.use("/v1/reviews", reviewRoutes);
