@@ -6,6 +6,7 @@ datasource db {
   provider = "postgresql"
 }
 
+<<<<<<< Updated upstream
 // MODELS
 model User {
   id           Int      @id @default(autoincrement())
@@ -112,12 +113,28 @@ model Category {
 }
 
 model AssetImage {
+=======
+model Passport {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @unique
+  totalStamps  Int      @default(0)
+  totalMileage Int      @default(0)
+  level        Int      @default(1)
+  achievements Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+  users        users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model asset_images {
+>>>>>>> Stashed changes
   id          Int     @id @default(autoincrement())
   assetId     Int
   url         String
   altText     String?
   orderIndex  Int?
   isThumbnail Boolean @default(false)
+<<<<<<< Updated upstream
 
   asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
@@ -238,6 +255,32 @@ model Payment {
 }
 
 model BookingAttendee {
+=======
+  assets      assets  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+}
+
+model assets {
+  id                          Int            @id @default(autoincrement())
+  ownerId                     Int
+  hostId                      Int
+  categoryId                  Int?
+  name                        String
+  description                 String
+  propertyType                String?
+  roomType                    String?
+  capacity                    Int?
+  maxAttendees                Int?
+  createdAt                   DateTime       @default(now())
+  updatedAt                   DateTime
+  asset_images                asset_images[]
+  categories                  categories?    @relation(fields: [categoryId], references: [id])
+  users_assets_hostIdTousers  users          @relation("assets_hostIdTousers", fields: [hostId], references: [id])
+  users_assets_ownerIdTousers users          @relation("assets_ownerIdTousers", fields: [ownerId], references: [id], onDelete: Cascade)
+  event_assets                event_assets[]
+}
+
+model booking_attendees {
+>>>>>>> Stashed changes
   id          Int       @id @default(autoincrement())
   bookingId   Int
   firstName   String
@@ -248,6 +291,7 @@ model BookingAttendee {
   checkedIn   Boolean   @default(false)
   checkInTime DateTime?
   createdAt   DateTime  @default(now())
+<<<<<<< Updated upstream
   updatedAt   DateTime  @updatedAt
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
@@ -269,6 +313,116 @@ model Passport {
 }
 
 model Review {
+=======
+  updatedAt   DateTime
+  bookings    bookings  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model bookings {
+  id                Int                 @id @default(autoincrement())
+  eventId           Int
+  userId            Int
+  guestCount        Int
+  totalAmount       Float
+  confirmationCode  String?             @unique
+  stampsEarned      Int                 @default(0)
+  currentStep       Int?                @default(1)
+  status            BookingStatus       @default(pending)
+  specialRequests   String?
+  start             DateTime            @default(now())
+  end               DateTime            @default(now())
+  expiresAt         DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  booking_attendees booking_attendees[]
+  events            events              @relation(fields: [eventId], references: [id])
+  users             users               @relation(fields: [userId], references: [id])
+  payments          payments[]
+}
+
+model categories {
+  id               Int          @id @default(autoincrement())
+  name             String
+  slug             String       @unique
+  description      String?
+  parentCategoryId Int?
+  assets           assets[]
+  categories       categories?  @relation("categoriesTocategories", fields: [parentCategoryId], references: [id])
+  other_categories categories[] @relation("categoriesTocategories")
+}
+
+model event_assets {
+  id       Int    @id @default(autoincrement())
+  eventId  Int
+  assetId  Int
+  quantity Int
+  assets   assets @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  events   events @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, assetId])
+}
+
+model event_services {
+  id          Int      @id @default(autoincrement())
+  eventId     Int
+  serviceId   Int
+  agreedPrice Float
+  events      events   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  services    services @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, serviceId])
+}
+
+model events {
+  id             Int              @id @default(autoincrement())
+  venueId        Int
+  organizerId    Int
+  name           String
+  description    String
+  eventType      EventType
+  startDatetime  DateTime
+  endDatetime    DateTime
+  maxAttendees   Int
+  totalPrice     Float
+  currency       String           @default("PHP")
+  status         EventStatus      @default(draft)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  bookings       bookings[]
+  event_assets   event_assets[]
+  event_services event_services[]
+  users          users            @relation(fields: [organizerId], references: [id])
+  venues         venues           @relation(fields: [venueId], references: [id])
+}
+
+model favorites {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  venueId   Int?
+  eventId   Int?
+  savedAt   DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  users     users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model payments {
+  id              Int           @id @default(autoincrement())
+  bookingId       Int
+  amount          Float
+  currency        String
+  paymentMethod   String
+  paymentStatus   PaymentStatus
+  paymentDate     DateTime      @default(now())
+  transactionId   String?       @unique
+  gatewayResponse String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime
+  bookings        bookings      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model reviews {
+>>>>>>> Stashed changes
   id                 Int      @id @default(autoincrement())
   venueId            Int?
   eventId            Int?
@@ -277,6 +431,7 @@ model Review {
   comment            String?
   isVerifiedAttendee Boolean  @default(false)
   createdAt          DateTime @default(now())
+<<<<<<< Updated upstream
   updatedAt          DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id])
@@ -299,6 +454,81 @@ model Favorite {
 }
 
 // ENUMS
+=======
+  updatedAt          DateTime
+  users              users    @relation(fields: [userId], references: [id])
+}
+
+model services {
+  id             Int              @id @default(autoincrement())
+  ownerId        Int
+  name           String
+  description    String
+  category       ServiceCategory
+  price          Float
+  status         ServiceStatus    @default(active)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  event_services event_services[]
+  users          users            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+}
+
+model users {
+  id                           Int         @id @default(autoincrement())
+  email                        String      @unique
+  password                     String
+  name                         String
+  username                     String?     @unique
+  profileImage                 String?
+  phone                        String?
+  role                         UserRole    @default(user)
+  isVerified                   Boolean     @default(false)
+  isHost                       Boolean     @default(false)
+  isMayor                      Boolean     @default(false)
+  isInvestor                   Boolean     @default(false)
+  isFoxer                      Boolean     @default(false)
+  createdAt                    DateTime    @default(now())
+  updatedAt                    DateTime
+  Passport                     Passport?
+  assets_assets_hostIdTousers  assets[]    @relation("assets_hostIdTousers")
+  assets_assets_ownerIdTousers assets[]    @relation("assets_ownerIdTousers")
+  bookings                     bookings[]
+  events                       events[]
+  favorites                    favorites[]
+  reviews                      reviews[]
+  services                     services[]
+  venues                       venues[]
+}
+
+model venue_images {
+  id          Int     @id @default(autoincrement())
+  venueId     Int
+  url         String
+  altText     String?
+  orderIndex  Int?
+  isThumbnail Boolean @default(false)
+  venues      venues  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+}
+
+model venues {
+  id           Int            @id @default(autoincrement())
+  hostId       Int
+  name         String
+  description  String
+  type         VenueType
+  capacity     Int
+  status       VenueStatus    @default(draft)
+  address      String
+  city         String
+  state        String?
+  country      String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime
+  events       events[]
+  venue_images venue_images[]
+  users        users          @relation(fields: [hostId], references: [id], onDelete: Cascade)
+}
+>>>>>>> Stashed changes
 
 enum UserRole {
   user
@@ -308,6 +538,7 @@ enum UserRole {
   admin
 }
 
+<<<<<<< Updated upstream
 enum VenueType {
   hotel
   resort
@@ -316,6 +547,14 @@ enum VenueType {
   beach
   rooftop
   other
+=======
+enum EventStatus {
+  draft
+  published
+  ongoing
+  completed
+  cancelled
+>>>>>>> Stashed changes
 }
 
 enum VenueStatus {
@@ -324,6 +563,7 @@ enum VenueStatus {
   published
   suspended
   archived
+<<<<<<< Updated upstream
 }
 
 enum AssetCategory {
@@ -382,6 +622,8 @@ enum EventStatus {
   ongoing
   completed
   cancelled
+=======
+>>>>>>> Stashed changes
 }
 
 enum BookingStatus {
@@ -398,3 +640,66 @@ enum PaymentStatus {
   failed
   refunded
 }
+<<<<<<< Updated upstream
+=======
+
+enum AssetCategory {
+  equipment
+  furniture
+  decoration
+  other
+}
+
+enum AssetCondition {
+  new
+  good
+  fair
+  refurbishment
+}
+
+enum AssetStatus {
+  available
+  reserved
+  unavailable
+}
+
+enum EventType {
+  corporate
+  celebration
+  private_experience
+  popup
+  other
+}
+
+enum ServiceCategory {
+  planning
+  decoration
+  catering
+  photography
+  videography
+  entertainment
+  coordination
+  other
+}
+
+enum ServiceStatus {
+  active
+  paused
+  unavailable
+}
+
+enum StorageType {
+  fixed_infrastructure
+  warehouse_stored
+}
+
+enum VenueType {
+  hotel
+  resort
+  hall
+  garden
+  beach
+  rooftop
+  other
+}
+>>>>>>> Stashed changes
