@@ -4,14 +4,14 @@ import { VenueStatus, VenueType } from "@prisma/client";
 export default class VenueRepo {
     // READ ALL
     static async getAllVenues(filters?: {
-        hostId?: string;
+        hostId?: number | string;
         type?: VenueType;
         city?: string;
         status?: VenueStatus;
     }) {
         return prisma.venue.findMany({
             where: {
-                ...(filters?.hostId && { hostId: filters.hostId }),
+                ...(filters?.hostId && { hostId: Number(filters.hostId) }),
                 ...(filters?.type && { type: filters.type }),
                 ...(filters?.city && { city: filters.city }),
                 ...(filters?.status && { status: filters.status }),
@@ -33,9 +33,9 @@ export default class VenueRepo {
     }
 
     // READ ONE
-    static async getVenueById(id: string) {
+    static async getVenueById(id: number | string) {
         return prisma.venue.findUnique({
-            where: { id },
+            where: { id: Number(id) },
             include: {
                 venueImages: true,
                 host: {
@@ -56,7 +56,7 @@ export default class VenueRepo {
 
     // CREATE
     static async createVenue(data: {
-        hostId: string;
+        hostId: number | string;
         name: string;
         description: string;
         type: VenueType;
@@ -68,7 +68,7 @@ export default class VenueRepo {
     }) {
         return prisma.venue.create({
             data: {
-                hostId: data.hostId,
+                hostId: Number(data.hostId),
                 name: data.name,
                 description: data.description,
                 type: data.type,
@@ -83,9 +83,9 @@ export default class VenueRepo {
     }
 
     // UPDATE
-    static async updateVenue(id: string, data: Partial<any>) {
+    static async updateVenue(id: number | string, data: Partial<any>) {
         return prisma.venue.update({
-            where: { id },
+            where: { id: Number(id) },
             data,
             include: {
                 venueImages: true,
@@ -94,17 +94,17 @@ export default class VenueRepo {
     }
 
     // DELETE
-    static async deleteVenue(id: string) {
+    static async deleteVenue(id: number | string) {
         return prisma.venue.delete({
-            where: { id },
+            where: { id: Number(id) },
         });
     }
 
     // Add Image
-    static async addImage(venueId: string, url: string, isThumbnail: boolean = false) {
+    static async addImage(venueId: number | string, url: string, isThumbnail: boolean = false) {
         return prisma.venueImage.create({
             data: {
-                venueId,
+                venueId: Number(venueId),
                 url,
                 isThumbnail,
             },
@@ -112,11 +112,11 @@ export default class VenueRepo {
     }
 
     // Verify Ownership
-    static async isVenueOwner(venueId: string, userId: string) {
+    static async isVenueOwner(venueId: number | string, userId: number | string) {
         const venue = await prisma.venue.findFirst({
             where: {
-                id: venueId,
-                hostId: userId,
+                id: Number(venueId),
+                hostId: Number(userId),
             },
         });
         return !!venue;
