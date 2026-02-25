@@ -4,13 +4,13 @@ import { ServiceStatus, ServiceCategory } from "@prisma/client";
 export default class ServiceRepo {
     // READ ALL
     static async getAllServices(filters?: {
-        ownerId?: string;
+        ownerId?: number | string;
         category?: ServiceCategory;
         status?: ServiceStatus;
     }) {
         return prisma.service.findMany({
             where: {
-                ...(filters?.ownerId && { ownerId: filters.ownerId }),
+                ...(filters?.ownerId && { ownerId: Number(filters.ownerId) }),
                 ...(filters?.category && { category: filters.category }),
                 ...(filters?.status && { status: filters.status }),
             },
@@ -27,10 +27,18 @@ export default class ServiceRepo {
     }
 
     // CREATE
-    static async createService(data: any) {
+    static async createService(data: {
+        ownerId: number | string;
+        name: string;
+        description: string;
+        category: ServiceCategory;
+        price: number;
+        status?: ServiceStatus;
+    }) {
         return prisma.service.create({
             data: {
                 ...data,
+                ownerId: Number(data.ownerId),
                 status: data.status || ServiceStatus.active,
             },
         });

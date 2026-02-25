@@ -4,12 +4,13 @@
     "main": "server.js",
     "license": "MIT",
     "scripts": {
-        "dev": "nodemon --watch *.ts --exec ts-node --files ./src/server.ts",
+        "dev": "npx kill-port 3002 && nodemon --watch *.ts --exec ts-node --files ./src/server.ts",
         "lint": "eslint src/**/*.ts --fix",
-        "test": "NODE_ENV=development mocha --require ts-node/register 'test/**/*.spec.ts'",
+        "test": "NODE_ENV=development mocha --require ts-node/register 'tests/**/*.spec.ts'",
         "build": "tsc",
         "start": "node ./dist/src/server.js",
-        "db:setup": "npx prisma generate && npx prisma migrate dev"
+        "db:setup": "npx prisma generate && npx prisma migrate dev",
+        "kill": "npx kill-port 3002"
     },
     "dependencies": {
         "@aws-sdk/client-s3": "^3.922.0",
@@ -66,7 +67,7 @@
         "eslint-config-prettier": "^9.0.0",
         "eslint-plugin-prettier": "^5.0.0",
         "mocha": "^5.0.5",
-        "nodemon": "^1.0.2",
+        "nodemon": "^3.1.13",
         "prettier": "^3.0.3",
         "prisma": "^7.4.1",
         "supertest": "^6.3.3",

@@ -16,9 +16,9 @@ export default class UsersRepo {
   }
 
   // READ ONE
-  static async getUserById(id: string) {
+  static async getUserById(id: number | string) {
     return prisma.user.findUnique({
-      where: { id },
+      where: { id: Number(id) },
     });
   }
 
@@ -51,7 +51,7 @@ export default class UsersRepo {
 
   // ✅ UPDATE (fields optional)
   static async updateUser(
-    id: string,
+    id: number | string,
     data: Partial<{
       email: string;
       username: string;
@@ -62,7 +62,7 @@ export default class UsersRepo {
     }>
   ) {
     return prisma.user.update({
-      where: { id },
+      where: { id: Number(id) },
       data,
       select: {
         id: true,
@@ -75,9 +75,9 @@ export default class UsersRepo {
   }
 
   // DELETE
-  static async deleteUser(id: string) {
+  static async deleteUser(id: number | string) {
     return prisma.user.delete({
-      where: { id },
+      where: { id: Number(id) },
     });
   }
 }

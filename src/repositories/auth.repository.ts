@@ -38,10 +38,10 @@ export default class AuthRepo {
     });
   }
 
-  static async updateUserLoginStatus(userId: string) {
+  static async updateUserLoginStatus(userId: number | string) {
     return prisma.user.update({
       where: {
-        id: userId,
+        id: Number(userId),
       },
       data: {
         // lastLoginAt field doesn't exist in schema, removing for now
@@ -81,10 +81,10 @@ export default class AuthRepo {
   //   });
   // }
 
-  static async findUserById(userId: string) {
+  static async findUserById(userId: number | string) {
     return prisma.user.findUnique({
       where: {
-        id: userId,
+        id: Number(userId),
       },
     });
   }
@@ -97,18 +97,18 @@ export default class AuthRepo {
     });
   }
 
-  static async updateUser(userId: string, data: any) {
+  static async updateUser(userId: number | string, data: any) {
     return prisma.user.update({
       where: {
-        id: userId,
+        id: Number(userId),
       },
       data: data,
     });
   }
-  static async getAuthUser(userId: string) {
+  static async getAuthUser(userId: number | string) {
     return prisma.user.findUnique({
       where: {
-        id: userId,
+        id: Number(userId),
       },
       select: {
         id: true,

@@ -4,18 +4,16 @@ import { AssetStatus, AssetCategory } from "@prisma/client";
 export default class AssetRepo {
     // READ ALL
     static async getAllAssets(filters?: {
-        ownerId?: string;
-        category?: AssetCategory;
-        status?: AssetStatus;
+        ownerId?: number;
+        categoryId?: number;
     }) {
         return prisma.asset.findMany({
             where: {
                 ...(filters?.ownerId && { ownerId: filters.ownerId }),
-                ...(filters?.category && { category: filters.category }),
-                ...(filters?.status && { status: filters.status }),
+                ...(filters?.categoryId && { categoryId: filters.categoryId }),
             },
             include: {
-                images: true,
+                assetImages: true,
                 owner: {
                     select: {
                         id: true,
@@ -32,7 +30,6 @@ export default class AssetRepo {
         return prisma.asset.create({
             data: {
                 ...data,
-                status: data.status || AssetStatus.available,
             },
         });
     }

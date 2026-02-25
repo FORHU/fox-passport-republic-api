@@ -1,0 +1,114 @@
+@baseUrl = http://localhost:3002/api/v1
+@authToken = REPLACE_WITH_YOUR_TOKEN
+@userId = 1
+@listingId = 1
+@categoryId = 1
+
+### 1. Authentication
+
+# @name Register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+    "email": "foxxer{{$timestamp}}@example.com",
+    "password": "password123",
+    "name": "Alex Foxxer",
+    "username": "afoxxer{{$timestamp}}",
+    "role": "mayor"
+}
+
+###
+
+# @name Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+    "email": "foxxer@example.com",
+    "password": "password123"
+}
+
+### 2. Categories
+
+# @name CreateCategory
+POST {{baseUrl}}/categories
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+    "name": "Wedding",
+    "slug": "wedding-{{$timestamp}}",
+    "iconUrl": "https://example.com/wedding.png"
+}
+
+### 3. Listings (Venues)
+
+# @name CreateVenue
+POST {{baseUrl}}/listings/create-complete
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+    "mayorId": {{userId}},
+    "title": "Garden Paradise Venue",
+    "description": "A beautiful outdoor space for weddings.",
+    "type": "venue",
+    "capacity": 200,
+    "pricing": { "basePrice": 1000, "currency": "USD" },
+    "location": {
+        "streetAddress": "123 Garden St",
+        "city": "Manila",
+        "country": "Philippines"
+    }
+}
+
+### 4. Discovery
+
+GET {{baseUrl}}/venues
+
+### 5. Bookings
+
+# @name StartBooking
+POST {{baseUrl}}/bookings/draft
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+    "listingId": {{listingId}},
+    "userId": {{userId}}
+}
+
+### 6. Reviews (New)
+
+# @name CreateReview
+POST {{baseUrl}}/reviews/create
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+    "venueId": {{listingId}},
+    "rating": 5,
+    "comment": "Amazing experience!"
+}
+
+###
+
+GET {{baseUrl}}/reviews
+
+### 7. Favorites (New)
+
+# @name AddFavorite
+POST {{baseUrl}}/favorites/add
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+    "targetId": {{listingId}},
+    "type": "venue"
+}
+
+###
+
+GET {{baseUrl}}/favorites/check?targetId={{listingId}}&type=venue
+Authorization: Bearer {{authToken}}

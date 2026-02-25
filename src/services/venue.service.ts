@@ -3,7 +3,7 @@ import { VenueStatus, VenueType } from "@prisma/client";
 
 export default class VenueSvc {
     static async getAllVenues(filters?: {
-        mayorId?: string;
+        hostId?: string;
         type?: VenueType;
         city?: string;
         status?: VenueStatus;
