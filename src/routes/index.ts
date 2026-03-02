@@ -10,6 +10,7 @@ import paymentRoutes from "./payment.routes";
 import categoryRoutes from "./category.routes";
 import reviewRoutes from "./review.routes";
 import favoriteRoutes from "./favorite.routes";
+import assetRoutes from "./asset.routes";
 
 const router = express.Router();
 
@@ -33,6 +34,8 @@ router.use("/v1/bookings", bookingRoutes);
 router.use("/v1/attendees", bookingAttendeeRoutes);
 router.use("/v1/payments", paymentRoutes);
 router.use("/v1/categories", categoryRoutes);
+router.use("/v1/assets", assetRoutes);
+
 
 // Feature Routes (Reviews & Favorites)
 router.use("/v1/reviews", reviewRoutes);

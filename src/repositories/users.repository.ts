@@ -29,16 +29,19 @@ export default class UsersRepo {
     });
   }
 
-  // ✅ CREATE (username MUST be required)
+  // CREATE (username MUST be required)
   static async createUser(data: {
     email: string;
-    username: string; // ✅ REQUIRED
+    username: string;
     password: string;
     role?: UserRole;
-    name: string; // ✅ REQUIRED - matches Prisma schema
+    name: string;
   }) {
     return prisma.user.create({
-      data,
+      data: {
+        ...data,
+        updatedAt: new Date(),
+      },
       select: {
         id: true,
         email: true,
@@ -49,7 +52,7 @@ export default class UsersRepo {
     });
   }
 
-  // ✅ UPDATE (fields optional)
+  // UPDATE (fields optional)
   static async updateUser(
     id: number | string,
     data: Partial<{

@@ -21,7 +21,8 @@ app.use(
   })
 );
 
-app.use(express.json());
+// allow larger payloads for base64 image uploads
+app.use(express.json({ limit: '10mb' }));
 
 // Request Logger
 app.use((req, res, next) => {

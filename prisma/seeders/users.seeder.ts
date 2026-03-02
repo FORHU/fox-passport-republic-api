@@ -1,4 +1,5 @@
 import { PrismaClient, UserRole } from "@prisma/client"
+import crypto from "crypto"
 
 type MockUser = {
   email: string
@@ -7,6 +8,17 @@ type MockUser = {
   phone: string
   profileImage: string
   role: UserRole
+}
+
+// 👇 Match AuthSvc.register hashing
+function hashPassword(password: string) {
+  const salt = crypto.randomBytes(16).toString("hex")
+
+  const hash = crypto
+    .pbkdf2Sync(password, salt, 1000, 64, "sha512")
+    .toString("hex")
+
+  return `${salt}:${hash}`
 }
 
 export async function seedUsers(prisma: PrismaClient) {
@@ -44,34 +56,33 @@ export async function seedUsers(prisma: PrismaClient) {
       role: UserRole.foxer,
     },
     {
-      email: "investor@app.com",
-      name: "Investor User",
-      username: "investor",
+      email: "host2@app.com",
+      name: "Venue Host 2",
+      username: "host2",
       phone: "09123456789",
       profileImage: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1a",
-      role: UserRole.investor,
+      role: UserRole.mayor,
     },
   ]
 
   const createdUsers: Record<string, any> = {}
 
   for (const u of mockUsers) {
-    // Check if user already exists
-    const existing = await prisma.user.findUnique({
+    const password = hashPassword("password123")
+
+    const user = await prisma.user.upsert({
       where: { email: u.email },
-    })
 
-    if (existing) {
-      // Already exists → skip creation
-      createdUsers[u.email] = existing
-      continue
-    }
+      update: {
+        password,
+        role: u.role,
+        name: u.name,
+        username: u.username,
+      },
 
-    // Create new user → auto-increment id will be generated
-    const user = await prisma.user.create({
-      data: {
+      create: {
         email: u.email,
-        password: "hashed_password", // ideally hash this before seeding
+        password,
         name: u.name,
         username: u.username,
         phone: u.phone,
@@ -80,6 +91,7 @@ export async function seedUsers(prisma: PrismaClient) {
       },
     })
 
+    console.log(`✅ Seeded/Updated user: ${u.email}`)
     createdUsers[u.email] = user
   }
 

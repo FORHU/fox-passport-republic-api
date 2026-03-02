@@ -3,7 +3,8 @@ import {
     VenueStatus,
     EventStatus,
     BookingStatus,
-    PaymentStatus
+    PaymentStatus,
+    RentalStatus
 } from "@prisma/client";
 
 export interface JWTUser {
@@ -13,4 +14,4 @@ export interface JWTUser {
     isHost: boolean;
 }
 
-export { UserRole, VenueStatus, EventStatus, BookingStatus, PaymentStatus };
+export { UserRole, VenueStatus, EventStatus, BookingStatus, PaymentStatus, RentalStatus };
