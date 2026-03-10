@@ -32,9 +32,9 @@ export default class CategoryRepo {
   }
 
   // READ ONE by ID
-  static async getCategoryById(id: number | string) {
+  static async getCategoryById(id: string) {
     return prisma.category.findUnique({
-      where: { id: Number(id) },
+      where: { id: String(id) },
       include: {
         parentCategory: true,
         subCategories: true,
@@ -70,14 +70,14 @@ export default class CategoryRepo {
     name: string;
     slug: string;
     description?: string;
-    parentCategoryId?: number;
+    parentCategoryId?: string;
   }) {
     return prisma.category.create({
       data: {
         name: data.name,
         slug: data.slug,
         description: data.description,
-        parentCategoryId: data.parentCategoryId,
+        parentCategoryId: data.parentCategoryId ? String(data.parentCategoryId) : undefined,
       },
       include: {
         parentCategory: true,
@@ -87,16 +87,16 @@ export default class CategoryRepo {
 
   // UPDATE
   static async updateCategory(
-    id: number | string,
+    id: string,
     data: Partial<{
       name: string;
       slug: string;
       description: string;
-      parentCategoryId: number;
+      parentCategoryId: string;
     }>
   ) {
     return prisma.category.update({
-      where: { id: Number(id) },
+      where: { id: String(id) },
       data,
       include: {
         parentCategory: true,
@@ -106,27 +106,27 @@ export default class CategoryRepo {
   }
 
   // DELETE
-  static async deleteCategory(id: number | string) {
+  static async deleteCategory(id: string) {
     return prisma.category.delete({
-      where: { id: Number(id) },
+      where: { id: String(id) },
     });
   }
 
   // Check if category exists
-  static async categoryExists(id: number | string) {
+  static async categoryExists(id: string) {
     const category = await prisma.category.findUnique({
-      where: { id: Number(id) },
+      where: { id: String(id) },
       select: { id: true },
     });
     return !!category;
   }
 
   // Check if slug exists
-  static async slugExists(slug: string, excludeId?: number) {
+  static async slugExists(slug: string, excludeId?: string) {
     const category = await prisma.category.findFirst({
       where: {
         slug,
-        ...(excludeId && { id: { not: excludeId } }),
+        ...(excludeId && { id: { not: String(excludeId) } }),
       },
       select: { id: true },
     });

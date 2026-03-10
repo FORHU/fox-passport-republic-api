@@ -4,8 +4,8 @@ import { AssetStatus, AssetCategory } from "@prisma/client";
 export default class AssetRepo {
     // READ ALL
     static async getAllAssets(filters?: {
-        ownerId?: number;
-        categoryId?: number;
+        ownerId?: string;
+        categoryId?: string;
     }) {
         return prisma.asset.findMany({
             where: {

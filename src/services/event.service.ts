@@ -40,7 +40,7 @@ export default class EventSvc {
         // Check ownership
         const event = await EventRepo.getEventById(id);
         if (!event) throw new Error("Event not found");
-        if (event.organizerId !== Number(userId)) {
+        if (event.organizerId !== String(userId)) {
             throw new Error("Unauthorized");
         }
         return EventRepo.updateEvent(id, data);
@@ -50,7 +50,7 @@ export default class EventSvc {
         // Check ownership
         const event = await EventRepo.getEventById(eventId);
         if (!event) throw new Error("Event not found");
-        if (event.organizerId !== Number(userId)) { // Or check if venue mayor? For now assume organizer builds the event
+        if (event.organizerId !== String(userId)) {
             throw new Error("Unauthorized");
         }
         return EventRepo.addAssetToEvent(eventId, assetId, quantity);
@@ -60,7 +60,7 @@ export default class EventSvc {
         // Check ownership
         const event = await EventRepo.getEventById(eventId);
         if (!event) throw new Error("Event not found");
-        if (event.organizerId !== Number(userId)) {
+        if (event.organizerId !== String(userId)) {
             throw new Error("Unauthorized");
         }
         return EventRepo.addServiceToEvent(eventId, serviceId, agreedPrice);

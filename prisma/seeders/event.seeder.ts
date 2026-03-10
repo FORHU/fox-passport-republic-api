@@ -25,7 +25,7 @@ export async function seedEvent(prisma: PrismaClient) {
     ]
 
     for (const event of mockEvents) {
-        let eventId = 0
+        let eventId = ""
         const existing = await prisma.event.findFirst({
             where: { name: event.name },
         })

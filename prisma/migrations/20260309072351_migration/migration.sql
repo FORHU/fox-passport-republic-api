@@ -8,6 +8,12 @@ CREATE TYPE "VenueType" AS ENUM ('hotel', 'resort', 'hall', 'garden', 'beach', '
 CREATE TYPE "VenueStatus" AS ENUM ('draft', 'pending_review', 'published', 'suspended', 'archived');
 
 -- CreateEnum
+CREATE TYPE "VerificationStatus" AS ENUM ('pending', 'approved', 'rejected');
+
+-- CreateEnum
+CREATE TYPE "VerificationDocumentType" AS ENUM ('land_title', 'tax_declaration', 'deed_of_sale', 'lease_contract', 'other');
+
+-- CreateEnum
 CREATE TYPE "AssetCategory" AS ENUM ('equipment', 'furniture', 'decoration', 'other');
 
 -- CreateEnum
@@ -39,7 +45,7 @@ CREATE TYPE "PaymentStatus" AS ENUM ('pending', 'completed', 'failed', 'refunded
 
 -- CreateTable
 CREATE TABLE "users" (
-    "id" SERIAL NOT NULL,
+    "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "password" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -60,8 +66,8 @@ CREATE TABLE "users" (
 
 -- CreateTable
 CREATE TABLE "venues" (
-    "id" SERIAL NOT NULL,
-    "hostId" INTEGER NOT NULL,
+    "id" TEXT NOT NULL,
+    "hostId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT NOT NULL,
     "type" "VenueType" NOT NULL,
@@ -71,16 +77,22 @@ CREATE TABLE "venues" (
     "city" TEXT NOT NULL,
     "state" TEXT,
     "country" TEXT NOT NULL,
+    "spaceType" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "amenities" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "techAv" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "staffing" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "policies" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "venues_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "venue_images" (
-    "id" SERIAL NOT NULL,
-    "venueId" INTEGER NOT NULL,
+    "id" TEXT NOT NULL,
+    "venueId" TEXT NOT NULL,
     "url" TEXT NOT NULL,
     "altText" TEXT,
     "orderIndex" INTEGER,
@@ -90,11 +102,28 @@ CREATE TABLE "venue_images" (
 );
 
 -- CreateTable
+CREATE TABLE "VenueVerification" (
+    "id" TEXT NOT NULL,
+    "venueId" TEXT NOT NULL,
+    "submittedById" TEXT NOT NULL,
+    "documentUrl" TEXT NOT NULL,
+    "documentType" "VerificationDocumentType" NOT NULL,
+    "status" "VerificationStatus" NOT NULL DEFAULT 'pending',
+    "adminNotes" TEXT,
+    "reviewedById" TEXT,
+    "reviewedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "VenueVerification_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "assets" (
-    "id" SERIAL NOT NULL,
-    "ownerId" INTEGER NOT NULL,
-    "hostId" INTEGER NOT NULL,
-    "categoryId" INTEGER,
+    "id" TEXT NOT NULL,
+    "ownerId" TEXT NOT NULL,
+    "hostId" TEXT NOT NULL,
+    "categoryId" TEXT,
     "name" TEXT NOT NULL,
     "description" TEXT NOT NULL,
     "propertyType" TEXT,
@@ -109,19 +138,19 @@ CREATE TABLE "assets" (
 
 -- CreateTable
 CREATE TABLE "categories" (
-    "id" SERIAL NOT NULL,
+    "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "description" TEXT,
-    "parentCategoryId" INTEGER,
+    "parentCategoryId" TEXT,
 
     CONSTRAINT "categories_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "asset_images" (
-    "id" SERIAL NOT NULL,
-    "assetId" INTEGER NOT NULL,
+    "id" TEXT NOT NULL,
+    "assetId" TEXT NOT NULL,
     "url" TEXT NOT NULL,
     "altText" TEXT,
     "orderIndex" INTEGER,
@@ -132,8 +161,8 @@ CREATE TABLE "asset_images" (
 
 -- CreateTable
 CREATE TABLE "services" (
-    "id" SERIAL NOT NULL,
-    "ownerId" INTEGER NOT NULL,
+    "id" TEXT NOT NULL,
+    "ownerId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT NOT NULL,
     "category" "ServiceCategory" NOT NULL,
@@ -147,9 +176,9 @@ CREATE TABLE "services" (
 
 -- CreateTable
 CREATE TABLE "events" (
-    "id" SERIAL NOT NULL,
-    "venueId" INTEGER NOT NULL,
-    "organizerId" INTEGER NOT NULL,
+    "id" TEXT NOT NULL,
+    "venueId" TEXT NOT NULL,
+    "organizerId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT NOT NULL,
     "eventType" "EventType" NOT NULL,
@@ -167,9 +196,9 @@ CREATE TABLE "events" (
 
 -- CreateTable
 CREATE TABLE "event_assets" (
-    "id" SERIAL NOT NULL,
-    "eventId" INTEGER NOT NULL,
-    "assetId" INTEGER NOT NULL,
+    "id" TEXT NOT NULL,
+    "eventId" TEXT NOT NULL,
+    "assetId" TEXT NOT NULL,
     "quantity" INTEGER NOT NULL,
 
     CONSTRAINT "event_assets_pkey" PRIMARY KEY ("id")
@@ -177,9 +206,9 @@ CREATE TABLE "event_assets" (
 
 -- CreateTable
 CREATE TABLE "event_services" (
-    "id" SERIAL NOT NULL,
-    "eventId" INTEGER NOT NULL,
-    "serviceId" INTEGER NOT NULL,
+    "id" TEXT NOT NULL,
+    "eventId" TEXT NOT NULL,
+    "serviceId" TEXT NOT NULL,
     "agreedPrice" DOUBLE PRECISION NOT NULL,
 
     CONSTRAINT "event_services_pkey" PRIMARY KEY ("id")
@@ -187,9 +216,9 @@ CREATE TABLE "event_services" (
 
 -- CreateTable
 CREATE TABLE "bookings" (
-    "id" SERIAL NOT NULL,
-    "eventId" INTEGER NOT NULL,
-    "userId" INTEGER NOT NULL,
+    "id" TEXT NOT NULL,
+    "eventId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
     "guestCount" INTEGER NOT NULL,
     "totalAmount" DOUBLE PRECISION NOT NULL,
     "confirmationCode" TEXT,
@@ -208,8 +237,8 @@ CREATE TABLE "bookings" (
 
 -- CreateTable
 CREATE TABLE "payments" (
-    "id" SERIAL NOT NULL,
-    "bookingId" INTEGER NOT NULL,
+    "id" TEXT NOT NULL,
+    "bookingId" TEXT NOT NULL,
     "amount" DOUBLE PRECISION NOT NULL,
     "currency" TEXT NOT NULL,
     "paymentMethod" TEXT NOT NULL,
@@ -225,8 +254,8 @@ CREATE TABLE "payments" (
 
 -- CreateTable
 CREATE TABLE "booking_attendees" (
-    "id" SERIAL NOT NULL,
-    "bookingId" INTEGER NOT NULL,
+    "id" TEXT NOT NULL,
+    "bookingId" TEXT NOT NULL,
     "firstName" TEXT NOT NULL,
     "lastName" TEXT NOT NULL,
     "email" TEXT,
@@ -242,8 +271,8 @@ CREATE TABLE "booking_attendees" (
 
 -- CreateTable
 CREATE TABLE "Passport" (
-    "id" SERIAL NOT NULL,
-    "userId" INTEGER NOT NULL,
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
     "totalStamps" INTEGER NOT NULL DEFAULT 0,
     "totalMileage" INTEGER NOT NULL DEFAULT 0,
     "level" INTEGER NOT NULL DEFAULT 1,
@@ -256,10 +285,10 @@ CREATE TABLE "Passport" (
 
 -- CreateTable
 CREATE TABLE "reviews" (
-    "id" SERIAL NOT NULL,
-    "venueId" INTEGER,
-    "eventId" INTEGER,
-    "userId" INTEGER NOT NULL,
+    "id" TEXT NOT NULL,
+    "venueId" TEXT,
+    "eventId" TEXT,
+    "userId" TEXT NOT NULL,
     "rating" INTEGER NOT NULL,
     "comment" TEXT,
     "isVerifiedAttendee" BOOLEAN NOT NULL DEFAULT false,
@@ -271,10 +300,10 @@ CREATE TABLE "reviews" (
 
 -- CreateTable
 CREATE TABLE "favorites" (
-    "id" SERIAL NOT NULL,
-    "userId" INTEGER NOT NULL,
-    "venueId" INTEGER,
-    "eventId" INTEGER,
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "venueId" TEXT,
+    "eventId" TEXT,
     "savedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -287,6 +316,9 @@ CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "users_username_key" ON "users"("username");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VenueVerification_venueId_key" ON "VenueVerification"("venueId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "categories_slug_key" ON "categories"("slug");
@@ -314,6 +346,15 @@ ALTER TABLE "venues" ADD CONSTRAINT "venues_hostId_fkey" FOREIGN KEY ("hostId") 
 
 -- AddForeignKey
 ALTER TABLE "venue_images" ADD CONSTRAINT "venue_images_venueId_fkey" FOREIGN KEY ("venueId") REFERENCES "venues"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VenueVerification" ADD CONSTRAINT "VenueVerification_venueId_fkey" FOREIGN KEY ("venueId") REFERENCES "venues"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VenueVerification" ADD CONSTRAINT "VenueVerification_submittedById_fkey" FOREIGN KEY ("submittedById") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VenueVerification" ADD CONSTRAINT "VenueVerification_reviewedById_fkey" FOREIGN KEY ("reviewedById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "assets" ADD CONSTRAINT "assets_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

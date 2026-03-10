@@ -212,7 +212,7 @@ export default class AuthSvc {
       // }
 
       // Get user
-      const user = await AuthRepo.findUserById(Number(decoded.userId));
+      const user = await AuthRepo.findUserById(String(decoded.userId));
       if (!user) {
         throw "User not found";
       }
@@ -350,6 +350,6 @@ export default class AuthSvc {
     };
   }
   static async getAuthUser(userId: string) {
-    return AuthRepo.getAuthUser(Number(userId));
+    return AuthRepo.getAuthUser(String(userId));
   }
 }

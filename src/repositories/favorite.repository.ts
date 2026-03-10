@@ -2,10 +2,10 @@ import { prisma } from "../utils/prisma";
 
 export default class FavoriteRepo {
   // TOGGLE
-  static async toggleFavorite(userId: number | string, targetId: number | string, type: 'venue' | 'event') {
-    const where: any = { userId: Number(userId) };
-    if (type === 'venue') where.venueId = Number(targetId);
-    else where.eventId = Number(targetId);
+  static async toggleFavorite(userId: string, targetId: string, type: 'venue' | 'event') {
+    const where: any = { userId: String(userId) };
+    if (type === 'venue') where.venueId = String(targetId);
+    else where.eventId = String(targetId);
 
     const existing = await prisma.favorite.findFirst({ where });
 
@@ -15,9 +15,9 @@ export default class FavoriteRepo {
     } else {
       await prisma.favorite.create({
         data: {
-          userId: Number(userId),
-          venueId: type === 'venue' ? Number(targetId) : undefined,
-          eventId: type === 'event' ? Number(targetId) : undefined
+          userId: String(userId),
+          venueId: type === 'venue' ? String(targetId) : undefined,
+          eventId: type === 'event' ? String(targetId) : undefined
         }
       });
       return { added: true };
@@ -25,40 +25,35 @@ export default class FavoriteRepo {
   }
 
   // LIST USER FAVORITES
-  static async getUserFavorites(userId: number | string) {
+  static async getUserFavorites(userId: string) {
     return prisma.favorite.findMany({
-      where: { userId: Number(userId) },
-      include: {
-        // Determine what to include?
-        // Ideally we include the related entity.
-        // But Prisma might complain if we include both and they are null.
-        // Let's rely on basic query for now.
-      }
+      where: { userId: String(userId) },
+      include: {}
     });
   }
 
   // CHECK
-  static async isFavorite(userId: number | string, targetId: number | string, type: 'venue' | 'event') {
-    const where: any = { userId: Number(userId) };
-    if (type === 'venue') where.venueId = Number(targetId);
-    else where.eventId = Number(targetId);
+  static async isFavorite(userId: string, targetId: string, type: 'venue' | 'event') {
+    const where: any = { userId: String(userId) };
+    if (type === 'venue') where.venueId = String(targetId);
+    else where.eventId = String(targetId);
 
     const favorite = await prisma.favorite.findFirst({ where });
     return !!favorite;
   }
 
   // REMOVE BY ID
-  static async removeFavorite(id: number | string) {
+  static async removeFavorite(id: string) {
     return prisma.favorite.delete({
-      where: { id: Number(id) }
+      where: { id: String(id) }
     });
   }
 
   // REMOVE BY LISTING
-  static async removeFavoriteByListing(userId: number | string, targetId: number | string, type: 'venue' | 'event') {
-    const where: any = { userId: Number(userId) };
-    if (type === 'venue') where.venueId = Number(targetId);
-    else where.eventId = Number(targetId);
+  static async removeFavoriteByListing(userId: string, targetId: string, type: 'venue' | 'event') {
+    const where: any = { userId: String(userId) };
+    if (type === 'venue') where.venueId = String(targetId);
+    else where.eventId = String(targetId);
 
     return prisma.favorite.deleteMany({ where });
   }
