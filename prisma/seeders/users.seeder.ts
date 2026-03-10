@@ -1,4 +1,5 @@
 import { PrismaClient, UserRole } from "@prisma/client"
+import crypto from "crypto"
 
 type MockUser = {
   email: string
@@ -7,6 +8,16 @@ type MockUser = {
   phone: string
   profileImage: string
   role: UserRole
+}
+
+function hashPassword(password: string) {
+  const salt = crypto.randomBytes(16).toString("hex")
+
+  const hash = crypto
+    .pbkdf2Sync(password, salt, 1000, 64, "sha512")
+    .toString("hex")
+
+  return `${salt}:${hash}`
 }
 
 export async function seedUsers(prisma: PrismaClient) {
@@ -53,25 +64,24 @@ export async function seedUsers(prisma: PrismaClient) {
     },
   ]
 
-  const createdUsers: Record<string, any> = {}
+  const createdUsers: Record<string, { id: string; email: string; name: string; role: UserRole }> = {}
 
   for (const u of mockUsers) {
-    // Check if user already exists
-    const existing = await prisma.user.findUnique({
+    const password = hashPassword("password123")
+
+    const user = await prisma.user.upsert({
       where: { email: u.email },
-    })
 
-    if (existing) {
-      // Already exists → skip creation
-      createdUsers[u.email] = existing
-      continue
-    }
+      update: {
+        password,
+        role: u.role,
+        name: u.name,
+        username: u.username,
+      },
 
-    // Create new user → auto-increment id will be generated
-    const user = await prisma.user.create({
-      data: {
+      create: {
         email: u.email,
-        password: "hashed_password", // ideally hash this before seeding
+        password,
         name: u.name,
         username: u.username,
         phone: u.phone,
@@ -79,7 +89,7 @@ export async function seedUsers(prisma: PrismaClient) {
         role: u.role,
       },
     })
-
+    
     createdUsers[u.email] = user
   }
 

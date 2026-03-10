@@ -22,8 +22,12 @@ export default class EventCtrl {
 
     static async createEvent(req: Request, res: Response) {
         try {
+            const userId = (req as any).user?.userId;
+            if (!userId) {
+                return res.status(401).json({ success: false, message: "User not authenticated" });
+            }
             const event = await EventSvc.createEvent({
-                organizerId: req.user!.id,
+                organizerId: userId,
                 ...req.body
             });
             return res.status(201).json({ success: true, data: event });

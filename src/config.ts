@@ -25,3 +25,7 @@ export const REDIS_PASSWORD = process.env.REDIS_PASSWORD as string;
 export const REDIS_TTL_SECONDS = Number(process.env.REDIS_TTL_SECONDS) || 3600;
 export const SERVICE_ACCOUNT = process.env.SERVICE_ACCOUNT as string;
 export const S3_CDN_URL = process.env.S3_CDN_URL as string;
+export const SUPABASE_URL = process.env.SUPABASE_URL as string;
+export const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
+export const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY as string;
+

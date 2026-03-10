@@ -5,7 +5,7 @@ export default class ProfileSvc {
     // Get user profile
     static async getProfile(userId: string) {
         const user = await prisma.user.findUnique({
-            where: { id: Number(userId) },
+            where: { id: String(userId) },
             select: {
                 id: true,
                 email: true,
@@ -41,7 +41,7 @@ export default class ProfileSvc {
             const existingUser = await prisma.user.findFirst({
                 where: {
                     username: data.username,
-                    NOT: { id: Number(userId) }
+                    NOT: { id: String(userId) }
                 }
             });
 
@@ -51,7 +51,7 @@ export default class ProfileSvc {
         }
 
         const updatedUser = await prisma.user.update({
-            where: { id: Number(userId) },
+            where: { id: String(userId) },
             data,
             select: {
                 id: true,
@@ -79,7 +79,7 @@ export default class ProfileSvc {
     ) {
         // Get user with password
         const user = await prisma.user.findUnique({
-            where: { id: Number(userId) }
+            where: { id: String(userId) }
         });
 
         if (!user) {
@@ -97,7 +97,7 @@ export default class ProfileSvc {
 
         // Update password
         await prisma.user.update({
-            where: { id: Number(userId) },
+            where: { id: String(userId) },
             data: { password: hashedPassword }
         });
 
@@ -108,7 +108,7 @@ export default class ProfileSvc {
     static async deleteAccount(userId: string, password: string) {
         // Get user with password
         const user = await prisma.user.findUnique({
-            where: { id: Number(userId) }
+            where: { id: String(userId) }
         });
 
         if (!user) {
@@ -123,7 +123,7 @@ export default class ProfileSvc {
 
         // Delete user (cascade will handle related records)
         await prisma.user.delete({
-            where: { id: Number(userId) }
+            where: { id: String(userId) }
         });
 
         return { message: "Account deleted successfully" };

@@ -8,7 +8,7 @@ datasource db {
 
 // MODELS
 model User {
-  id           Int      @id @default(autoincrement())
+  id           String   @id @default(uuid())
   email        String   @unique
   password     String
   name         String
@@ -26,22 +26,24 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  ownedVenues     Venue[]    @relation("VenueHost")
-  ownedAssets     Asset[]    @relation("AssetOwner")
-  hostedAssets    Asset[]    @relation("AssetHost")
-  organizedEvents Event[]    @relation("EventOrganizer")
-  bookings        Booking[]  @relation("UserBookings")
-  passport        Passport?
-  reviews         Review[]
-  favorites       Favorite[]
-  services        Service[]  @relation("ServiceOwner")
+  ownedVenues            Venue[]             @relation("VenueHost")
+  ownedAssets            Asset[]             @relation("AssetOwner")
+  hostedAssets           Asset[]             @relation("AssetHost")
+  organizedEvents        Event[]             @relation("EventOrganizer")
+  bookings               Booking[]           @relation("UserBookings")
+  passport               Passport?
+  reviews                Review[]
+  favorites              Favorite[]
+  services               Service[]           @relation("ServiceOwner")
+  submittedVerifications VenueVerification[] @relation("VerificationSubmitter")
+  reviewedVerifications  VenueVerification[] @relation("VerificationReviewer")
 
   @@map("users")
 }
 
 model Venue {
-  id          Int         @id @default(autoincrement())
-  hostId      Int
+  id          String      @id @default(uuid())
+  hostId      String
   name        String
   description String
   type        VenueType
@@ -51,19 +53,28 @@ model Venue {
   city        String
   state       String?
   country     String
+  //latitude    Float?
+  //longitude   Float?
+  spaceType   String[]    @default([])
+  amenities   String[]    @default([])
+  techAv      String[]    @default([])
+  staffing    String[]    @default([])
+  policies    String[]    @default([])
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
 
-  host        User         @relation("VenueHost", fields: [hostId], references: [id], onDelete: Cascade)
-  events      Event[]
-  venueImages VenueImage[]
+  host         User               @relation("VenueHost", fields: [hostId], references: [id], onDelete: Cascade)
+  events       Event[]
+  venueImages  VenueImage[]
+  verification VenueVerification?
 
   @@map("venues")
 }
 
 model VenueImage {
-  id          Int     @id @default(autoincrement())
-  venueId     Int
+  id          String  @id @default(uuid())
+  venueId     String
   url         String
   altText     String?
   orderIndex  Int?
@@ -74,11 +85,29 @@ model VenueImage {
   @@map("venue_images")
 }
 
+model VenueVerification {
+  id            String                   @id @default(uuid())
+  venueId       String                   @unique
+  submittedById String
+  documentUrl   String // stored in Supabase Storage / S3
+  documentType  VerificationDocumentType
+  status        VerificationStatus       @default(pending)
+  adminNotes    String?
+  reviewedById  String?
+  reviewedAt    DateTime?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  venue       Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  submittedBy User  @relation("VerificationSubmitter", fields: [submittedById], references: [id])
+  reviewedBy  User? @relation("VerificationReviewer", fields: [reviewedById], references: [id])
+}
+
 model Asset {
-  id           Int      @id @default(autoincrement())
-  ownerId      Int
-  hostId       Int
-  categoryId   Int?
+  id           String   @id @default(uuid())
+  ownerId      String
+  hostId       String
+  categoryId   String?
   name         String
   description  String
   propertyType String?
@@ -98,11 +127,11 @@ model Asset {
 }
 
 model Category {
-  id               Int     @id @default(autoincrement())
+  id               String  @id @default(uuid())
   name             String
   slug             String  @unique
   description      String?
-  parentCategoryId Int?
+  parentCategoryId String?
 
   assets         Asset[]
   parentCategory Category?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id])
@@ -112,8 +141,8 @@ model Category {
 }
 
 model AssetImage {
-  id          Int     @id @default(autoincrement())
-  assetId     Int
+  id          String  @id @default(uuid())
+  assetId     String
   url         String
   altText     String?
   orderIndex  Int?
@@ -125,8 +154,8 @@ model AssetImage {
 }
 
 model Service {
-  id          Int             @id @default(autoincrement())
-  ownerId     Int
+  id          String          @id @default(uuid())
+  ownerId     String
   name        String
   description String
   category    ServiceCategory
@@ -142,9 +171,9 @@ model Service {
 }
 
 model Event {
-  id            Int         @id @default(autoincrement())
-  venueId       Int
-  organizerId   Int
+  id            String      @id @default(uuid())
+  venueId       String
+  organizerId   String
   name          String
   description   String
   eventType     EventType
@@ -168,9 +197,9 @@ model Event {
 
 // Join table: Event <-> Asset (many-to-many)
 model EventAsset {
-  id       Int @id @default(autoincrement())
-  eventId  Int
-  assetId  Int
+  id       String @id @default(uuid())
+  eventId  String
+  assetId  String
   quantity Int
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -182,9 +211,9 @@ model EventAsset {
 
 // Join table: Event <-> Service (many-to-many)
 model EventService {
-  id          Int   @id @default(autoincrement())
-  eventId     Int
-  serviceId   Int
+  id          String @id @default(uuid())
+  eventId     String
+  serviceId   String
   agreedPrice Float
 
   event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -195,9 +224,9 @@ model EventService {
 }
 
 model Booking {
-  id               Int           @id @default(autoincrement())
-  eventId          Int
-  userId           Int
+  id               String        @id @default(uuid())
+  eventId          String
+  userId           String
   guestCount       Int
   totalAmount      Float
   confirmationCode String?       @unique
@@ -220,8 +249,8 @@ model Booking {
 }
 
 model Payment {
-  id              Int           @id @default(autoincrement())
-  bookingId       Int
+  id              String        @id @default(uuid())
+  bookingId       String
   amount          Float
   currency        String
   paymentMethod   String
@@ -238,8 +267,8 @@ model Payment {
 }
 
 model BookingAttendee {
-  id          Int       @id @default(autoincrement())
-  bookingId   Int
+  id          String    @id @default(uuid())
+  bookingId   String
   firstName   String
   lastName    String
   email       String?
@@ -256,8 +285,8 @@ model BookingAttendee {
 }
 
 model Passport {
-  id           Int      @id @default(autoincrement())
-  userId       Int      @unique
+  id           String   @id @default(uuid())
+  userId       String   @unique
   totalStamps  Int      @default(0)
   totalMileage Int      @default(0)
   level        Int      @default(1)
@@ -269,10 +298,10 @@ model Passport {
 }
 
 model Review {
-  id                 Int      @id @default(autoincrement())
-  venueId            Int?
-  eventId            Int?
-  userId             Int
+  id                 String   @id @default(uuid())
+  venueId            String?
+  eventId            String?
+  userId             String
   rating             Int
   comment            String?
   isVerifiedAttendee Boolean  @default(false)
@@ -285,10 +314,10 @@ model Review {
 }
 
 model Favorite {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  venueId   Int?
-  eventId   Int?
+  id        String   @id @default(uuid())
+  userId    String
+  venueId   String?
+  eventId   String?
   savedAt   DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -324,6 +353,20 @@ enum VenueStatus {
   published
   suspended
   archived
+}
+
+enum VerificationStatus {
+  pending
+  approved
+  rejected
+}
+
+enum VerificationDocumentType {
+  land_title
+  tax_declaration
+  deed_of_sale
+  lease_contract
+  other
 }
 
 enum AssetCategory {
