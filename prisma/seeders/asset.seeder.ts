@@ -48,6 +48,7 @@ export async function seedAsset(prisma: PrismaClient) {
                     categoryId: category.id,
                     name: asset.name,
                     description: asset.description,
+                    condition: "good",
                     propertyType: "Equipment",
                     roomType: "Equipment",
                     capacity: 10,

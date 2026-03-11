@@ -2,6 +2,7 @@ import express from "express";
 import authRoute from "./auth.route";
 import usersRoute from "./users.route";
 import profileRoute from "./profile.route";
+import categoryRoutes from "./category.routes";
 import venueRoutes from "./venue.routes";
 import eventRoutes from "./event.routes";
 import bookingRoutes from "./booking.routes";
@@ -10,6 +11,7 @@ import paymentRoutes from "./payment.routes";
 import categoryRoutes from "./category.routes";
 import reviewRoutes from "./review.routes";
 import favoriteRoutes from "./favorite.routes";
+import assetRoutes from "./asset.routes";
 
 const router = express.Router();
 
@@ -31,6 +33,7 @@ router.use("/v1", (req, res, next) => {
 router.use("/v1/auth", authRoute);
 router.use("/v1/users", usersRoute);
 router.use("/v1/profile", profileRoute);
+router.use("/v1/categories", categoryRoutes);
 
 // Feature Routes
 router.use("/v1/venues", venueRoutes);
@@ -48,7 +51,8 @@ router.use("/v1/attendees/", bookingAttendeeRoutes); // Trailing slash alias
 router.use("/v1/payments", paymentRoutes);
 router.use("/v1/payments/", paymentRoutes); // Trailing slash alias
 router.use("/v1/categories", categoryRoutes);
-router.use("/v1/categories/", categoryRoutes); // Trailing slash alias
+router.use("/v1/assets", assetRoutes);
+
 
 // Feature Routes (Reviews & Favorites)
 router.use("/v1/reviews", reviewRoutes);

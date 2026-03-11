@@ -10,6 +10,7 @@ type MockUser = {
   role: UserRole
 }
 
+// 👇 Match AuthSvc.register hashing
 function hashPassword(password: string) {
   const salt = crypto.randomBytes(16).toString("hex")
 
@@ -55,12 +56,12 @@ export async function seedUsers(prisma: PrismaClient) {
       role: UserRole.foxer,
     },
     {
-      email: "investor@app.com",
-      name: "Investor User",
-      username: "investor",
+      email: "host2@app.com",
+      name: "Venue Host 2",
+      username: "host2",
       phone: "09123456789",
       profileImage: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1a",
-      role: UserRole.investor,
+      role: UserRole.mayor,
     },
   ]
 
@@ -89,7 +90,8 @@ export async function seedUsers(prisma: PrismaClient) {
         role: u.role,
       },
     })
-    
+
+    console.log(`✅ Seeded/Updated user: ${u.email}`)
     createdUsers[u.email] = user
   }
 
