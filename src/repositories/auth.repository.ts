@@ -39,10 +39,10 @@ export default class AuthRepo {
     });
   }
 
-  static async updateUserLoginStatus(userId: number | string) {
+  static async updateUserLoginStatus(userId: string) {
     return prisma.user.update({
       where: {
-        id: Number(userId),
+        id: String(userId),
       },
       data: {
         updatedAt: new Date(),
@@ -82,10 +82,10 @@ export default class AuthRepo {
   //   });
   // }
 
-  static async findUserById(userId: number | string) {
+  static async findUserById(userId: string) {
     return prisma.user.findUnique({
       where: {
-        id: Number(userId),
+        id: String(userId),
       },
     });
   }
@@ -101,7 +101,7 @@ export default class AuthRepo {
   static async updateUser(userId: number | string, data: any) {
     return prisma.user.update({
       where: {
-        id: Number(userId),
+        id: String(userId),
       },
       data: data,
     });
@@ -110,7 +110,7 @@ export default class AuthRepo {
   static async getAuthUser(userId: number | string) {
     return prisma.user.findUnique({
       where: {
-        id: Number(userId),
+        id: String(userId),
       },
       select: {
         id: true,

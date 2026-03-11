@@ -65,7 +65,7 @@ export async function seedUsers(prisma: PrismaClient) {
     },
   ]
 
-  const createdUsers: Record<string, any> = {}
+  const createdUsers: Record<string, { id: string; email: string; name: string; role: UserRole }> = {}
 
   for (const u of mockUsers) {
     const password = hashPassword("password123")

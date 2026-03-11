@@ -13,14 +13,14 @@ export default class BookingAttendeeSvc {
         checkedIn?: boolean;
     }) {
         return BookingAttendeeRepo.getAllAttendees({
-            ...(filters?.bookingId && { bookingId: Number(filters.bookingId) }),
+            ...(filters?.bookingId && { bookingId: String(filters.bookingId) }),
             checkedIn: filters?.checkedIn,
         });
     }
 
     // GET ATTENDEE BY ID
     static async getAttendeeById(id: string) {
-        const attendee = await BookingAttendeeRepo.getAttendeeById(Number(id));
+        const attendee = await BookingAttendeeRepo.getAttendeeById(String(id));
         if (!attendee) {
             throw new Error("Attendee not found");
         }
@@ -51,7 +51,7 @@ export default class BookingAttendeeSvc {
         }
 
         return BookingAttendeeRepo.createAttendee({
-            bookingId: Number(data.bookingId),
+            bookingId: String(data.bookingId),
             firstName: data.firstName,
             lastName: data.lastName,
             email: data.email,
@@ -71,23 +71,23 @@ export default class BookingAttendeeSvc {
         }>
     ) {
         // Check if attendee exists
-        const exists = await BookingAttendeeRepo.attendeeExists(Number(id));
+        const exists = await BookingAttendeeRepo.attendeeExists(String(id));
         if (!exists) {
             throw new Error("Attendee not found");
         }
 
-        return BookingAttendeeRepo.updateAttendee(Number(id), data);
+        return BookingAttendeeRepo.updateAttendee(String(id), data);
     }
 
     // CHECK IN ATTENDEE
     static async checkInAttendee(id: string) {
         // Check if attendee exists
-        const exists = await BookingAttendeeRepo.attendeeExists(Number(id));
+        const exists = await BookingAttendeeRepo.attendeeExists(String(id));
         if (!exists) {
             throw new Error("Attendee not found");
         }
 
-        return BookingAttendeeRepo.checkInAttendee(Number(id));
+        return BookingAttendeeRepo.checkInAttendee(String(id));
     }
 
     // CHECK IN BY TICKET CODE
@@ -103,21 +103,21 @@ export default class BookingAttendeeSvc {
     // DELETE ATTENDEE
     static async deleteAttendee(id: string) {
         // Check if attendee exists
-        const exists = await BookingAttendeeRepo.attendeeExists(Number(id));
+        const exists = await BookingAttendeeRepo.attendeeExists(String(id));
         if (!exists) {
             throw new Error("Attendee not found");
         }
 
-        return BookingAttendeeRepo.deleteAttendee(Number(id));
+        return BookingAttendeeRepo.deleteAttendee(String(id));
     }
 
     // GET BOOKING ATTENDEES
     static async getBookingAttendees(bookingId: string) {
-        return BookingAttendeeRepo.getBookingAttendees(Number(bookingId));
+        return BookingAttendeeRepo.getBookingAttendees(String(bookingId));
     }
 
     // GET EVENT ATTENDEES
     static async getEventAttendees(eventId: string) {
-        return BookingAttendeeRepo.getEventAttendees(Number(eventId));
+        return BookingAttendeeRepo.getEventAttendees(String(eventId));
     }
 }

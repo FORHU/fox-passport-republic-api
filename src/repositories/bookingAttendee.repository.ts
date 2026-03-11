@@ -2,16 +2,16 @@ import { prisma } from "../utils/prisma";
 
 export default class BookingAttendeeRepo {
     // Check if attendee exists
-    static async attendeeExists(id: number | string) {
+    static async attendeeExists(id: string) {
         const attendee = await prisma.bookingAttendee.findUnique({
-            where: { id: Number(id) },
+            where: { id: String(id) },
         });
         return !!attendee;
     }
 
     // CREATE
     static async createAttendee(data: {
-        bookingId: number | string;
+        bookingId: string;
         firstName: string;
         lastName: string;
         email?: string;
@@ -20,7 +20,7 @@ export default class BookingAttendeeRepo {
     }) {
         return prisma.bookingAttendee.create({
             data: {
-                bookingId: Number(data.bookingId),
+                bookingId: String(data.bookingId),
                 firstName: data.firstName,
                 lastName: data.lastName,
                 email: data.email,
@@ -43,17 +43,17 @@ export default class BookingAttendeeRepo {
     }
 
     // READ ALL (by booking)
-    static async getBookingAttendees(bookingId: number | string) {
+    static async getBookingAttendees(bookingId: string) {
         return prisma.bookingAttendee.findMany({
-            where: { bookingId: Number(bookingId) },
+            where: { bookingId: String(bookingId) },
             orderBy: { createdAt: "asc" },
         });
     }
 
     // READ ONE by ID
-    static async getAttendeeById(id: number | string) {
+    static async getAttendeeById(id: string) {
         return prisma.bookingAttendee.findUnique({
-            where: { id: Number(id) },
+            where: { id: String(id) },
             include: {
                 booking: {
                     include: {
@@ -90,7 +90,7 @@ export default class BookingAttendeeRepo {
     }
 
     // UPDATE
-    static async updateAttendee(id: number | string, data: Partial<{
+    static async updateAttendee(id: string, data: Partial<{
         firstName: string;
         lastName: string;
         email: string;
@@ -99,22 +99,22 @@ export default class BookingAttendeeRepo {
         checkInTime: Date;
     }>) {
         return prisma.bookingAttendee.update({
-            where: { id: Number(id) },
+            where: { id: String(id) },
             data,
         });
     }
 
     // DELETE
-    static async deleteAttendee(id: number | string) {
+    static async deleteAttendee(id: string) {
         return prisma.bookingAttendee.delete({
-            where: { id: Number(id) },
+            where: { id: String(id) },
         });
     }
 
     // Check In Logic
-    static async checkInAttendee(id: number | string) {
+    static async checkInAttendee(id: string) {
         return prisma.bookingAttendee.update({
-            where: { id: Number(id) },
+            where: { id: String(id) },
             data: {
                 checkedIn: true,
                 checkInTime: new Date()
@@ -123,7 +123,7 @@ export default class BookingAttendeeRepo {
     }
 
     // Validate Ticket for Event
-    static async validateTicketForEvent(ticketCode: string, eventId: number | string) {
+    static async validateTicketForEvent(ticketCode: string, eventId: string) {
         const attendee = await prisma.bookingAttendee.findUnique({
             where: { ticketCode },
             include: {
@@ -132,17 +132,17 @@ export default class BookingAttendeeRepo {
         });
 
         if (!attendee) return null;
-        if (attendee.booking.eventId !== Number(eventId)) return null;
+        if (attendee.booking.eventId !== String(eventId)) return null;
 
         return attendee;
     }
 
     // Get event attendees
-    static async getEventAttendees(eventId: number | string) {
+    static async getEventAttendees(eventId: string) {
         return prisma.bookingAttendee.findMany({
             where: {
                 booking: {
-                    eventId: Number(eventId),
+                    eventId: String(eventId),
                 },
             },
             include: {
@@ -165,11 +165,11 @@ export default class BookingAttendeeRepo {
 
     // Get all attendees with filters
     static async getAllAttendees(filters?: {
-        bookingId?: number | string;
+        bookingId?: string;
         checkedIn?: boolean;
     }) {
         const where: any = {};
-        if (filters?.bookingId) where.bookingId = Number(filters.bookingId);
+        if (filters?.bookingId) where.bookingId = String(filters.bookingId);
         if (filters?.checkedIn !== undefined) where.checkedIn = filters.checkedIn;
 
         return prisma.bookingAttendee.findMany({
@@ -205,7 +205,7 @@ export default class BookingAttendeeRepo {
     }
 
     // Get listing attendees (renamed to event attendees)
-    static async getListingAttendees(listingId: number | string) {
+    static async getListingAttendees(listingId: string) {
         // This method is deprecated, use getEventAttendees instead
         return this.getEventAttendees(listingId);
     }

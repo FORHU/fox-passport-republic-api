@@ -87,7 +87,7 @@ export default class CategoryRepo {
         name: data.name,
         slug: data.slug,
         description: data.description,
-        parentCategoryId: data.parentCategoryId,
+        parentCategoryId: data.parentCategoryId ? String(data.parentCategoryId) : undefined,
       },
       include: {
         parentCategory: true,
@@ -136,7 +136,7 @@ export default class CategoryRepo {
     const category = await prisma.category.findFirst({
       where: {
         slug,
-        ...(excludeId && { id: { not: excludeId } }),
+        ...(excludeId && { id: { not: String(excludeId) } }),
       },
       select: { id: true },
     });

@@ -116,17 +116,17 @@ export const requireRole = (roles: string[]) => {
 /**
  * Check if user is admin or super_admin
  */
-export const requireAdmin = requireRole(["admin", "super_admin"]);
+export const requireAdmin = requireRole(["admin", "super_admin", "mayor"]);
 
 /**
  * Check if user is super_admin only
  */
-export const requireSuperAdmin = requireRole(["super_admin"]);
+export const requireSuperAdmin = requireRole(["super_admin", "mayor"]);
 
 /**
  * Check if user is host, admin, or super_admin
  */
-export const requireHost = requireRole(["host", "admin", "super_admin"]);
+export const requireHost = requireRole(["host", "admin", "super_admin", "mayor"]);
 
 /**
  * Resource Owner or Admin Middleware
@@ -150,7 +150,7 @@ export const requireOwnerOrAdmin = (
 
         const ownerId = getUserIdFromRequest(req);
         const isOwner = req.user.userId === ownerId;
-        const isAdmin = ["admin", "super_admin"].includes(req.user.role);
+        const isAdmin = ["admin", "super_admin", "mayor"].includes(req.user.role);
 
         if (!isOwner && !isAdmin) {
             return res.status(403).json({

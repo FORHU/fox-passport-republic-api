@@ -4,14 +4,14 @@ import { BookingStatus } from "@prisma/client";
 export default class BookingRepo {
     // READ ALL with filters
     static async getAllBookings(filters?: {
-        userId?: number | string;
-        eventId?: number | string;
+        userId?: string;
+        eventId?: string;
         bookingStatus?: BookingStatus;
     }) {
         return prisma.booking.findMany({
             where: {
-                ...(filters?.userId && { userId: Number(filters.userId) }),
-                ...(filters?.eventId && { eventId: Number(filters.eventId) }),
+                ...(filters?.userId && { userId: String(filters.userId) }),
+                ...(filters?.eventId && { eventId: String(filters.eventId) }),
                 ...(filters?.bookingStatus && { status: filters.bookingStatus }),
             },
             include: {
@@ -38,9 +38,9 @@ export default class BookingRepo {
     }
 
     // READ ONE by ID
-    static async getBookingById(id: number | string) {
+    static async getBookingById(id: string) {
         return prisma.booking.findUnique({
-            where: { id: Number(id) },
+            where: { id: String(id) },
             include: {
                 user: {
                     select: {
@@ -92,8 +92,8 @@ export default class BookingRepo {
     }) {
         return prisma.booking.create({
             data: {
-                eventId: Number(data.eventId),
-                userId: Number(data.userId),
+                eventId: String(data.eventId),
+                userId: String(data.userId),
                 guestCount: data.guestCount || 0,
                 totalAmount: data.totalAmount || 0,
                 status: data.bookingStatus || BookingStatus.draft,
@@ -123,7 +123,7 @@ export default class BookingRepo {
     ) {
         const { bookingStatus, ...rest } = data;
         return prisma.booking.update({
-            where: { id: Number(id) },
+            where: { id: String(id) },
             data: {
                 ...rest,
                 ...(bookingStatus && { status: bookingStatus }),
@@ -138,27 +138,27 @@ export default class BookingRepo {
     }
 
     // DELETE (Cancel)
-    static async deleteBooking(id: number | string) {
+    static async deleteBooking(id: string) {
         return prisma.booking.delete({
-            where: { id: Number(id) },
+            where: { id: String(id) },
         });
     }
 
     // Check if booking exists
-    static async bookingExists(id: number | string) {
+    static async bookingExists(id: string) {
         const booking = await prisma.booking.findUnique({
-            where: { id: Number(id) },
+            where: { id: String(id) },
             select: { id: true },
         });
         return !!booking;
     }
 
     // Check if user owns booking
-    static async isBookingOwner(bookingId: number | string, userId: number | string) {
+    static async isBookingOwner(bookingId: string, userId: string) {
         const booking = await prisma.booking.findFirst({
             where: {
-                id: Number(bookingId),
-                userId: Number(userId),
+                id: String(bookingId),
+                userId: String(userId),
             },
             select: { id: true },
         });
@@ -175,9 +175,9 @@ export default class BookingRepo {
     }
 
     // Get user bookings
-    static async getUserBookings(userId: number | string) {
+    static async getUserBookings(userId: string) {
         return prisma.booking.findMany({
-            where: { userId: Number(userId) },
+            where: { userId: String(userId) },
             include: {
                 event: {
                     include: {
@@ -194,9 +194,9 @@ export default class BookingRepo {
     }
 
     // Get event bookings (for event organizer)
-    static async getEventBookings(eventId: number | string) {
+    static async getEventBookings(eventId: string) {
         return prisma.booking.findMany({
-            where: { eventId: Number(eventId) },
+            where: { eventId: String(eventId) },
             include: {
                 user: {
                     select: {

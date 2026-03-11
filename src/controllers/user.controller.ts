@@ -19,7 +19,7 @@ export default class UserController {
 
       // Update user to host role
       const updatedUser = await prisma.user.update({
-        where: { id: Number(userId) },
+        where: { id: String(userId) },
         data: {
           role: "mayor",
           isHost: true,
@@ -64,7 +64,7 @@ export default class UserController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { id: Number(userId) },
+        where: { id: String(userId) },
         select: {
           id: true,
           email: true,

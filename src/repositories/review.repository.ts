@@ -17,9 +17,9 @@ export default class ReviewRepo {
     }
 
     // READ ONE
-    static async getReviewById(id: number | string) {
+    static async getReviewById(id: string) {
         return prisma.review.findUnique({
-            where: { id: Number(id) },
+            where: { id: String(id) },
             include: {
                 user: {
                     select: {
@@ -33,18 +33,18 @@ export default class ReviewRepo {
 
     // CREATE
     static async createReview(data: {
-        venueId?: number | string;
-        eventId?: number | string;
-        userId: number | string;
+        venueId?: string;
+        eventId?: string;
+        userId: string;
         rating: number;
         comment?: string;
         isVerifiedAttendee?: boolean;
     }) {
         return prisma.review.create({
             data: {
-                venueId: data.venueId ? Number(data.venueId) : undefined,
-                eventId: data.eventId ? Number(data.eventId) : undefined,
-                userId: Number(data.userId),
+                venueId: data.venueId ? String(data.venueId) : undefined,
+                eventId: data.eventId ? String(data.eventId) : undefined,
+                userId: String(data.userId),
                 rating: data.rating,
                 comment: data.comment,
                 isVerifiedAttendee: data.isVerifiedAttendee || false,
@@ -61,9 +61,9 @@ export default class ReviewRepo {
     }
 
     // LIST BY VENUE
-    static async getVenueReviews(venueId: number | string) {
+    static async getVenueReviews(venueId: string) {
         return prisma.review.findMany({
-            where: { venueId: Number(venueId) },
+            where: { venueId: String(venueId) },
             include: {
                 user: {
                     select: {
@@ -77,9 +77,9 @@ export default class ReviewRepo {
     }
 
     // LIST BY EVENT
-    static async getEventReviews(eventId: number | string) {
+    static async getEventReviews(eventId: string) {
         return prisma.review.findMany({
-            where: { eventId: Number(eventId) },
+            where: { eventId: String(eventId) },
             include: {
                 user: {
                     select: {
@@ -93,9 +93,9 @@ export default class ReviewRepo {
     }
 
     // LIST BY USER
-    static async getUserReviews(userId: number | string) {
+    static async getUserReviews(userId: string) {
         return prisma.review.findMany({
-            where: { userId: Number(userId) },
+            where: { userId: String(userId) },
             include: {
                 user: {
                     select: {
@@ -109,17 +109,17 @@ export default class ReviewRepo {
     }
 
     // UPDATE
-    static async updateReview(id: number | string, data: Partial<{ rating: number; comment: string }>) {
+    static async updateReview(id: string, data: Partial<{ rating: number; comment: string }>) {
         return prisma.review.update({
-            where: { id: Number(id) },
+            where: { id: String(id) },
             data,
         });
     }
 
     // DELETE
-    static async deleteReview(id: number | string) {
+    static async deleteReview(id: string) {
         return prisma.review.delete({
-            where: { id: Number(id) },
+            where: { id: String(id) },
         });
     }
 }

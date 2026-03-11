@@ -201,8 +201,8 @@ model Favorite {
 }
 
 model Payment {
-  id              Int           @id @default(autoincrement())
-  bookingId       Int
+  id              String        @id @default(uuid())
+  bookingId       String
   amount          Float
   currency        String
   paymentMethod   String
@@ -218,10 +218,10 @@ model Payment {
 }
 
 model Review {
-  id                 Int      @id @default(autoincrement())
-  venueId            Int?
-  eventId            Int?
-  userId             Int
+  id                 String   @id @default(uuid())
+  venueId            String?
+  eventId            String?
+  userId             String
   rating             Int
   comment            String?
   isVerifiedAttendee Boolean  @default(false)
