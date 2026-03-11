@@ -4,15 +4,15 @@ import { EventStatus, EventType } from "@prisma/client";
 export default class EventRepo {
     // READ ALL
     static async getAllEvents(filters?: {
-        venueId?: string;
-        organizerId?: string;
+        venueId?: number | string;
+        organizerId?: number | string;
         eventType?: EventType;
         status?: EventStatus;
     }) {
         return prisma.event.findMany({
             where: {
-                ...(filters?.venueId && { venueId: filters.venueId }),
-                ...(filters?.organizerId && { organizerId: filters.organizerId }),
+                ...(filters?.venueId && { venueId: Number(filters.venueId) }),
+                ...(filters?.organizerId && { organizerId: Number(filters.organizerId) }),
                 ...(filters?.eventType && { eventType: filters.eventType }),
                 ...(filters?.status && { status: filters.status }),
             },
@@ -46,9 +46,9 @@ export default class EventRepo {
     }
 
     // READ ONE
-    static async getEventById(id: string) {
+    static async getEventById(id: number | string) {
         return prisma.event.findUnique({
-            where: { id },
+            where: { id: Number(id) },
             include: {
                 venue: {
                     include: {
@@ -76,8 +76,8 @@ export default class EventRepo {
 
     // CREATE
     static async createEvent(data: {
-        venueId: string;
-        organizerId: string;
+        venueId: number | string;
+        organizerId: number | string;
         name: string;
         description: string;
         eventType: EventType;
@@ -90,8 +90,8 @@ export default class EventRepo {
     }) {
         return prisma.event.create({
             data: {
-                venueId: data.venueId,
-                organizerId: data.organizerId,
+                venueId: Number(data.venueId),
+                organizerId: Number(data.organizerId),
                 name: data.name,
                 description: data.description,
                 eventType: data.eventType,
@@ -106,30 +106,30 @@ export default class EventRepo {
     }
 
     // UPDATE
-    static async updateEvent(id: string, data: Partial<any>) {
+    static async updateEvent(id: number | string, data: Partial<any>) {
         return prisma.event.update({
-            where: { id },
+            where: { id: Number(id) },
             data,
         });
     }
 
     // Link Asset to Event
-    static async addAssetToEvent(eventId: string, assetId: string, quantity: number) {
+    static async addAssetToEvent(eventId: number | string, assetId: number | string, quantity: number) {
         return prisma.eventAsset.create({
             data: {
-                eventId,
-                assetId,
+                eventId: Number(eventId),
+                assetId: Number(assetId),
                 quantity
             }
         });
     }
 
     // Link Service to Event
-    static async addServiceToEvent(eventId: string, serviceId: string, agreedPrice: number) {
+    static async addServiceToEvent(eventId: number | string, serviceId: number | string, agreedPrice: number) {
         return prisma.eventService.create({
             data: {
-                eventId,
-                serviceId,
+                eventId: Number(eventId),
+                serviceId: Number(serviceId),
                 agreedPrice
             }
         });

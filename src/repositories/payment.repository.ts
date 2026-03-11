@@ -4,12 +4,12 @@ import { PaymentStatus } from "@prisma/client";
 export default class PaymentRepo {
     // READ ALL with filters
     static async getAllPayments(filters?: {
-        bookingId?: string;
+        bookingId?: number | string;
         paymentStatus?: PaymentStatus;
     }) {
         return prisma.payment.findMany({
             where: {
-                ...(filters?.bookingId && { bookingId: filters.bookingId }),
+                ...(filters?.bookingId && { bookingId: Number(filters.bookingId) }),
                 ...(filters?.paymentStatus && { paymentStatus: filters.paymentStatus }),
             },
             include: {
@@ -38,9 +38,9 @@ export default class PaymentRepo {
     }
 
     // READ ONE by ID
-    static async getPaymentById(id: string) {
+    static async getPaymentById(id: number | string) {
         return prisma.payment.findUnique({
-            where: { id },
+            where: { id: Number(id) },
             include: {
                 booking: {
                     include: {
@@ -69,7 +69,7 @@ export default class PaymentRepo {
 
     // CREATE
     static async createPayment(data: {
-        bookingId: string;
+        bookingId: number | string;
         amount: number;
         currency: string;
         paymentMethod: string;
@@ -79,7 +79,7 @@ export default class PaymentRepo {
     }) {
         return prisma.payment.create({
             data: {
-                bookingId: data.bookingId,
+                bookingId: Number(data.bookingId),
                 amount: data.amount,
                 currency: data.currency,
                 paymentMethod: data.paymentMethod,
@@ -95,14 +95,14 @@ export default class PaymentRepo {
 
     // UPDATE
     static async updatePayment(
-        id: string,
+        id: number | string,
         data: Partial<{
             paymentStatus: PaymentStatus;
             gatewayResponse: string;
         }>
     ) {
         return prisma.payment.update({
-            where: { id },
+            where: { id: Number(id) },
             data,
             include: {
                 booking: true,
@@ -111,9 +111,9 @@ export default class PaymentRepo {
     }
 
     // Check if payment exists
-    static async paymentExists(id: string) {
+    static async paymentExists(id: number | string) {
         const payment = await prisma.payment.findUnique({
-            where: { id },
+            where: { id: Number(id) },
             select: { id: true },
         });
         return !!payment;
@@ -129,9 +129,9 @@ export default class PaymentRepo {
     }
 
     // Get booking payments
-    static async getBookingPayments(bookingId: string) {
+    static async getBookingPayments(bookingId: number | string) {
         return prisma.payment.findMany({
-            where: { bookingId },
+            where: { bookingId: Number(bookingId) },
             orderBy: {
                 paymentDate: "desc",
             },

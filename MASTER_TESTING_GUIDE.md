@@ -3,7 +3,7 @@
 This guide provides a comprehensive flow to test the entire Fox Passport Republic API, including the unified Listing model, specialized types (Venues, Chairs, Food), and the multi-step booking process.
 
 ## Base URL
-`http://localmayor:3002/api/v1`
+`http://localhost:3002/api/v1`
 
 ---
 
@@ -48,6 +48,7 @@ This guide provides a comprehensive flow to test the entire Fox Passport Republi
     "name": "Wedding",
     "slug": "wedding",
     "iconUrl": "https://example.com/wedding.png"
+    
 }
 ```
 
@@ -172,7 +173,21 @@ This is for when a user wants to book a specialized service (like "Full Venue St
 
 ---
 
-## 6. Foxxer Services (The "Who")
+## 6. User Profile & Host Upgrade (New)
+
+### A. Get My Profile
+- **Method**: `GET`
+- **URL**: `/users/profile/me`
+- **Headers**: `Authorization: Bearer <token>`
+
+### B. Become Host
+- **Method**: `POST`
+- **URL**: `/users/become-host`
+- **Headers**: `Authorization: Bearer <token>`
+
+---
+
+## 7. Foxxer Services (The "Who")
 
 ### A. Create Profile
 - **URL**: `/foxxers/profile` (POST)
@@ -184,7 +199,54 @@ This is for when a user wants to book a specialized service (like "Full Venue St
 
 ---
 
-## 7. Postman Pro-Tips: Automating IDs
+## 8. Reviews (New)
+
+### A. Create a Review
+- **Method**: `POST`
+- **URL**: `/reviews/create`
+- **Body**:
+```json
+{
+    "venueId": 1,
+    "rating": 5,
+    "comment": "Amazing experience!"
+}
+```
+
+### B. Get All Reviews
+- **Method**: `GET`
+- **URL**: `/reviews`
+
+### C. Get Listing Reviews
+- **Method**: `GET`
+- **URL**: `/reviews/listing/1`
+
+---
+
+## 9. Favorites (New)
+
+### A. Add to Favorites
+- **Method**: `POST`
+- **URL**: `/favorites/add`
+- **Body**:
+```json
+{
+    "targetId": 1,
+    "type": "venue"
+}
+```
+
+### B. Check if Favorite
+- **Method**: `GET`
+- **URL**: `/favorites/check?targetId=1&type=venue`
+
+### C. Get User Favorites
+- **Method**: `GET`
+- **URL**: `/favorites/user/REPLACE_WITH_USER_ID`
+
+---
+
+## 10. Postman Pro-Tips: Automating IDs
 
 Instead of copying and pasting IDs manually, you can use the **Tests** tab in Postman to save IDs automatically.
 

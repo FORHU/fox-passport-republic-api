@@ -1,7 +1,5 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "../utils/prisma";
 
 export default class UserController {
   /**
@@ -21,7 +19,7 @@ export default class UserController {
 
       // Update user to host role
       const updatedUser = await prisma.user.update({
-        where: { id: userId },
+        where: { id: Number(userId) },
         data: {
           role: "mayor",
           isHost: true,
@@ -66,7 +64,7 @@ export default class UserController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { id: Number(userId) },
         select: {
           id: true,
           email: true,

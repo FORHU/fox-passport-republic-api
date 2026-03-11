@@ -3,7 +3,7 @@ import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import router from "./routes";
-import { isDev } from "./config";
+import { isDev, FRONTEND_URL } from "./config";
 import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -34,7 +34,8 @@ app.use(
   })
 );
 
-app.use(express.json());
+// allow larger payloads for base64 image uploads
+app.use(express.json({ limit: '10mb' }));
 
 // Request Logger
 app.use((req, res, next) => {
@@ -63,7 +64,7 @@ const server = createServer(app);
 
 export const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: FRONTEND_URL,
     methods: ["GET", "POST"],
     credentials: true,
   },
