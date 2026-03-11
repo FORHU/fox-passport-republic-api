@@ -2,6 +2,7 @@ import express from "express";
 import authRoute from "./auth.route";
 import usersRoute from "./users.route";
 import profileRoute from "./profile.route";
+import categoryRoutes from "./category.routes";
 import venueRoutes from "./venue.routes";
 import eventRoutes from "./event.routes";
 import bookingRoutes from "./booking.routes";
@@ -26,6 +27,7 @@ router.get("/v1", (req, res) => {
 router.use("/v1/auth", authRoute);
 router.use("/v1/users", usersRoute);
 router.use("/v1/profile", profileRoute);
+router.use("/v1/categories", categoryRoutes);
 
 // Feature Routes
 router.use("/v1/venues", venueRoutes);

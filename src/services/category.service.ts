@@ -8,7 +8,7 @@ export default class CategorySvc {
 
     // GET CATEGORY BY ID
     static async getCategoryById(id: string) {
-        const category = await CategoryRepo.getCategoryById(Number(id));
+        const category = await CategoryRepo.getCategoryById(id);
         if (!category) {
             throw new Error("Category not found");
         }
@@ -39,16 +39,13 @@ export default class CategorySvc {
 
         // If parentCategoryId is provided, check if it exists
         if (data.parentCategoryId) {
-            const parentExists = await CategoryRepo.categoryExists(Number(data.parentCategoryId));
+            const parentExists = await CategoryRepo.categoryExists(data.parentCategoryId);
             if (!parentExists) {
                 throw new Error("Parent category not found");
             }
         }
 
-        return CategoryRepo.createCategory({
-            ...data,
-            parentCategoryId: data.parentCategoryId ? Number(data.parentCategoryId) : undefined,
-        });
+        return CategoryRepo.createCategory(data);
     }
 
     // UPDATE CATEGORY
@@ -62,14 +59,14 @@ export default class CategorySvc {
         }>
     ) {
         // Check if category exists
-        const exists = await CategoryRepo.categoryExists(Number(id));
+        const exists = await CategoryRepo.categoryExists(id);
         if (!exists) {
             throw new Error("Category not found");
         }
 
         // If updating slug, check if new slug is available
         if (data.slug) {
-            const slugExists = await CategoryRepo.slugExists(data.slug, Number(id));
+            const slugExists = await CategoryRepo.slugExists(data.slug, id);
             if (slugExists) {
                 throw new Error("Category slug already exists");
             }
@@ -80,28 +77,25 @@ export default class CategorySvc {
             if (data.parentCategoryId === id) {
                 throw new Error("Category cannot be its own parent");
             }
-            const parentExists = await CategoryRepo.categoryExists(Number(data.parentCategoryId));
+            const parentExists = await CategoryRepo.categoryExists(data.parentCategoryId);
             if (!parentExists) {
                 throw new Error("Parent category not found");
             }
         }
 
-        return CategoryRepo.updateCategory(Number(id), {
-            ...data,
-            parentCategoryId: data.parentCategoryId ? Number(data.parentCategoryId) : undefined,
-        });
+        return CategoryRepo.updateCategory(id, data);
     }
 
     // DELETE CATEGORY
     static async deleteCategory(id: string) {
         // Check if category exists
-        const exists = await CategoryRepo.categoryExists(Number(id));
+        const exists = await CategoryRepo.categoryExists(id);
         if (!exists) {
             throw new Error("Category not found");
         }
 
         // Note: This will fail if there are listings or subcategories
-        return CategoryRepo.deleteCategory(Number(id));
+        return CategoryRepo.deleteCategory(id);
     }
 
     // GET TOP-LEVEL CATEGORIES

@@ -10,6 +10,12 @@ export default class CategoryRepo {
             id: true,
             name: true,
             slug: true,
+            image: true,
+            tagline: true,
+            gradient: true,
+            spotLabel: true,
+            spotColor: true,
+            icon: true,
           },
         },
         subCategories: {
@@ -17,11 +23,17 @@ export default class CategoryRepo {
             id: true,
             name: true,
             slug: true,
+            image: true,
+            tagline: true,
+            gradient: true,
+            spotLabel: true,
+            spotColor: true,
+            icon: true,
           },
         },
         _count: {
           select: {
-            assets: true,
+            subCategories: true,
           },
         },
       },
@@ -32,16 +44,14 @@ export default class CategoryRepo {
   }
 
   // READ ONE by ID
-  static async getCategoryById(id: number | string) {
+  static async getCategoryById(id: string) {
     return prisma.category.findUnique({
-      where: { id: Number(id) },
+      where: { id },
       include: {
         parentCategory: true,
         subCategories: true,
-        assets: true,
         _count: {
           select: {
-            assets: true,
             subCategories: true,
           },
         },
@@ -58,7 +68,7 @@ export default class CategoryRepo {
         subCategories: true,
         _count: {
           select: {
-            assets: true,
+            subCategories: true,
           },
         },
       },
@@ -70,7 +80,7 @@ export default class CategoryRepo {
     name: string;
     slug: string;
     description?: string;
-    parentCategoryId?: number;
+    parentCategoryId?: string;
   }) {
     return prisma.category.create({
       data: {
@@ -87,16 +97,16 @@ export default class CategoryRepo {
 
   // UPDATE
   static async updateCategory(
-    id: number | string,
+    id: string,
     data: Partial<{
       name: string;
       slug: string;
       description: string;
-      parentCategoryId: number;
+      parentCategoryId: string;
     }>
   ) {
     return prisma.category.update({
-      where: { id: Number(id) },
+      where: { id },
       data,
       include: {
         parentCategory: true,
@@ -106,23 +116,23 @@ export default class CategoryRepo {
   }
 
   // DELETE
-  static async deleteCategory(id: number | string) {
+  static async deleteCategory(id: string) {
     return prisma.category.delete({
-      where: { id: Number(id) },
+      where: { id },
     });
   }
 
   // Check if category exists
-  static async categoryExists(id: number | string) {
+  static async categoryExists(id: string) {
     const category = await prisma.category.findUnique({
-      where: { id: Number(id) },
+      where: { id },
       select: { id: true },
     });
     return !!category;
   }
 
   // Check if slug exists
-  static async slugExists(slug: string, excludeId?: number) {
+  static async slugExists(slug: string, excludeId?: string) {
     const category = await prisma.category.findFirst({
       where: {
         slug,
@@ -143,7 +153,7 @@ export default class CategoryRepo {
         subCategories: true,
         _count: {
           select: {
-            assets: true,
+            subCategories: true,
           },
         },
       },
