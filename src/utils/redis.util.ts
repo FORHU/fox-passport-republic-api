@@ -9,19 +9,28 @@ class RedisUtil {
         socket: {
           host: process.env.REDIS_HOST || "127.0.0.1",
           port: parseInt(process.env.REDIS_PORT || "6379"),
+          reconnectStrategy: (retries) => {
+            if (retries > 3) {
+              console.warn("⚠️ Redis max retries reached. Giving up.");
+              return false;
+            }
+            return Math.min(retries * 200, 2000);
+          },
         },
         password: process.env.REDIS_PASSWORD || undefined,
       });
 
       this.client.on("error", (err) => {
-        console.error("Redis Client Error:", err);
+        if (!err.message?.includes("ECONNREFUSED")) {
+          console.error("Redis Client Error:", err);
+        }
       });
 
       await this.client.connect();
       console.log("✅ Redis connected successfully");
     } catch (error) {
-      console.error("❌ Redis connection failed:", error);
-      // Don't throw error - allow app to continue without Redis
+      console.error("❌ Redis connection failed — app will continue without Redis");
+      this.client = null;
     }
   }
 

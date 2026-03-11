@@ -19,6 +19,7 @@ export default class AuthRepo {
         username: data.username,
         name: data.name,
         phone: data.mobileNumber,
+        updatedAt: new Date(),
       },
       select: {
         id: true,
@@ -44,7 +45,7 @@ export default class AuthRepo {
         id: String(userId),
       },
       data: {
-        // lastLoginAt field doesn't exist in schema, removing for now
+        updatedAt: new Date(),
       },
       select: {
         id: true,
@@ -105,6 +106,7 @@ export default class AuthRepo {
       data: data,
     });
   }
+
   static async getAuthUser(userId: number | string) {
     return prisma.user.findUnique({
       where: {
