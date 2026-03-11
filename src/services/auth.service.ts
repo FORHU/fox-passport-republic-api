@@ -134,7 +134,7 @@ export default class AuthSvc {
     username: string;
     password: string;
   }) {
-    const user = await AuthRepo.findUserByEmail(username);
+    const user = await AuthRepo.findUserByUsername(username);
     console.log("+++++++++", user);
     if (!user) {
       throw "Invalid credentials";
@@ -212,7 +212,7 @@ export default class AuthSvc {
       // }
 
       // Get user
-      const user = await AuthRepo.findUserById(decoded.userId);
+      const user = await AuthRepo.findUserById(Number(decoded.userId));
       if (!user) {
         throw "User not found";
       }
@@ -350,6 +350,6 @@ export default class AuthSvc {
     };
   }
   static async getAuthUser(userId: string) {
-    return AuthRepo.getAuthUser(userId);
+    return AuthRepo.getAuthUser(Number(userId));
   }
 }

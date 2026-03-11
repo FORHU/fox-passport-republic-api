@@ -12,12 +12,15 @@ export default class BookingAttendeeSvc {
         bookingId?: string;
         checkedIn?: boolean;
     }) {
-        return BookingAttendeeRepo.getAllAttendees(filters);
+        return BookingAttendeeRepo.getAllAttendees({
+            ...(filters?.bookingId && { bookingId: Number(filters.bookingId) }),
+            checkedIn: filters?.checkedIn,
+        });
     }
 
     // GET ATTENDEE BY ID
     static async getAttendeeById(id: string) {
-        const attendee = await BookingAttendeeRepo.getAttendeeById(id);
+        const attendee = await BookingAttendeeRepo.getAttendeeById(Number(id));
         if (!attendee) {
             throw new Error("Attendee not found");
         }
@@ -48,7 +51,7 @@ export default class BookingAttendeeSvc {
         }
 
         return BookingAttendeeRepo.createAttendee({
-            bookingId: data.bookingId,
+            bookingId: Number(data.bookingId),
             firstName: data.firstName,
             lastName: data.lastName,
             email: data.email,
@@ -68,23 +71,23 @@ export default class BookingAttendeeSvc {
         }>
     ) {
         // Check if attendee exists
-        const exists = await BookingAttendeeRepo.attendeeExists(id);
+        const exists = await BookingAttendeeRepo.attendeeExists(Number(id));
         if (!exists) {
             throw new Error("Attendee not found");
         }
 
-        return BookingAttendeeRepo.updateAttendee(id, data);
+        return BookingAttendeeRepo.updateAttendee(Number(id), data);
     }
 
     // CHECK IN ATTENDEE
     static async checkInAttendee(id: string) {
         // Check if attendee exists
-        const exists = await BookingAttendeeRepo.attendeeExists(id);
+        const exists = await BookingAttendeeRepo.attendeeExists(Number(id));
         if (!exists) {
             throw new Error("Attendee not found");
         }
 
-        return BookingAttendeeRepo.checkInAttendee(id);
+        return BookingAttendeeRepo.checkInAttendee(Number(id));
     }
 
     // CHECK IN BY TICKET CODE
@@ -100,21 +103,21 @@ export default class BookingAttendeeSvc {
     // DELETE ATTENDEE
     static async deleteAttendee(id: string) {
         // Check if attendee exists
-        const exists = await BookingAttendeeRepo.attendeeExists(id);
+        const exists = await BookingAttendeeRepo.attendeeExists(Number(id));
         if (!exists) {
             throw new Error("Attendee not found");
         }
 
-        return BookingAttendeeRepo.deleteAttendee(id);
+        return BookingAttendeeRepo.deleteAttendee(Number(id));
     }
 
     // GET BOOKING ATTENDEES
     static async getBookingAttendees(bookingId: string) {
-        return BookingAttendeeRepo.getBookingAttendees(bookingId);
+        return BookingAttendeeRepo.getBookingAttendees(Number(bookingId));
     }
 
     // GET EVENT ATTENDEES
     static async getEventAttendees(eventId: string) {
-        return BookingAttendeeRepo.getEventAttendees(eventId);
+        return BookingAttendeeRepo.getEventAttendees(Number(eventId));
     }
 }

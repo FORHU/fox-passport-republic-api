@@ -4,14 +4,14 @@ import { BookingStatus } from "@prisma/client";
 export default class BookingRepo {
     // READ ALL with filters
     static async getAllBookings(filters?: {
-        userId?: string;
-        eventId?: string;
+        userId?: number | string;
+        eventId?: number | string;
         bookingStatus?: BookingStatus;
     }) {
         return prisma.booking.findMany({
             where: {
-                ...(filters?.userId && { userId: filters.userId }),
-                ...(filters?.eventId && { eventId: filters.eventId }),
+                ...(filters?.userId && { userId: Number(filters.userId) }),
+                ...(filters?.eventId && { eventId: Number(filters.eventId) }),
                 ...(filters?.bookingStatus && { status: filters.bookingStatus }),
             },
             include: {
@@ -38,9 +38,9 @@ export default class BookingRepo {
     }
 
     // READ ONE by ID
-    static async getBookingById(id: string) {
+    static async getBookingById(id: number | string) {
         return prisma.booking.findUnique({
-            where: { id },
+            where: { id: Number(id) },
             include: {
                 user: {
                     select: {
@@ -92,8 +92,8 @@ export default class BookingRepo {
     }) {
         return prisma.booking.create({
             data: {
-                eventId: data.eventId,
-                userId: data.userId,
+                eventId: Number(data.eventId),
+                userId: Number(data.userId),
                 guestCount: data.guestCount || 0,
                 totalAmount: data.totalAmount || 0,
                 status: data.bookingStatus || BookingStatus.draft,
@@ -111,7 +111,7 @@ export default class BookingRepo {
 
     // UPDATE
     static async updateBooking(
-        id: string,
+        id: number | string,
         data: Partial<{
             guestCount: number;
             totalAmount: number;
@@ -123,7 +123,7 @@ export default class BookingRepo {
     ) {
         const { bookingStatus, ...rest } = data;
         return prisma.booking.update({
-            where: { id },
+            where: { id: Number(id) },
             data: {
                 ...rest,
                 ...(bookingStatus && { status: bookingStatus }),
@@ -138,27 +138,27 @@ export default class BookingRepo {
     }
 
     // DELETE (Cancel)
-    static async deleteBooking(id: string) {
+    static async deleteBooking(id: number | string) {
         return prisma.booking.delete({
-            where: { id },
+            where: { id: Number(id) },
         });
     }
 
     // Check if booking exists
-    static async bookingExists(id: string) {
+    static async bookingExists(id: number | string) {
         const booking = await prisma.booking.findUnique({
-            where: { id },
+            where: { id: Number(id) },
             select: { id: true },
         });
         return !!booking;
     }
 
     // Check if user owns booking
-    static async isBookingOwner(bookingId: string, userId: string) {
+    static async isBookingOwner(bookingId: number | string, userId: number | string) {
         const booking = await prisma.booking.findFirst({
             where: {
-                id: bookingId,
-                userId: userId,
+                id: Number(bookingId),
+                userId: Number(userId),
             },
             select: { id: true },
         });
@@ -175,9 +175,9 @@ export default class BookingRepo {
     }
 
     // Get user bookings
-    static async getUserBookings(userId: string) {
+    static async getUserBookings(userId: number | string) {
         return prisma.booking.findMany({
-            where: { userId },
+            where: { userId: Number(userId) },
             include: {
                 event: {
                     include: {
@@ -194,9 +194,9 @@ export default class BookingRepo {
     }
 
     // Get event bookings (for event organizer)
-    static async getEventBookings(eventId: string) {
+    static async getEventBookings(eventId: number | string) {
         return prisma.booking.findMany({
-            where: { eventId },
+            where: { eventId: Number(eventId) },
             include: {
                 user: {
                     select: {

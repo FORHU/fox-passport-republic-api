@@ -13,4 +13,64 @@ export default class ReviewCtrl {
             return res.status(400).json({ success: false, message: error.message });
         }
     }
+
+    static async getAllReviews(req: Request, res: Response) {
+        try {
+            const reviews = await ReviewSvc.getAllReviews();
+            return res.status(200).json({ success: true, data: reviews });
+        } catch (error: any) {
+            return res.status(500).json({ success: false, message: error.message });
+        }
+    }
+
+    static async getReviewById(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const review = await ReviewSvc.getReviewById(id);
+            if (!review) return res.status(404).json({ success: false, message: "Review not found" });
+            return res.status(200).json({ success: true, data: review });
+        } catch (error: any) {
+            return res.status(500).json({ success: false, message: error.message });
+        }
+    }
+
+    static async getListingReviews(req: Request, res: Response) {
+        try {
+            const { listingId } = req.params;
+            const reviews = await ReviewSvc.getListingReviews(listingId);
+            return res.status(200).json({ success: true, data: reviews });
+        } catch (error: any) {
+            return res.status(500).json({ success: false, message: error.message });
+        }
+    }
+
+    static async getUserReviews(req: Request, res: Response) {
+        try {
+            const { userId } = req.params;
+            const reviews = await ReviewSvc.getUserReviews(userId);
+            return res.status(200).json({ success: true, data: reviews });
+        } catch (error: any) {
+            return res.status(500).json({ success: false, message: error.message });
+        }
+    }
+
+    static async updateReview(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const review = await ReviewSvc.updateReview(id, req.body);
+            return res.status(200).json({ success: true, data: review });
+        } catch (error: any) {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+    }
+
+    static async deleteReview(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            await ReviewSvc.deleteReview(id);
+            return res.status(200).json({ success: true, message: "Review deleted successfully" });
+        } catch (error: any) {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+    }
 }
