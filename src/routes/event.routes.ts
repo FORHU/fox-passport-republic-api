@@ -11,5 +11,6 @@ router.get("/:id", EventCtrl.getEventById);
 // Protected
 router.use(authenticate);
 router.post("/", EventCtrl.createEvent);
+router.put("/:id", EventCtrl.updateEvent);
 
 export default router;

@@ -82,24 +82,24 @@ export default class BookingRepo {
     static async createBooking(data: {
         eventId: string;
         userId: string;
-        guestCount?: number;
-        totalAmount?: number;
-        bookingStatus?: BookingStatus;
+        guestCount: number;
+        totalAmount: number;
+        bookingStatus: BookingStatus;
         confirmationCode: string;
         specialRequests?: string;
-        currentStep?: number;
+        currentStep: number;
         expiresAt?: Date;
     }) {
         return prisma.booking.create({
             data: {
                 eventId: String(data.eventId),
                 userId: String(data.userId),
-                guestCount: data.guestCount || 0,
-                totalAmount: data.totalAmount || 0,
-                status: data.bookingStatus || BookingStatus.draft,
+                guestCount: data.guestCount,
+                totalAmount: data.totalAmount,
+                status: data.bookingStatus,
                 confirmationCode: data.confirmationCode,
                 specialRequests: data.specialRequests,
-                currentStep: data.currentStep || 1,
+                currentStep: data.currentStep,
                 expiresAt: data.expiresAt,
             },
             include: {

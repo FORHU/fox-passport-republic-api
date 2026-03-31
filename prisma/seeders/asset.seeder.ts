@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client"
+import { BillingRate, PrismaClient } from "@prisma/client"
 
 export async function seedAsset(prisma: PrismaClient) {
     const host = await prisma.user.findUnique({
@@ -48,11 +48,13 @@ export async function seedAsset(prisma: PrismaClient) {
                     categoryId: category.id,
                     name: asset.name,
                     description: asset.description,
+                    billingRate: BillingRate.daily,
                     condition: "good",
                     propertyType: "Equipment",
                     roomType: "Equipment",
                     capacity: 10,
                     maxAttendees: 10,
+                    price: 100,
                     assetImages: {
                         create: [
                             {

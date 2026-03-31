@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import AssetSvc from "../services/asset.service";
 import AssetRentalSvc from "../services/assetRental.service";
-import CategorySvc from "../services/category.service";
 
 export default class AssetCtrl {
 
@@ -11,11 +10,10 @@ export default class AssetCtrl {
     const schema = Joi.object({
       name: Joi.string().required(),
       description: Joi.string().required(),
-      hostId: Joi.number().required(),
-      // either a numeric ID or the slug (frontend fallback)
-      categoryId: Joi.number().integer().optional().allow(null).messages({
-        "number.base": "\"categoryId\" must be a number",
-        "number.integer": "\"categoryId\" must be an integer",
+      hostId: Joi.string().optional(),
+      // either a string ID or the slug (frontend fallback)
+      categoryId: Joi.string().optional().messages({
+        "string.base": "\"categoryId\" must be a string",
       }),
       categorySlug: Joi.string().optional(),
       condition: Joi.string().valid("new", "good", "fair", "refurbished").optional(),
@@ -23,17 +21,10 @@ export default class AssetCtrl {
       roomType: Joi.string().optional(),
       capacity: Joi.number().integer().min(1).optional(),
       maxAttendees: Joi.number().integer().min(1).optional(),
-      images: Joi.array()
-        .items(
-          Joi.object({
-            url: Joi.string().uri().required(),
-            altText: Joi.string().optional(),
-            orderIndex: Joi.number().optional(),
-            isThumbnail: Joi.boolean().optional(),
-          })
-        )
-        .optional(),
-    });
+      price: Joi.number().required(),
+      billingRate: Joi.string().optional(),
+      images: Joi.array().items(Joi.any()).optional(),
+    }).xor("categoryId", "categorySlug");
 
     const { error, value } = schema.validate(req.body);
     if (error) {
@@ -47,26 +38,17 @@ export default class AssetCtrl {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // ensure categoryId is a number (Joi should handle this, but be explicit)
-      let assetData: any = { ...value, ownerId };
-
-      // if slug was sent and we don't yet have an ID, resolve it
-      if ((assetData.categoryId === undefined || assetData.categoryId === null) && assetData.categorySlug) {
-        try {
-          const cat = await CategorySvc.getCategoryBySlug(assetData.categorySlug);
-          assetData.categoryId = cat.id;
-        } catch (e) {
-          // leave it null if slug not found
-          assetData.categoryId = null;
-        }
-      }
-
-      if (assetData.categoryId !== undefined && assetData.categoryId !== null) {
-        assetData.categoryId = Number(assetData.categoryId);
-      }
-      const asset = await AssetSvc.createAsset(assetData);
+      const files = req.files as Express.Multer.File[] | undefined;
+      const asset = await AssetSvc.createAssetFromRequest({
+        ownerId: String(ownerId),
+        body: value,
+        files,
+      });
       return res.status(201).json({ message: "Asset created successfully", asset });
     } catch (error: any) {
+      if (error?.message?.startsWith("Category with slug") ) {
+        return res.status(404).json({ message: error.message });
+      }
       return res.status(400).json({ message: error.message || error });
     }
   }
@@ -77,8 +59,8 @@ export default class AssetCtrl {
       const { ownerId, categoryId } = req.query;
 
       const assets = await AssetSvc.getAssets({
-        ...(ownerId && { ownerId: Number(ownerId) }),
-        ...(categoryId && { categoryId: Number(categoryId) }),
+        ...(ownerId && { ownerId: String(ownerId) }),
+        ...(categoryId && { categoryId: String(categoryId) }),
       });
 
       return res.status(200).json({ assets });
@@ -91,10 +73,10 @@ export default class AssetCtrl {
    static async getAssetById(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const idNum = Number(id);
-      if (!Number.isInteger(idNum) || idNum <= 0) {
-        return res.status(400).json({ message: "Invalid asset id" });
-      }
+      const idNum = String(id);
+      if (!id || typeof id !== "string") {
+      return res.status(400).json({ message: "Invalid asset id" });
+    }
 
       const asset = await AssetSvc.getAssetById(idNum);
       return res.status(200).json({ asset });
@@ -107,10 +89,10 @@ export default class AssetCtrl {
   static async getAssetRentals(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const idNum = Number(id);
-      if (!Number.isInteger(idNum) || idNum <= 0) {
-        return res.status(400).json({ message: "Invalid asset id" });
-      }
+      const idNum = String(id);
+      if (!id || typeof id !== "string") {
+      return res.status(400).json({ message: "Invalid asset id" });
+    }
 
       const rentals = await AssetRentalSvc.getRentalsForAsset(idNum);
       return res.status(200).json({ rentals });
@@ -133,10 +115,10 @@ export default class AssetCtrl {
 
     try {
       const { id } = req.params;
-      const assetId = Number(id);
-      if (!Number.isInteger(assetId) || assetId <= 0) {
-        return res.status(400).json({ message: "Invalid asset id" });
-      }
+      const assetId = String(id);
+      if (!assetId || typeof assetId !== "string") {
+      return res.status(400).json({ message: "Invalid asset id" });
+    }
 
       const renterId = (req as any).user?.userId;
       if (!renterId) {
@@ -161,12 +143,12 @@ export default class AssetCtrl {
     const schema = Joi.object({
       name: Joi.string().optional(),
       description: Joi.string().optional(),
-      hostId: Joi.number().optional(),
-      categoryId: Joi.number().integer().allow(null).optional().messages({
-        "number.base": "\"categoryId\" must be a number",
-        "number.integer": "\"categoryId\" must be an integer",
+      hostId: Joi.string().optional(),
+      categoryId: Joi.string().allow(null).optional().messages({
+        "string.base": "\"categoryId\" must be a string",
       }),
       categorySlug: Joi.string().optional(),
+      price: Joi.number().min(0).optional(),
       images: Joi.array()
         .items(
           Joi.object({
@@ -186,8 +168,7 @@ export default class AssetCtrl {
 
     try {
       const { id } = req.params;
-      const idNum = Number(id);
-      if (!Number.isInteger(idNum) || idNum <= 0) {
+      if (!id || typeof id !== "string") {
         return res.status(400).json({ message: "Invalid asset id" });
       }
 
@@ -196,21 +177,11 @@ export default class AssetCtrl {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      let updateData: any = value;
-      // allow slug on update too
-      if ((updateData.categoryId === undefined || updateData.categoryId === null) && updateData.categorySlug) {
-        try {
-          const cat = await CategorySvc.getCategoryBySlug(updateData.categorySlug);
-          updateData.categoryId = cat.id;
-        } catch (e) {
-          updateData.categoryId = null;
-        }
-      }
-
-      if (updateData.categoryId !== undefined && updateData.categoryId !== null) {
-        updateData.categoryId = Number(updateData.categoryId);
-      }
-      const asset = await AssetSvc.updateAsset(idNum, ownerId, updateData);
+      const asset = await AssetSvc.updateAssetFromRequest({
+        id: String(id),
+        ownerId: String(ownerId),
+        body: value,
+      });
       return res.status(200).json({ message: "Asset updated successfully", asset });
     } catch (error: any) {
       return res.status(400).json({ message: error.message || error });
@@ -227,11 +198,70 @@ export default class AssetCtrl {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const result = await AssetSvc.deleteAsset(Number(id), Number(requesterId));
+      const result = await AssetSvc.deleteAsset(String(id), String(requesterId));
       return res.status(200).json(result);
     } catch (error: any) {
       const status = error.message.includes("authorized") ? 403 : 400;
       return res.status(status).json({ message: error.message || error });
+    }
+  }
+
+  // IMAGE MANAGEMENT METHODS
+  static async uploadAssetImages(req: Request, res: Response) {
+    try {
+      const ownerId = (req as any).user?.userId;
+      const { id } = req.params; // assetId
+      const files = req.files as Express.Multer.File[];
+
+      if (!ownerId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (!files || files.length === 0) {
+        return res.status(400).json({ message: "No images uploaded" });
+      }
+      const images = await AssetSvc.uploadAssetImages(
+        String(id),
+        String(ownerId),
+        files
+      );
+
+      return res.status(201).json({ success: true, data: images });
+    } catch (error: any) {
+      console.error("🔥 [AssetCtrl] Global Image Upload Error:", error);
+      return res.status(400).json({
+        message: error.message || "Failed to upload images",
+        error: typeof error === 'object' ? error : String(error)
+      });
+    }
+  }
+
+  static async updateAssetImage(req: Request, res: Response) {
+    try {
+      const ownerId = (req as any).user?.userId;
+      const { imageId } = req.params;
+      const data = req.body;
+
+      if (!ownerId) return res.status(401).json({ message: "Unauthorized" });
+
+      const image = await AssetSvc.updateImage(ownerId, imageId, data);
+      return res.status(200).json({ success: true, data: image });
+    } catch (error: any) {
+      return res.status(400).json({ message: error.message || error });
+    }
+  }
+
+  static async deleteAssetImage(req: Request, res: Response) {
+    try {
+      const ownerId = (req as any).user?.userId;
+      const { imageId } = req.params;
+
+      if (!ownerId) return res.status(401).json({ message: "Unauthorized" });
+
+      await AssetSvc.deleteImage(ownerId, imageId);
+      return res.status(200).json({ success: true, message: "Image deleted successfully" });
+    } catch (error: any) {
+      return res.status(400).json({ message: error.message || error });
     }
   }
 }

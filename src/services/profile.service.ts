@@ -1,26 +1,10 @@
-import { prisma } from "../utils/prisma";
 import bcrypt from "bcryptjs";
+import ProfileRepo from "../repositories/profile.repository";
 
 export default class ProfileSvc {
     // Get user profile
     static async getProfile(userId: string) {
-        const user = await prisma.user.findUnique({
-            where: { id: String(userId) },
-            select: {
-                id: true,
-                email: true,
-                username: true,
-                name: true,
-                phone: true,
-                profileImage: true,
-                role: true,
-                isHost: true,
-                isFoxer: true,
-                isVerified: true,
-                createdAt: true,
-                updatedAt: true
-            }
-        });
+        const user = await ProfileRepo.findProfileById(userId);
 
         if (!user) {
             throw new Error("User not found");
@@ -38,37 +22,17 @@ export default class ProfileSvc {
     }) {
         // Check if username is already taken (if updating username)
         if (data.username) {
-            const existingUser = await prisma.user.findFirst({
-                where: {
-                    username: data.username,
-                    NOT: { id: String(userId) }
-                }
-            });
+            const existingUser = await ProfileRepo.findByUsernameExcludingUserId(
+                data.username,
+                userId
+            );
 
             if (existingUser) {
                 throw new Error("Username already taken");
             }
         }
 
-        const updatedUser = await prisma.user.update({
-            where: { id: String(userId) },
-            data,
-            select: {
-                id: true,
-                email: true,
-                username: true,
-                name: true,
-                phone: true,
-                profileImage: true,
-                role: true,
-                isHost: true,
-                isFoxer: true,
-                isVerified: true,
-                updatedAt: true
-            }
-        });
-
-        return updatedUser;
+        return ProfileRepo.updateProfile(userId, data);
     }
 
     // Change password
@@ -78,9 +42,7 @@ export default class ProfileSvc {
         newPassword: string
     ) {
         // Get user with password
-        const user = await prisma.user.findUnique({
-            where: { id: String(userId) }
-        });
+        const user = await ProfileRepo.findUserForPasswordCheck(userId);
 
         if (!user) {
             throw new Error("User not found");
@@ -96,10 +58,7 @@ export default class ProfileSvc {
         const hashedPassword = await bcrypt.hash(newPassword, 10);
 
         // Update password
-        await prisma.user.update({
-            where: { id: String(userId) },
-            data: { password: hashedPassword }
-        });
+        await ProfileRepo.updatePasswordHash(userId, hashedPassword);
 
         return { message: "Password changed successfully" };
     }
@@ -107,9 +66,7 @@ export default class ProfileSvc {
     // Delete account
     static async deleteAccount(userId: string, password: string) {
         // Get user with password
-        const user = await prisma.user.findUnique({
-            where: { id: String(userId) }
-        });
+        const user = await ProfileRepo.findUserForPasswordCheck(userId);
 
         if (!user) {
             throw new Error("User not found");
@@ -122,9 +79,7 @@ export default class ProfileSvc {
         }
 
         // Delete user (cascade will handle related records)
-        await prisma.user.delete({
-            where: { id: String(userId) }
-        });
+        await ProfileRepo.deleteUser(userId);
 
         return { message: "Account deleted successfully" };
     }

@@ -77,6 +77,24 @@ export default class UsersRepo {
     });
   }
 
+  static async becomeHost(userId: string) {
+    return prisma.user.update({
+      where: { id: String(userId) },
+      data: {
+        role: "mayor",
+        isHost: true,
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        name: true,
+        role: true,
+        isHost: true,
+      },
+    });
+  }
+
   // DELETE
   static async deleteUser(id: string) {
     return prisma.user.delete({

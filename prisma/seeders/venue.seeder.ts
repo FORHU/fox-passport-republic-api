@@ -26,6 +26,7 @@ export async function seedVenue(prisma: PrismaClient) {
         techAv: ["Free WiFi", "Projector", "Sound System"],
         staffing: ["Cleaning Lady", "Security", "Event Staff"],
         policies: ["No Smoking", "No Pets"],
+        price: 10000,
         status: VenueStatus.published,
       },
       {
@@ -42,19 +43,18 @@ export async function seedVenue(prisma: PrismaClient) {
         techAv: ["Microphones", "Display Screen"],
         staffing: ["Cleaning Lady", "Security"],
         policies: ["No Smoking", "No Alcohol"],
+        price: 100,
         status: VenueStatus.published,
       },
     ]
 
     for (const v of mockVenues) {
-      console.log(`🔍 Checking if venue exists: "${v.name}"`)
 
       const existing = await prisma.venue.findFirst({
         where: { name: v.name },
       })
 
       if (!existing) {
-        console.log(`➕ Creating venue: "${v.name}"`)
         await prisma.venue.create({
           data: {
             hostId: host.id,
@@ -72,6 +72,7 @@ export async function seedVenue(prisma: PrismaClient) {
             techAv: v.techAv,
             staffing: v.staffing,
             policies: v.policies,
+            price: v.price,
             venueImages: {
               create: [
                 {

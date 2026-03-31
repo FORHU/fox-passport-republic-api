@@ -35,12 +35,13 @@ export default class EventRepo {
                 organizer: {
                     select: {
                         id: true,
-                        name: true
+                        name: true,
+                        profileImage: true,
                     }
                 }
             },
             orderBy: {
-                startDatetime: "asc",
+                createdAt: "desc",
             },
         });
     }
@@ -99,8 +100,8 @@ export default class EventRepo {
                 endDatetime: data.endDatetime,
                 maxAttendees: data.maxAttendees,
                 totalPrice: data.totalPrice,
-                currency: data.currency || "PHP",
-                status: data.status || EventStatus.draft,
+                ...(data.currency ? { currency: data.currency } : {}),
+                ...(data.status ? { status: data.status } : {}),
             },
         });
     }

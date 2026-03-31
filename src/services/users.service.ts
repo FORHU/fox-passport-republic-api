@@ -61,4 +61,11 @@ export default class UsersSvc {
 
     return UsersRepo.deleteUser(id);
   }
+
+  static async becomeHost(userId: string) {
+    const user = await UsersRepo.getUserById(userId);
+    if (!user) throw new Error("User not found");
+
+    return UsersRepo.becomeHost(userId);
+  }
 }

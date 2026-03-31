@@ -8,10 +8,10 @@ import eventRoutes from "./event.routes";
 import bookingRoutes from "./booking.routes";
 import bookingAttendeeRoutes from "./bookingAttendee.routes";
 import paymentRoutes from "./payment.routes";
-import categoryRoutes from "./category.routes";
 import reviewRoutes from "./review.routes";
 import favoriteRoutes from "./favorite.routes";
 import assetRoutes from "./asset.routes";
+import serviceRoutes from "./service.routes";
 
 const router = express.Router();
 
@@ -50,8 +50,10 @@ router.use("/v1/attendees", bookingAttendeeRoutes);
 router.use("/v1/attendees/", bookingAttendeeRoutes); // Trailing slash alias
 router.use("/v1/payments", paymentRoutes);
 router.use("/v1/payments/", paymentRoutes); // Trailing slash alias
-router.use("/v1/categories", categoryRoutes);
 router.use("/v1/assets", assetRoutes);
+router.use("/v1/asset", assetRoutes);
+router.use("/v1/services", serviceRoutes);
+router.use("/v1/service", serviceRoutes);
 
 
 // Feature Routes (Reviews & Favorites)
@@ -59,3 +61,4 @@ router.use("/v1/reviews", reviewRoutes);
 router.use("/v1/favorites", favoriteRoutes);
 
 export default router;
+
