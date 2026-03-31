@@ -32,8 +32,12 @@ export default class EventSvc {
         currency?: string;
         status?: EventStatus;
     }) {
-        // Ideally verify venue availability here
-        return EventRepo.createEvent(data);
+        // Default event fields at the service layer.
+        return EventRepo.createEvent({
+            ...data,
+            currency: data.currency ?? "PHP",
+            status: data.status ?? EventStatus.draft,
+        });
     }
 
     static async updateEvent(id: string, userId: string, data: Partial<any>) {

@@ -20,6 +20,7 @@ function hashPassword(password: string) {
 
   return `${salt}:${hash}`
 }
+//pasword: password123
 
 export async function seedUsers(prisma: PrismaClient) {
   const mockUsers: MockUser[] = [
@@ -90,8 +91,6 @@ export async function seedUsers(prisma: PrismaClient) {
         role: u.role,
       },
     })
-
-    console.log(`✅ Seeded/Updated user: ${u.email}`)
     createdUsers[u.email] = user
   }
 

@@ -5,6 +5,6 @@
     "outDir": "./dist-test"
   },
   "include": [
-    "test/**/*.ts",
+    "test/**/*.ts"
   ]
 }

@@ -4,8 +4,8 @@ import AssetRepo from "../repositories/asset.repository";
 export default class AssetRentalSvc {
   // create a new rental for an asset
   static async rentAsset(
-    assetId: number,
-    renterId: number,
+    assetId: string,
+    renterId: string,
     startDate: Date,
     endDate: Date
   ) {
@@ -41,11 +41,11 @@ export default class AssetRentalSvc {
     return rental;
   }
 
-  static async getRentalsForAsset(assetId: number) {
+  static async getRentalsForAsset(assetId: string) {
     return AssetRentalRepo.findRentalsByAsset(assetId);
   }
 
-  static async getRentalById(id: number) {
+  static async getRentalById(id: string) {
     const rental = await AssetRentalRepo.findRentalById(id);
     if (!rental) {
       throw new Error("Rental not found");

@@ -1,9 +1,10 @@
+import { RentalStatus } from "@prisma/client";
 import { prisma } from "../utils/prisma";
 
 export default class AssetRentalRepo {
   static async createRental(data: {
-    assetId: number;
-    renterId: number;
+    assetId: string;
+    renterId: string;
     startDate: Date;
     endDate: Date;
   }) {
@@ -17,17 +18,14 @@ export default class AssetRentalRepo {
     });
   }
 
-  static async findRentalById(id: number) {
-    if (!Number.isInteger(id) || id <= 0) {
-      throw new Error("Invalid rental id");
-    }
+  static async findRentalById(id: string) {
     return prisma.assetRental.findUnique({
       where: { id },
       include: { asset: true, renter: true },
     });
   }
 
-  static async findRentalsByAsset(assetId: number) {
+  static async findRentalsByAsset(assetId: string) {
     return prisma.assetRental.findMany({
       where: { assetId },
       include: { renter: true },
@@ -35,7 +33,7 @@ export default class AssetRentalRepo {
     });
   }
 
-  static async updateRentalStatus(id: number, status: "pending" | "active" | "completed" | "cancelled") {
+  static async updateRentalStatus(id: string, status: RentalStatus) {
     return prisma.assetRental.update({
       where: { id },
       data: { status },

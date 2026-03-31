@@ -26,4 +26,50 @@ export async function uploadVenueImage(file: Express.Multer.File, venueId: strin
     return data.publicUrl;
 }
 
+export async function uploadServiceImage(file: Express.Multer.File, serviceId: string) {
+    const filename = `${Date.now()}-${file.originalname.replace(/\s+/g, "_")}`;
+    const filePath = `${serviceId}/${filename}`;
+
+    const { error } = await supabase.storage
+        .from("services")
+        .upload(filePath, file.buffer, {
+            contentType: file.mimetype,
+            upsert: true,
+        });
+
+    if (error) {
+        console.error("Supabase upload error:", error);
+        throw error;
+    }
+
+    const { data } = supabase.storage
+        .from("services")
+        .getPublicUrl(filePath);
+
+    return data.publicUrl;
+}
+
+export async function uploadAssetImage(file: Express.Multer.File, assetId: string) {
+    const filename = `${Date.now()}-${file.originalname.replace(/\s+/g, "_")}`;
+    const filePath = `${assetId}/${filename}`;
+
+    const { error } = await supabase.storage
+        .from("assets")
+        .upload(filePath, file.buffer, {
+            contentType: file.mimetype,
+            upsert: true,
+        });
+
+    if (error) {
+        console.error("Supabase upload error:", error);
+        throw error;
+    }
+
+    const { data } = supabase.storage
+        .from("assets")
+        .getPublicUrl(filePath);
+
+    return data.publicUrl;
+}
+
 export default supabase;

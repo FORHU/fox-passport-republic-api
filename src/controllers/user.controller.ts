@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
-import { prisma } from "../utils/prisma";
+import UsersSvc from "../services/users.service";
+import ProfileSvc from "../services/profile.service";
 
 export default class UserController {
   /**
@@ -17,37 +18,24 @@ export default class UserController {
         });
       }
 
-      // Update user to host role
-      const updatedUser = await prisma.user.update({
-        where: { id: String(userId) },
-        data: {
-          role: "mayor",
-          isHost: true,
-        },
-        select: {
-          id: true,
-          email: true,
-          username: true,
-          name: true,
-          role: true,
-          isHost: true,
-        },
-      });
+      const updatedUser = await UsersSvc.becomeHost(String(userId));
 
       return res.status(200).json({
         success: true,
         message:
-          "You are now a host! Please log in again to refresh your session.",
+          "Your request to be a mayor has been sent to the admin. Please wait for the admin to approve your request.",
         data: updatedUser,
       });
     } catch (error: any) {
-      console.error("Error upgrading to host:", error);
+      console.error("Error upgrading to mayor:", error);
       return res.status(500).json({
         success: false,
-        message: error.message || "Failed to upgrade to host",
+        message: error.message || "Failed to upgrade to mayor",
       });
     }
   }
+
+  
 
   /**
    * Get current user profile
@@ -63,29 +51,7 @@ export default class UserController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { id: String(userId) },
-        select: {
-          id: true,
-          email: true,
-          username: true,
-          name: true,
-          phone: true,
-          profileImage: true,
-          role: true,
-          isHost: true,
-          isFoxer: true,
-          isVerified: true,
-          createdAt: true,
-        },
-      });
-
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: "User not found",
-        });
-      }
+      const user = await ProfileSvc.getProfile(String(userId));
 
       return res.status(200).json({
         success: true,
@@ -93,6 +59,12 @@ export default class UserController {
       });
     } catch (error: any) {
       console.error("Error fetching profile:", error);
+      if (error.message === "User not found") {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
       return res.status(500).json({
         success: false,
         message: error.message || "Failed to fetch profile",

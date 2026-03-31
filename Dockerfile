@@ -1,21 +1,27 @@
 FROM node:22-alpine
 
+# Install pnpm globally
+RUN npm install -g pnpm
+
 WORKDIR /app
 
 # Copy package files and prisma schema first for better caching
-# This prevents re-installing dependencies if only source code changes
-COPY package*.json ./
+COPY package*.json pnpm-lock.yaml ./
 COPY prisma ./prisma/
 
-# Install dependencies
-RUN npm ci --legacy-peer-deps
+# Install dependencies using pnpm
+RUN pnpm install --frozen-lockfile
 
 # Generate Prisma client
-RUN npx prisma generate
+RUN pnpm prisma generate
 
-RUN npm run build
+# Copy project files
+COPY . .
+
+# Build the application
+RUN pnpm build
 
 # Optional: expose port for readability
-EXPOSE 3000
+EXPOSE 3002
 
-CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
+CMD ["sh", "-c", "pnpm prisma migrate deploy && pnpm start"]

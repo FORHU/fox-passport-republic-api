@@ -192,8 +192,9 @@ export default class BookingSvc {
       userId: data.userId,
       guestCount: data.guestCount,
       totalAmount: data.totalAmount,
-      bookingStatus: data.bookingStatus || BookingStatus.pending,
+      bookingStatus: data.bookingStatus ?? BookingStatus.pending,
       confirmationCode,
+      currentStep: 1,
     });
 
     // 3. Create Attendees

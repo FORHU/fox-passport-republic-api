@@ -4,13 +4,12 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // MODELS
 model Passport {
-  id           Int      @id @default(autoincrement())
-  userId       Int      @unique
+  id           String   @id @default(uuid())
+  userId       String   @unique
   totalStamps  Int      @default(0)
   totalMileage Int      @default(0)
   level        Int      @default(1)
@@ -21,8 +20,8 @@ model Passport {
 }
 
 model AssetImage {
-  id          Int     @id @default(autoincrement())
-  assetId     Int
+  id          String  @id @default(uuid())
+  assetId     String
   url         String
   altText     String?
   orderIndex  Int?
@@ -32,6 +31,7 @@ model AssetImage {
   @@map("asset_images")
 }
 
+//shared by AssetRental, ServiceRental, and VenueRental
 enum RentalStatus {
   pending
   active
@@ -40,23 +40,25 @@ enum RentalStatus {
 }
 
 model Asset {
-  id           Int          @id @default(autoincrement())
-  ownerId      Int
-  hostId       Int
-  categoryId   Int?
+  id           String         @id @default(uuid())
+  ownerId      String
+  hostId       String
+  categoryId   String?
   name         String
   description  String
-  condition    AssetCondition @default(good) 
+  condition    AssetCondition @default(good)
   propertyType String?
   roomType     String?
   capacity     Int?
   maxAttendees Int?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  price        Float
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  billingRate  BillingRate
   assetImages  AssetImage[]
-  category     Category?    @relation(fields: [categoryId], references: [id])
-  host         User         @relation("assets_hostIdTousers", fields: [hostId], references: [id])
-  owner        User         @relation("assets_ownerIdTousers", fields: [ownerId], references: [id], onDelete: Cascade)
+  category     Category?      @relation(fields: [categoryId], references: [id])
+  host         User           @relation("assets_hostIdTousers", fields: [hostId], references: [id])
+  owner        User           @relation("assets_ownerIdTousers", fields: [ownerId], references: [id], onDelete: Cascade)
   eventAssets  EventAsset[]
   rentals      AssetRental[]
   deleteAt     DateTime?
@@ -65,8 +67,8 @@ model Asset {
 }
 
 model BookingAttendee {
-  id          Int       @id @default(autoincrement())
-  bookingId   Int
+  id          String    @id @default(uuid())
+  bookingId   String
   firstName   String
   lastName    String
   email       String?
@@ -82,9 +84,9 @@ model BookingAttendee {
 }
 
 model Booking {
-  id               Int               @id @default(autoincrement())
-  eventId          Int
-  userId           Int
+  id               String            @id @default(uuid())
+  eventId          String
+  userId           String
   guestCount       Int
   totalAmount      Float
   confirmationCode String?           @unique
@@ -120,41 +122,45 @@ model Category {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  parentCategory Category?  @relation("CategoryToCategory", fields: [parentCategoryId], references: [id])
+  subCategories  Category[] @relation("CategoryToCategory")
+  assets         Asset[]
+
   @@map("categories")
 }
 
 model EventAsset {
-  id       Int   @id @default(autoincrement())
-  eventId  Int
-  assetId  Int
+  id       String @id @default(uuid())
+  eventId  String
+  assetId  String
   quantity Int
-  asset    Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  event    Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  asset    Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  event    Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, assetId])
   @@map("event_assets")
 }
 
 model AssetRental {
-  id        Int          @id @default(autoincrement())
-  assetId   Int
-  renterId  Int
+  id        String       @id @default(uuid())
+  assetId   String
+  renterId  String
   startDate DateTime
   endDate   DateTime
   status    RentalStatus @default(pending)
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  asset   Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  renter  User  @relation(fields: [renterId], references: [id])
+  asset  Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  renter User  @relation(fields: [renterId], references: [id])
 
   @@map("asset_rentals")
 }
 
 model EventService {
-  id          Int     @id @default(autoincrement())
-  eventId     Int
-  serviceId   Int
+  id          String  @id @default(uuid())
+  eventId     String
+  serviceId   String
   agreedPrice Float
   event       Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
   service     Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
@@ -164,9 +170,9 @@ model EventService {
 }
 
 model Event {
-  id            Int            @id @default(autoincrement())
-  venueId       Int
-  organizerId   Int
+  id            String         @id @default(uuid())
+  venueId       String
+  organizerId   String
   name          String
   description   String
   eventType     EventType
@@ -183,19 +189,23 @@ model Event {
   eventServices EventService[]
   organizer     User           @relation(fields: [organizerId], references: [id])
   venue         Venue          @relation(fields: [venueId], references: [id])
+  favorites     Favorite[]
+  reviews       Review[]
 
   @@map("events")
 }
 
 model Favorite {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  venueId   Int?
-  eventId   Int?
+  id        String   @id @default(uuid())
+  userId    String
+  venueId   String?
+  eventId   String?
   savedAt   DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venue     Venue?   @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  event     Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@map("favorites")
 }
@@ -227,60 +237,85 @@ model Review {
   isVerifiedAttendee Boolean  @default(false)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
-  user               User     @relation(fields: [userId], references: [id])
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venue              Venue?   @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  event              Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@map("reviews")
 }
 
 model Service {
-  id            Int             @id @default(autoincrement())
-  ownerId       Int
+  id            String          @id @default(uuid())
+  ownerId       String
   name          String
   description   String
   category      ServiceCategory
   price         Float
+  billingRate   BillingRate
   status        ServiceStatus   @default(active)
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   eventServices EventService[]
   owner         User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  images        ServiceImage[]
 
   @@map("services")
 }
 
+model ServiceImage {
+  id          String  @id @default(uuid())
+  serviceId   String
+  url         String
+  altText     String?
+  orderIndex  Int?
+  isThumbnail Boolean @default(false)
+  service     Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@map("service_images")
+}
+
+model ServiceRental {
+  id        String       @id @default(uuid())
+  serviceId String
+  renterId  String
+  startDate DateTime
+  endDate   DateTime
+  status    RentalStatus @default(pending)
+}
+
 model User {
-  id                         Int        @id @default(autoincrement())
-  email                      String     @unique
-  password                   String
-  name                       String
-  username                   String?    @unique
-  profileImage               String?
-  phone                      String?
-  role                       UserRole   @default(user)
-  isVerified                 Boolean    @default(false)
-  isHost                     Boolean    @default(false)
-  isMayor                    Boolean    @default(false)
-  isInvestor                 Boolean    @default(false)
-  isFoxer                    Boolean    @default(false)
-  createdAt                  DateTime   @default(now())
-  updatedAt                  DateTime   @updatedAt
-  Passport                   Passport?
-  assetsAssetsHostIdTousers  Asset[]    @relation("assets_hostIdTousers")
-  assetsAssetsOwnerIdTousers Asset[]    @relation("assets_ownerIdTousers")
-  bookings                   Booking[]
-  events                     Event[]
-  favorites                  Favorite[]
-  reviews                    Review[]
-  services                   Service[]
-  venues                     Venue[]
-  rentals                    AssetRental[]
+  id           String        @id @default(uuid())
+  email        String        @unique
+  password     String
+  name         String
+  username     String?       @unique
+  profileImage String?
+  phone        String?
+  role         UserRole      @default(user)
+  isVerified   Boolean       @default(false)
+  isHost       Boolean       @default(false)
+  isMayor      Boolean       @default(false)
+  isInvestor   Boolean       @default(false)
+  isFoxer      Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  passport     Passport?
+  hostedAssets Asset[]       @relation("assets_hostIdTousers")
+  ownedAssets  Asset[]       @relation("assets_ownerIdTousers")
+  bookings     Booking[]
+  events       Event[]
+  favorites    Favorite[]
+  reviews      Review[]
+  services     Service[]
+  venues       Venue[]
+  rentals      AssetRental[]
 
   @@map("users")
 }
 
 model VenueImage {
-  id          Int     @id @default(autoincrement())
-  venueId     Int
+  id          String  @id @default(uuid())
+  venueId     String
   url         String
   altText     String?
   orderIndex  Int?
@@ -291,8 +326,8 @@ model VenueImage {
 }
 
 model Venue {
-  id          Int          @id @default(autoincrement())
-  hostId      Int
+  id          String       @id @default(uuid())
+  hostId      String
   name        String
   description String
   type        VenueType
@@ -306,9 +341,26 @@ model Venue {
   updatedAt   DateTime     @updatedAt
   events      Event[]
   venueImages VenueImage[]
+  price       Float
+  spaceType   String[]
+  amenities   String[]
+  techAv      String[]
+  staffing    String[]
+  policies    String[]
   host        User         @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  favorites   Favorite[]
+  reviews     Review[]
 
   @@map("venues")
+}
+
+model VenueRental {
+  id        String       @id @default(uuid())
+  venueId   String
+  renterId  String
+  startDate DateTime
+  endDate   DateTime
+  status    RentalStatus @default(pending)
 }
 
 // ENUMS
@@ -335,6 +387,7 @@ enum VenueStatus {
   published
   suspended
   archived
+  rejected
 }
 
 enum BookingStatus {
@@ -363,7 +416,7 @@ enum AssetCondition {
   new
   good
   fair
-  refurbished 
+  refurbished
 }
 
 enum AssetStatus {
@@ -374,9 +427,11 @@ enum AssetStatus {
 
 enum EventType {
   corporate
-  celebration
-  private_experience
-  popup
+  fair
+  birthday
+  wedding
+  anniversary
+  graduation
   other
 }
 
@@ -395,6 +450,17 @@ enum ServiceStatus {
   active
   paused
   unavailable
+}
+
+//shared by Service and Asset
+enum BillingRate {
+  hourly
+  daily
+  weekly
+  monthly
+  yearly
+  one_time
+  other
 }
 
 enum StorageType {

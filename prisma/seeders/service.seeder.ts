@@ -1,4 +1,4 @@
-import { PrismaClient, ServiceCategory } from "@prisma/client"
+import { BillingRate, PrismaClient, ServiceCategory } from "@prisma/client"
 
 export async function seedService(prisma: PrismaClient) {
     const host = await prisma.user.findUnique({
@@ -43,6 +43,7 @@ export async function seedService(prisma: PrismaClient) {
                     description: service.description,
                     category: service.category,
                     price: service.price,
+                    billingRate: BillingRate.daily,
                 },
             })
         }
