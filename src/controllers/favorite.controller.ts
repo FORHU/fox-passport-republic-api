@@ -5,7 +5,7 @@ export default class FavoriteCtrl {
     static async toggleFavorite(req: Request, res: Response) {
         try {
             const { targetId, type } = req.body; // type: 'venue' or 'event'
-            const result = await FavoriteSvc.toggleFavorite(req.user!.id, targetId, type);
+            const result = await FavoriteSvc.toggleFavorite(req.user!.userId, targetId, type);
             return res.status(200).json({ success: true, data: result });
         } catch (error: any) {
             return res.status(400).json({ success: false, message: error.message });
@@ -14,7 +14,7 @@ export default class FavoriteCtrl {
 
     static async getUserFavorites(req: Request, res: Response) {
         try {
-            const favorites = await FavoriteSvc.getUserFavorites(req.user!.id);
+            const favorites = await FavoriteSvc.getUserFavorites(req.user!.userId);
             return res.status(200).json({ success: true, data: favorites });
         } catch (error: any) {
             return res.status(500).json({ success: false, message: error.message });
@@ -24,7 +24,7 @@ export default class FavoriteCtrl {
     static async checkFavorite(req: Request, res: Response) {
         try {
             const { targetId, type } = req.query as any;
-            const isFavorite = await FavoriteSvc.checkFavorite(req.user!.id, targetId, type);
+            const isFavorite = await FavoriteSvc.checkFavorite(req.user!.userId, targetId, type);
             return res.status(200).json({ success: true, data: { isFavorite } });
         } catch (error: any) {
             return res.status(500).json({ success: false, message: error.message });
@@ -34,7 +34,7 @@ export default class FavoriteCtrl {
     static async addFavorite(req: Request, res: Response) {
         try {
             const { targetId, type } = req.body;
-            const result = await FavoriteSvc.addFavorite(req.user!.id, targetId, type);
+            const result = await FavoriteSvc.addFavorite(req.user!.userId, targetId, type);
             return res.status(201).json({ success: true, data: result });
         } catch (error: any) {
             return res.status(400).json({ success: false, message: error.message });
@@ -54,7 +54,7 @@ export default class FavoriteCtrl {
     static async removeFavoriteByListing(req: Request, res: Response) {
         try {
             const { targetId, type } = req.body;
-            await FavoriteSvc.removeFavoriteByListing(req.user!.id, targetId, type);
+            await FavoriteSvc.removeFavoriteByListing(req.user!.userId, targetId, type);
             return res.status(200).json({ success: true, message: "Favorite removed successfully" });
         } catch (error: any) {
             return res.status(400).json({ success: false, message: error.message });

@@ -26,7 +26,7 @@ export default class BookingCtrl {
             }
 
             const booking = await BookingSvc.createBooking({
-                userId: req.user!.id,
+                userId: req.user!.userId,
                 ...value,
             });
 
@@ -50,7 +50,7 @@ export default class BookingCtrl {
             if (error) return res.status(400).json({ message: error.message });
 
             const booking = await BookingSvc.createDraftBooking({
-                userId: req.user!.id,
+                userId: req.user!.userId,
                 ...value
             });
 
@@ -84,7 +84,7 @@ export default class BookingCtrl {
     // GET USER BOOKINGS
     static async getUserBookings(req: Request, res: Response) {
         try {
-            const bookings = await BookingSvc.getUserBookings(req.user!.id);
+            const bookings = await BookingSvc.getUserBookings(req.user!.userId);
             return res.status(200).json({ success: true, data: bookings });
         } catch (error: any) {
             return res.status(500).json({ success: false, message: error.message });

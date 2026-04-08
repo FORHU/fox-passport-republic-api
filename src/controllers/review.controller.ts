@@ -5,7 +5,7 @@ export default class ReviewCtrl {
     static async createReview(req: Request, res: Response) {
         try {
             const review = await ReviewSvc.createReview({
-                userId: req.user!.id,
+                userId: req.user!.userId,
                 ...req.body
             });
             return res.status(201).json({ success: true, data: review });
