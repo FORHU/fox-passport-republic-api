@@ -262,6 +262,8 @@ export default class VenueRepo {
                 address: data.address ?? undefined,
                 city: data.city ?? undefined,
                 state: data.state ?? undefined,
+                country: data.country ?? undefined,
+                spaceType: data.spaceType ?? undefined,
                 amenities: data.amenities ?? undefined,
                 techAv: data.techAv ?? undefined,
                 staffing: data.staffing ?? undefined,

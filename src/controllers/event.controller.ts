@@ -42,17 +42,17 @@ export default class EventCtrl {
         const schema = Joi.object({
             name: Joi.string().optional(),
             description: Joi.string().optional(),
-            eventType: Joi.string().valid(...Object.values(EventType)).optional(),
+            eventType: Joi.string().lowercase().valid(...Object.values(EventType)).optional(),
             startDatetime: Joi.date().optional(),
             endDatetime: Joi.date().optional(),
             maxAttendees: Joi.number().integer().min(1).optional(),
             totalPrice: Joi.number().min(0).optional(),
             currency: Joi.string().optional(),
-            status: Joi.string().valid(...Object.values(EventStatus)).optional(),
+            status: Joi.string().lowercase().valid(...Object.values(EventStatus)).optional(),
             venueId: Joi.string().uuid().optional(),
         }).min(1);
 
-        const { error, value } = schema.validate(req.body);
+        const { error, value } = schema.validate(req.body, { stripUnknown: true });
         if (error) {
             return res.status(400).json({ success: false, message: error.message });
         }
