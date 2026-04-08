@@ -85,6 +85,7 @@ CREATE TABLE "assets" (
     "price" DOUBLE PRECISION NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "assetStatus" "AssetStatus" NOT NULL DEFAULT 'available',
     "billingRate" "BillingRate" NOT NULL,
     "deleteAt" TIMESTAMP(3),
 

@@ -35,12 +35,13 @@ type UpdateAssetFromRequestInput = {
     categorySlug?: string;
     name?: string;
     description?: string;
-    condition?: AssetCondition;
-    propertyType?: string;
-    roomType?: string;
     capacity?: number;
     maxAttendees?: number;
     price?: number;
+    billingRate?: BillingRate;
+    condition?: AssetCondition;
+    propertyType?: string;
+    roomType?: string;
     images?: AssetImageInput[];
   };
 };
@@ -207,7 +208,8 @@ export default class AssetSvc {
       roomType?: string;
       capacity?: number;
       maxAttendees?: number;
-      price: number;
+      price?: number; // Optional in update
+      billingRate?: BillingRate;
       images?: { url: string; altText?: string; orderIndex?: number; isThumbnail?: boolean }[];
     }>
   ) {

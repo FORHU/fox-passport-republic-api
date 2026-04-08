@@ -154,7 +154,7 @@ export default class VenueSvc {
         }
 
         // Business rule: validate status transition (admins bypass this)
-        if (!isAdmin && data.status) {
+        if (!isAdmin && data.status && data.status !== venue.status) {
             const validTransitions = this.getValidStatusTransitions(venue.status);
             if (!validTransitions.includes(data.status)) {
                 throw new Error(`Invalid status transition from ${venue.status} to ${data.status}`);

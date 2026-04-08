@@ -111,6 +111,28 @@ export default class EventRepo {
         return prisma.event.update({
             where: { id: String(id) },
             data,
+            include: {
+                venue: {
+                    include: {
+                        venueImages: true
+                    }
+                },
+                eventAssets: {
+                    include: {
+                        asset: {
+                            include: {
+                                assetImages: true
+                            }
+                        }
+                    }
+                },
+                eventServices: {
+                    include: {
+                        service: true
+                    }
+                },
+                organizer: true,
+            },
         });
     }
 
