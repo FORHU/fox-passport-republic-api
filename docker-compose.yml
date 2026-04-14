@@ -1,81 +1,53 @@
-version: '3.8'
-
 services:
-  # PostgreSQL Database
   postgres:
     image: postgres:15
-    container_name: fox_postgres
+    container_name: local_postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres_password
-      POSTGRES_DB: fox_passport_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: foxpassportrepublic
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: unless-stopped
+    networks:
+      - fox_network
 
-  # Redis Cache
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: local_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: 'False'
+      PGADMIN_CONFIG_COOKIE_DEFAULT_SECURE: 'False'
+      PGADMIN_CONFIG_COOKIE_SameSite: 'Lax'
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - fox_network
+
   redis:
-    image: redis:7.4-alpine
-    container_name: fox_redis
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "redis_password"]
+    image: redis:7
+    container_name: local_redis
+    command: [ "redis-server", "--appendonly", "yes" ]
     ports:
       - "6379:6379"
     volumes:
       - redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: unless-stopped
-
-  # Node.js API
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: fox_api
-    environment:
-      NODE_ENV: production
-      PORT: 3002
-      FRONTEND_URL: http://localhost:3001
-      SECRET_KEY: ${SECRET_KEY:-supersecretkey123}
-      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:-accesssecret123}
-      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-refreshsecret123}
-      ACCESS_TOKEN_EXPIRY: 15m
-      REFRESH_TOKEN_EXPIRY: 7d
-      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/fox_passport_db
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: redis_password
-      REDIS_TTL_SECONDS: 3600
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
-      MAILER_TRANSPORT_HOST: ${MAILER_TRANSPORT_HOST:-smtp.ethereal.email}
-      MAILER_TRANSPORT_PORT: ${MAILER_TRANSPORT_PORT:-587}
-      MAILER_TRANSPORT_SECURE: ${MAILER_TRANSPORT_SECURE:-false}
-      MAILER_EMAIL: ${MAILER_EMAIL:-test@example.com}
-      MAILER_PASSWORD: ${MAILER_PASSWORD:-password}
-    ports:
-      - "3002:3002"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - .:/app
-      - /app/node_modules
-    restart: unless-stopped
+    networks:
+      - fox_network
 
 volumes:
   pgdata:
   redisdata:
+
+networks:
+  fox_network:
+    driver: bridge
