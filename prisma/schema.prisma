@@ -364,6 +364,15 @@ model VenueRental {
   status    RentalStatus @default(pending)
 }
 
+model File {
+  id        String       @id @default(uuid())
+  url       String
+  name      String
+  type      String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
 // ENUMS
 
 enum UserRole {
