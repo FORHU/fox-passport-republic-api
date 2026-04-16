@@ -16,7 +16,10 @@ export async function seedPassport(prisma: PrismaClient) {
             userId: user.id,
             totalStamps: 5,
             totalMileage: 120,
-            achievements: ["XLR", "AUX", "MIDI"],
+            achievements: {
+                badges: ["Early Adopter", "Explorer Level 1", "Verified Citizen"],
+                rewards: ["Free Coffee at Skyline", "10% Discount at Garden Pavilion"]
+            },
 
         },
     })

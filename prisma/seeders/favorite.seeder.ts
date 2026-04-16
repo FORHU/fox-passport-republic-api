@@ -17,24 +17,27 @@ export async function seedFavorite(prisma: PrismaClient) {
 
   const favorites = []
 
-  const now = new Date()
-
-  // Only pass the relevant field, plus timestamps
   if (event) {
     favorites.push({
       userId: user.id,
-      venueId: venue?.id,
-      eventId: event.id,
-      savedAt: now,
-      createdAt: now,
-      updatedAt: now,
+      entityId: event.id,
+      entityType: "event",
+    })
+  }
+
+  if (venue) {
+    favorites.push({
+      userId: user.id,
+      entityId: venue.id,
+      entityType: "venue",
     })
   }
 
   if (favorites.length > 0) {
-    await prisma.favorite.createMany({
-      data: favorites,
-      skipDuplicates: true, // prevents unique constraint errors
-    })
+    for (const fav of favorites) {
+      await prisma.favorite.create({
+        data: fav,
+      })
+    }
   }
 }

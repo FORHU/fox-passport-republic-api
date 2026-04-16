@@ -13,42 +13,32 @@ export async function seedReviews(prisma: PrismaClient) {
         where: { name: "Tech Networking Night" },
     })
 
-    const venue = await prisma.venue.findFirst({
-        where: { name: "Skyline Rooftop" },
-    })
-
-    const reviewsToCreate = []
+    const reviews = []
 
     if (event) {
-        reviewsToCreate.push({
+        reviews.push({
             userId: user.id,
             rating: 5,
             comment: "Amazing event experience!",
-            eventId: event.id,
-            venueId: venue?.id,
-            isVerifiedAttendee: true,
+            entityId: event.id,
+            entityType: "event",
         })
     }
 
-    for (const review of reviewsToCreate) {
-        const existing = await prisma.review.findFirst({
+    for (const review of reviews) {
+        const existing = await prisma.review.findUnique({
             where: {
-                userId: review.userId,
-                eventId: review.eventId ?? undefined,
-                venueId: review.venueId ?? undefined,
+                userId_entityId_entityType: {
+                    userId: review.userId,
+                    entityId: review.entityId,
+                    entityType: review.entityType,
+                },
             },
         })
 
         if (!existing) {
             await prisma.review.create({
-                data: {
-                    userId: review.userId,
-                    rating: review.rating,
-                    comment: review.comment,
-                    eventId: review.eventId,
-                    venueId: review.venueId,
-                    isVerifiedAttendee: review.isVerifiedAttendee,
-                },
+                data: review,
             })
         }
     }
