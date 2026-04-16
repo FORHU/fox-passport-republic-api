@@ -6,8 +6,8 @@ type MockUser = {
   name: string
   username: string
   phone: string
-  profileImage: string
   role: UserRole
+  isHost: boolean
 }
 
 // 👇 Match AuthSvc.register hashing
@@ -29,44 +29,44 @@ export async function seedUsers(prisma: PrismaClient) {
       name: "Admin User",
       username: "admin",
       phone: "09123456789",
-      profileImage: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1a",
       role: UserRole.admin,
+      isHost: false,
     },
     {
       email: "host@app.com",
       name: "Venue Host",
       username: "host",
       phone: "09123456789",
-      profileImage: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1a",
       role: UserRole.mayor,
+      isHost: true,
     },
     {
       email: "user@app.com",
       name: "Regular User",
       username: "maria",
       phone: "09123456789",
-      profileImage: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1a",
       role: UserRole.user,
+      isHost: false,
     },
     {
       email: "foxer@app.com",
       name: "Foxer User",
       username: "foxer",
       phone: "09123456789",
-      profileImage: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1a",
       role: UserRole.foxer,
+      isHost: false,
     },
     {
       email: "host2@app.com",
       name: "Venue Host 2",
       username: "host2",
       phone: "09123456789",
-      profileImage: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1a",
       role: UserRole.mayor,
+      isHost: true,
     },
   ]
 
-  const createdUsers: Record<string, { id: string; email: string; name: string; role: UserRole }> = {}
+  const createdUsers: Record<string, any> = {}
 
   for (const u of mockUsers) {
     const password = hashPassword("password123")
@@ -79,6 +79,8 @@ export async function seedUsers(prisma: PrismaClient) {
         role: u.role,
         name: u.name,
         username: u.username,
+        isHost: u.isHost,
+        isVerified: true,
       },
 
       create: {
@@ -87,8 +89,9 @@ export async function seedUsers(prisma: PrismaClient) {
         name: u.name,
         username: u.username,
         phone: u.phone,
-        profileImage: u.profileImage,
         role: u.role,
+        isHost: u.isHost,
+        isVerified: true,
       },
     })
     createdUsers[u.email] = user

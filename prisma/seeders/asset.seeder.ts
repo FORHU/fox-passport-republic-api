@@ -9,29 +9,33 @@ export async function seedAsset(prisma: PrismaClient) {
         throw new Error("Host user not found")
     }
 
-    const category = await prisma.category.findUnique({
-        where: { slug: "equipment" },
-    })
-
-    if (!category) {
-        throw new Error("Category 'equipment' not found")
-    }
-
     const mockAssets = [
         {
             name: "Sound System",
-            description: "Professional audio setup",
-            imageUrl: "https://picsum.photos/400/300?1",
+            description: "Professional audio setup for events",
+            category: "Equipment",
+            price: 5000,
+            billingRate: BillingRate.daily,
+            condition: "good",
+            status: "available",
         },
         {
             name: "Lighting Rig",
             description: "Stage lighting for events",
-            imageUrl: "https://picsum.photos/400/300?2",
+            category: "Equipment",
+            price: 3000,
+            billingRate: BillingRate.daily,
+            condition: "good",
+            status: "available",
         },
         {
             name: "Projector",
             description: "High-resolution event projector",
-            imageUrl: "https://picsum.photos/400/300?3",
+            category: "Equipment",
+            price: 2000,
+            billingRate: BillingRate.daily,
+            condition: "fair",
+            status: "available",
         },
     ]
 
@@ -44,27 +48,13 @@ export async function seedAsset(prisma: PrismaClient) {
             await prisma.asset.create({
                 data: {
                     ownerId: host.id,
-                    hostId: host.id,
-                    categoryId: category.id,
                     name: asset.name,
                     description: asset.description,
-                    billingRate: BillingRate.daily,
-                    condition: "good",
-                    propertyType: "Equipment",
-                    roomType: "Equipment",
-                    capacity: 10,
-                    maxAttendees: 10,
-                    price: 100,
-                    assetImages: {
-                        create: [
-                            {
-                                url: asset.imageUrl,
-                                altText: `${asset.name} Image`,
-                                isThumbnail: true,
-                                orderIndex: 1,
-                            },
-                        ],
-                    },
+                    category: asset.category,
+                    price: asset.price,
+                    billingRate: asset.billingRate as BillingRate,
+                    condition: asset.condition as any,
+                    status: asset.status as any,
                 },
             })
         }

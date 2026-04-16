@@ -1,4 +1,4 @@
-import { BillingRate, PrismaClient, ServiceCategory } from "@prisma/client"
+import { BillingRate, PrismaClient } from "@prisma/client"
 
 export async function seedService(prisma: PrismaClient) {
     const host = await prisma.user.findUnique({
@@ -12,21 +12,27 @@ export async function seedService(prisma: PrismaClient) {
     const mockServices = [
         {
             name: "Catering Service",
-            description: "Full-service catering",
-            category: ServiceCategory.catering,
+            description: "Full-service catering with organic options",
+            category: "Catering",
             price: 15000,
+            billingRate: BillingRate.one_time,
+            status: "available",
         },
         {
             name: "Event Photography",
-            description: "Professional event coverage",
-            category: ServiceCategory.photography,
+            description: "Professional event coverage and video editing",
+            category: "Photography",
             price: 8000,
+            billingRate: BillingRate.daily,
+            status: "available",
         },
         {
             name: "Live Band",
-            description: "Entertainment for events",
-            category: ServiceCategory.entertainment,
+            description: "Entertainment for events ranging from jazz to rock",
+            category: "Entertainment",
             price: 12000,
+            billingRate: BillingRate.daily,
+            status: "available",
         },
     ]
 
@@ -43,7 +49,8 @@ export async function seedService(prisma: PrismaClient) {
                     description: service.description,
                     category: service.category,
                     price: service.price,
-                    billingRate: BillingRate.daily,
+                    billingRate: service.billingRate,
+                    status: service.status as any,
                 },
             })
         }
