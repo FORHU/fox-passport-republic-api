@@ -1,4 +1,4 @@
-import { PrismaClient, VenueType, VenueStatus } from "@prisma/client"
+import { PrismaClient, VenueStatus } from "@prisma/client"
 
 export async function seedVenue(prisma: PrismaClient) {
 
@@ -15,7 +15,7 @@ export async function seedVenue(prisma: PrismaClient) {
       {
         name: "Skyline Rooftop",
         description: "Premium rooftop venue with a stunning view of Baguio City.",
-        type: VenueType.rooftop,
+        category: "Rooftop",
         capacity: 150,
         address: "123 Session Road",
         city: "Baguio",
@@ -27,12 +27,12 @@ export async function seedVenue(prisma: PrismaClient) {
         staffing: ["Cleaning Lady", "Security", "Event Staff"],
         policies: ["No Smoking", "No Pets"],
         price: 10000,
-        status: VenueStatus.published,
+        status: VenueStatus.available,
       },
       {
         name: "Emerald Garden Pavilion",
         description: "Lush garden venue perfect for weddings and outdoor events.",
-        type: VenueType.garden,
+        category: "Garden",
         capacity: 250,
         address: "Kilometer 5, Balili",
         city: "La Trinidad",
@@ -44,7 +44,7 @@ export async function seedVenue(prisma: PrismaClient) {
         staffing: ["Cleaning Lady", "Security"],
         policies: ["No Smoking", "No Alcohol"],
         price: 100,
-        status: VenueStatus.published,
+        status: VenueStatus.available,
       },
     ]
 
@@ -60,7 +60,7 @@ export async function seedVenue(prisma: PrismaClient) {
             hostId: host.id,
             name: v.name,
             description: v.description,
-            type: v.type,
+            category: v.category,
             capacity: v.capacity,
             status: v.status,
             address: v.address,
@@ -73,16 +73,6 @@ export async function seedVenue(prisma: PrismaClient) {
             staffing: v.staffing,
             policies: v.policies,
             price: v.price,
-            venueImages: {
-              create: [
-                {
-                  url: "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format",
-                  altText: `${v.name} Main Image`,
-                  orderIndex: 0,
-                  isThumbnail: true,
-                },
-              ],
-            },
           },
         })
       }

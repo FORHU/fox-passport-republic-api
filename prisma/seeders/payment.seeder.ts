@@ -1,27 +1,28 @@
-import { PrismaClient } from "@prisma/client"
+import { PrismaClient, PaymentStatus } from "@prisma/client"
 
 export async function seedPayment(prisma: PrismaClient) {
-
-  // Get an existing booking
   const booking = await prisma.booking.findFirst()
   if (!booking) {
-    throw new Error("❌ No booking found. Please seed bookings first.")
+    console.warn("No booking found, skipping payment seed")
+    return
   }
 
-  // Check if a payment already exists for this booking
   const existingPayment = await prisma.payment.findFirst({
     where: { bookingId: booking.id },
   })
 
-  if (existingPayment) {
-    // Update only transactionId and gatewayResponse
-    await prisma.payment.update({
-      where: { id: existingPayment.id },
+  if (!existingPayment) {
+    await prisma.payment.create({
       data: {
-        transactionId: "PAY-001",
-        gatewayResponse: "GCASH_SUCCESS",
+        bookingId: booking.id,
+        amount: booking.totalAmount,
+        currency: "PHP",
+        method: "GCash",
+        status: PaymentStatus.completed,
+        transactionId: "TXN-" + Math.random().toString(36).substr(2, 9).toUpperCase(),
+        paidAt: new Date(),
       },
     })
-  } 
+  }
 }
 

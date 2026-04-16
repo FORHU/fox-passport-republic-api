@@ -1,8 +1,4 @@
-import {
-    PrismaClient,
-    BookingStatus,
-    PaymentStatus,
-} from "@prisma/client"
+import { PrismaClient, BookingStatus } from "@prisma/client"
 
 export async function seedBooking(prisma: PrismaClient) {
     const event = await prisma.event.findFirst({
@@ -23,8 +19,8 @@ export async function seedBooking(prisma: PrismaClient) {
         return
     }
 
-    const existingBooking = await prisma.booking.findUnique({
-        where: { confirmationCode: "CONF123" },
+    const existingBooking = await prisma.booking.findFirst({
+        where: { eventId: event.id, userId: user.id },
     })
 
     if (!existingBooking) {
@@ -35,41 +31,8 @@ export async function seedBooking(prisma: PrismaClient) {
                 guestCount: 2,
                 totalAmount: 1000,
                 status: BookingStatus.confirmed,
-                confirmationCode: "CONF123",
-                specialRequests: "Special requests",
-                expiresAt: new Date(),
-
-                payments: {
-                    create: {
-                        amount: 1000,
-                        currency: "PHP",
-                        paymentMethod: "GCash",
-                        paymentStatus: PaymentStatus.completed,
-                    },
-                },
-
-                attendees: {
-                    create: [
-                        {
-                            firstName: "Juan",
-                            lastName: "Dela Cruz",
-                            email: "juan@email.com",
-                            ticketCode: "TICKET1",
-                            phone: "1234567890",
-                            checkedIn: true,
-                            checkInTime: new Date(),
-                        },
-                        {
-                            firstName: "Maria",
-                            lastName: "Santos",
-                            email: "maria@email.com",
-                            ticketCode: "TICKET2",
-                            phone: "1234567890",
-                            checkedIn: true,
-                            checkInTime: new Date(),
-                        },
-                    ],
-                },
+                startAt: new Date(Date.now() + 86400000),
+                endAt: new Date(Date.now() + 90000000),
             },
         })
     }
