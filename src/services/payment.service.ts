@@ -39,9 +39,8 @@ export default class PaymentSvc {
         bookingId: string;
         amount: number;
         currency: string;
-        paymentMethod: string;
+        method: string;
         paymentStatus?: PaymentStatus;
-        gatewayResponse?: string;
     }) {
         // Generate unique transaction ID
         let transactionId = this.generateTransactionId();
@@ -53,10 +52,9 @@ export default class PaymentSvc {
             bookingId: data.bookingId,
             amount: data.amount,
             currency: data.currency || "USD",
-            paymentMethod: data.paymentMethod,
+            method: data.method,
             paymentStatus: data.paymentStatus || PaymentStatus.pending,
             transactionId,
-            gatewayResponse: data.gatewayResponse,
         });
     }
 
@@ -65,7 +63,6 @@ export default class PaymentSvc {
         id: string,
         data: Partial<{
             paymentStatus: PaymentStatus;
-            gatewayResponse: string;
         }>
     ) {
         // Check if payment exists

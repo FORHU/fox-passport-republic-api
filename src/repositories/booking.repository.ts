@@ -61,23 +61,6 @@ export default class BookingRepo {
         });
     }
 
-    // READ ONE by Confirmation Code
-    static async getBookingByConfirmationCode(confirmationCode: string) {
-        return prisma.booking.findUnique({
-            where: { confirmationCode },
-            include: {
-                user: true,
-                event: {
-                    include: {
-                        venue: true,
-                    }
-                },
-                attendees: true,
-                payments: true,
-            },
-        });
-    }
-
     // CREATE
     static async createBooking(data: {
         eventId: string;
@@ -85,10 +68,8 @@ export default class BookingRepo {
         guestCount: number;
         totalAmount: number;
         bookingStatus: BookingStatus;
-        confirmationCode: string;
-        specialRequests?: string;
-        currentStep: number;
-        expiresAt?: Date;
+        startAt: Date;
+        endAt: Date;
     }) {
         return prisma.booking.create({
             data: {
@@ -97,10 +78,8 @@ export default class BookingRepo {
                 guestCount: data.guestCount,
                 totalAmount: data.totalAmount,
                 status: data.bookingStatus,
-                confirmationCode: data.confirmationCode,
-                specialRequests: data.specialRequests,
-                currentStep: data.currentStep,
-                expiresAt: data.expiresAt,
+                startAt: data.startAt,
+                endAt: data.endAt,
             },
             include: {
                 user: true,
@@ -116,9 +95,8 @@ export default class BookingRepo {
             guestCount: number;
             totalAmount: number;
             bookingStatus: BookingStatus;
-            specialRequests: string;
-            currentStep: number;
-            expiresAt: Date | null;
+            startAt: Date;
+            endAt: Date;
         }>
     ) {
         const { bookingStatus, ...rest } = data;
@@ -160,15 +138,6 @@ export default class BookingRepo {
                 id: String(bookingId),
                 userId: String(userId),
             },
-            select: { id: true },
-        });
-        return !!booking;
-    }
-
-    // Check if confirmation code exists
-    static async confirmationCodeExists(confirmationCode: string) {
-        const booking = await prisma.booking.findUnique({
-            where: { confirmationCode },
             select: { id: true },
         });
         return !!booking;

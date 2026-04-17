@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import VenueSvc from "../services/venue.service";
-import { VenueType, VenueStatus } from "@prisma/client";
+import { VenueStatus } from "@prisma/client";
 
 export default class VenueCtrl {
 
@@ -10,7 +10,7 @@ export default class VenueCtrl {
         const schema = Joi.object({
             name: Joi.string().required(),
             description: Joi.string().required(),
-            type: Joi.string().valid(...Object.values(VenueType)).required(),
+            category: Joi.string().required(),
             capacity: Joi.number().integer().min(1).required(),
             address: Joi.string().required(),
             city: Joi.string().required(),
@@ -60,11 +60,11 @@ export default class VenueCtrl {
     // READ Venues Controller with optional query parameters for filtering
     static async getVenues(req: Request, res: Response) {
         try {
-            const { hostId, type, city, status } = req.query;
+            const { hostId, category, city, status } = req.query;
 
             const venues = await VenueSvc.getVenues({
                 ...(hostId && { hostId: String(hostId) }),
-                ...(type && { type: type as VenueType }),
+                ...(category && { category: String(category) }),
                 ...(city && { city: String(city) }),
                 ...(status && { status: status as VenueStatus }),
             });
@@ -91,7 +91,7 @@ export default class VenueCtrl {
         const schema = Joi.object({
             name: Joi.string().optional(),
             description: Joi.string().optional(),
-            type: Joi.string().valid(...Object.values(VenueType)).optional(),
+            category: Joi.string().optional(),
             capacity: Joi.number().integer().min(1).optional(),
             address: Joi.string().optional(),
             city: Joi.string().optional(),
