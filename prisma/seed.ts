@@ -18,7 +18,6 @@ import { seedBookingAttendee } from "./seeders/bookingAttendee.seeder"
 import { seedPayment } from "./seeders/payment.seeder"
 import { seedFavorite } from "./seeders/favorite.seeder"
 import { seedReviews } from "./seeders/review.seeder"
-import { seedFile } from "./seeders/file.seeder"
 
 const connectionString = `${process.env.DATABASE_URL}`
 
@@ -42,7 +41,6 @@ async function main() {
   await seedPayment(prisma)
   await seedFavorite(prisma)
   await seedReviews(prisma)
-  await seedFile(prisma)
   console.log("✅ Seeding completed successfully!")
 }
 

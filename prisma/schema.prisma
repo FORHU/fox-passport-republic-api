@@ -33,21 +33,15 @@ model User {
 }
 
 model File {
-  id        String    @id @default(uuid())
-  url       String
-  name      String
-  type      String
-  userId    String?
-  assetId   String?
-  venueId   String?
-  serviceId String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-  asset     Asset?    @relation(fields: [assetId], references: [id])
-  service   Service?  @relation(fields: [serviceId], references: [id])
-  user      User?     @relation(fields: [userId], references: [id])
-  venue     Venue?    @relation(fields: [venueId], references: [id])
+  id         String    @id @default(uuid())
+  url        String
+  name       String
+  type       String
+  uploadedBy String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+  user       User?     @relation(fields: [uploadedBy], references: [id])
 
   @@map("files")
 }
@@ -80,7 +74,6 @@ model Asset {
   deletedAt   DateTime?
   eventAssets EventAsset[]
   owner       User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  files       File[]
 
   @@map("assets")
 }
@@ -98,7 +91,6 @@ model Service {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   eventServices EventService[]
-  files         File[]
   owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@map("services")
@@ -116,7 +108,7 @@ model Venue {
   city        String
   state       String?
   country     String
-  imgId       String?
+  imgIds      String[]
   status      VenueStatus  @default(draft)
   spaceType   String[]
   amenities   String[]
@@ -127,7 +119,6 @@ model Venue {
   updatedAt   DateTime     @updatedAt
   eventVenues EventVenue[]
   events      Event[]
-  files       File[]
   host        User         @relation(fields: [hostId], references: [id], onDelete: Cascade)
 
   @@map("venues")

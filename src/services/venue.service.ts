@@ -21,6 +21,7 @@ export default class VenueSvc {
         city: string;
         state?: string;
         country: string;
+        imgIds: string[];
         spaceType?: string[];
         amenities?: string[];
         techAv?: string[];
@@ -28,7 +29,6 @@ export default class VenueSvc {
         policies?: string[];
         status?: VenueStatus;
         price?: number;
-        images?: { url: string; altText?: string; orderIndex?: number; isThumbnail?: boolean }[];
     }) {
         // Business logic: validate business rules before creation
         if (data.price && data.price < 0) {
@@ -37,17 +37,24 @@ export default class VenueSvc {
         if (data.capacity < 1) {
             throw new Error("Capacity must be at least 1");
         }
+        if (!Array.isArray(data.imgIds) || data.imgIds.length === 0) {
+            throw new Error("At least one image is required");
+        }
+        if (data.imgIds.length > 5) {
+            throw new Error("A maximum of 5 images is allowed");
+        }
 
         // Normalize defaults (previously done inside repository)
         return VenueRepo.createVenue({
             ...data,
-            state: data.state ?? null,
+            state: data.state ?? undefined,
+            imgIds: data.imgIds,
             spaceType: data.spaceType ?? [],
             amenities: data.amenities ?? [],
             techAv: data.techAv ?? [],
             staffing: data.staffing ?? [],
             policies: data.policies ?? [],
-            status: data.status ?? VenueStatus.draft,
+            status: data.status ?? VenueStatus.pending,
             price: data.price ?? 0,
         });
     }
@@ -56,14 +63,8 @@ export default class VenueSvc {
     // READ — Delegate all queries to repository
     // ───────────────────────────────────────────────────────────
 
-    static async getVenues(filters?: {
-        hostId?: string;
-        category?: string;
-        city?: string;
-        status?: VenueStatus
-    }) {
-        const effectiveFilters = filters?.status ? filters : { ...filters, status: VenueStatus.available };
-        return VenueRepo.findAllVenues(effectiveFilters);
+    static async getVenues() {
+        return VenueRepo.findAllVenues();
     }
 
     static async getVenueById(id: string) {
@@ -89,196 +90,64 @@ export default class VenueSvc {
         return venue;
     }
 
-    static async searchVenues(query: string, filters?: { city?: string; category?: string }) {
-        if (!query || query.trim().length < 2) {
-            throw new Error("Search query must be at least 2 characters");
-        }
-        // Business logic: only searchable venues are non-archived & published
-        const results = await VenueRepo.searchVenues(query.trim(), filters);
-        return results.filter(v => v.status === VenueStatus.available);
-    }
-
-    static async getHostStats(hostId: string) {
-        return VenueRepo.getHostVenueStats(hostId);
-    }
-
-    // ───────────────────────────────────────────────────────────
-    // UPDATE — Authorization logic, delegate data access
-    // ───────────────────────────────────────────────────────────
-
-    static async updateVenue(
-        id: string,
-        hostId: string,
+    static async updateVenue(params: {
+        id: string;
+        requesterId: string;
         data: Partial<{
             name: string;
             description: string;
             category: string;
             capacity: number;
+            price: number;
             address: string;
             city: string;
             state?: string;
             country: string;
-            spaceType?: string[];
-            amenities?: string[];
-            techAv?: string[];
-            staffing?: string[];
-            policies?: string[];
-            status?: VenueStatus;
-            price?: number;
-            images?: { url: string; altText?: string; orderIndex?: number; isThumbnail?: boolean }[];
-        }>,
-        userRole?: string
-    ) {
-        const isAdmin = this.isAdminRole(userRole);
-        let venue;
+            imgIds: string[];
+            spaceType: string[];
+            amenities: string[];
+            techAv: string[];
+            staffing: string[];
+            policies: string[];
+            status: VenueStatus;
+        }>;
+    }) {
+        const { id, requesterId, data } = params;
 
-        if (isAdmin) {
-            // Admins can update any venue
-            venue = await VenueRepo.findVenueByIdForAdmin(id);
-            if (!venue) throw new Error("Venue not found");
-        } else {
-            // Non-admins must be owners
-            venue = await VenueRepo.findVenueByIdAndOwner(id, hostId);
-            if (!venue) throw new Error("Unauthorized or venue not found");
+        const venue = await VenueRepo.findVenueById(id);
+        if (!venue) throw new Error("Venue not found");
+
+        if (venue.hostId !== requesterId) {
+            throw new Error("Unauthorized");
         }
 
-        // Business rule: prevent changing status from archived (admins can bypass this)
-        if (!isAdmin && venue.status === VenueStatus.archived) {
-            throw new Error("Cannot modify archived venue");
+        if (data.price !== undefined && data.price < 0) {
+            throw new Error("Price cannot be negative");
         }
-
-        // Business rule: validate status transition (admins bypass this)
-        if (!isAdmin && data.status && data.status !== venue.status) {
-            const validTransitions = this.getValidStatusTransitions(venue.status);
-            if (!validTransitions.includes(data.status)) {
-                throw new Error(`Invalid status transition from ${venue.status} to ${data.status}`);
-            }
+        if (data.capacity !== undefined && data.capacity < 1) {
+            throw new Error("Capacity must be at least 1");
+        }
+        if (data.imgIds && data.imgIds.length > 5) {
+            throw new Error("A maximum of 5 images is allowed");
         }
 
         return VenueRepo.updateVenue(id, data);
     }
 
-    // ───────────────────────────────────────────────────────────
-    // DELETE — Authorization logic only
-    // ───────────────────────────────────────────────────────────
-
-    static async deleteVenue(id: string, requesterId: string, userRole?: string) {
-        const isAdmin = this.isAdminRole(userRole);
-        if (isAdmin) {
-            // Admin can delete any non-archived venue
-            const venue = await VenueRepo.findVenueByIdForAdmin(id);
-            if (!venue) throw new Error("Venue not found");
-            if (venue.status === VenueStatus.archived) {
-                throw new Error("Venue already archived");
-            }
-            return VenueRepo.deleteVenue(id);
-        }
-
-        // Non-admin: must be owner
-        const venue = await VenueRepo.findVenueByIdAndOwner(id, requesterId);
-        if (!venue) {
-            throw new Error("You are not authorized to delete this venue or it doesn't exist");
-        }
-        if (venue.status === VenueStatus.archived) {
-            throw new Error("Venue already archived");
-        }
-        const result = await VenueRepo.deleteVenue(id);
-        if (!result) {
-            throw new Error("You are not authorized to delete this venue or it doesn't exist");
-        }
-
-        return { message: "Venue deleted successfully" };
-    }
-
-    // IMAGE SERVICES — compatibility placeholders
-
-    static async addImage(
-        venueId: string,
-        userId: string,
-        url: string,
-        isThumbnail: boolean,
-        altText?: string,
-        orderIndex?: number,
-        isAdmin: boolean = false
-    ) {
-        void venueId;
-        void userId;
-        void isAdmin;
-        return { url, isThumbnail, altText, orderIndex };
-    }
-
-    static async uploadVenueImages(params: {
-        venueId: string;
-        userId: string;
-        userRole?: string;
-        files: Express.Multer.File[];
+    static async deleteVenue(params: {
+        id: string;
+        requesterId: string;
+        requesterRole?: string;
     }) {
-        const { venueId, userId, userRole, files } = params;
-        const isAdmin = this.isAdminRole(userRole);
+        const { id, requesterId, requesterRole } = params;
+        const venue = await VenueRepo.findVenueById(id);
+        if (!venue) throw new Error("Venue not found");
 
-        if (!files || files.length === 0) {
-            throw new Error("No images uploaded");
+        const isAdmin = this.isAdminRole(requesterRole);
+        if (!isAdmin && venue.hostId !== requesterId) {
+            throw new Error("Unauthorized");
         }
 
-        const images = [];
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const url = await uploadVenueImage(file, venueId);
-            const isThumbnail = i === 0;
-            const image = await this.addImage(
-                venueId,
-                userId,
-                url,
-                isThumbnail,
-                file.originalname,
-                i,
-                isAdmin
-            );
-            images.push(image);
-        }
-
-        return images;
-    }
-
-    static async updateImage(
-        userId: string,
-        imageId: string,
-        data: Partial<{
-            altText: string;
-            orderIndex: number;
-            isThumbnail: boolean;
-        }>,
-        userRole?: string
-    ) {
-        void userId;
-        void userRole;
-        return { id: imageId, ...data };
-    }
-
-    static async deleteImage(userId: string, imageId: string, userRole?: string) {
-        void userId;
-        void userRole;
-        return { message: "Image deleted successfully", imageId };
-    }
-
-    static async reorderVenueImages(userId: string, venueId: string, imageOrders: { id: string; orderIndex: number }[]) {
-        // Verify ownership
-        void userId;
-        return { venueId, imageOrders };
-    }
-
-    // ───────────────────────────────────────────────────────────
-    // BUSINESS RULES HELPERS
-    // ───────────────────────────────────────────────────────────
-
-    private static getValidStatusTransitions(currentStatus: VenueStatus): VenueStatus[] {
-        const transitions: Record<VenueStatus, VenueStatus[]> = {
-            [VenueStatus.draft]: [VenueStatus.pending, VenueStatus.available, VenueStatus.archived],
-            [VenueStatus.pending]: [VenueStatus.available, VenueStatus.rejected, VenueStatus.draft],
-            [VenueStatus.available]: [VenueStatus.archived, VenueStatus.draft],
-            [VenueStatus.rejected]: [VenueStatus.draft, VenueStatus.pending],
-            [VenueStatus.archived]: [], // No transitions out of archived
-        };
-        return transitions[currentStatus] || [];
+        return VenueRepo.archiveVenue(id);
     }
 }
