@@ -19,7 +19,7 @@ export default class EventRepo {
             include: {
                 venue: {
                     include: {
-                        venueImages: true
+                        files: true
                     }
                 },
                 eventAssets: {
@@ -36,7 +36,7 @@ export default class EventRepo {
                     select: {
                         id: true,
                         name: true,
-                        profileImage: true,
+                        imgId: true,
                     }
                 }
             },
@@ -53,14 +53,14 @@ export default class EventRepo {
             include: {
                 venue: {
                     include: {
-                        venueImages: true
+                        files: true
                     }
                 },
                 eventAssets: {
                     include: {
                         asset: {
                             include: {
-                                assetImages: true
+                                files: true
                             }
                         }
                     }
@@ -82,8 +82,8 @@ export default class EventRepo {
         name: string;
         description: string;
         eventType: EventType;
-        startDatetime: Date;
-        endDatetime: Date;
+        startAt: Date;
+        endAt: Date;
         maxAttendees: number;
         totalPrice: number;
         currency?: string;
@@ -96,8 +96,8 @@ export default class EventRepo {
                 name: data.name,
                 description: data.description,
                 eventType: data.eventType,
-                startDatetime: data.startDatetime,
-                endDatetime: data.endDatetime,
+                startAt: data.startAt,
+                endAt: data.endAt,
                 maxAttendees: data.maxAttendees,
                 totalPrice: data.totalPrice,
                 ...(data.currency ? { currency: data.currency } : {}),
@@ -111,27 +111,52 @@ export default class EventRepo {
         return prisma.event.update({
             where: { id: String(id) },
             data,
+            include: {
+                venue: {
+                    include: {
+                        files: true
+                    }
+                },
+                eventAssets: {
+                    include: {
+                        asset: {
+                            include: {
+                                files: true
+                            }
+                        }
+                    }
+                },
+                eventServices: {
+                    include: {
+                        service: true
+                    }
+                },
+                organizer: true,
+            },
         });
     }
 
     // Link Asset to Event
-    static async addAssetToEvent(eventId: string, assetId: string, quantity: number) {
+    static async addAssetToEvent(eventId: string, assetId: string, data: { quantity?: number; agreedPrice: number; billingRate: any }) {
         return prisma.eventAsset.create({
             data: {
                 eventId: String(eventId),
                 assetId: String(assetId),
-                quantity
+                quantity: data.quantity ?? 1,
+                agreedPrice: data.agreedPrice,
+                billingRate: data.billingRate,
             }
         });
     }
 
     // Link Service to Event
-    static async addServiceToEvent(eventId: string, serviceId: string, agreedPrice: number) {
+    static async addServiceToEvent(eventId: string, serviceId: string, data: { agreedPrice: number; billingRate: any }) {
         return prisma.eventService.create({
             data: {
                 eventId: String(eventId),
                 serviceId: String(serviceId),
-                agreedPrice
+                agreedPrice: data.agreedPrice,
+                billingRate: data.billingRate,
             }
         });
     }

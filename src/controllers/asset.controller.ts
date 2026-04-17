@@ -26,7 +26,7 @@ export default class AssetCtrl {
       images: Joi.array().items(Joi.any()).optional(),
     }).xor("categoryId", "categorySlug");
 
-    const { error, value } = schema.validate(req.body);
+    const { error, value } = schema.validate(req.body, { stripUnknown: true });
     if (error) {
       return res.status(400).json({ message: error.message });
     }
@@ -149,6 +149,12 @@ export default class AssetCtrl {
       }),
       categorySlug: Joi.string().optional(),
       price: Joi.number().min(0).optional(),
+      billingRate: Joi.string().optional(),
+      condition: Joi.string().valid("new", "good", "fair", "refurbished").optional(),
+      propertyType: Joi.string().optional(),
+      roomType: Joi.string().optional(),
+      capacity: Joi.number().integer().min(1).optional(),
+      maxAttendees: Joi.number().integer().min(1).optional(),
       images: Joi.array()
         .items(
           Joi.object({
@@ -161,7 +167,7 @@ export default class AssetCtrl {
         .optional(),
     }).min(1);
 
-    const { error, value } = schema.validate(req.body);
+    const { error, value } = schema.validate(req.body, { stripUnknown: true });
     if (error) {
       return res.status(400).json({ message: error.message });
     }
