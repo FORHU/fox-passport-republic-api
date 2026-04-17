@@ -10,10 +10,9 @@ export default class ProfileRepo {
         username: true,
         name: true,
         phone: true,
-        profileImage: true,
+        imgId: true,
         role: true,
         isHost: true,
-        isFoxer: true,
         isVerified: true,
         createdAt: true,
         updatedAt: true,
@@ -47,7 +46,7 @@ export default class ProfileRepo {
       name?: string;
       username?: string;
       phone?: string;
-      profileImage?: string;
+      imgId?: string;
     }
   ) {
     return prisma.user.update({
@@ -59,10 +58,9 @@ export default class ProfileRepo {
         username: true,
         name: true,
         phone: true,
-        profileImage: true,
+        imgId: true,
         role: true,
         isHost: true,
-        isFoxer: true,
         isVerified: true,
         updatedAt: true,
       },

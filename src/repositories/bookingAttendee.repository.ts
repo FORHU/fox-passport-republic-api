@@ -96,7 +96,6 @@ export default class BookingAttendeeRepo {
         email: string;
         phone: string;
         checkedIn: boolean;
-        checkInTime: Date;
     }>) {
         return prisma.bookingAttendee.update({
             where: { id: String(id) },
@@ -117,7 +116,6 @@ export default class BookingAttendeeRepo {
             where: { id: String(id) },
             data: {
                 checkedIn: true,
-                checkInTime: new Date()
             }
         });
     }
@@ -199,7 +197,6 @@ export default class BookingAttendeeRepo {
             where: { ticketCode },
             data: {
                 checkedIn: true,
-                checkInTime: new Date(),
             },
         });
     }

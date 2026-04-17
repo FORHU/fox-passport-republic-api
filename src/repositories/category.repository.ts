@@ -1,165 +1,108 @@
 import { prisma } from "../utils/prisma";
 
+type CategorySummary = {
+  name: string;
+  count: number;
+  sources: {
+    assets: number;
+    venues: number;
+    services: number;
+  };
+};
+
+/**
+ * The current schema has no `Category` model. Categories are stored as plain strings
+ * on `Asset.category`, `Venue.category`, and `Service.category`.
+ */
 export default class CategoryRepo {
-  // READ ALL
-  static async getAllCategories() {
-    return prisma.category.findMany({
-      include: {
-        parentCategory: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            image: true,
-            tagline: true,
-            gradient: true,
-            spotLabel: true,
-            spotColor: true,
-            icon: true,
-          },
-        },
-        subCategories: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            image: true,
-            tagline: true,
-            gradient: true,
-            spotLabel: true,
-            spotColor: true,
-            icon: true,
-          },
-        },
-        _count: {
-          select: {
-            subCategories: true,
-          },
-        },
-      },
-      orderBy: {
-        name: "asc",
-      },
-    });
+  static async getAllCategories(): Promise<CategorySummary[]> {
+    const [assetCats, venueCats, serviceCats] = await Promise.all([
+      prisma.asset.groupBy({
+        by: ["category"],
+        where: { deletedAt: null },
+        _count: { category: true },
+      }),
+      prisma.venue.groupBy({
+        by: ["category"],
+        _count: { category: true },
+      }),
+      prisma.service.groupBy({
+        by: ["category"],
+        _count: { category: true },
+      }),
+    ]);
+
+    const map = new Map<string, CategorySummary>();
+
+    for (const row of assetCats) {
+      const key = row.category;
+      const existing =
+        map.get(key) ??
+        ({ name: key, count: 0, sources: { assets: 0, venues: 0, services: 0 } } as CategorySummary);
+      existing.sources.assets = row._count.category;
+      map.set(key, existing);
+    }
+
+    for (const row of venueCats) {
+      const key = row.category;
+      const existing =
+        map.get(key) ??
+        ({ name: key, count: 0, sources: { assets: 0, venues: 0, services: 0 } } as CategorySummary);
+      existing.sources.venues = row._count.category;
+      map.set(key, existing);
+    }
+
+    for (const row of serviceCats) {
+      const key = row.category;
+      const existing =
+        map.get(key) ??
+        ({ name: key, count: 0, sources: { assets: 0, venues: 0, services: 0 } } as CategorySummary);
+      existing.sources.services = row._count.category;
+      map.set(key, existing);
+    }
+
+    for (const v of map.values()) {
+      v.count = v.sources.assets + v.sources.venues + v.sources.services;
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  // READ ONE by ID
   static async getCategoryById(id: string) {
-    return prisma.category.findUnique({
-      where: { id },
-      include: {
-        parentCategory: true,
-        subCategories: true,
-        _count: {
-          select: {
-            subCategories: true,
-          },
-        },
-      },
-    });
+    const categories = await this.getAllCategories();
+    return categories.find((c) => c.name === id) ?? null;
   }
 
-  // READ ONE by Slug
   static async getCategoryBySlug(slug: string) {
-    return prisma.category.findFirst({
-      where: { slug },
-      include: {
-        parentCategory: true,
-        subCategories: true,
-        _count: {
-          select: {
-            subCategories: true,
-          },
-        },
-      },
-    });
+    const categories = await this.getAllCategories();
+    const found = categories.find((c) => c.name.toLowerCase() === slug.toLowerCase());
+    if (!found) return null;
+    return { id: found.name, name: found.name, slug: found.name.toLowerCase() };
   }
 
-  // CREATE
-  static async createCategory(data: {
-    name: string;
-    slug: string;
-    description?: string;
-    parentCategoryId?: string;
-  }) {
-    return prisma.category.create({
-      data: {
-        name: data.name,
-        slug: data.slug,
-        description: data.description,
-        parentCategoryId: data.parentCategoryId ? String(data.parentCategoryId) : undefined,
-      },
-      include: {
-        parentCategory: true,
-      },
-    });
+  static async createCategory(_data?: any): Promise<never> {
+    throw new Error("Category model does not exist in current schema");
   }
 
-  // UPDATE
-  static async updateCategory(
-    id: string,
-    data: Partial<{
-      name: string;
-      slug: string;
-      description: string;
-      parentCategoryId: string;
-    }>
-  ) {
-    return prisma.category.update({
-      where: { id },
-      data,
-      include: {
-        parentCategory: true,
-        subCategories: true,
-      },
-    });
+  static async updateCategory(_id?: string, _data?: any): Promise<never> {
+    throw new Error("Category model does not exist in current schema");
   }
 
-  // DELETE
-  static async deleteCategory(id: string) {
-    return prisma.category.delete({
-      where: { id },
-    });
+  static async deleteCategory(_id?: string): Promise<never> {
+    throw new Error("Category model does not exist in current schema");
   }
 
-  // Check if category exists
   static async categoryExists(id: string) {
-    const category = await prisma.category.findUnique({
-      where: { id },
-      select: { id: true },
-    });
+    const category = await this.getCategoryById(id);
     return !!category;
   }
 
-  // Check if slug exists
-  static async slugExists(slug: string, excludeId?: string) {
-    const category = await prisma.category.findFirst({
-      where: {
-        slug,
-        ...(excludeId && { id: { not: String(excludeId) } }),
-      },
-      select: { id: true },
-    });
+  static async slugExists(slug: string, _excludeId?: string) {
+    const category = await this.getCategoryBySlug(slug);
     return !!category;
   }
 
-  // Get top-level categories (no parent)
   static async getTopLevelCategories() {
-    return prisma.category.findMany({
-      where: {
-        parentCategoryId: null,
-      },
-      include: {
-        subCategories: true,
-        _count: {
-          select: {
-            subCategories: true,
-          },
-        },
-      },
-      orderBy: {
-        name: "asc",
-      },
-    });
+    return this.getAllCategories();
   }
 }
