@@ -6,8 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-// USER
-
 model User {
   id         String     @id @default(uuid())
   email      String     @unique
@@ -21,20 +19,18 @@ model User {
   isHost     Boolean    @default(false)
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
-  passport   Passport?
-  assets     Asset[]
-  services   Service[]
-  venues     Venue[]
-  events     Event[]
   bookings   Booking[]
   favorites  Favorite[]
+  passport   Passport?
   reviews    Review[]
+  assets     Asset[]
+  events     Event[]
   files      File[]
+  services   Service[]
+  venues     Venue[]
 
   @@map("users")
 }
-
-// FILES (POLYMORPHIC - NO TRUE RELATIONS IN PRISMA)
 
 model File {
   id        String    @id @default(uuid())
@@ -48,15 +44,13 @@ model File {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
-  user      User?     @relation(fields: [userId], references: [id])
   asset     Asset?    @relation(fields: [assetId], references: [id])
-  venue     Venue?    @relation(fields: [venueId], references: [id])
   service   Service?  @relation(fields: [serviceId], references: [id])
+  user      User?     @relation(fields: [userId], references: [id])
+  venue     Venue?    @relation(fields: [venueId], references: [id])
 
   @@map("files")
 }
-
-// PASSPORT
 
 model Passport {
   id           String   @id @default(uuid())
@@ -69,8 +63,6 @@ model Passport {
   updatedAt    DateTime @updatedAt
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
-
-// ASSETS
 
 model Asset {
   id          String         @id @default(uuid())
@@ -86,14 +78,12 @@ model Asset {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   deletedAt   DateTime?
+  eventAssets EventAsset[]
   owner       User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   files       File[]
-  eventAssets EventAsset[]
 
   @@map("assets")
 }
-
-// SERVICES
 
 model Service {
   id            String         @id @default(uuid())
@@ -107,14 +97,12 @@ model Service {
   imgId         String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-  owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  files         File[]
   eventServices EventService[]
+  files         File[]
+  owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@map("services")
 }
-
-// VENUES
 
 model Venue {
   id          String       @id @default(uuid())
@@ -137,15 +125,13 @@ model Venue {
   policies    String[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-  host        User         @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  eventVenues EventVenue[]
   events      Event[]
   files       File[]
-  eventVenues EventVenue[]
+  host        User         @relation(fields: [hostId], references: [id], onDelete: Cascade)
 
   @@map("venues")
 }
-
-// EVENTS
 
 model Event {
   id            String         @id @default(uuid())
@@ -163,17 +149,15 @@ model Event {
   status        EventStatus    @default(pending)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-  venue         Venue          @relation(fields: [venueId], references: [id])
-  organizer     User           @relation(fields: [organizerId], references: [id])
   bookings      Booking[]
   eventAssets   EventAsset[]
   eventServices EventService[]
   eventVenues   EventVenue[]
+  organizer     User           @relation(fields: [organizerId], references: [id])
+  venue         Venue          @relation(fields: [venueId], references: [id])
 
   @@map("events")
 }
-
-// TRANSACTIONS
 
 model EventAsset {
   id          String            @id @default(uuid())
@@ -185,8 +169,8 @@ model EventAsset {
   status      TransactionStatus @default(pending)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
-  event       Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
   asset       Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  event       Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, assetId])
 }
@@ -220,8 +204,6 @@ model EventVenue {
 
   @@unique([eventId, venueId])
 }
-
-// BOOKINGS
 
 model Booking {
   id          String            @id @default(uuid())
@@ -266,8 +248,6 @@ model Payment {
   booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }
 
-// SOCIAL
-
 model Favorite {
   id         String   @id @default(uuid())
   userId     String
@@ -290,8 +270,6 @@ model Review {
 
   @@unique([userId, entityId, entityType])
 }
-
-// ENUMS
 
 enum UserRole {
   user

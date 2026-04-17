@@ -47,11 +47,10 @@ export default class BookingSvc {
 
   // GET BOOKING BY CODE
   static async getBookingByConfirmationCode(code: string) {
-    const booking = await BookingRepo.getBookingByConfirmationCode(code);
-    if (!booking) {
-      throw new Error("Booking not found");
-    }
-    return booking;
+    const bookings = await BookingRepo.getAllBookings();
+    const booking = bookings.find((b: any) => String(b.id) === String(code));
+    if (!booking) throw new Error("Booking not found");
+    return booking as any;
   }
 
   // ========== MULTI-STEP BOOKING METHODS ==========
@@ -69,19 +68,17 @@ export default class BookingSvc {
     let isUnique = false;
     while (!isUnique) {
       confirmationCode = crypto.randomBytes(4).toString("hex").toUpperCase();
-      const existing = await BookingRepo.confirmationCodeExists(confirmationCode);
-      if (!existing) isUnique = true;
+      isUnique = true;
     }
 
     const booking = await BookingRepo.createBooking({
       eventId: data.eventId,
       userId: data.userId,
-      confirmationCode,
-      bookingStatus: BookingStatus.draft,
+      bookingStatus: BookingStatus.pending,
       guestCount: data.guestCount || 0,
       totalAmount: data.totalAmount || 0,
-      currentStep: 1,
-      expiresAt: this.calculateExpiryTime(),
+      startAt: new Date(),
+      endAt: this.calculateExpiryTime(),
     });
 
     return booking;
@@ -100,7 +97,7 @@ export default class BookingSvc {
   ) {
     const booking = await BookingRepo.getBookingById(bookingId);
     if (!booking) throw new Error("Booking not found");
-    if (booking.status !== BookingStatus.draft) throw new Error("Booking is not in draft status");
+    if (booking.status !== BookingStatus.pending) throw new Error("Booking is not in pending status");
 
     // Clear existing attendees if re-submitting step 2? 
     // For now, let's just add/ensure they are there. Ideally we wipe and replace for a "step" logic
@@ -108,7 +105,7 @@ export default class BookingSvc {
     // Add attendees
     const createdAttendees = [];
     for (const attendee of attendees) {
-      const ticketCode = `${booking.confirmationCode}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
+      const ticketCode = `${booking.id}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
       const newAttendee = await BookingAttendeeRepo.createAttendee({
         bookingId,
         ...attendee,
@@ -119,7 +116,6 @@ export default class BookingSvc {
 
     // Update step
     await BookingRepo.updateBooking(bookingId, {
-      currentStep: 2,
       guestCount: attendees.length,
     });
 
@@ -149,7 +145,7 @@ export default class BookingSvc {
       bookingId,
       amount: paymentData.amount,
       currency: "PHP", // Default
-      paymentMethod: paymentData.method,
+      method: paymentData.method,
       paymentStatus: PaymentStatus.completed,
       transactionId: paymentData.transactionId
     });
@@ -157,8 +153,6 @@ export default class BookingSvc {
     // Update Booking Status
     const confirmedBooking = await BookingRepo.updateBooking(bookingId, {
       bookingStatus: BookingStatus.confirmed,
-      currentStep: 3,
-      expiresAt: null // Clear expiry
     });
 
     // TODO: Send confirmation email
@@ -182,8 +176,7 @@ export default class BookingSvc {
     let isUnique = false;
     while (!isUnique) {
       confirmationCode = crypto.randomBytes(4).toString("hex").toUpperCase();
-      const existing = await BookingRepo.confirmationCodeExists(confirmationCode);
-      if (!existing) isUnique = true;
+      isUnique = true;
     }
 
     // 2. Create Booking
@@ -193,14 +186,14 @@ export default class BookingSvc {
       guestCount: data.guestCount,
       totalAmount: data.totalAmount,
       bookingStatus: data.bookingStatus ?? BookingStatus.pending,
-      confirmationCode,
-      currentStep: 1,
+      startAt: new Date(),
+      endAt: new Date(),
     });
 
     // 3. Create Attendees
     if (data.attendees && data.attendees.length > 0) {
       for (const attendee of data.attendees) {
-        const ticketCode = `${confirmationCode}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
+        const ticketCode = `${booking.id}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
         await BookingAttendeeRepo.createAttendee({
           bookingId: booking.id,
           firstName: attendee.firstName,

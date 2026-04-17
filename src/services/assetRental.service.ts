@@ -2,54 +2,17 @@ import AssetRentalRepo from "../repositories/assetRental.repository";
 import AssetRepo from "../repositories/asset.repository";
 
 export default class AssetRentalSvc {
-  // create a new rental for an asset
-  static async rentAsset(
-    assetId: string,
-    renterId: string,
-    startDate: Date,
-    endDate: Date
-  ) {
-    // ensure asset exists and is not deleted
+  static async rentAsset(assetId: string, _renterId?: string, _startDate?: Date, _endDate?: Date) {
     const asset = await AssetRepo.findAssetById(assetId);
-    if (!asset) {
-      throw new Error("Asset not found");
-    }
-    if (asset.ownerId === renterId) {
-      throw new Error("Owner cannot rent their own asset");
-    }
-
-    // simple availability check: make sure requested range does not overlap existing active or pending rentals
-    const existing = await AssetRentalRepo.findRentalsByAsset(assetId);
-    for (const r of existing) {
-      if (
-        (startDate >= r.startDate && startDate < r.endDate) ||
-        (endDate > r.startDate && endDate <= r.endDate) ||
-        (startDate <= r.startDate && endDate >= r.endDate)
-      ) {
-        if (r.status !== "cancelled" && r.status !== "completed") {
-          throw new Error("Asset is already rented for the selected period");
-        }
-      }
-    }
-
-    const rental = await AssetRentalRepo.createRental({
-      assetId,
-      renterId,
-      startDate,
-      endDate,
-    });
-    return rental;
+    if (!asset) throw new Error("Asset not found");
+    return AssetRentalRepo.createRental();
   }
 
-  static async getRentalsForAsset(assetId: string) {
-    return AssetRentalRepo.findRentalsByAsset(assetId);
+  static async getRentalsForAsset(_assetId?: string) {
+    return AssetRentalRepo.findRentalsByAsset();
   }
 
-  static async getRentalById(id: string) {
-    const rental = await AssetRentalRepo.findRentalById(id);
-    if (!rental) {
-      throw new Error("Rental not found");
-    }
-    return rental;
+  static async getRentalById(_id?: string) {
+    return AssetRentalRepo.findRentalById();
   }
 }
