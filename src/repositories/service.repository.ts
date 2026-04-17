@@ -1,11 +1,11 @@
 import { prisma } from "../utils/prisma";
-import { ServiceStatus, ServiceCategory, BillingRate } from "@prisma/client";
+import { ServiceStatus, BillingRate } from "@prisma/client";
 
 export default class ServiceRepo {
     // READ ALL
     static async getAllServices(filters?: {
         ownerId?: string;
-        category?: ServiceCategory;
+        category?: string;
         status?: ServiceStatus;
     }) {
         return prisma.service.findMany({
@@ -22,7 +22,7 @@ export default class ServiceRepo {
                         email: true,
                     },
                 },
-                images: { where: { isThumbnail: true }, take: 1 },
+                files: true,
             },
             orderBy: {
                 createdAt: "desc",
@@ -36,16 +36,11 @@ export default class ServiceRepo {
         ownerId: string;
         name: string;
         description: string;
-        category: ServiceCategory;
+        category: string;
         price: number;
         status?: ServiceStatus;
         billingRate: BillingRate;
-        images?: {
-            url: string;
-            altText?: string;
-            orderIndex?: number;
-            isThumbnail?: boolean;
-        }[];
+        imgId?: string;
     }) {
         // Repo should only persist; business defaults are expected to be normalized by the service.
         return prisma.service.create({
@@ -58,19 +53,10 @@ export default class ServiceRepo {
                 price: data.price,
                 status: data.status,
                 billingRate: data.billingRate,
-                images: data.images?.length
-                    ? {
-                        create: data.images.map((img, index) => ({
-                            url: img.url,
-                            altText: img.altText ?? null,
-                            orderIndex: img.orderIndex,
-                            isThumbnail: img.isThumbnail,
-                        })),
-                    }
-                    : undefined,
+                imgId: data.imgId ?? undefined,
             },
             include: {
-                images: true,
+                files: true,
                 owner: { select: { id: true, name: true, email: true } },
             },
         });
@@ -88,7 +74,7 @@ export default class ServiceRepo {
                         email: true,
                     },
                 },
-                images: true,
+                files: true,
             },
         });
     }
@@ -99,7 +85,7 @@ export default class ServiceRepo {
             where: { id },
             data,
             include: {
-                images: true,
+                files: true,
                 owner: { select: { id: true, name: true, email: true } },
             },
         });
@@ -121,47 +107,4 @@ export default class ServiceRepo {
         return service?.ownerId ?? null;
     }
 
-    // IMAGE REPOSITORY METHODS
-    static async addServiceImage(data: {
-        serviceId: string;
-        url: string;
-        isThumbnail?: boolean;
-        altText?: string;
-        orderIndex?: number;
-    }) {
-        return prisma.serviceImage.create({
-            data: {
-                serviceId: data.serviceId,
-                url: data.url,
-                isThumbnail: data.isThumbnail ?? false,
-                altText: data.altText ?? null,
-                orderIndex: data.orderIndex ?? 0,
-            },
-        });
-    }
-
-    static async updateServiceImage(imageId: string, data: Partial<{
-        url: string;
-        altText: string | null;
-        orderIndex: number;
-        isThumbnail: boolean;
-    }>) {
-        return prisma.serviceImage.update({
-            where: { id: imageId },
-            data,
-        });
-    }
-
-    static async deleteServiceImage(imageId: string) {
-        return prisma.serviceImage.delete({
-            where: { id: imageId },
-        });
-    }
-
-    static async findImageById(imageId: string) {
-        return prisma.serviceImage.findUnique({
-            where: { id: imageId },
-            include: { service: { select: { ownerId: true } } },
-        });
-    }
 }

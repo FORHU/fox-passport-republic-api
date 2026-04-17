@@ -2,10 +2,8 @@ import { prisma } from "../utils/prisma";
 
 export default class FavoriteRepo {
   // TOGGLE
-  static async toggleFavorite(userId: string, targetId: string, type: 'venue' | 'event') {
-    const where: any = { userId: String(userId) };
-    if (type === 'venue') where.venueId = String(targetId);
-    else where.eventId = String(targetId);
+  static async toggleFavorite(userId: string, targetId: string, type: string) {
+    const where = { userId: String(userId), entityId: String(targetId), entityType: String(type) };
 
     const existing = await prisma.favorite.findFirst({ where });
 
@@ -16,8 +14,8 @@ export default class FavoriteRepo {
       await prisma.favorite.create({
         data: {
           userId: String(userId),
-          venueId: type === 'venue' ? String(targetId) : undefined,
-          eventId: type === 'event' ? String(targetId) : undefined
+          entityId: String(targetId),
+          entityType: String(type),
         }
       });
       return { added: true };
@@ -33,10 +31,8 @@ export default class FavoriteRepo {
   }
 
   // CHECK
-  static async isFavorite(userId: string, targetId: string, type: 'venue' | 'event') {
-    const where: any = { userId: String(userId) };
-    if (type === 'venue') where.venueId = String(targetId);
-    else where.eventId = String(targetId);
+  static async isFavorite(userId: string, targetId: string, type: string) {
+    const where = { userId: String(userId), entityId: String(targetId), entityType: String(type) };
 
     const favorite = await prisma.favorite.findFirst({ where });
     return !!favorite;
@@ -50,10 +46,8 @@ export default class FavoriteRepo {
   }
 
   // REMOVE BY LISTING
-  static async removeFavoriteByListing(userId: string, targetId: string, type: 'venue' | 'event') {
-    const where: any = { userId: String(userId) };
-    if (type === 'venue') where.venueId = String(targetId);
-    else where.eventId = String(targetId);
+  static async removeFavoriteByListing(userId: string, targetId: string, type: string) {
+    const where = { userId: String(userId), entityId: String(targetId), entityType: String(type) };
 
     return prisma.favorite.deleteMany({ where });
   }

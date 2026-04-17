@@ -253,7 +253,7 @@ export default class AssetSvc {
   static async updateImage(ownerId: string, imageId: string, data: any) {
     const image = await AssetRepo.findImageById(imageId);
     if (!image) throw new Error("Image not found");
-    if (image.asset.ownerId !== ownerId) throw new Error("Unauthorized");
+    if (!image.asset || image.asset.ownerId !== ownerId) throw new Error("Unauthorized");
 
     return AssetRepo.updateImage(imageId, data);
   }
@@ -261,7 +261,7 @@ export default class AssetSvc {
   static async deleteImage(ownerId: string, imageId: string) {
     const image = await AssetRepo.findImageById(imageId);
     if (!image) throw new Error("Image not found");
-    if (image.asset.ownerId !== ownerId) throw new Error("Unauthorized");
+    if (!image.asset || image.asset.ownerId !== ownerId) throw new Error("Unauthorized");
 
     return AssetRepo.deleteImage(imageId);
   }

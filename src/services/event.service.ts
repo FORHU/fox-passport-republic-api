@@ -25,8 +25,8 @@ export default class EventSvc {
         name: string;
         description: string;
         eventType: EventType;
-        startDatetime: Date;
-        endDatetime: Date;
+        startAt: Date;
+        endAt: Date;
         maxAttendees: number;
         totalPrice: number;
         currency?: string;
@@ -57,7 +57,11 @@ export default class EventSvc {
         if (event.organizerId !== String(userId)) {
             throw new Error("Unauthorized");
         }
-        return EventRepo.addAssetToEvent(eventId, assetId, quantity);
+        return EventRepo.addAssetToEvent(eventId, assetId, {
+            quantity,
+            agreedPrice: 0,
+            billingRate: "one_time",
+        });
     }
 
     static async addServiceToEvent(eventId: string, userId: string, serviceId: string, agreedPrice: number) {
@@ -67,6 +71,9 @@ export default class EventSvc {
         if (event.organizerId !== String(userId)) {
             throw new Error("Unauthorized");
         }
-        return EventRepo.addServiceToEvent(eventId, serviceId, agreedPrice);
+        return EventRepo.addServiceToEvent(eventId, serviceId, {
+            agreedPrice,
+            billingRate: "one_time",
+        });
     }
 }
