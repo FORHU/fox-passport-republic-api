@@ -17,11 +17,7 @@ export default class EventRepo {
                 ...(filters?.status && { status: filters.status }),
             },
             include: {
-                venue: {
-                    include: {
-                        files: true
-                    }
-                },
+                venue: true,
                 eventAssets: {
                     include: {
                         asset: true
@@ -51,18 +47,10 @@ export default class EventRepo {
         return prisma.event.findUnique({
             where: { id: String(id) },
             include: {
-                venue: {
-                    include: {
-                        files: true
-                    }
-                },
+                venue: true,
                 eventAssets: {
                     include: {
-                        asset: {
-                            include: {
-                                files: true
-                            }
-                        }
+                        asset: true
                     }
                 },
                 eventServices: {
@@ -112,18 +100,10 @@ export default class EventRepo {
             where: { id: String(id) },
             data,
             include: {
-                venue: {
-                    include: {
-                        files: true
-                    }
-                },
+                venue: true,
                 eventAssets: {
                     include: {
-                        asset: {
-                            include: {
-                                files: true
-                            }
-                        }
+                        asset: true
                     }
                 },
                 eventServices: {

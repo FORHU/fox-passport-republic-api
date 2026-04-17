@@ -129,7 +129,7 @@ CREATE TABLE "venues" (
     "city" TEXT NOT NULL,
     "state" TEXT,
     "country" TEXT NOT NULL,
-    "imgId" TEXT,
+    "imgIds" TEXT[],
     "status" "VenueStatus" NOT NULL DEFAULT 'draft',
     "spaceType" TEXT[],
     "amenities" TEXT[],
