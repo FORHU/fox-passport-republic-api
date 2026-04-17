@@ -12,6 +12,8 @@ import reviewRoutes from "./review.routes";
 import favoriteRoutes from "./favorite.routes";
 import assetRoutes from "./asset.routes";
 import serviceRoutes from "./service.routes";
+import s3Routes from "./s3.routes";
+import fileRoutes from "./file.routes";
 
 const router = express.Router();
 
@@ -54,11 +56,16 @@ router.use("/v1/assets", assetRoutes);
 router.use("/v1/asset", assetRoutes);
 router.use("/v1/services", serviceRoutes);
 router.use("/v1/service", serviceRoutes);
+router.use("/v1/files", fileRoutes);
+router.use("/v1/file", fileRoutes);
 
 
 // Feature Routes (Reviews & Favorites)
 router.use("/v1/reviews", reviewRoutes);
 router.use("/v1/favorites", favoriteRoutes);
+
+// S3 Routes
+router.use("/v1/s3", s3Routes);
 
 export default router;
 

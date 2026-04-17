@@ -33,21 +33,19 @@ export default class ReviewRepo {
 
     // CREATE
     static async createReview(data: {
-        venueId?: string;
-        eventId?: string;
         userId: string;
+        entityId: string;
+        entityType: string;
         rating: number;
         comment?: string;
-        isVerifiedAttendee?: boolean;
     }) {
         return prisma.review.create({
             data: {
-                venueId: data.venueId ? String(data.venueId) : undefined,
-                eventId: data.eventId ? String(data.eventId) : undefined,
                 userId: String(data.userId),
+                entityId: String(data.entityId),
+                entityType: String(data.entityType),
                 rating: data.rating,
                 comment: data.comment,
-                isVerifiedAttendee: data.isVerifiedAttendee || false,
             },
             include: {
                 user: {
@@ -63,7 +61,7 @@ export default class ReviewRepo {
     // LIST BY VENUE
     static async getVenueReviews(venueId: string) {
         return prisma.review.findMany({
-            where: { venueId: String(venueId) },
+            where: { entityType: "venue", entityId: String(venueId) },
             include: {
                 user: {
                     select: {
@@ -79,7 +77,7 @@ export default class ReviewRepo {
     // LIST BY EVENT
     static async getEventReviews(eventId: string) {
         return prisma.review.findMany({
-            where: { eventId: String(eventId) },
+            where: { entityType: "event", entityId: String(eventId) },
             include: {
                 user: {
                     select: {

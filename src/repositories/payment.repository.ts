@@ -10,7 +10,7 @@ export default class PaymentRepo {
         return prisma.payment.findMany({
             where: {
                 ...(filters?.bookingId && { bookingId: String(filters.bookingId) }),
-                ...(filters?.paymentStatus && { paymentStatus: filters.paymentStatus }),
+                ...(filters?.paymentStatus && { status: filters.paymentStatus }),
             },
             include: {
                 booking: {
@@ -32,7 +32,7 @@ export default class PaymentRepo {
                 },
             },
             orderBy: {
-                paymentDate: "desc",
+                paidAt: "desc",
             },
         });
     }
@@ -72,20 +72,18 @@ export default class PaymentRepo {
         bookingId: string;
         amount: number;
         currency: string;
-        paymentMethod: string;
+        method: string;
         paymentStatus: PaymentStatus;
         transactionId: string;
-        gatewayResponse?: string;
     }) {
         return prisma.payment.create({
             data: {
                 bookingId: String(data.bookingId),
                 amount: data.amount,
                 currency: data.currency,
-                paymentMethod: data.paymentMethod,
-                paymentStatus: data.paymentStatus,
+                method: data.method,
+                status: data.paymentStatus,
                 transactionId: data.transactionId,
-                gatewayResponse: data.gatewayResponse,
             },
             include: {
                 booking: true,
@@ -98,12 +96,13 @@ export default class PaymentRepo {
         id: string,
         data: Partial<{
             paymentStatus: PaymentStatus;
-            gatewayResponse: string;
         }>
     ) {
         return prisma.payment.update({
             where: { id: String(id) },
-            data,
+            data: {
+                ...(data.paymentStatus ? { status: data.paymentStatus } : {}),
+            },
             include: {
                 booking: true,
             },
@@ -133,7 +132,7 @@ export default class PaymentRepo {
         return prisma.payment.findMany({
             where: { bookingId: String(bookingId) },
             orderBy: {
-                paymentDate: "desc",
+                paidAt: "desc",
             },
         });
     }

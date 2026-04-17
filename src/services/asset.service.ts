@@ -35,12 +35,13 @@ type UpdateAssetFromRequestInput = {
     categorySlug?: string;
     name?: string;
     description?: string;
-    condition?: AssetCondition;
-    propertyType?: string;
-    roomType?: string;
     capacity?: number;
     maxAttendees?: number;
     price?: number;
+    billingRate?: BillingRate;
+    condition?: AssetCondition;
+    propertyType?: string;
+    roomType?: string;
     images?: AssetImageInput[];
   };
 };
@@ -207,7 +208,8 @@ export default class AssetSvc {
       roomType?: string;
       capacity?: number;
       maxAttendees?: number;
-      price: number;
+      price?: number; // Optional in update
+      billingRate?: BillingRate;
       images?: { url: string; altText?: string; orderIndex?: number; isThumbnail?: boolean }[];
     }>
   ) {
@@ -251,7 +253,7 @@ export default class AssetSvc {
   static async updateImage(ownerId: string, imageId: string, data: any) {
     const image = await AssetRepo.findImageById(imageId);
     if (!image) throw new Error("Image not found");
-    if (image.asset.ownerId !== ownerId) throw new Error("Unauthorized");
+    if (!image.asset || image.asset.ownerId !== ownerId) throw new Error("Unauthorized");
 
     return AssetRepo.updateImage(imageId, data);
   }
@@ -259,7 +261,7 @@ export default class AssetSvc {
   static async deleteImage(ownerId: string, imageId: string) {
     const image = await AssetRepo.findImageById(imageId);
     if (!image) throw new Error("Image not found");
-    if (image.asset.ownerId !== ownerId) throw new Error("Unauthorized");
+    if (!image.asset || image.asset.ownerId !== ownerId) throw new Error("Unauthorized");
 
     return AssetRepo.deleteImage(imageId);
   }
