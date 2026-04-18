@@ -22,7 +22,6 @@ export default class ServiceRepo {
                         email: true,
                     },
                 },
-                files: true,
             },
             orderBy: {
                 createdAt: "desc",
@@ -56,7 +55,6 @@ export default class ServiceRepo {
                 imgId: data.imgId ?? undefined,
             },
             include: {
-                files: true,
                 owner: { select: { id: true, name: true, email: true } },
             },
         });
@@ -74,7 +72,6 @@ export default class ServiceRepo {
                         email: true,
                     },
                 },
-                files: true,
             },
         });
     }
@@ -85,7 +82,6 @@ export default class ServiceRepo {
             where: { id },
             data,
             include: {
-                files: true,
                 owner: { select: { id: true, name: true, email: true } },
             },
         });

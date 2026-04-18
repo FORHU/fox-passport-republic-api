@@ -12,7 +12,6 @@ export default class AssetRepo {
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
-        files: true,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -46,7 +45,6 @@ export default class AssetRepo {
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
-        files: true,
       },
     });
   }
@@ -57,7 +55,6 @@ export default class AssetRepo {
       where: { id: String(id) },
       include: {
         owner: { select: { id: true, name: true, email: true } },
-        files: true,
       },
     });
   }
@@ -90,7 +87,6 @@ export default class AssetRepo {
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
-        files: true,
       },
     });
   }
@@ -105,9 +101,9 @@ export default class AssetRepo {
 
   // IMAGE-LIKE HELPERS BACKED BY `File` MODEL
   static async addImage(assetId: string, url: string, isThumbnail: boolean, altText?: string, orderIndex?: number) {
+    void assetId;
     return prisma.file.create({
       data: {
-        assetId: String(assetId),
         url,
         name: altText ?? `asset-image-${orderIndex ?? 0}`,
         type: isThumbnail ? "thumbnail" : "image",
@@ -118,7 +114,6 @@ export default class AssetRepo {
   static async findImageById(imageId: string) {
     return prisma.file.findUnique({
       where: { id: String(imageId) },
-      include: { asset: true },
     });
   }
 
