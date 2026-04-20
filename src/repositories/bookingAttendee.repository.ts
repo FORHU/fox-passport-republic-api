@@ -80,7 +80,7 @@ export default class BookingAttendeeRepo {
                     include: {
                         event: {
                             include: {
-                                venue: true,
+                                venue: { include: { images: true } },
                             }
                         },
                     },

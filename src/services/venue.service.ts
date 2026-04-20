@@ -1,6 +1,5 @@
 import VenueRepo from "../repositories/venue.repository";
 import { VenueStatus } from "@prisma/client";
-import { uploadVenueImage } from "../utils/supabase";
 
 export default class VenueSvc {
     private static isAdminRole(role?: string) {
