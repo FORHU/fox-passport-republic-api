@@ -8,6 +8,7 @@ export default class FileRepo {
         uploadedBy: string;
         venueId: string | null;
         assetId: string | null;
+        serviceId: string | null;
     }) {
         return prisma.file.create({ data: {
             url: data.url,
@@ -16,6 +17,7 @@ export default class FileRepo {
             uploadedBy: data.uploadedBy,
             venueId: data.venueId ?? null,
             assetId: data.assetId ?? null,
+            serviceId: data.serviceId ?? null,
         } });
     }
 }

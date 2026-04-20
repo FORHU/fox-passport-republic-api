@@ -10,6 +10,7 @@ export default class FileCtrl {
       type: Joi.string().min(1).required(),
       venueId: Joi.string().uuid().optional(),
       assetId: Joi.string().uuid().optional(),
+      serviceId: Joi.string().uuid().optional(),
     });
 
     const { error, value } = schema.validate(req.body);

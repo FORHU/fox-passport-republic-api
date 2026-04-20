@@ -40,15 +40,18 @@ model File {
   uploadedBy String?
   venueId    String?
   assetId    String?
+  serviceId  String?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
   user       User?     @relation(fields: [uploadedBy], references: [id])
   venue      Venue?    @relation(fields: [venueId], references: [id], onDelete: SetNull)
   asset      Asset?    @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  service    Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
 
   @@index([venueId])
   @@index([assetId])
+  @@index([serviceId])
   @@map("files")
 }
 
@@ -92,12 +95,19 @@ model Service {
   category      String
   name          String
   description   String
+  city          String         @default("Unknown City")
+  state         String?
+  country       String         @default("Unknown Country")
+  isWillingToTravel Boolean        @default(false)
+  tags          String[]
   price         Float
+  currency      String         @default("USD")  
   billingRate   BillingRate
-  status        ServiceStatus  @default(pending)
-  imgId         String?
+  status        ServiceStatus  @default(draft)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+  images        File[]
   eventServices EventService[]
   owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
