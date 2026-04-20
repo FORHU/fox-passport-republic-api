@@ -53,7 +53,6 @@ router.use("/v1/attendees/", bookingAttendeeRoutes); // Trailing slash alias
 router.use("/v1/payments", paymentRoutes);
 router.use("/v1/payments/", paymentRoutes); // Trailing slash alias
 router.use("/v1/asset", assetRoutes);
-router.use("/v1/services", serviceRoutes);
 router.use("/v1/service", serviceRoutes);
 router.use("/v1/files", fileRoutes);
 router.use("/v1/file", fileRoutes);

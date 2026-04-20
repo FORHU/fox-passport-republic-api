@@ -1,106 +1,121 @@
 import { prisma } from "../utils/prisma";
-import { ServiceStatus, BillingRate } from "@prisma/client";
+import { BillingRate, ServiceStatus } from "@prisma/client";
 
 export default class ServiceRepo {
-    // READ ALL
-    static async getAllServices(filters?: {
-        ownerId?: string;
-        category?: string;
-        status?: ServiceStatus;
-    }) {
-        return prisma.service.findMany({
-            where: {
-                ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
-                ...(filters?.category && { category: filters.category }),
-                ...(filters?.status && { status: filters.status }),
-            },
-            include: {
-                owner: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                    },
-                },
-            },
-            orderBy: {
-                createdAt: "desc",
-            },
-        });
-    }
+  static async getAllServices(filters?: {
+    ownerId?: string;
+    category?: string;
+    status?: ServiceStatus;
+  }) {
+    return prisma.service.findMany({
+      where: {
+        ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
+        ...(filters?.category && { category: String(filters.category) }),
+        ...(filters?.status && { status: filters.status }),
+        deletedAt: null,
+      },
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+        images: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
 
-    // CREATE
-    static async createService(data: {
-        id?: string;
-        ownerId: string;
-        name: string;
-        description: string;
-        category: string;
-        price: number;
-        status?: ServiceStatus;
-        billingRate: BillingRate;
-        imgId?: string;
-    }) {
-        // Repo should only persist; business defaults are expected to be normalized by the service.
-        return prisma.service.create({
-            data: {
-                id: data.id,
-                ownerId: String(data.ownerId),
-                name: data.name,
-                description: data.description,
-                category: data.category,
-                price: data.price,
-                status: data.status,
-                billingRate: data.billingRate,
-                imgId: data.imgId ?? undefined,
-            },
-            include: {
-                owner: { select: { id: true, name: true, email: true } },
-            },
-        });
-    }
+  static async createService(data: {
+    id?: string;
+    ownerId: string;
+    category: string;
+    name: string;
+    description: string;
+    city: string;
+    state?: string;
+    country: string;
+    isWillingToTravel?: boolean;
+    tags: string[];
+    price: number;
+    currency?: string;
+    billingRate: BillingRate;
+    status?: ServiceStatus;
+  }) {
+    return prisma.service.create({
+      data: {
+        id: data.id,
+        ownerId: String(data.ownerId),
+        category: String(data.category),
+        name: data.name,
+        description: data.description,
+        city: data.city,
+        state: data.state,
+        country: data.country,
+        isWillingToTravel: data.isWillingToTravel,
+        tags: data.tags,
+        price: data.price,
+        currency: data.currency,
+        billingRate: data.billingRate,
+        status: data.status,
+      },
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+        images: true,
+      },
+    });
+  }
 
-    // READ BY ID
-    static async getServiceById(id: string) {
-        return prisma.service.findUnique({
-            where: { id },
-            include: {
-                owner: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                    },
-                },
-            },
-        });
-    }
+  static async getServiceById(id: string) {
+    return prisma.service.findUnique({
+      where: { id: String(id) },
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+        images: true,
+      },
+    });
+  }
 
-    // UPDATE
-    static async updateService(id: string, data: any) {
-        return prisma.service.update({
-            where: { id },
-            data,
-            include: {
-                owner: { select: { id: true, name: true, email: true } },
-            },
-        });
-    }
+  static async updateService(
+    id: string,
+    data: Partial<{
+      category: string;
+      name: string;
+      description: string;
+      city: string;
+      state: string;
+      country: string;
+      isWillingToTravel: boolean;
+      tags: string[];
+      price: number;
+      currency: string;
+      billingRate: BillingRate;
+      status: ServiceStatus;
+    }>
+  ) {
+    return prisma.service.update({
+      where: { id: String(id) },
+      data: {
+        category: data.category ?? undefined,
+        name: data.name ?? undefined,
+        description: data.description ?? undefined,
+        city: data.city ?? undefined,
+        state: data.state ?? undefined,
+        country: data.country ?? undefined,
+        isWillingToTravel: data.isWillingToTravel ?? undefined,
+        tags: data.tags ?? undefined,
+        price: data.price ?? undefined,
+        currency: data.currency ?? undefined,
+        billingRate: data.billingRate ?? undefined,
+        status: data.status ?? undefined,
+      },
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+        images: true,
+      },
+    });
+  }
 
-    // DELETE
-    static async deleteService(id: string) {
-        return prisma.service.delete({
-            where: { id },
-        });
-    }
-
-    // CHECK OWNERSHIP (query only; authorization lives in service)
-    static async getServiceOwnerId(serviceId: string) {
-        const service = await prisma.service.findUnique({
-            where: { id: serviceId },
-            select: { ownerId: true },
-        });
-        return service?.ownerId ?? null;
-    }
-
+  static async deleteService(id: string) {
+    return prisma.service.update({
+      where: { id: String(id) },
+      data: { deletedAt: new Date() },
+    });
+  }
 }
