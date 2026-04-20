@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "assets" ADD COLUMN     "currency" TEXT NOT NULL DEFAULT 'USD',
+ADD COLUMN     "quantity" INTEGER NOT NULL DEFAULT 1;
