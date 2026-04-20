@@ -35,11 +35,9 @@ export default class ServiceCtrl {
                 return res.status(401).json({ message: "Unauthorized" });
             }
 
-            const files = req.files as Express.Multer.File[];
-            const service = await ServiceSvc.createServiceFromRequest({
+            const service = await ServiceSvc.createService({
                 ownerId: String(ownerId),
-                body: value,
-                files,
+                ...value,
             });
             return res.status(201).json({ message: "Service created successfully", service });
         } catch (error: any) {

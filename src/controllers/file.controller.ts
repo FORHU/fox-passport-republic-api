@@ -8,6 +8,8 @@ export default class FileCtrl {
       url: Joi.string().uri().required(),
       name: Joi.string().min(1).required(),
       type: Joi.string().min(1).required(),
+      venueId: Joi.string().uuid().optional(),
+      assetId: Joi.string().uuid().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -16,7 +18,14 @@ export default class FileCtrl {
     }
 
     try {
-      const file = await FileSvc.createFile(value);
+      const uploadedBy = (req as any).user?.userId;
+      if (!uploadedBy) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const file = await FileSvc.createFile({
+        ...value,
+        uploadedBy: String(uploadedBy),
+      });
       return res.status(201).json({ message: "File created successfully", file });
     } catch (err: any) {
       return res.status(400).json({ message: err?.message || "Failed to create file" });
