@@ -38,11 +38,14 @@ model File {
   name       String
   type       String
   uploadedBy String?
+  venueId    String?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
   user       User?     @relation(fields: [uploadedBy], references: [id])
+  venue      Venue?    @relation(fields: [venueId], references: [id], onDelete: SetNull)
 
+  @@index([venueId])
   @@map("files")
 }
 
@@ -108,7 +111,6 @@ model Venue {
   city        String
   state       String?
   country     String
-  imgIds      String[]
   status      VenueStatus  @default(draft)
   spaceType   String[]
   amenities   String[]
@@ -117,6 +119,7 @@ model Venue {
   policies    String[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  images      File[]
   eventVenues EventVenue[]
   events      Event[]
   host        User         @relation(fields: [hostId], references: [id], onDelete: Cascade)
