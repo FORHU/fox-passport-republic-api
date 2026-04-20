@@ -1,6 +1,8 @@
 import { prisma } from "../utils/prisma";
 import { VenueStatus } from "@prisma/client";
 
+const hostSelect = { select: { id: true, name: true, email: true } } as const;
+
 export default class VenueRepo {
   static async createVenue(data: {
     hostId: string;
@@ -21,57 +23,36 @@ export default class VenueRepo {
     status?: VenueStatus;
     price: number;
   }) {
+    const { imgIds, ...venueScalars } = data;
     return prisma.venue.create({
-      data,
-      include: { host: { select: { id: true, name: true, email: true } } },
+      data: {
+        ...venueScalars,
+        images: {
+          connect: imgIds.map((id) => ({ id })),
+        },
+      },
+      include: { host: hostSelect, images: true },
     });
   }
 
   static async findVenueById(id: string) {
-    const venue = await prisma.venue.findUnique({
+    return prisma.venue.findUnique({
       where: { id },
+      include: { images: true },
     });
-  
-    if (!venue) return null;
-  
-    const files = await prisma.file.findMany({
-      where: {
-        id: { in: venue.imgIds || [] },
-      },
-    });
-  
-    return {
-      ...venue,
-      images: files,
-    };
   }
 
   static async findAllVenues() {
-    const venues = await prisma.venue.findMany({
+    return prisma.venue.findMany({
       orderBy: { createdAt: "desc" },
+      include: { images: true },
     });
-
-    const venuesWithImages = await Promise.all(
-      venues.map(async (venue) => {
-        const files = await prisma.file.findMany({
-          where: {
-            id: { in: venue.imgIds || [] },
-          },
-        });
-  
-        return {
-          ...venue,
-          images: files,
-        };
-      })
-    );
-    return venuesWithImages;
   }
 
   static async findVenueByIdAndOwner(id: string, hostId: string) {
     return prisma.venue.findFirst({
       where: { id: String(id), hostId: String(hostId) },
-      include: { host: { select: { id: true, name: true, email: true } } },
+      include: { host: hostSelect, images: true },
     });
   }
 
@@ -100,10 +81,16 @@ export default class VenueRepo {
       status: VenueStatus;
     }>
   ) {
+    const { imgIds, ...rest } = data;
     return prisma.venue.update({
       where: { id: String(id) },
-      data,
-      include: { host: { select: { id: true, name: true, email: true } } },
+      data: {
+        ...rest,
+        ...(imgIds !== undefined && {
+          images: { set: imgIds.map((fid) => ({ id: fid })) },
+        }),
+      },
+      include: { host: hostSelect, images: true },
     });
   }
 

@@ -17,7 +17,7 @@ export default class EventRepo {
                 ...(filters?.status && { status: filters.status }),
             },
             include: {
-                venue: true,
+                venue: { include: { images: true } },
                 eventAssets: {
                     include: {
                         asset: true
@@ -47,7 +47,7 @@ export default class EventRepo {
         return prisma.event.findUnique({
             where: { id: String(id) },
             include: {
-                venue: true,
+                venue: { include: { images: true } },
                 eventAssets: {
                     include: {
                         asset: true
@@ -100,7 +100,7 @@ export default class EventRepo {
             where: { id: String(id) },
             data,
             include: {
-                venue: true,
+                venue: { include: { images: true } },
                 eventAssets: {
                     include: {
                         asset: true
