@@ -5,37 +5,6 @@ import { uploadServiceImage } from "../utils/supabase";
 import { v4 as uuidv4 } from "uuid";
 
 export default class ServiceSvc {
-    static async createServiceFromRequest(params: {
-        ownerId: string;
-        body: any;
-        files?: Express.Multer.File[];
-    }) {
-        const { ownerId, body, files } = params;
-        const serviceId = uuidv4();
-
-        const images =
-            files && files.length > 0
-                ? await Promise.all(
-                      files.map(async (file, i) => {
-                          const url = await uploadServiceImage(file, serviceId);
-                          return {
-                              url,
-                              altText: file.originalname,
-                              orderIndex: i,
-                              isThumbnail: i === 0,
-                          };
-                      })
-                  )
-                : body.images;
-
-        return this.createService({
-            ...body,
-            id: serviceId,
-            ownerId,
-            images,
-        });
-    }
-
     static async uploadServiceImages(serviceId: string, ownerId: string, files: Express.Multer.File[]) {
         const images = [];
 
@@ -69,6 +38,7 @@ export default class ServiceSvc {
         // Normalize defaults at the service layer (repo only persists).
         const normalized = {
             ...data,
+            id: data.id ?? uuidv4(),
             status: data.status ?? ServiceStatus.available,
             billingRate: data.billingRate as BillingRate,
             images: Array.isArray(data.images)

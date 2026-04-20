@@ -20,7 +20,11 @@ export default class EventRepo {
                 venue: { include: { images: true } },
                 eventAssets: {
                     include: {
-                        asset: true
+                        asset: {
+                            include: {
+                                images: true,
+                            }
+                        }
                     }
                 },
                 eventServices: {
@@ -50,7 +54,11 @@ export default class EventRepo {
                 venue: { include: { images: true } },
                 eventAssets: {
                     include: {
-                        asset: true
+                        asset: {
+                            include: {
+                                images: true,
+                            }
+                        }
                     }
                 },
                 eventServices: {
@@ -103,7 +111,11 @@ export default class EventRepo {
                 venue: { include: { images: true } },
                 eventAssets: {
                     include: {
-                        asset: true
+                        asset: {
+                            include: {
+                                images: true,
+                            }
+                        }
                     }
                 },
                 eventServices: {
