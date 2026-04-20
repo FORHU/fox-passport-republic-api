@@ -25,7 +25,7 @@ export default class BookingRepo {
                 },
                 event: {
                     include: {
-                        venue: true,
+                        venue: { include: { images: true } },
                     }
                 },
                 attendees: true,
@@ -52,7 +52,7 @@ export default class BookingRepo {
                 },
                 event: {
                     include: {
-                        venue: true,
+                        venue: { include: { images: true } },
                     }
                 },
                 attendees: true,
@@ -150,7 +150,7 @@ export default class BookingRepo {
             include: {
                 event: {
                     include: {
-                        venue: true,
+                        venue: { include: { images: true } },
                     }
                 },
                 attendees: true,
