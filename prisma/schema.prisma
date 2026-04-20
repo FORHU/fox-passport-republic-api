@@ -39,13 +39,16 @@ model File {
   type       String
   uploadedBy String?
   venueId    String?
+  assetId    String?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
   user       User?     @relation(fields: [uploadedBy], references: [id])
   venue      Venue?    @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  asset      Asset?    @relation(fields: [assetId], references: [id], onDelete: SetNull)
 
   @@index([venueId])
+  @@index([assetId])
   @@map("files")
 }
 
@@ -67,14 +70,16 @@ model Asset {
   category    String
   name        String
   description String
+  quantity    Int            @default(1)
   price       Float
+  currency    String         @default("USD")
   billingRate BillingRate
-  imgId       String?
   condition   AssetCondition @default(good)
   status      AssetStatus    @default(available)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   deletedAt   DateTime?
+  images      File[]
   eventAssets EventAsset[]
   owner       User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
