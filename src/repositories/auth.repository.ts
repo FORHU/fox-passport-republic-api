@@ -26,6 +26,8 @@ export default class AuthRepo {
         email: true,
         username: true,
         name: true,
+        systemRole: true,
+        roleType: true,
         createdAt: true,
       },
     });
@@ -52,6 +54,8 @@ export default class AuthRepo {
         email: true,
         username: true,
         name: true,
+        systemRole: true,
+        roleType: true,
       },
     });
   }
@@ -116,6 +120,8 @@ export default class AuthRepo {
         id: true,
         name: true,
         username: true,
+        systemRole: true,
+        roleType: true,
       },
     });
   }

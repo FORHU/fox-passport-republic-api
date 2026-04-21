@@ -71,7 +71,8 @@ export default class AuthSvc {
     const accessToken = jwt.sign(
       {
         userId: user.id,
-        role: "user", // New users default to 'user' role
+        systemRole: (user as any).systemRole || "user",
+        roleType: (user as any).roleType || [],
         email: user.email,
       },
       ACCESS_TOKEN_SECRET,
@@ -83,7 +84,8 @@ export default class AuthSvc {
     const refreshToken = jwt.sign(
       {
         userId: user.id,
-        role: "user",
+        systemRole: (user as any).systemRole || "user",
+        roleType: (user as any).roleType || [],
         email: user.email,
       },
       REFRESH_TOKEN_SECRET,
@@ -157,7 +159,8 @@ export default class AuthSvc {
     const accessToken = jwt.sign(
       {
         userId: user.id,
-        role: (user as any).role || "user",
+        systemRole: (user as any).systemRole || "user",
+        roleType: (user as any).roleType || [],
         email: user.email,
       },
       ACCESS_TOKEN_SECRET,
@@ -169,7 +172,8 @@ export default class AuthSvc {
     const refreshToken = jwt.sign(
       {
         userId: user.id,
-        role: (user as any).role || "user",
+        systemRole: (user as any).systemRole || "user",
+        roleType: (user as any).roleType || [],
         email: user.email,
       },
       REFRESH_TOKEN_SECRET,
@@ -191,7 +195,8 @@ export default class AuthSvc {
         email: user.email,
         username: user.username,
         name: user.name,
-        role: (user as any).role || "user",
+        systemRole: (user as any).systemRole || "user",
+        roleType: (user as any).roleType || [],
         isHost: (user as any).isHost || false,
       },
     };
@@ -221,7 +226,8 @@ export default class AuthSvc {
       const accessToken = jwt.sign(
         {
           userId: user.id,
-          role: (user as any).role || "user",
+          systemRole: (user as any).systemRole || "user",
+          roleType: (user as any).roleType || [],
           email: user.email,
         },
         ACCESS_TOKEN_SECRET,
