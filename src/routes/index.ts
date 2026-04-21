@@ -1,7 +1,8 @@
 import express from "express";
-import authRoute from "./auth.route";
-import usersRoute from "./users.route";
-import profileRoute from "./profile.route";
+import authRoutes from "./auth.routes";
+import usersRoutes from "./users.routes";
+import profileRoutes from "./profile.routes";
+import roleRequestRoutes from "./role-request.routes";
 import categoryRoutes from "./category.routes";
 import venueRoutes from "./venue.routes";
 import paymentRoutes from "./payment.routes";
@@ -29,9 +30,10 @@ router.use("/v1", (req, res, next) => {
 });
 
 // Core Routes
-router.use("/v1/auth", authRoute);
-router.use("/v1/users", usersRoute);
-router.use("/v1/profile", profileRoute);
+router.use("/v1/auth", authRoutes);
+router.use("/v1/users", usersRoutes);
+router.use("/v1/profile", profileRoutes);
+router.use("/v1/role-requests", roleRequestRoutes);
 router.use("/v1/categories", categoryRoutes);
 
 // Feature Routes
