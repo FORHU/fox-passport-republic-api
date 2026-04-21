@@ -7,32 +7,136 @@ datasource db {
 }
 
 model User {
-  id         String     @id @default(uuid())
-  email      String     @unique
-  password   String
-  name       String
-  username   String?    @unique
-  phone      String?
-  imgId      String?
-  role       UserRole   @default(user)
-  isVerified Boolean    @default(false)
-  isHost     Boolean    @default(false)
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-  bookings   Booking[]
-  favorites  Favorite[]
-  passport   Passport?
-  reviews    Review[]
-  assets     Asset[]
-  events     Event[]
-  files      File[]
-  services   Service[]
-  venues     Venue[]
+  id       String  @id @default(uuid())
+  email    String  @unique
+  password String
+  name     String
+  username String? @unique
+  phone    String?
+  imgId    String?
+  systemRole   SystemRole    @default(user)
+  roleType     RoleType[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  roleRequests RoleRequest[] @relation("Applicant")
+  reviewsGiven RoleRequest[] @relation("Reviewer")
+  // file relation
+  files     File[]
+  passport  Passport?
+  assets    Asset[]
+  services  Service[]
+  venues    Venue[]
+  events    Event[]
+  bookings  Booking[]
+  favorites Favorite[]
+  reviews   Review[]
   renterAssets RenterAsset[]
   renterServices RenterService[]
   renterVenues RenterVenue[]
+}
 
-  @@map("users")
+model RoleRequest {
+  id       String        @id @default(uuid())
+  userId   String
+  roleType RoleType
+  status   RequestStatus @default(pending)
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user            User          @relation("Applicant", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer        User?         @relation("Reviewer", fields: [reviewedBy], references: [id])
+  mayorApplication        MayorApplication?
+  foxerAssetApplication   FoxerAssetApplication?
+  foxerServiceApplication FoxerServiceApplication?
+  investorApplication     InvestorApplication?
+
+  @@index([userId, roleType])
+  @@map("role_requests")
+}
+
+
+// APPLICATIONS
+model MayorApplication {
+  id        String @id @default(uuid())
+  requestId String @unique
+  businessName  String
+  contactNumber String
+  address       String
+  tinNumber     String
+  description   String?
+  validIdFileId   String?
+  tinIdFileId     String?
+  birPermitFileId String?
+  selfieFileId    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  request RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  validId       File? @relation("MayorValidId", fields: [validIdFileId], references: [id])
+  tinIdFile     File? @relation("MayorTinId", fields: [tinIdFileId], references: [id])
+  birPermitFile File? @relation("MayorBirPermit", fields: [birPermitFileId], references: [id])
+  selfieFile    File? @relation("MayorSelfie", fields: [selfieFileId], references: [id])
+}
+
+
+model FoxerAssetApplication {
+  id        String @id @default(uuid())
+  requestId String @unique
+  businessName String
+  assetTypes   String[]
+  tinNumber    String
+  validIdFileId   String?
+  tinIdFileId     String?
+  birPermitFileId String?
+  selfieFileId    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  request RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  validId       File? @relation("FoxerAssetValidId", fields: [validIdFileId], references: [id])
+  tinIdFile     File? @relation("FoxerAssetTinId", fields: [tinIdFileId], references: [id])
+  birPermitFile File? @relation("FoxerAssetBirPermit", fields: [birPermitFileId], references: [id])
+  selfieFile    File? @relation("FoxerAssetSelfie", fields: [selfieFileId], references: [id])
+}
+
+
+model FoxerServiceApplication {
+  id        String @id @default(uuid())
+  requestId String @unique
+  serviceTypes         String[]
+  portfolioUrls        String[]
+  experience           Int
+  nbiClearanceIdNumber String
+  tinNumber            String?
+  validId1FileId  String?
+  validId2FileId  String?
+  nbiFileId       String?
+  tinIdFileId     String?
+  birPermitFileId String?
+  selfieFileId    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  request RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  validId1      File? @relation("ServiceValidId1", fields: [validId1FileId], references: [id])
+  validId2      File? @relation("ServiceValidId2", fields: [validId2FileId], references: [id])
+  nbiFile       File? @relation("ServiceNBI", fields: [nbiFileId], references: [id])
+  tinIdFile     File? @relation("ServiceTinId", fields: [tinIdFileId], references: [id])
+  birPermitFile File? @relation("ServiceBirPermit", fields: [birPermitFileId], references: [id])
+  selfieFile    File? @relation("ServiceSelfie", fields: [selfieFileId], references: [id])
+}
+
+model InvestorApplication {
+  id        String @id @default(uuid())
+  requestId String @unique
+  companyName     String?
+  investmentRange Float
+  interests       String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  request RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  // 🔗 FILES
+  proofOfFunds File?   @relation("InvestorProof", fields: [proofFileId], references: [id])
+  proofFileId  String?
 }
 
 model File {
@@ -51,7 +155,25 @@ model File {
   venue      Venue?    @relation(fields: [venueId], references: [id], onDelete: SetNull)
   asset      Asset?    @relation(fields: [assetId], references: [id], onDelete: SetNull)
   service    Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
-
+  // Mayor Request
+  mayorValidId   MayorApplication[] @relation("MayorValidId")
+  mayorTinId     MayorApplication[] @relation("MayorTinId")
+  mayorBirPermit MayorApplication[] @relation("MayorBirPermit")
+  mayorSelfie    MayorApplication[] @relation("MayorSelfie")
+  // Foxer Asset Request
+  foxerValidId   FoxerAssetApplication[] @relation("FoxerAssetValidId")
+  foxerTinId     FoxerAssetApplication[] @relation("FoxerAssetTinId")
+  foxerBirPermit FoxerAssetApplication[] @relation("FoxerAssetBirPermit")
+  foxerSelfie    FoxerAssetApplication[] @relation("FoxerAssetSelfie")
+  //Foxer Service
+  serviceValidId1  FoxerServiceApplication[] @relation("ServiceValidId1")
+  serviceValidId2  FoxerServiceApplication[] @relation("ServiceValidId2")
+  serviceNbi       FoxerServiceApplication[] @relation("ServiceNBI")
+  serviceTinId     FoxerServiceApplication[] @relation("ServiceTinId")
+  serviceBirPermit FoxerServiceApplication[] @relation("ServiceBirPermit")
+  serviceSelfie    FoxerServiceApplication[] @relation("ServiceSelfie")
+  // Investor Request
+  investorProof InvestorApplication[] @relation("InvestorProof")
   @@index([venueId])
   @@index([assetId])
   @@index([serviceId])
@@ -281,13 +403,26 @@ model Review {
   @@unique([userId, entityId, entityType])
 }
 
-enum UserRole {
+enum SystemRole {
   user
-  mayor
-  investor
-  foxer
   admin
 }
+
+
+enum RoleType {
+  mayor
+  foxerAsset
+  foxerService
+  investor
+}
+
+
+enum RequestStatus {
+  pending
+  approved
+  rejected
+}
+
 
 enum EventStatus {
   draft
