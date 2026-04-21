@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import UsersRepo from "../repositories/users.repository";
-import { UserRole } from "@prisma/client";
+import { SystemRole } from "@prisma/client";
 
 export default class UsersSvc {
   // GET ALL USERS
@@ -23,7 +23,7 @@ export default class UsersSvc {
     username: string;
     password: string;
     name: string;
-    role?: UserRole;
+    role?: SystemRole;
   }) {
     const existingUser = await UsersRepo.getUserByEmail(data.email);
     if (existingUser) throw new Error("Email already exists");
@@ -43,7 +43,7 @@ export default class UsersSvc {
       email: string;
       username: string;
       password: string;
-      role: UserRole;
+      systemRole: SystemRole;
       name: string;
       isActive: boolean;
     }>
@@ -61,11 +61,5 @@ export default class UsersSvc {
 
     return UsersRepo.deleteUser(id);
   }
-
-  static async becomeHost(userId: string) {
-    const user = await UsersRepo.getUserById(userId);
-    if (!user) throw new Error("User not found");
-
-    return UsersRepo.becomeHost(userId);
-  }
 }
+
