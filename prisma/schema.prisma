@@ -28,6 +28,9 @@ model User {
   files      File[]
   services   Service[]
   venues     Venue[]
+  renterAssets RenterAsset[]
+  renterServices RenterService[]
+  renterVenues RenterVenue[]
 
   @@map("users")
 }
@@ -83,7 +86,7 @@ model Asset {
   updatedAt   DateTime       @updatedAt
   deletedAt   DateTime?
   images      File[]
-  eventAssets EventAsset[]
+  renterAssets RenterAsset[]
   owner       User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@map("assets")
@@ -108,7 +111,7 @@ model Service {
   updatedAt     DateTime       @updatedAt
   deletedAt     DateTime?
   images        File[]
-  eventServices EventService[]
+  renterServices RenterService[]
   owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@map("services")
@@ -135,8 +138,7 @@ model Venue {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   images      File[]
-  eventVenues EventVenue[]
-  events      Event[]
+  renterVenues RenterVenue[]
   host        User         @relation(fields: [hostId], references: [id], onDelete: Cascade)
 
   @@map("venues")
@@ -144,7 +146,6 @@ model Venue {
 
 model Event {
   id            String         @id @default(uuid())
-  venueId       String
   organizerId   String
   imgId         String?
   name          String
@@ -158,60 +159,60 @@ model Event {
   status        EventStatus    @default(pending)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-  bookings      Booking[]
-  eventAssets   EventAsset[]
-  eventServices EventService[]
-  eventVenues   EventVenue[]
   organizer     User           @relation(fields: [organizerId], references: [id])
-  venue         Venue          @relation(fields: [venueId], references: [id])
+
+  bookings      Booking[]
 
   @@map("events")
 }
 
-model EventAsset {
+model RenterAsset {
   id          String            @id @default(uuid())
-  eventId     String
+  renterId    String
   assetId     String
   quantity    Int               @default(1)
+  currency      String         @default("USD")    
   agreedPrice Float
   billingRate BillingRate
-  status      TransactionStatus @default(pending)
+  status      TransactionStatus @default(available)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   asset       Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  event       Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  renter      User              @relation(fields: [renterId], references: [id], onDelete: Cascade)
 
-  @@unique([eventId, assetId])
+  @@unique([renterId, assetId])
 }
 
-model EventService {
+model RenterService {
   id          String            @id @default(uuid())
-  eventId     String
+  renterId    String
   serviceId   String
+  currency      String         @default("USD")
   agreedPrice Float
   billingRate BillingRate
-  status      TransactionStatus @default(pending)
+  status      TransactionStatus @default(available)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
-  event       Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  renter      User              @relation(fields: [renterId], references: [id], onDelete: Cascade)
   service     Service           @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
-  @@unique([eventId, serviceId])
+  @@unique([renterId, serviceId])
 }
 
-model EventVenue {
+model RenterVenue {
   id          String            @id @default(uuid())
-  eventId     String
+  renterId    String
   venueId     String
+  currency      String         @default("USD")
   agreedPrice Float
   billingRate BillingRate
-  status      TransactionStatus @default(pending)
+  status      TransactionStatus @default(available)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
-  event       Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  renter      User              @relation(fields: [renterId], references: [id], onDelete: Cascade)
   venue       Venue             @relation(fields: [venueId], references: [id], onDelete: Cascade)
 
-  @@unique([eventId, venueId])
+  @@unique([renterId, venueId])
 }
 
 model Booking {
@@ -297,9 +298,8 @@ enum EventStatus {
 }
 
 enum TransactionStatus {
-  pending
-  approved
-  rejected
+  available
+  in_use
 }
 
 enum BookingStatus {
