@@ -2,7 +2,6 @@ import { prisma } from "../utils/prisma";
 import { SystemRole, RoleType } from "@prisma/client";
 
 export default class UsersRepo {
-  static findUserById: any;
   // READ ALL
   static async getAllUsers() {
     return prisma.user.findMany({
@@ -19,7 +18,7 @@ export default class UsersRepo {
   }
 
   // READ ONE
-  static async getUserById(id: string) {
+  static async findUserById(id: string) {
     return prisma.user.findUnique({
       where: { id: String(id) },
     });
