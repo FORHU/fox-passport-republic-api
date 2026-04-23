@@ -60,7 +60,7 @@ export default class RoleRequestService {
       });
 
       // 3. If approved, grant the role
-      if (status === RequestStatus.accepted) {
+      if (status === RequestStatus.approved) {
         await tx.user.update({
           where: { id: request.userId },
           data: {
