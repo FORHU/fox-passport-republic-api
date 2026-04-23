@@ -49,7 +49,6 @@ export default class VenueSvc {
             ...data,
             state: data.state ?? undefined,
             imgIds: data.imgIds,
-            billingRate: data.billingRate ?? BillingRate.daily,
             spaceType: data.spaceType ?? [],
             amenities: data.amenities ?? [],
             techAv: data.techAv ?? [],

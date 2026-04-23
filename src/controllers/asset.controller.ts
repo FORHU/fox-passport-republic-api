@@ -37,7 +37,7 @@ export default class AssetCtrl {
       });
       return res.status(201).json({ message: "Asset created successfully", asset });
     } catch (error: any) {
-      if (error?.message?.startsWith("Category with slug") ) {
+      if (error?.message?.startsWith("Category with slug")) {
         return res.status(404).json({ message: error.message });
       }
       return res.status(400).json({ message: error.message || error });
@@ -45,7 +45,7 @@ export default class AssetCtrl {
   }
 
   //READ Assets Controller with optional query parameters for filtering by ownerId and categoryId
-    static async getAssets(req: Request, res: Response) {
+  static async getAssets(req: Request, res: Response) {
     try {
       const { ownerId, category } = req.query;
 
@@ -61,13 +61,13 @@ export default class AssetCtrl {
   }
 
   //READ Asset by ID Controller
-   static async getAssetById(req: Request, res: Response) {
+  static async getAssetById(req: Request, res: Response) {
     try {
       const { id } = req.params;
       const idNum = String(id);
       if (!id || typeof id !== "string") {
-      return res.status(400).json({ message: "Invalid asset id" });
-    }
+        return res.status(400).json({ message: "Invalid asset id" });
+      }
 
       const asset = await AssetSvc.getAssetById(idNum);
       return res.status(200).json({ asset });
@@ -77,7 +77,7 @@ export default class AssetCtrl {
   }
 
   //UPDATE Asset Controller - allows partial updates; validates fields if provided; checks ownership before updating
-  static async updateAsset(req: Request, res: Response) {   
+  static async updateAsset(req: Request, res: Response) {
     // request body may include any subset of fields; when `images` is
     const schema = Joi.object({
       category: Joi.string().optional(),

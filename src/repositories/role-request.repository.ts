@@ -47,10 +47,18 @@ export default class RoleRequestRepo {
             email: true,
           },
         },
-        mayorApplication: true,
-        hostApplication: true,
-        foxerAssetApplication: true,
-        foxerServiceApplication: true,
+        mayorApplication: {
+          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+        },
+        hostApplication: {
+          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true, portfolioFile: true }
+        },
+        foxerAssetApplication: {
+          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+        },
+        foxerServiceApplication: {
+          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+        },
         investorApplication: true,
       },
       orderBy: {
@@ -67,10 +75,18 @@ export default class RoleRequestRepo {
       where: { id },
       include: {
         user: true,
-        mayorApplication: true,
-        hostApplication: true,
-        foxerAssetApplication: true,
-        foxerServiceApplication: true,
+        mayorApplication: {
+          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+        },
+        hostApplication: {
+          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true, portfolioFile: true }
+        },
+        foxerAssetApplication: {
+          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+        },
+        foxerServiceApplication: {
+          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+        },
         investorApplication: true,
       },
     });
