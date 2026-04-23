@@ -10,9 +10,9 @@ export default class S3Svc {
   ) {
     const ext = (S3Svc.getFileExtension(originalFilename) || "bin").toLowerCase();
 
-    const allowedImageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "ico", "webp"];
-    if (!allowedImageExtensions.includes(ext)) {
-      throw new Error("Only image files are allowed");
+    const allowedExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "ico", "webp", "pdf"];
+    if (!allowedExtensions.includes(ext)) {
+      throw new Error("Only images and PDF files are allowed");
     }
 
     if (!sizeOfFile || sizeOfFile > 15 * 1024 * 1024) {

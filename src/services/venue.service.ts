@@ -1,5 +1,5 @@
 import VenueRepo from "../repositories/venue.repository";
-import { VenueStatus } from "@prisma/client";
+import { VenueStatus, BillingRate } from "@prisma/client";
 
 export default class VenueSvc {
     private static isAdminRole(role?: string) {
@@ -28,6 +28,7 @@ export default class VenueSvc {
         policies?: string[];
         status?: VenueStatus;
         price?: number;
+        billingRate?: BillingRate;
     }) {
         // Business logic: validate business rules before creation
         if (data.price && data.price < 0) {
@@ -55,6 +56,7 @@ export default class VenueSvc {
             policies: data.policies ?? [],
             status: data.status ?? VenueStatus.pending,
             price: data.price ?? 0,
+            billingRate: (data.billingRate as BillingRate) ?? BillingRate.daily,
         });
     }
 
@@ -109,6 +111,7 @@ export default class VenueSvc {
             staffing: string[];
             policies: string[];
             status: VenueStatus;
+            billingRate: BillingRate;
         }>;
     }) {
         const { id, requesterId, data } = params;
