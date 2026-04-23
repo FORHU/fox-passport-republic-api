@@ -68,14 +68,16 @@ model MayorApplication {
   address         String
   tinNumber       String
   description     String?
-  validIdFileId   String?
+  validId1FileId  String?
+  nbiFileId       String?
   tinIdFileId     String?
   birPermitFileId String?
   selfieFileId    String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  validId         File?       @relation("MayorValidId", fields: [validIdFileId], references: [id])
+  validId1        File?       @relation("MayorValidId1", fields: [validId1FileId], references: [id])
+  nbiFile         File?       @relation("MayorNBI", fields: [nbiFileId], references: [id])
   tinIdFile       File?       @relation("MayorTinId", fields: [tinIdFileId], references: [id])
   birPermitFile   File?       @relation("MayorBirPermit", fields: [birPermitFileId], references: [id])
   selfieFile      File?       @relation("MayorSelfie", fields: [selfieFileId], references: [id])
@@ -87,14 +89,16 @@ model FoxerAssetApplication {
   businessName    String
   assetTypes      String[]
   tinNumber       String
-  validIdFileId   String?
+  validId1FileId  String?
+  nbiFileId       String?
   tinIdFileId     String?
   birPermitFileId String?
   selfieFileId    String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  validId         File?       @relation("FoxerAssetValidId", fields: [validIdFileId], references: [id])
+  validId1        File?       @relation("FoxerAssetValidId1", fields: [validId1FileId], references: [id])
+  nbiFile         File?       @relation("FoxerAssetNBI", fields: [nbiFileId], references: [id])
   tinIdFile       File?       @relation("FoxerAssetTinId", fields: [tinIdFileId], references: [id])
   birPermitFile   File?       @relation("FoxerAssetBirPermit", fields: [birPermitFileId], references: [id])
   selfieFile      File?       @relation("FoxerAssetSelfie", fields: [selfieFileId], references: [id])
@@ -109,7 +113,6 @@ model FoxerServiceApplication {
   nbiClearanceIdNumber String
   tinNumber            String?
   validId1FileId       String?
-  validId2FileId       String?
   nbiFileId            String?
   tinIdFileId          String?
   birPermitFileId      String?
@@ -118,7 +121,6 @@ model FoxerServiceApplication {
   updatedAt            DateTime    @updatedAt
   request              RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
   validId1             File?       @relation("ServiceValidId1", fields: [validId1FileId], references: [id])
-  validId2             File?       @relation("ServiceValidId2", fields: [validId2FileId], references: [id])
   nbiFile              File?       @relation("ServiceNBI", fields: [nbiFileId], references: [id])
   tinIdFile            File?       @relation("ServiceTinId", fields: [tinIdFileId], references: [id])
   birPermitFile        File?       @relation("ServiceBirPermit", fields: [birPermitFileId], references: [id])
@@ -140,19 +142,28 @@ model InvestorApplication {
 }
 
 model HostApplication {
-  id             String      @id @default(uuid())
-  requestId      String      @unique
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  validId1FileId String?
-  validId2FileId String?
+  id              String      @id @default(uuid())
+  requestId       String      @unique
+  bio             String?
+  experience      String?
+  location        String?
+  validId1FileId  String?
+  nbiFileId       String?
+  tinIdFileId     String?
+  birPermitFileId String?
+  selfieFileId    String?
   portfolioFileId String?
-  request        RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  validId1       File?       @relation("HostValidId1", fields: [validId1FileId], references: [id])
-  validId2       File?       @relation("HostValidId2", fields: [validId2FileId], references: [id])
-  portfolioFile  File?       @relation("Portfolio", fields: [portfolioFileId], references: [id])
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  validId1        File?       @relation("HostValidId1", fields: [validId1FileId], references: [id])
+  nbiFile         File?       @relation("HostNBI", fields: [nbiFileId], references: [id])
+  tinIdFile       File?       @relation("HostTinId", fields: [tinIdFileId], references: [id])
+  birPermitFile   File?       @relation("HostBirPermit", fields: [birPermitFileId], references: [id])
+  selfieFile      File?       @relation("HostSelfie", fields: [selfieFileId], references: [id])
+  portfolioFile   File?       @relation("HostPortfolio", fields: [portfolioFileId], references: [id])
 
-  files File[] @relation("HostPortfolio")
+  files File[] @relation("HostPortfolioMany")
 }
 
 model File {
@@ -171,31 +182,38 @@ model File {
   venue            Venue?                    @relation(fields: [venueId], references: [id], onDelete: SetNull)
   asset            Asset?                    @relation(fields: [assetId], references: [id], onDelete: SetNull)
   service          Service?                  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
-  // Mayor Request
-  mayorValidId     MayorApplication[]        @relation("MayorValidId")
+  // Mayor Application Relations
+  mayorValidId1   MayorApplication[]        @relation("MayorValidId1")
+  mayorNbi         MayorApplication[]        @relation("MayorNBI")
   mayorTinId       MayorApplication[]        @relation("MayorTinId")
   mayorBirPermit   MayorApplication[]        @relation("MayorBirPermit")
   mayorSelfie      MayorApplication[]        @relation("MayorSelfie")
-  // Foxer Asset Request
-  foxerValidId     FoxerAssetApplication[]   @relation("FoxerAssetValidId")
-  foxerTinId       FoxerAssetApplication[]   @relation("FoxerAssetTinId")
-  foxerBirPermit   FoxerAssetApplication[]   @relation("FoxerAssetBirPermit")
-  foxerSelfie      FoxerAssetApplication[]   @relation("FoxerAssetSelfie")
-  //Foxer Service
-  serviceValidId1  FoxerServiceApplication[] @relation("ServiceValidId1")
-  serviceValidId2  FoxerServiceApplication[] @relation("ServiceValidId2")
-  serviceNbi       FoxerServiceApplication[] @relation("ServiceNBI")
-  serviceTinId     FoxerServiceApplication[] @relation("ServiceTinId")
-  serviceBirPermit FoxerServiceApplication[] @relation("ServiceBirPermit")
-  serviceSelfie    FoxerServiceApplication[] @relation("ServiceSelfie")
+
+  // Foxer Asset Application Relations
+  foxerAssetValidId1   FoxerAssetApplication[]   @relation("FoxerAssetValidId1")
+  foxerAssetNbi         FoxerAssetApplication[]   @relation("FoxerAssetNBI")
+  foxerAssetTinId       FoxerAssetApplication[]   @relation("FoxerAssetTinId")
+  foxerAssetBirPermit   FoxerAssetApplication[]   @relation("FoxerAssetBirPermit")
+  foxerAssetSelfie      FoxerAssetApplication[]   @relation("FoxerAssetSelfie")
+
+  // Foxer Service Application Relations
+  foxerServiceValidId1  FoxerServiceApplication[] @relation("ServiceValidId1")
+  foxerServiceNbi       FoxerServiceApplication[] @relation("ServiceNBI")
+  foxerServiceTinId     FoxerServiceApplication[] @relation("ServiceTinId")
+  foxerServiceBirPermit FoxerServiceApplication[] @relation("ServiceBirPermit")
+  foxerServiceSelfie    FoxerServiceApplication[] @relation("ServiceSelfie")
+
+  // Host Application Relations
+  hostValidId1     HostApplication[] @relation("HostValidId1")
+  hostNbi           HostApplication[] @relation("HostNBI")
+  hostTinId         HostApplication[] @relation("HostTinId")
+  hostBirPermit     HostApplication[] @relation("HostBirPermit")
+  hostSelfie        HostApplication[] @relation("HostSelfie")
+  hostPortfolio     HostApplication[] @relation("HostPortfolio")
+  hostPortfolioMany HostApplication[] @relation("HostPortfolioMany")
+
   // Investor Request
   investorProof    InvestorApplication[]     @relation("InvestorProof")
-
-  hostValidId1 HostApplication[] @relation("HostValidId1")
-  hostValidId2 HostApplication[] @relation("HostValidId2")
-  hostPortfolio HostApplication[] @relation("HostPortfolio")
-
-  hostApplications HostApplication[] @relation("Portfolio")
 }
 
 model Passport {

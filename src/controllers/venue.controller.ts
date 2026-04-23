@@ -24,6 +24,7 @@ export default class VenueCtrl {
             policies: Joi.array().items(Joi.string()).optional(),
             status: Joi.string().valid(...Object.values(VenueStatus)).optional(),
             price: Joi.number().min(0).optional(),
+            billingRate: Joi.string().valid("hourly", "daily", "weekly", "monthly", "yearly", "one_time").default("daily"),
         });
 
         const { error, value } = schema.validate(req.body);
@@ -87,6 +88,7 @@ export default class VenueCtrl {
             staffing: Joi.array().items(Joi.string()).optional(),
             policies: Joi.array().items(Joi.string()).optional(),
             status: Joi.string().valid(...Object.values(VenueStatus)).optional(),
+            billingRate: Joi.string().valid("hourly", "daily", "weekly", "monthly", "yearly", "one_time").optional(),
         }).min(1);
 
         const { error, value } = schema.validate(req.body);
