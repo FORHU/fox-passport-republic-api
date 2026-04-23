@@ -10,7 +10,7 @@ export default class UsersSvc {
 
   // GET USER BY ID
   static async getUserById(id: string) {
-    const user = await UsersRepo.getUserById(id);
+    const user = await UsersRepo.findUserById(id);
     if (!user) {
       throw new Error("User not found");
     }
@@ -48,7 +48,7 @@ export default class UsersSvc {
       isActive: boolean;
     }>
   ) {
-    const user = await UsersRepo.getUserById(id);
+    const user = await UsersRepo.findUserById(id);
     if (!user) throw new Error("User not found");
 
     return UsersRepo.updateUser(id, data);
@@ -56,7 +56,7 @@ export default class UsersSvc {
 
   // DELETE
   static async deleteUser(id: string) {
-    const user = await UsersRepo.getUserById(id);
+    const user = await UsersRepo.findUserById(id);
     if (!user) throw new Error("User not found");
 
     return UsersRepo.deleteUser(id);

@@ -12,6 +12,7 @@ import assetRoutes from "./asset.routes";
 import serviceRoutes from "./service.routes";
 import s3Routes from "./s3.routes";
 import fileRoutes from "./file.routes";
+import eventTemplateRoutes from "./event-template.routes";
 
 const router = express.Router();
 
@@ -21,12 +22,6 @@ router.get("/health", (req, res) => {
 
 router.get("/v1", (req, res) => {
   res.status(200).send("Welcome to my API");
-});
-
-// Diagnostic middleware
-router.use("/v1", (req, res, next) => {
-  console.log(`📡 V1 ROUTE DETECTED: ${req.method} ${req.url}`);
-  next();
 });
 
 // Core Routes
@@ -47,6 +42,7 @@ router.use("/v1/asset", assetRoutes);
 router.use("/v1/service", serviceRoutes);
 router.use("/v1/files", fileRoutes);
 router.use("/v1/file", fileRoutes);
+router.use("/v1/event-templates", eventTemplateRoutes);
 
 
 // Feature Routes (Reviews & Favorites)

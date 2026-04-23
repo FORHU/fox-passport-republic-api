@@ -197,7 +197,6 @@ export default class AuthSvc {
         name: user.name,
         systemRole: (user as any).systemRole || "user",
         roleType: (user as any).roleType || [],
-        isHost: (user as any).isHost || false,
       },
     };
   }
