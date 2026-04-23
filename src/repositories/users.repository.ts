@@ -1,7 +1,8 @@
 import { prisma } from "../utils/prisma";
-import { UserRole } from "@prisma/client";
+import { SystemRole, RoleType } from "@prisma/client";
 
 export default class UsersRepo {
+  static findUserById: any;
   // READ ALL
   static async getAllUsers() {
     return prisma.user.findMany({
@@ -10,6 +11,8 @@ export default class UsersRepo {
         email: true,
         username: true,
         name: true,
+        systemRole: true,
+        roleType: true,
         createdAt: true,
       },
     });
@@ -34,7 +37,7 @@ export default class UsersRepo {
     email: string;
     username: string;
     password: string;
-    role?: UserRole;
+    role?: SystemRole;
     name: string;
   }) {
     return prisma.user.create({
@@ -47,6 +50,8 @@ export default class UsersRepo {
         email: true,
         username: true,
         name: true,
+        systemRole: true,
+        roleType: true,
         createdAt: true,
       },
     });
@@ -59,7 +64,7 @@ export default class UsersRepo {
       email: string;
       username: string;
       password: string;
-      role: UserRole;
+      systemRole: SystemRole;
       name: string;
       isActive: boolean;
     }>
@@ -77,23 +82,6 @@ export default class UsersRepo {
     });
   }
 
-  static async becomeHost(userId: string) {
-    return prisma.user.update({
-      where: { id: String(userId) },
-      data: {
-        role: "mayor",
-        isHost: true,
-      },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        role: true,
-        isHost: true,
-      },
-    });
-  }
 
   // DELETE
   static async deleteUser(id: string) {
