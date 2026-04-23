@@ -11,7 +11,7 @@ class S3Controller {
 
     const schema = Joi.object({
       originalFilename: Joi.string().min(1).required(),
-      contentType: Joi.string().valid("image/jpeg", "image/png", "image/gif", "image/bmp", "image/tiff", "image/ico", "image/webp").required(),
+      contentType: Joi.string().valid("image/jpeg", "image/png", "image/gif", "image/bmp", "image/tiff", "image/ico", "image/webp", "application/pdf").required(),
       sizeOfFile: Joi.number().integer().min(1).max(10 * 1024 * 1024).required()
     });
 

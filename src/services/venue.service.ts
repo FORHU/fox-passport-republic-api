@@ -1,5 +1,5 @@
 import VenueRepo from "../repositories/venue.repository";
-import { BillingRate, VenueStatus } from "@prisma/client";
+import { VenueStatus, BillingRate } from "@prisma/client";
 
 export default class VenueSvc {
     private static isAdminRole(role?: string) {
@@ -57,6 +57,7 @@ export default class VenueSvc {
             policies: data.policies ?? [],
             status: data.status ?? VenueStatus.pending,
             price: data.price ?? 0,
+            billingRate: (data.billingRate as BillingRate) ?? BillingRate.daily,
         });
     }
 

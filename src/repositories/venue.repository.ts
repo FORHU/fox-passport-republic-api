@@ -1,5 +1,5 @@
 import { prisma } from "../utils/prisma";
-import { BillingRate, VenueStatus } from "@prisma/client";
+import { VenueStatus, BillingRate } from "@prisma/client";
 
 const hostSelect = { select: { id: true, name: true, email: true } } as const;
 
