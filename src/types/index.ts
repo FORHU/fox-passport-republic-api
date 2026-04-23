@@ -1,5 +1,6 @@
 import {
-    UserRole,
+    SystemRole,
+    RoleType,
     VenueStatus,
     EventStatus,
     BookingStatus,
@@ -9,8 +10,8 @@ import {
 export interface JWTUser {
     id: string;
     email: string;
-    role: UserRole;
-    isHost: boolean;
+    systemRole: SystemRole;
+    roleType: RoleType[];
 }
 
-export { UserRole, VenueStatus, EventStatus, BookingStatus, PaymentStatus };
+export { SystemRole, RoleType, VenueStatus, EventStatus, BookingStatus, PaymentStatus };
