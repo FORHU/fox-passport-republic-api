@@ -48,6 +48,7 @@ export default class RoleRequestRepo {
           },
         },
         mayorApplication: true,
+        hostApplication: true,
         foxerAssetApplication: true,
         foxerServiceApplication: true,
         investorApplication: true,
@@ -67,6 +68,7 @@ export default class RoleRequestRepo {
       include: {
         user: true,
         mayorApplication: true,
+        hostApplication: true,
         foxerAssetApplication: true,
         foxerServiceApplication: true,
         investorApplication: true,

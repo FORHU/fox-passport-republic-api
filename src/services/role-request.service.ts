@@ -25,6 +25,7 @@ export default class RoleRequestService {
     // 3. Map roleType to the correct application model name in Prisma
     const modelMapping: Record<RoleType, string> = {
       [RoleType.mayor]: "mayorApplication",
+      [RoleType.host]: "hostApplication",
       [RoleType.foxerAsset]: "foxerAssetApplication",
       [RoleType.foxerService]: "foxerServiceApplication",
       [RoleType.investor]: "investorApplication",
@@ -59,7 +60,7 @@ export default class RoleRequestService {
       });
 
       // 3. If approved, grant the role
-      if (status === RequestStatus.approved) {
+      if (status === RequestStatus.accepted) {
         await tx.user.update({
           where: { id: request.userId },
           data: {
