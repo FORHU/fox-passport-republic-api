@@ -5,7 +5,7 @@ CREATE TYPE "UserRole" AS ENUM ('user', 'mayor', 'investor', 'foxer', 'admin');
 CREATE TYPE "EventStatus" AS ENUM ('draft', 'pending', 'ongoing', 'completed', 'cancelled');
 
 -- CreateEnum
-CREATE TYPE "TransactionStatus" AS ENUM ('pending', 'approved', 'rejected');
+CREATE TYPE "TransactionStatus" AS ENUM ('available', 'in_use');
 
 -- CreateEnum
 CREATE TYPE "BookingStatus" AS ENUM ('pending', 'confirmed', 'cancelled', 'completed');
@@ -55,9 +55,9 @@ CREATE TABLE "files" (
     "url" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "type" TEXT NOT NULL,
-    "userId" TEXT,
-    "assetId" TEXT,
+    "uploadedBy" TEXT,
     "venueId" TEXT,
+    "assetId" TEXT,
     "serviceId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -87,9 +87,10 @@ CREATE TABLE "assets" (
     "category" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT NOT NULL,
+    "quantity" INTEGER NOT NULL DEFAULT 1,
     "price" DOUBLE PRECISION NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'USD',
     "billingRate" "BillingRate" NOT NULL,
-    "imgId" TEXT,
     "condition" "AssetCondition" NOT NULL DEFAULT 'good',
     "status" "AssetStatus" NOT NULL DEFAULT 'available',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -106,12 +107,18 @@ CREATE TABLE "services" (
     "category" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT NOT NULL,
+    "city" TEXT NOT NULL DEFAULT 'Unknown City',
+    "state" TEXT,
+    "country" TEXT NOT NULL DEFAULT 'Unknown Country',
+    "isWillingToTravel" BOOLEAN NOT NULL DEFAULT false,
+    "tags" TEXT[],
     "price" DOUBLE PRECISION NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'USD',
     "billingRate" "BillingRate" NOT NULL,
-    "status" "ServiceStatus" NOT NULL DEFAULT 'pending',
-    "imgId" TEXT,
+    "status" "ServiceStatus" NOT NULL DEFAULT 'draft',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "services_pkey" PRIMARY KEY ("id")
 );
@@ -129,7 +136,6 @@ CREATE TABLE "venues" (
     "city" TEXT NOT NULL,
     "state" TEXT,
     "country" TEXT NOT NULL,
-    "imgId" TEXT,
     "status" "VenueStatus" NOT NULL DEFAULT 'draft',
     "spaceType" TEXT[],
     "amenities" TEXT[],
@@ -145,7 +151,6 @@ CREATE TABLE "venues" (
 -- CreateTable
 CREATE TABLE "events" (
     "id" TEXT NOT NULL,
-    "venueId" TEXT NOT NULL,
     "organizerId" TEXT NOT NULL,
     "imgId" TEXT,
     "name" TEXT NOT NULL,
@@ -164,46 +169,49 @@ CREATE TABLE "events" (
 );
 
 -- CreateTable
-CREATE TABLE "EventAsset" (
+CREATE TABLE "RenterAsset" (
     "id" TEXT NOT NULL,
-    "eventId" TEXT NOT NULL,
+    "renterId" TEXT NOT NULL,
     "assetId" TEXT NOT NULL,
     "quantity" INTEGER NOT NULL DEFAULT 1,
+    "currency" TEXT NOT NULL DEFAULT 'USD',
     "agreedPrice" DOUBLE PRECISION NOT NULL,
     "billingRate" "BillingRate" NOT NULL,
-    "status" "TransactionStatus" NOT NULL DEFAULT 'pending',
+    "status" "TransactionStatus" NOT NULL DEFAULT 'available',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "EventAsset_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "RenterAsset_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "EventService" (
+CREATE TABLE "RenterService" (
     "id" TEXT NOT NULL,
-    "eventId" TEXT NOT NULL,
+    "renterId" TEXT NOT NULL,
     "serviceId" TEXT NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'USD',
     "agreedPrice" DOUBLE PRECISION NOT NULL,
     "billingRate" "BillingRate" NOT NULL,
-    "status" "TransactionStatus" NOT NULL DEFAULT 'pending',
+    "status" "TransactionStatus" NOT NULL DEFAULT 'available',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "EventService_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "RenterService_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "EventVenue" (
+CREATE TABLE "RenterVenue" (
     "id" TEXT NOT NULL,
-    "eventId" TEXT NOT NULL,
+    "renterId" TEXT NOT NULL,
     "venueId" TEXT NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'USD',
     "agreedPrice" DOUBLE PRECISION NOT NULL,
     "billingRate" "BillingRate" NOT NULL,
-    "status" "TransactionStatus" NOT NULL DEFAULT 'pending',
+    "status" "TransactionStatus" NOT NULL DEFAULT 'available',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "EventVenue_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "RenterVenue_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -284,16 +292,25 @@ CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 CREATE UNIQUE INDEX "users_username_key" ON "users"("username");
 
 -- CreateIndex
+CREATE INDEX "files_venueId_idx" ON "files"("venueId");
+
+-- CreateIndex
+CREATE INDEX "files_assetId_idx" ON "files"("assetId");
+
+-- CreateIndex
+CREATE INDEX "files_serviceId_idx" ON "files"("serviceId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Passport_userId_key" ON "Passport"("userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "EventAsset_eventId_assetId_key" ON "EventAsset"("eventId", "assetId");
+CREATE UNIQUE INDEX "RenterAsset_renterId_assetId_key" ON "RenterAsset"("renterId", "assetId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "EventService_eventId_serviceId_key" ON "EventService"("eventId", "serviceId");
+CREATE UNIQUE INDEX "RenterService_renterId_serviceId_key" ON "RenterService"("renterId", "serviceId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "EventVenue_eventId_venueId_key" ON "EventVenue"("eventId", "venueId");
+CREATE UNIQUE INDEX "RenterVenue_renterId_venueId_key" ON "RenterVenue"("renterId", "venueId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "BookingAttendee_ticketCode_key" ON "BookingAttendee"("ticketCode");
@@ -305,13 +322,13 @@ CREATE UNIQUE INDEX "Payment_transactionId_key" ON "Payment"("transactionId");
 CREATE UNIQUE INDEX "Review_userId_entityId_entityType_key" ON "Review"("userId", "entityId", "entityType");
 
 -- AddForeignKey
-ALTER TABLE "files" ADD CONSTRAINT "files_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "files" ADD CONSTRAINT "files_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "assets"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "files" ADD CONSTRAINT "files_uploadedBy_fkey" FOREIGN KEY ("uploadedBy") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "files" ADD CONSTRAINT "files_venueId_fkey" FOREIGN KEY ("venueId") REFERENCES "venues"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "files" ADD CONSTRAINT "files_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "assets"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "files" ADD CONSTRAINT "files_serviceId_fkey" FOREIGN KEY ("serviceId") REFERENCES "services"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -329,28 +346,25 @@ ALTER TABLE "services" ADD CONSTRAINT "services_ownerId_fkey" FOREIGN KEY ("owne
 ALTER TABLE "venues" ADD CONSTRAINT "venues_hostId_fkey" FOREIGN KEY ("hostId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "events" ADD CONSTRAINT "events_venueId_fkey" FOREIGN KEY ("venueId") REFERENCES "venues"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "events" ADD CONSTRAINT "events_organizerId_fkey" FOREIGN KEY ("organizerId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "EventAsset" ADD CONSTRAINT "EventAsset_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "events"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "RenterAsset" ADD CONSTRAINT "RenterAsset_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "assets"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "EventAsset" ADD CONSTRAINT "EventAsset_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "assets"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "RenterAsset" ADD CONSTRAINT "RenterAsset_renterId_fkey" FOREIGN KEY ("renterId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "EventService" ADD CONSTRAINT "EventService_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "events"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "RenterService" ADD CONSTRAINT "RenterService_renterId_fkey" FOREIGN KEY ("renterId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "EventService" ADD CONSTRAINT "EventService_serviceId_fkey" FOREIGN KEY ("serviceId") REFERENCES "services"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "RenterService" ADD CONSTRAINT "RenterService_serviceId_fkey" FOREIGN KEY ("serviceId") REFERENCES "services"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "EventVenue" ADD CONSTRAINT "EventVenue_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "events"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "RenterVenue" ADD CONSTRAINT "RenterVenue_renterId_fkey" FOREIGN KEY ("renterId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "EventVenue" ADD CONSTRAINT "EventVenue_venueId_fkey" FOREIGN KEY ("venueId") REFERENCES "venues"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "RenterVenue" ADD CONSTRAINT "RenterVenue_venueId_fkey" FOREIGN KEY ("venueId") REFERENCES "venues"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Booking" ADD CONSTRAINT "Booking_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "events"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

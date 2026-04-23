@@ -12,7 +12,7 @@ export default class AssetRepo {
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
-        files: true,
+        images: true,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -25,11 +25,12 @@ export default class AssetRepo {
     category: string;
     name: string;
     description: string;
+    quantity?: number;
     price: number;
+    currency?: string;
     billingRate: BillingRate;
     condition?: AssetCondition;
     status?: AssetStatus;
-    imgId?: string | null;
   }) {
     return prisma.asset.create({
       data: {
@@ -38,15 +39,16 @@ export default class AssetRepo {
         category: String(data.category),
         name: data.name,
         description: data.description,
+        quantity: data.quantity,
         price: data.price,
+        currency: data.currency,
         billingRate: data.billingRate,
         condition: data.condition,
         status: data.status,
-        imgId: data.imgId ?? undefined,
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
-        files: true,
+        images: true,
       },
     });
   }
@@ -57,7 +59,7 @@ export default class AssetRepo {
       where: { id: String(id) },
       include: {
         owner: { select: { id: true, name: true, email: true } },
-        files: true,
+        images: true,
       },
     });
   }
@@ -69,11 +71,12 @@ export default class AssetRepo {
       category: string;
       name: string;
       description: string;
+      quantity: number;
       price: number;
+      currency: string;
       billingRate: BillingRate;
       condition: AssetCondition;
       status: AssetStatus;
-      imgId: string | null;
     }>
   ) {
     return prisma.asset.update({
@@ -82,15 +85,16 @@ export default class AssetRepo {
         category: data.category ?? undefined,
         name: data.name ?? undefined,
         description: data.description ?? undefined,
+        quantity: data.quantity ?? undefined,
         price: data.price ?? undefined,
+        currency: data.currency ?? undefined,
         billingRate: data.billingRate ?? undefined,
         condition: data.condition ?? undefined,
         status: data.status ?? undefined,
-        imgId: Object.prototype.hasOwnProperty.call(data, "imgId") ? (data.imgId as any) : undefined,
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
-        files: true,
+        images: true,
       },
     });
   }
@@ -103,43 +107,4 @@ export default class AssetRepo {
     });
   }
 
-  // IMAGE-LIKE HELPERS BACKED BY `File` MODEL
-  static async addImage(assetId: string, url: string, isThumbnail: boolean, altText?: string, orderIndex?: number) {
-    return prisma.file.create({
-      data: {
-        assetId: String(assetId),
-        url,
-        name: altText ?? `asset-image-${orderIndex ?? 0}`,
-        type: isThumbnail ? "thumbnail" : "image",
-      },
-    });
-  }
-
-  static async findImageById(imageId: string) {
-    return prisma.file.findUnique({
-      where: { id: String(imageId) },
-      include: { asset: true },
-    });
-  }
-
-  static async updateImage(imageId: string, data: Partial<{ url: string; altText: string | null; isThumbnail: boolean }>) {
-    return prisma.file.update({
-      where: { id: String(imageId) },
-      data: {
-        ...(data.url ? { url: data.url } : {}),
-        ...(Object.prototype.hasOwnProperty.call(data, "altText")
-          ? { name: data.altText ?? "image" }
-          : {}),
-        ...(Object.prototype.hasOwnProperty.call(data, "isThumbnail")
-          ? { type: data.isThumbnail ? "thumbnail" : "image" }
-          : {}),
-      },
-    });
-  }
-
-  static async deleteImage(imageId: string) {
-    return prisma.file.delete({
-      where: { id: String(imageId) },
-    });
-  }
 }

@@ -30,8 +30,11 @@ export const authenticate = (
         // Attach user to request
         req.user = {
             userId: decoded.userId,
-            role: decoded.role || "user",
+            systemRole: decoded.systemRole || "user",
+            roleType: decoded.roleType || [],
             email: decoded.email,
+            // Keep role for backward compatibility if needed, mapping to systemRole
+            role: decoded.systemRole || decoded.role || "user",
         };
 
         next();
@@ -68,8 +71,10 @@ export const optionalAuth = (
 
             req.user = {
                 userId: decoded.userId,
-                role: decoded.role || "user",
+                systemRole: decoded.systemRole || "user",
+                roleType: decoded.roleType || [],
                 email: decoded.email,
+                role: decoded.systemRole || decoded.role || "user",
             };
         }
 
@@ -82,14 +87,11 @@ export const optionalAuth = (
 
 /**
  * Role-Based Access Control Middleware
- * Requires authentication first
+ * Checks if the user has the required SystemRole or any of the required RoleTypes
  * 
- * @param roles - Array of allowed roles
- * 
- * @example
- * router.delete('/:id', authenticate, requireRole(['admin', 'super_admin']), deleteListing)
+ * @param allowedRoles - Array of allowed roles (can be SystemRole or RoleType)
  */
-export const requireRole = (roles: string[]) => {
+export const requireRole = (allowedRoles: string[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
         // Check if user is authenticated
         if (!req.user) {
@@ -99,19 +101,27 @@ export const requireRole = (roles: string[]) => {
             });
         }
 
-        // Check if user has required role
-        if (!roles.includes(req.user.role)) {
+        const userSystemRole = req.user.systemRole;
+        const userRoleTypes = req.user.roleType;
+
+        // Check if user has required SystemRole or any required RoleType
+        const hasSystemRole = allowedRoles.includes(userSystemRole);
+        const hasRoleType = allowedRoles.some(role => userRoleTypes.includes(role as any));
+
+        if (!hasSystemRole && !hasRoleType) {
             return res.status(403).json({
                 success: false,
                 message: "Insufficient permissions",
-                requiredRoles: roles,
-                userRole: req.user.role,
+                requiredRoles: allowedRoles,
+                userSystemRole,
+                userRoleTypes,
             });
         }
 
         next();
     };
 };
+
 
 /**
  * Check if user is admin or super_admin
