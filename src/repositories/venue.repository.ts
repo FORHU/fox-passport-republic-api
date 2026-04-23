@@ -1,5 +1,5 @@
 import { prisma } from "../utils/prisma";
-import { VenueStatus } from "@prisma/client";
+import { BillingRate, VenueStatus } from "@prisma/client";
 
 const hostSelect = { select: { id: true, name: true, email: true } } as const;
 
@@ -22,6 +22,7 @@ export default class VenueRepo {
     policies: string[];
     status?: VenueStatus;
     price: number;
+    billingRate: BillingRate;
   }) {
     const { imgIds, ...venueScalars } = data;
     return prisma.venue.create({
@@ -79,6 +80,7 @@ export default class VenueRepo {
       staffing: string[];
       policies: string[];
       status: VenueStatus;
+      billingRate: BillingRate;
     }>
   ) {
     const { imgIds, ...rest } = data;
