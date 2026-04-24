@@ -1,8 +1,48 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import FileSvc from "../services/file.service";
+import S3Svc from "../services/s3.service";
 
 export default class FileCtrl {
+  static async uploadDirect(req: Request, res: Response) {
+    try {
+      const file = req.file;
+      const userId = (req as any).user?.userId;
+
+      if (!file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // 1. Upload to S3 from backend
+      const { key } = await S3Svc.uploadFile(userId, file as any);
+
+      // 2. Generate Public URL
+      const { url } = await S3Svc.generateDownloadUrl(key);
+
+      // 3. Register in DB
+      const dbFile = await FileSvc.createFile({
+        name: file.originalname,
+        type: file.mimetype,
+        url: url,
+        uploadedBy: userId,
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: "File uploaded and registered successfully",
+        fileId: dbFile.id,
+        key: key
+      });
+    } catch (error: any) {
+      console.error("[FileCtrl] Upload error:", error);
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
   static async createFile(req: Request, res: Response) {
     const schema = Joi.object({
       url: Joi.string().uri().required(),

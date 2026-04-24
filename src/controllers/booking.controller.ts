@@ -49,7 +49,7 @@ export default class BookingCtrl {
             const { error, value } = schema.validate(req.body);
             if (error) return res.status(400).json({ message: error.message });
 
-            const booking = await BookingSvc.createDraftBooking({
+            const booking = await BookingSvc.createBooking({
                 userId: req.user!.userId,
                 ...value
             });

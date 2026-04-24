@@ -12,17 +12,18 @@ export const authenticate = (
     next: NextFunction
 ) => {
     try {
-        // Get token from header
         const authHeader = req.headers.authorization;
+        console.log(`[Auth] Header received: ${authHeader?.substring(0, 20)}...`);
 
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            console.warn(`[Auth] Invalid header format: ${authHeader}`);
             return res.status(401).json({
                 success: false,
                 message: "No token provided",
             });
         }
 
-        const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+        const token = authHeader.substring(7).replace(/"/g, ''); // Remove 'Bearer ' and any accidental quotes
 
         // Verify token
         const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET) as any;

@@ -1,7 +1,7 @@
-import { prisma } from "./src/utils/prisma";
+import { PrismaClient } from "@prisma/client";
 import crypto from "crypto";
 
-async function seedUsers() {
+export async function seedUsers(prisma: PrismaClient) {
   try {
     console.log("Starting user seed...");
 
@@ -12,7 +12,7 @@ async function seedUsers() {
         name: "Admin User",
         username: "admin",
         systemRole: "admin",
-        roleType: [],
+        roleType: ["host", "mayor", "foxerAsset", "foxerService"],
       },
       {
         email: "host@example.com",
@@ -31,6 +31,8 @@ async function seedUsers() {
         roleType: [],
       },
     ];
+
+    const seededUsers = [];
 
     for (const u of users) {
       const salt = crypto.randomBytes(16).toString("hex");
@@ -57,14 +59,13 @@ async function seedUsers() {
       });
 
       console.log(`✓ Created/Updated user: ${created.email} (${created.id})`);
+      seededUsers.push(created);
     }
 
-    console.log("\n✅ User seeding completed successfully!");
+    console.log("✅ User seeding completed successfully!");
+    return seededUsers;
   } catch (error) {
     console.error("❌ Error seeding users:", error);
-  } finally {
-    await prisma.$disconnect();
+    throw error;
   }
 }
-
-seedUsers();
