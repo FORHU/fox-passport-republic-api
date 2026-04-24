@@ -217,6 +217,9 @@ model File {
 
   // Investor Request
   investorProof    InvestorApplication[]     @relation("InvestorProof")
+
+  //Event Templates
+  eventTemplates EventTemplate[] @relation("EventTemplateImages")
 }
 
 model Passport {
@@ -323,19 +326,21 @@ model EventTemplate {
   templateAssets   EventTemplateAsset[]
   templateServices EventTemplateService[]
   templateVenues   EventTemplateVenue[]
+
+  images File[] @relation("EventTemplateImages")
 }
 
 model EventTemplateAsset {
   id         String        @id @default(uuid())
   templateId String
-  assetId    String?
+  assetId    String
   name       String?
   quantity   Int           @default(1)
   currency   String        @default("PHP")
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
   template   EventTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  asset      Asset?        @relation(fields: [assetId], references: [id])
+  asset      Asset         @relation(fields: [assetId], references: [id])
 
   @@map("event_template_assets")
 }
@@ -343,13 +348,13 @@ model EventTemplateAsset {
 model EventTemplateService {
   id         String        @id @default(uuid())
   templateId String
-  serviceId  String?
+  serviceId  String
   name       String?
   currency   String        @default("PHP")
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
   template   EventTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  service    Service?      @relation(fields: [serviceId], references: [id])
+  service    Service       @relation(fields: [serviceId], references: [id])
 
   @@map("event_template_services")
 }
@@ -357,13 +362,13 @@ model EventTemplateService {
 model EventTemplateVenue {
   id         String        @id @default(uuid())
   templateId String
-  venueId    String?
+  venueId    String
   name       String?
   currency   String        @default("PHP")
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
   template   EventTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  venue      Venue?        @relation(fields: [venueId], references: [id])
+  venue      Venue         @relation(fields: [venueId], references: [id])
 
   @@map("event_template_venues")
 }
@@ -398,7 +403,7 @@ model EventAssetTransaction {
   assetId     String
   providerId  String
   quantity    Int               @default(1)
-  status      TransactionStatus @default(available)
+  status      TransactionStatus @default(pending)
   agreedPrice Float
   currency    String            @default("PHP")
   lockedAt    DateTime?
@@ -415,7 +420,7 @@ model EventServiceTransaction {
   eventId     String
   serviceId   String
   providerId  String
-  status      TransactionStatus @default(available)
+  status      TransactionStatus @default(pending)
   agreedPrice Float
   currency    String            @default("PHP")
   lockedAt    DateTime?
@@ -432,7 +437,7 @@ model EventVenueTransaction {
   eventId     String
   venueId     String
   providerId  String
-  status      TransactionStatus @default(available)
+  status      TransactionStatus @default(pending)
   agreedPrice Float
   currency    String            @default("PHP")
   lockedAt    DateTime?
@@ -544,8 +549,10 @@ enum EventStatus {
 }
 
 enum TransactionStatus {
-  available
-  in_use
+  pending
+  approved
+  rejected
+  cancelled
 }
 
 enum BookingStatus {

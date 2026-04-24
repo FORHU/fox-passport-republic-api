@@ -9,6 +9,7 @@ export default class FileRepo {
         venueId: string | null;
         assetId: string | null;
         serviceId: string | null;
+        roleRequestId: string | null;
     }) {
         return prisma.file.create({ data: {
             url: data.url,
@@ -18,6 +19,7 @@ export default class FileRepo {
             venueId: data.venueId ?? null,
             assetId: data.assetId ?? null,
             serviceId: data.serviceId ?? null,
+            roleRequestId: data.roleRequestId ?? null,
         } });
     }
 }

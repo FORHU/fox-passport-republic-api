@@ -15,6 +15,17 @@ export default class EventTemplateCtrl {
     const { error, value } = schema.validate(req.body);
     if (error) return res.status(400).json({ message: error.message });
 
+    // Enforce dependency rule: at least one join table entry
+    const hasAssets = value.assets && value.assets.length > 0;
+    const hasServices = value.services && value.services.length > 0;
+    const hasVenues = value.venues && value.venues.length > 0;
+
+    if (!hasAssets && !hasServices && !hasVenues) {
+      return res.status(400).json({ 
+        message: "An EventTemplate must include at least one valid Asset, Service, or Venue." 
+      });
+    }
+
     try {
       const ownerId = (req as any).user?.userId;
       const template = await EventTemplateSvc.createTemplate({
