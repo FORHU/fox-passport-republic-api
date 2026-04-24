@@ -31,7 +31,12 @@ export default class RoleRequestService {
       [RoleType.investor]: "investorApplication",
     };
 
-    return RoleRequestRepo.createRequest(userId, roleType, applicationData, modelMapping[roleType]);
+    // Convert empty strings to null so optional FK fields don't violate constraints
+    const cleanedData = Object.fromEntries(
+      Object.entries(applicationData).map(([k, v]) => [k, v === "" ? null : v])
+    );
+
+    return RoleRequestRepo.createRequest(userId, roleType, cleanedData, modelMapping[roleType]);
   }
 
   /**

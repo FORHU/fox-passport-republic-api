@@ -1,5 +1,5 @@
 import { prisma } from "./src/utils/prisma";
-import bcrypt from "bcrypt";
+import crypto from "crypto";
 
 async function seedUsers() {
   try {
@@ -33,7 +33,9 @@ async function seedUsers() {
     ];
 
     for (const u of users) {
-      const hashed = await bcrypt.hash(u.password, 10);
+      const salt = crypto.randomBytes(16).toString("hex");
+      const hash = crypto.pbkdf2Sync(u.password, salt, 1000, 64, "sha512").toString("hex");
+      const hashed = `${salt}:${hash}`;
 
       const created = await prisma.user.upsert({
         where: { email: u.email },
