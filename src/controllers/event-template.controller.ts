@@ -10,6 +10,7 @@ export default class EventTemplateCtrl {
       description: Joi.string().required(),
       category: Joi.string().valid(...Object.values(EventType)).required(),
       isPublic: Joi.boolean().optional(),
+      imgIds: Joi.array().items(Joi.string().uuid()).max(5).optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -24,6 +25,31 @@ export default class EventTemplateCtrl {
       return res.status(201).json({ message: "Template created successfully", template });
     } catch (error: any) {
       return res.status(400).json({ message: error.message });
+    }
+  }
+
+  static async updateTemplate(req: Request, res: Response) {
+    const schema = Joi.object({
+      name: Joi.string().optional(),
+      description: Joi.string().optional(),
+      category: Joi.string().valid(...Object.values(EventType)).optional(),
+      isPublic: Joi.boolean().optional(),
+      imgIds: Joi.array().items(Joi.string().uuid()).max(5).optional(),
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) return res.status(400).json({ message: error.message });
+
+    try {
+      const ownerId = (req as any).user?.userId;
+      const template = await EventTemplateSvc.updateTemplate({
+        id: req.params.id,
+        ownerId,
+        data: value,
+      });
+      return res.status(200).json({ message: "Template updated successfully", template });
+    } catch (error: any) {
+      return res.status(error.message.includes("Unauthorized") ? 403 : 400).json({ message: error.message });
     }
   }
 
