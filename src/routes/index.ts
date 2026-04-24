@@ -12,6 +12,7 @@ import assetRoutes from "./asset.routes";
 import serviceRoutes from "./service.routes";
 import s3Routes from "./s3.routes";
 import fileRoutes from "./file.routes";
+import adminRoutes from "./admin.routes";
 import eventTemplateRoutes from "./event-template.routes";
 import eventRequestRoutes from "./event-request.routes";
 import bookingRoutes from "./booking.routes";
@@ -52,6 +53,9 @@ router.use("/v1/event-transactions", eventTransactionRoutes);
 // Feature Routes (Reviews & Favorites)
 router.use("/v1/reviews", reviewRoutes);
 router.use("/v1/favorites", favoriteRoutes);
+
+// Admin Routes
+router.use("/v1/admin", adminRoutes);
 
 // S3 Routes
 router.use("/v1/s3", s3Routes);

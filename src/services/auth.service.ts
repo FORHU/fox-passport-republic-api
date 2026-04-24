@@ -130,14 +130,13 @@ export default class AuthSvc {
   }
 
   static async login({
-    username,
+    email,
     password,
   }: {
-    username: string;
+    email: string;
     password: string;
   }) {
-    const user = await AuthRepo.findUserByUsername(username);
-    console.log("+++++++++", user);
+    const user = await AuthRepo.findUserByEmail(email);
     if (!user) {
       throw "Invalid credentials";
     }

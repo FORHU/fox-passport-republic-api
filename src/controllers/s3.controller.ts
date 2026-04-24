@@ -12,7 +12,7 @@ class S3Controller {
     const schema = Joi.object({
       originalFilename: Joi.string().min(1).required(),
       contentType: Joi.string().valid("image/jpeg", "image/png", "image/gif", "image/bmp", "image/tiff", "image/ico", "image/webp", "application/pdf").required(),
-      sizeOfFile: Joi.number().integer().min(1).max(10 * 1024 * 1024).required()
+      sizeOfFile: Joi.number().integer().min(1).max(15 * 1024 * 1024).required()
     });
 
     const { error, value } = schema.validate({
@@ -41,8 +41,6 @@ class S3Controller {
   }
 
   static async getGetUrl(req: Request, res: Response) {
-    const userId = req.user?.userId as string;
-
     const { key } = req.query;
 
     const schema = Joi.object({
