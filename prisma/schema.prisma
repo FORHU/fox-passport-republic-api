@@ -171,11 +171,13 @@ model File {
   venueId               String?
   assetId               String?
   serviceId             String?
+  templateId            String?
   createdAt             DateTime                  @default(now())
   updatedAt             DateTime                  @updatedAt
   deletedAt             DateTime?
   asset                 Asset?                    @relation(fields: [assetId], references: [id])
   service               Service?                  @relation(fields: [serviceId], references: [id])
+  template              EventTemplate?            @relation(fields: [templateId], references: [id])
   user                  User?                     @relation(fields: [uploadedBy], references: [id])
   venue                 Venue?                    @relation(fields: [venueId], references: [id])
   foxerAssetBirPermit   FoxerAssetApplication[]   @relation("FoxerAssetBirPermit")
@@ -303,6 +305,7 @@ model EventTemplate {
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
   events           EventClientRequest[]
+  images           File[]
   owner            User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   templateAssets   EventTemplateAsset[]
   templateServices EventTemplateService[]

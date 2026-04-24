@@ -9,11 +9,17 @@ export default class EventTemplateRepo {
     description: string;
     category: EventType;
     isPublic?: boolean;
+    imgIds?: string[];
   }) {
+    const { imgIds, ...rest } = data;
     return prisma.eventTemplate.create({
-      data,
+      data: {
+        ...rest,
+        images: imgIds ? { connect: imgIds.map(id => ({ id })) } : undefined,
+      },
       include: {
         owner: { select: { id: true, name: true, email: true } },
+        images: true,
       },
     });
   }
@@ -30,6 +36,7 @@ export default class EventTemplateRepo {
         templateAssets: { include: { asset: true } },
         templateServices: { include: { service: true } },
         templateVenues: { include: { venue: true } },
+        images: true,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -44,6 +51,23 @@ export default class EventTemplateRepo {
         templateAssets: { include: { asset: true } },
         templateServices: { include: { service: true } },
         templateVenues: { include: { venue: true } },
+        images: true,
+      },
+    });
+  }
+
+  // UPDATE
+  static async updateTemplate(id: string, data: any) {
+    const { imgIds, ...rest } = data;
+    return prisma.eventTemplate.update({
+      where: { id },
+      data: {
+        ...rest,
+        images: imgIds ? { set: imgIds.map((id: string) => ({ id })) } : undefined,
+      },
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+        images: true,
       },
     });
   }
