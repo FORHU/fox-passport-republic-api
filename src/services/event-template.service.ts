@@ -8,8 +8,25 @@ export default class EventTemplateSvc {
     description: string;
     category: EventType;
     isPublic?: boolean;
+    imgIds?: string[];
   }) {
     return EventTemplateRepo.createTemplate(data);
+  }
+
+  static async updateTemplate(params: {
+    id: string;
+    ownerId: string;
+    data: Partial<{
+      name: string;
+      description: string;
+      category: EventType;
+      isPublic: boolean;
+      imgIds: string[];
+    }>;
+  }) {
+    const { id, ownerId, data } = params;
+    await this.verifyOwnership(id, ownerId);
+    return EventTemplateRepo.updateTemplate(id, data);
   }
 
   static async getTemplates(filters?: { ownerId?: string; isPublic?: boolean }) {
