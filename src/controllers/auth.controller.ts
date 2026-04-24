@@ -157,6 +157,7 @@ export default class AuthCtrl {
         }
     }
 
+
     static async logout(req: Request, res: Response) {
         try {
             // In a stateless JWT system, logout is handled client-side by removing the token
