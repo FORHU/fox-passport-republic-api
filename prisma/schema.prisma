@@ -7,59 +7,57 @@ datasource db {
 }
 
 model User {
-  id              String          @id @default(uuid())
-  email           String          @unique
-  password        String
-  name            String
-  username        String?         @unique
-  phone           String?
-  imgId           String?
-  systemRole      SystemRole      @default(user)
-  roleType        RoleType[]
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  roleRequests    RoleRequest[]   @relation("Applicant")
-  reviewsGiven    RoleRequest[]   @relation("Reviewer")
-  // file relation
-  files           File[]
-  passport        Passport?
-  assets          Asset[]
-  services        Service[]
-  venues          Venue[]
-  clientEvents    EventClientRequest[]         @relation("EventClient")
-  organizedEvents EventClientRequest[]         @relation("EventOrganizer")
-  bookings        Booking[]
-  favorites       Favorite[]
-  reviews         Review[]
-  eventTemplates      EventTemplate[]
+  id                  String                    @id @default(uuid())
+  email               String                    @unique
+  password            String
+  name                String
+  username            String?                   @unique
+  phone               String?
+  imgId               String?
+  systemRole          SystemRole                @default(user)
+  roleType            RoleType[]
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  bookings            Booking[]
   assetTransactions   EventAssetTransaction[]   @relation("AssetProvider")
+  clientEvents        EventClientRequest[]      @relation("EventClient")
+  organizedEvents     EventClientRequest[]      @relation("EventOrganizer")
   serviceTransactions EventServiceTransaction[] @relation("ServiceProvider")
+  eventTemplates      EventTemplate[]
   venueTransactions   EventVenueTransaction[]   @relation("VenueProvider")
+  favorites           Favorite[]
+  files               File[]
+  passport            Passport?
+  reviews             Review[]
+  assets              Asset[]
+  reviewsGiven        RoleRequest[]             @relation("Reviewer")
+  roleRequests        RoleRequest[]             @relation("Applicant")
+  services            Service[]
+  venues              Venue[]
 }
 
 model RoleRequest {
-  id                        String                     @id @default(uuid())
-  userId                    String
-  roleType                  RoleType
-  status                    RequestStatus              @default(pending)
-  reviewedBy                String?
-  reviewedAt                DateTime?
-  rejectionReason           String?
-  createdAt                 DateTime                   @default(now())
-  updatedAt                 DateTime                   @updatedAt
-  user                      User                       @relation("Applicant", fields: [userId], references: [id], onDelete: Cascade)
-  reviewer                  User?                      @relation("Reviewer", fields: [reviewedBy], references: [id])
-  mayorApplication          MayorApplication?
-  foxerAssetApplication     FoxerAssetApplication?
-  foxerServiceApplication   FoxerServiceApplication?
-  investorApplication       InvestorApplication?
-  hostApplication HostApplication?
+  id                      String                   @id @default(uuid())
+  userId                  String
+  roleType                RoleType
+  status                  RequestStatus            @default(pending)
+  reviewedBy              String?
+  reviewedAt              DateTime?
+  rejectionReason         String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  foxerAssetApplication   FoxerAssetApplication?
+  foxerServiceApplication FoxerServiceApplication?
+  hostApplication         HostApplication?
+  investorApplication     InvestorApplication?
+  mayorApplication        MayorApplication?
+  reviewer                User?                    @relation("Reviewer", fields: [reviewedBy], references: [id])
+  user                    User                     @relation("Applicant", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, roleType])
   @@map("role_requests")
 }
 
-// APPLICATIONS
 model MayorApplication {
   id              String      @id @default(uuid())
   requestId       String      @unique
@@ -75,12 +73,12 @@ model MayorApplication {
   selfieFileId    String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
-  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  validId1        File?       @relation("MayorValidId1", fields: [validId1FileId], references: [id])
-  nbiFile         File?       @relation("MayorNBI", fields: [nbiFileId], references: [id])
-  tinIdFile       File?       @relation("MayorTinId", fields: [tinIdFileId], references: [id])
   birPermitFile   File?       @relation("MayorBirPermit", fields: [birPermitFileId], references: [id])
+  nbiFile         File?       @relation("MayorNBI", fields: [nbiFileId], references: [id])
+  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
   selfieFile      File?       @relation("MayorSelfie", fields: [selfieFileId], references: [id])
+  tinIdFile       File?       @relation("MayorTinId", fields: [tinIdFileId], references: [id])
+  validId1        File?       @relation("MayorValidId1", fields: [validId1FileId], references: [id])
 }
 
 model FoxerAssetApplication {
@@ -96,12 +94,12 @@ model FoxerAssetApplication {
   selfieFileId    String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
-  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  validId1        File?       @relation("FoxerAssetValidId1", fields: [validId1FileId], references: [id])
-  nbiFile         File?       @relation("FoxerAssetNBI", fields: [nbiFileId], references: [id])
-  tinIdFile       File?       @relation("FoxerAssetTinId", fields: [tinIdFileId], references: [id])
   birPermitFile   File?       @relation("FoxerAssetBirPermit", fields: [birPermitFileId], references: [id])
+  nbiFile         File?       @relation("FoxerAssetNBI", fields: [nbiFileId], references: [id])
+  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
   selfieFile      File?       @relation("FoxerAssetSelfie", fields: [selfieFileId], references: [id])
+  tinIdFile       File?       @relation("FoxerAssetTinId", fields: [tinIdFileId], references: [id])
+  validId1        File?       @relation("FoxerAssetValidId1", fields: [validId1FileId], references: [id])
 }
 
 model FoxerServiceApplication {
@@ -119,12 +117,12 @@ model FoxerServiceApplication {
   selfieFileId         String?
   createdAt            DateTime    @default(now())
   updatedAt            DateTime    @updatedAt
-  request              RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  validId1             File?       @relation("ServiceValidId1", fields: [validId1FileId], references: [id])
-  nbiFile              File?       @relation("ServiceNBI", fields: [nbiFileId], references: [id])
-  tinIdFile            File?       @relation("ServiceTinId", fields: [tinIdFileId], references: [id])
   birPermitFile        File?       @relation("ServiceBirPermit", fields: [birPermitFileId], references: [id])
+  nbiFile              File?       @relation("ServiceNBI", fields: [nbiFileId], references: [id])
+  request              RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
   selfieFile           File?       @relation("ServiceSelfie", fields: [selfieFileId], references: [id])
+  tinIdFile            File?       @relation("ServiceTinId", fields: [tinIdFileId], references: [id])
+  validId1             File?       @relation("ServiceValidId1", fields: [validId1FileId], references: [id])
 }
 
 model InvestorApplication {
@@ -135,10 +133,9 @@ model InvestorApplication {
   interests       String[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
-  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  // 🔗 FILES
-  proofOfFunds    File?       @relation("InvestorProof", fields: [proofFileId], references: [id])
   proofFileId     String?
+  proofOfFunds    File?       @relation("InvestorProof", fields: [proofFileId], references: [id])
+  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
 }
 
 model HostApplication {
@@ -155,65 +152,57 @@ model HostApplication {
   portfolioFileId String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
-  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  validId1        File?       @relation("HostValidId1", fields: [validId1FileId], references: [id])
-  nbiFile         File?       @relation("HostNBI", fields: [nbiFileId], references: [id])
-  tinIdFile       File?       @relation("HostTinId", fields: [tinIdFileId], references: [id])
   birPermitFile   File?       @relation("HostBirPermit", fields: [birPermitFileId], references: [id])
-  selfieFile      File?       @relation("HostSelfie", fields: [selfieFileId], references: [id])
+  nbiFile         File?       @relation("HostNBI", fields: [nbiFileId], references: [id])
   portfolioFile   File?       @relation("HostPortfolio", fields: [portfolioFileId], references: [id])
-
-  files File[] @relation("HostPortfolioMany")
+  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  selfieFile      File?       @relation("HostSelfie", fields: [selfieFileId], references: [id])
+  tinIdFile       File?       @relation("HostTinId", fields: [tinIdFileId], references: [id])
+  validId1        File?       @relation("HostValidId1", fields: [validId1FileId], references: [id])
+  files           File[]      @relation("HostPortfolioMany")
 }
 
 model File {
-  id               String                    @id @default(uuid())
-  url              String
-  name             String
-  type             String
-  uploadedBy       String?
-  venueId          String?
-  assetId          String?
-  serviceId        String?
-  createdAt        DateTime                  @default(now())
-  updatedAt        DateTime                  @updatedAt
-  deletedAt        DateTime?
-  user             User?                     @relation(fields: [uploadedBy], references: [id])
-  venue            Venue?                    @relation(fields: [venueId], references: [id], onDelete: SetNull)
-  asset            Asset?                    @relation(fields: [assetId], references: [id], onDelete: SetNull)
-  service          Service?                  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
-  // Mayor Application Relations
-  mayorValidId1   MayorApplication[]        @relation("MayorValidId1")
-  mayorNbi         MayorApplication[]        @relation("MayorNBI")
-  mayorTinId       MayorApplication[]        @relation("MayorTinId")
-  mayorBirPermit   MayorApplication[]        @relation("MayorBirPermit")
-  mayorSelfie      MayorApplication[]        @relation("MayorSelfie")
-
-  // Foxer Asset Application Relations
-  foxerAssetValidId1   FoxerAssetApplication[]   @relation("FoxerAssetValidId1")
-  foxerAssetNbi         FoxerAssetApplication[]   @relation("FoxerAssetNBI")
-  foxerAssetTinId       FoxerAssetApplication[]   @relation("FoxerAssetTinId")
+  id                    String                    @id @default(uuid())
+  url                   String
+  name                  String
+  type                  String
+  uploadedBy            String?
+  venueId               String?
+  assetId               String?
+  serviceId             String?
+  templateId            String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  deletedAt             DateTime?
+  asset                 Asset?                    @relation(fields: [assetId], references: [id])
+  service               Service?                  @relation(fields: [serviceId], references: [id])
+  template              EventTemplate?            @relation(fields: [templateId], references: [id])
+  user                  User?                     @relation(fields: [uploadedBy], references: [id])
+  venue                 Venue?                    @relation(fields: [venueId], references: [id])
   foxerAssetBirPermit   FoxerAssetApplication[]   @relation("FoxerAssetBirPermit")
+  foxerAssetNbi         FoxerAssetApplication[]   @relation("FoxerAssetNBI")
   foxerAssetSelfie      FoxerAssetApplication[]   @relation("FoxerAssetSelfie")
-
-  // Foxer Service Application Relations
-  foxerServiceValidId1  FoxerServiceApplication[] @relation("ServiceValidId1")
-  foxerServiceNbi       FoxerServiceApplication[] @relation("ServiceNBI")
-  foxerServiceTinId     FoxerServiceApplication[] @relation("ServiceTinId")
+  foxerAssetTinId       FoxerAssetApplication[]   @relation("FoxerAssetTinId")
+  foxerAssetValidId1    FoxerAssetApplication[]   @relation("FoxerAssetValidId1")
   foxerServiceBirPermit FoxerServiceApplication[] @relation("ServiceBirPermit")
+  foxerServiceNbi       FoxerServiceApplication[] @relation("ServiceNBI")
   foxerServiceSelfie    FoxerServiceApplication[] @relation("ServiceSelfie")
-
-  // Host Application Relations
-  hostValidId1     HostApplication[] @relation("HostValidId1")
-  hostNbi           HostApplication[] @relation("HostNBI")
-  hostTinId         HostApplication[] @relation("HostTinId")
-  hostBirPermit     HostApplication[] @relation("HostBirPermit")
-  hostSelfie        HostApplication[] @relation("HostSelfie")
-  hostPortfolio     HostApplication[] @relation("HostPortfolio")
-  hostPortfolioMany HostApplication[] @relation("HostPortfolioMany")
-
-  // Investor Request
-  investorProof    InvestorApplication[]     @relation("InvestorProof")
+  foxerServiceTinId     FoxerServiceApplication[] @relation("ServiceTinId")
+  foxerServiceValidId1  FoxerServiceApplication[] @relation("ServiceValidId1")
+  hostBirPermit         HostApplication[]         @relation("HostBirPermit")
+  hostNbi               HostApplication[]         @relation("HostNBI")
+  hostPortfolio         HostApplication[]         @relation("HostPortfolio")
+  hostSelfie            HostApplication[]         @relation("HostSelfie")
+  hostTinId             HostApplication[]         @relation("HostTinId")
+  hostValidId1          HostApplication[]         @relation("HostValidId1")
+  investorProof         InvestorApplication[]     @relation("InvestorProof")
+  mayorBirPermit        MayorApplication[]        @relation("MayorBirPermit")
+  mayorNbi              MayorApplication[]        @relation("MayorNBI")
+  mayorSelfie           MayorApplication[]        @relation("MayorSelfie")
+  mayorTinId            MayorApplication[]        @relation("MayorTinId")
+  mayorValidId1         MayorApplication[]        @relation("MayorValidId1")
+  hostPortfolioMany     HostApplication[]         @relation("HostPortfolioMany")
 }
 
 model Passport {
@@ -229,79 +218,79 @@ model Passport {
 }
 
 model Asset {
-  id                 String                   @id @default(uuid())
-  ownerId            String
-  category           String
-  name               String
-  description        String
-  quantity           Int                      @default(1)
-  price              Float
-  currency           String                   @default("USD")
-  billingRate        BillingRate
-  condition          AssetCondition           @default(good)
-  status             AssetStatus              @default(available)
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
-  deletedAt          DateTime?
-  images             File[]
-  owner           User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  templateAssets  EventTemplateAsset[]
-  transactions    EventAssetTransaction[]
+  id             String                  @id @default(uuid())
+  ownerId        String
+  category       String
+  name           String
+  description    String
+  quantity       Int                     @default(1)
+  price          Float
+  currency       String                  @default("USD")
+  billingRate    BillingRate
+  condition      AssetCondition          @default(good)
+  status         AssetStatus             @default(available)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  deletedAt      DateTime?
+  transactions   EventAssetTransaction[]
+  images         File[]
+  owner          User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  templateAssets EventTemplateAsset[]
 
   @@map("assets")
 }
 
 model Service {
-  id                 String                   @id @default(uuid())
-  ownerId            String
-  category           String
-  name               String
-  description        String
-  city               String                   @default("Unknown City")
-  state              String?
-  country            String                   @default("Unknown Country")
-  isWillingToTravel  Boolean                  @default(false)
-  tags               String[]
-  price              Float
-  currency           String                   @default("USD")
-  billingRate        BillingRate
-  status             ServiceStatus            @default(draft)
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
-  deletedAt          DateTime?
-  images             File[]
-  owner            User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  templateServices EventTemplateService[]
-  transactions     EventServiceTransaction[]
+  id                String                    @id @default(uuid())
+  ownerId           String
+  category          String
+  name              String
+  description       String
+  city              String                    @default("Unknown City")
+  state             String?
+  country           String                    @default("Unknown Country")
+  isWillingToTravel Boolean                   @default(false)
+  tags              String[]
+  price             Float
+  currency          String                    @default("USD")
+  billingRate       BillingRate
+  status            ServiceStatus             @default(draft)
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  deletedAt         DateTime?
+  transactions      EventServiceTransaction[]
+  images            File[]
+  templateServices  EventTemplateService[]
+  owner             User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@map("services")
 }
 
 model Venue {
-  id                 String                   @id @default(uuid())
-  hostId             String
-  category           String
-  name               String
-  description        String
-  capacity           Int
-  price              Float
-  billingRate        BillingRate
-  address            String
-  city               String
-  state              String?
-  country            String
-  status             VenueStatus              @default(draft)
-  spaceType          String[]
-  amenities          String[]
-  techAv             String[]
-  staffing           String[]
-  policies           String[]
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
-  images             File[]
-  host           User                  @relation(fields: [hostId], references: [id], onDelete: Cascade)
-  templateVenues EventTemplateVenue[]
+  id             String                  @id @default(uuid())
+  hostId         String
+  category       String
+  name           String
+  description    String
+  capacity       Int
+  price          Float
+  billingRate    BillingRate
+  address        String
+  city           String
+  state          String?
+  country        String
+  status         VenueStatus             @default(draft)
+  spaceType      String[]
+  amenities      String[]
+  techAv         String[]
+  staffing       String[]
+  policies       String[]
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
   transactions   EventVenueTransaction[]
+  images         File[]
+  templateVenues EventTemplateVenue[]
+  host           User                    @relation(fields: [hostId], references: [id], onDelete: Cascade)
 
   @@map("venues")
 }
@@ -315,8 +304,9 @@ model EventTemplate {
   isPublic         Boolean                @default(false)
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
-  owner            User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   events           EventClientRequest[]
+  images           File[]
+  owner            User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   templateAssets   EventTemplateAsset[]
   templateServices EventTemplateService[]
   templateVenues   EventTemplateVenue[]
@@ -331,8 +321,8 @@ model EventTemplateAsset {
   currency   String        @default("PHP")
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
-  template   EventTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
   asset      Asset?        @relation(fields: [assetId], references: [id])
+  template   EventTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@map("event_template_assets")
 }
@@ -345,8 +335,8 @@ model EventTemplateService {
   currency   String        @default("PHP")
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
-  template   EventTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
   service    Service?      @relation(fields: [serviceId], references: [id])
+  template   EventTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@map("event_template_services")
 }
@@ -366,92 +356,94 @@ model EventTemplateVenue {
 }
 
 model EventClientRequest {
-  id             String             @id @default(uuid())
-  clientId       String
-  organizerId    String
-  templateId     String
-  name           String
-  description    String
-  startAt        DateTime
-  endAt          DateTime
-  eventStatus         EventStatus        @default(pending)
-  requestStatus       RequestStatus       @default(pending)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  client         User               @relation("EventClient", fields: [clientId], references: [id])
-  host User               @relation("EventOrganizer", fields: [organizerId], references: [id])
-  template           EventTemplate      @relation(fields: [templateId], references: [id])
-  assetTransactions  EventAssetTransaction[]
+  id                  String                    @id @default(uuid())
+  clientId            String
+  organizerId         String
+  templateId          String
+  name                String
+  description         String
+  startAt             DateTime
+  endAt               DateTime
+  guestCount          Int
+  totalAmount         Float
+  eventStatus         EventStatus               @default(pending)
+  requestStatus       RequestStatus             @default(pending)
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  bookings            Booking[]
+  assetTransactions   EventAssetTransaction[]
+  client              User                      @relation("EventClient", fields: [clientId], references: [id])
+  host                User                      @relation("EventOrganizer", fields: [organizerId], references: [id])
+  template            EventTemplate             @relation(fields: [templateId], references: [id])
   serviceTransactions EventServiceTransaction[]
-  venueTransactions  EventVenueTransaction[]
-  bookings           Booking[]
+  venueTransactions   EventVenueTransaction[]
 }
 
 model EventAssetTransaction {
-  id          String            @id @default(uuid())
+  id          String             @id @default(uuid())
   eventId     String
   assetId     String
   providerId  String
-  quantity    Int               @default(1)
-  status      TransactionStatus @default(available)
+  quantity    Int                @default(1)
+  status      TransactionStatus  @default(pending)
   agreedPrice Float
-  currency    String            @default("PHP")
+  currency    String             @default("PHP")
   lockedAt    DateTime?
   releasedAt  DateTime?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  asset       Asset              @relation(fields: [assetId], references: [id])
   event       EventClientRequest @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  provider    User              @relation("AssetProvider", fields: [providerId], references: [id])
-  asset       Asset             @relation(fields: [assetId], references: [id])
+  provider    User               @relation("AssetProvider", fields: [providerId], references: [id])
 }
 
 model EventServiceTransaction {
-  id          String            @id @default(uuid())
+  id          String             @id @default(uuid())
   eventId     String
   serviceId   String
   providerId  String
-  status      TransactionStatus @default(available)
+  status      TransactionStatus  @default(pending)
   agreedPrice Float
-  currency    String            @default("PHP")
+  currency    String             @default("PHP")
   lockedAt    DateTime?
   releasedAt  DateTime?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   event       EventClientRequest @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  provider    User              @relation("ServiceProvider", fields: [providerId], references: [id])
-  service     Service           @relation(fields: [serviceId], references: [id])
+  provider    User               @relation("ServiceProvider", fields: [providerId], references: [id])
+  service     Service            @relation(fields: [serviceId], references: [id])
 }
 
 model EventVenueTransaction {
-  id          String            @id @default(uuid())
+  id          String             @id @default(uuid())
   eventId     String
   venueId     String
   providerId  String
-  status      TransactionStatus @default(available)
+  status      TransactionStatus  @default(pending)
   agreedPrice Float
-  currency    String            @default("PHP")
+  currency    String             @default("PHP")
   lockedAt    DateTime?
   releasedAt  DateTime?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   event       EventClientRequest @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  provider    User              @relation("VenueProvider", fields: [providerId], references: [id])
-  venue       Venue             @relation(fields: [venueId], references: [id])
+  provider    User               @relation("VenueProvider", fields: [providerId], references: [id])
+  venue       Venue              @relation(fields: [venueId], references: [id])
 }
 
 model Booking {
-  id          String            @id @default(uuid())
+  id          String             @id @default(uuid())
   eventId     String
   userId      String
   guestCount  Int
   totalAmount Float
-  status      BookingStatus     @default(pending)
+  status      BookingStatus      @default(pending)
   startAt     DateTime
   endAt       DateTime
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  event       EventClientRequest             @relation(fields: [eventId], references: [id])
-  user        User              @relation(fields: [userId], references: [id])
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  event       EventClientRequest @relation(fields: [eventId], references: [id])
+  user        User               @relation(fields: [userId], references: [id])
   attendees   BookingAttendee[]
   payments    Payment[]
 }
@@ -539,8 +531,10 @@ enum EventStatus {
 }
 
 enum TransactionStatus {
-  available
-  in_use
+  pending
+  approved
+  rejected
+  cancelled
 }
 
 enum BookingStatus {
