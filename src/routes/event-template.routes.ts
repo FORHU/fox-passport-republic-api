@@ -10,6 +10,7 @@ router.get("/:id", authenticate, EventTemplateCtrl.getTemplateById);
 
 // Organizer only actions
 router.post("/", authenticate, requireRole(["host"]), EventTemplateCtrl.createTemplate);
+router.put("/:id", authenticate, requireRole(["host"]), EventTemplateCtrl.updateTemplate);
 router.delete("/:id", authenticate, requireRole(["host"]), EventTemplateCtrl.deleteTemplate);
 
 // Asset associations

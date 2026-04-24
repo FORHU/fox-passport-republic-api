@@ -14,6 +14,9 @@ import s3Routes from "./s3.routes";
 import fileRoutes from "./file.routes";
 import adminRoutes from "./admin.routes";
 import eventTemplateRoutes from "./event-template.routes";
+import eventRequestRoutes from "./event-request.routes";
+import eventTransactionRoutes from "./event-transaction.routes";
+import bookingRoutes from "./booking.routes";
 
 const router = express.Router();
 
@@ -44,6 +47,10 @@ router.use("/v1/service", serviceRoutes);
 router.use("/v1/files", fileRoutes);
 router.use("/v1/file", fileRoutes);
 router.use("/v1/event-templates", eventTemplateRoutes);
+router.use("/v1/event-requests", eventRequestRoutes);
+router.use("/v1/event-transactions", eventTransactionRoutes);
+router.use("/v1/bookings", bookingRoutes);
+router.use("/v1/booking", bookingRoutes);
 
 
 // Feature Routes (Reviews & Favorites)
