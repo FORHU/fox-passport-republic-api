@@ -10,7 +10,11 @@ export default class EventTemplateSvc {
     isPublic?: boolean;
     imgIds?: string[];
   }) {
-    return EventTemplateRepo.createTemplate(data);
+    const template = await EventTemplateRepo.createTemplate(data);
+    return {
+      ...template,
+      estimatedTotal: this.calculateTotalAmount(template)
+    };
   }
 
   static async updateTemplate(params: {
@@ -26,11 +30,19 @@ export default class EventTemplateSvc {
   }) {
     const { id, ownerId, data } = params;
     await this.verifyOwnership(id, ownerId);
-    return EventTemplateRepo.updateTemplate(id, data);
+    const template = await EventTemplateRepo.updateTemplate(id, data);
+    return {
+      ...template,
+      estimatedTotal: this.calculateTotalAmount(template)
+    };
   }
 
   static async getTemplates(filters?: { ownerId?: string; isPublic?: boolean }) {
-    return EventTemplateRepo.findAllTemplates(filters);
+    const templates = await EventTemplateRepo.findAllTemplates(filters);
+    return templates.map(t => ({
+      ...t,
+      estimatedTotal: this.calculateTotalAmount(t)
+    }));
   }
 
   static async getTemplateById(id: string) {
@@ -38,7 +50,42 @@ export default class EventTemplateSvc {
     if (!template) {
       throw new Error("Event template not found");
     }
-    return template;
+    return {
+      ...template,
+      estimatedTotal: this.calculateTotalAmount(template)
+    };
+  }
+
+  /**
+   * Calculate the total price of all items in the template
+   */
+  static calculateTotalAmount(template: any): number {
+    let total = 0;
+
+    // Sum Assets
+    if (template.templateAssets) {
+      template.templateAssets.forEach((ta: any) => {
+        const price = ta.asset?.price || 0;
+        const qty = ta.quantity || 1;
+        total += price * qty;
+      });
+    }
+
+    // Sum Services
+    if (template.templateServices) {
+      template.templateServices.forEach((ts: any) => {
+        total += ts.service?.price || 0;
+      });
+    }
+
+    // Sum Venues
+    if (template.templateVenues) {
+      template.templateVenues.forEach((tv: any) => {
+        total += tv.venue?.price || 0;
+      });
+    }
+
+    return total;
   }
 
   static async attachAsset(templateId: string, ownerId: string, assetId: string, quantity?: number) {

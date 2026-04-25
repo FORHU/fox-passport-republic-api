@@ -31,7 +31,10 @@ export default class BookingRepo {
                 event: true,
                 user: { select: { name: true, email: true } },
                 attendees: true,
-                payments: true
+                payments: true,
+                assetTransactions: true,
+                serviceTransactions: true,
+                venueTransactions: true
             }
         });
     }

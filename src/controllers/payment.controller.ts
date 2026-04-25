@@ -103,7 +103,8 @@ export default class PaymentController {
                 amount: Joi.number().min(0).required(),
                 currency: Joi.string().length(3).uppercase().optional(),
                 paymentMethod: Joi.string().required(),
-                paymentStatus: Joi.string().valid("pending", "completed", "failed", "refunded").optional(),
+                paymentType: Joi.string().valid("deposit", "full").required(),
+                paymentStatus: Joi.string().valid("pending", "completed", "failed", "refunded", "cancelled").optional(),
                 gatewayResponse: Joi.string().optional(),
             });
 
@@ -112,7 +113,11 @@ export default class PaymentController {
                 return res.status(400).json({ message: error.message });
             }
 
-            const payment = await PaymentSvc.createPayment(value);
+            const { paymentMethod, ...rest } = value;
+            const payment = await PaymentSvc.createPayment({
+                ...rest,
+                method: paymentMethod
+            });
             return res.status(201).json({
                 success: true,
                 message: "Payment created successfully",
@@ -140,7 +145,7 @@ export default class PaymentController {
             }
 
             const bodySchema = Joi.object({
-                paymentStatus: Joi.string().valid("pending", "completed", "failed", "refunded").optional(),
+                paymentStatus: Joi.string().valid("pending", "completed", "failed", "refunded", "cancelled").optional(),
                 gatewayResponse: Joi.string().optional(),
             });
 
@@ -194,6 +199,32 @@ export default class PaymentController {
             return res.status(500).json({
                 success: false,
                 message: error.message || "Failed to fetch booking payments",
+            });
+        }
+    }
+
+    // GET REMAINING BALANCE
+    static async getRemainingBalance(req: Request, res: Response) {
+        try {
+            const schema = Joi.object({
+                bookingId: Joi.string().uuid().required(),
+            });
+
+            const { error, value } = schema.validate(req.params);
+            if (error) {
+                return res.status(400).json({ message: error.message });
+            }
+
+            const balance = await PaymentSvc.getRemainingBalance(value.bookingId);
+            return res.status(200).json({
+                success: true,
+                data: balance,
+            });
+        } catch (error: any) {
+            console.error("Get remaining balance error:", error);
+            return res.status(500).json({
+                success: false,
+                message: error.message || "Failed to calculate balance",
             });
         }
     }
