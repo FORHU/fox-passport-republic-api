@@ -382,6 +382,7 @@ model EventClientRequest {
 model EventAssetTransaction {
   id          String             @id @default(uuid())
   eventId     String
+  bookingId   String?
   assetId     String
   providerId  String
   quantity    Int                @default(1)
@@ -394,12 +395,14 @@ model EventAssetTransaction {
   updatedAt   DateTime           @updatedAt
   asset       Asset              @relation(fields: [assetId], references: [id])
   event       EventClientRequest @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  booking     Booking?           @relation(fields: [bookingId], references: [id])
   provider    User               @relation("AssetProvider", fields: [providerId], references: [id])
 }
 
 model EventServiceTransaction {
   id          String             @id @default(uuid())
   eventId     String
+  bookingId   String?
   serviceId   String
   providerId  String
   status      TransactionStatus  @default(pending)
@@ -410,6 +413,7 @@ model EventServiceTransaction {
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
   event       EventClientRequest @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  booking     Booking?           @relation(fields: [bookingId], references: [id])
   provider    User               @relation("ServiceProvider", fields: [providerId], references: [id])
   service     Service            @relation(fields: [serviceId], references: [id])
 }
@@ -417,6 +421,7 @@ model EventServiceTransaction {
 model EventVenueTransaction {
   id          String             @id @default(uuid())
   eventId     String
+  bookingId   String?
   venueId     String
   providerId  String
   status      TransactionStatus  @default(pending)
@@ -427,6 +432,7 @@ model EventVenueTransaction {
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
   event       EventClientRequest @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  booking     Booking?           @relation(fields: [bookingId], references: [id])
   provider    User               @relation("VenueProvider", fields: [providerId], references: [id])
   venue       Venue              @relation(fields: [venueId], references: [id])
 }
@@ -440,24 +446,29 @@ model Booking {
   status      BookingStatus      @default(pending)
   startAt     DateTime
   endAt       DateTime
+  expiresAt   DateTime?
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
   event       EventClientRequest @relation(fields: [eventId], references: [id])
   user        User               @relation(fields: [userId], references: [id])
   attendees   BookingAttendee[]
   payments    Payment[]
+  assetTransactions   EventAssetTransaction[]
+  serviceTransactions EventServiceTransaction[]
+  venueTransactions   EventVenueTransaction[]
 }
 
 model BookingAttendee {
-  id         String   @id @default(uuid())
-  bookingId  String
-  firstName  String
-  lastName   String
-  email      String?
-  phone      String?
-  ticketCode String   @unique
-  checkedIn  Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  id           String       @id @default(uuid())
+  bookingId    String
+  firstName    String
+  lastName     String
+  email        String?
+  phone        String?
+  inviteStatus InviteStatus @default(pending)
+  ticketCode   String       @unique
+  checkedIn    Boolean      @default(false)
+  createdAt    DateTime     @default(now())
   updatedAt  DateTime @updatedAt
   booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }
@@ -468,9 +479,13 @@ model Payment {
   amount        Float
   currency      String
   method        String
+  paymentType   PaymentType
   status        PaymentStatus
   transactionId String?       @unique
-  paidAt        DateTime      @default(now())
+  expiresAt     DateTime?
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }
 
@@ -549,6 +564,12 @@ enum PaymentStatus {
   completed
   failed
   refunded
+  cancelled
+}
+
+enum PaymentType {
+  deposit
+  full
 }
 
 enum AssetCondition {
@@ -601,4 +622,10 @@ enum EventType {
   anniversary
   graduation
   other
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  declined
 }
