@@ -73,8 +73,10 @@ export default class PaymentRepo {
         amount: number;
         currency: string;
         method: string;
+        paymentType: "deposit" | "full";
         paymentStatus: PaymentStatus;
         transactionId: string;
+        expiresAt?: Date;
     }) {
         return prisma.payment.create({
             data: {
@@ -82,8 +84,10 @@ export default class PaymentRepo {
                 amount: data.amount,
                 currency: data.currency,
                 method: data.method,
+                paymentType: data.paymentType,
                 status: data.paymentStatus,
                 transactionId: data.transactionId,
+                expiresAt: data.expiresAt,
             },
             include: {
                 booking: true,
@@ -132,8 +136,44 @@ export default class PaymentRepo {
         return prisma.payment.findMany({
             where: { bookingId: String(bookingId) },
             orderBy: {
-                paidAt: "desc",
+                createdAt: "desc",
             },
         });
+    }
+
+    // Lazy cancellation of expired payments
+    static async cancelExpiredPayments() {
+        const now = new Date();
+        
+        // 1. Find expired pending payments
+        const expiredPayments = await prisma.payment.findMany({
+            where: {
+                status: PaymentStatus.pending,
+                expiresAt: { lt: now }
+            },
+            select: { id: true, bookingId: true }
+        });
+
+        if (expiredPayments.length === 0) return 0;
+
+        const paymentIds = expiredPayments.map(p => p.id);
+        const bookingIds = [...new Set(expiredPayments.map(p => p.bookingId))];
+
+        // 2. Batch cancel payments and their related bookings
+        await prisma.$transaction([
+            prisma.payment.updateMany({
+                where: { id: { in: paymentIds } },
+                data: { status: PaymentStatus.cancelled }
+            }),
+            prisma.booking.updateMany({
+                where: { 
+                    id: { in: bookingIds },
+                    status: "pending" // Only cancel if it's still pending
+                },
+                data: { status: "cancelled" }
+            })
+        ]);
+
+        return expiredPayments.length;
     }
 }

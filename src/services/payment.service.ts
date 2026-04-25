@@ -13,11 +13,13 @@ export default class PaymentSvc {
         bookingId?: string;
         paymentStatus?: PaymentStatus;
     }) {
+        await PaymentRepo.cancelExpiredPayments();
         return PaymentRepo.getAllPayments(filters);
     }
 
     // GET PAYMENT BY ID
     static async getPaymentById(id: string) {
+        await PaymentRepo.cancelExpiredPayments();
         const payment = await PaymentRepo.getPaymentById(id);
         if (!payment) {
             throw new Error("Payment not found");
@@ -27,6 +29,7 @@ export default class PaymentSvc {
 
     // GET PAYMENT BY TRANSACTION ID
     static async getPaymentByTransactionId(transactionId: string) {
+        await PaymentRepo.cancelExpiredPayments();
         const payment = await PaymentRepo.getPaymentByTransactionId(transactionId);
         if (!payment) {
             throw new Error("Payment not found");
@@ -40,7 +43,9 @@ export default class PaymentSvc {
         amount: number;
         currency: string;
         method: string;
+        paymentType: "deposit" | "full";
         paymentStatus?: PaymentStatus;
+        expiresAt?: Date;
     }) {
         // Generate unique transaction ID
         let transactionId = this.generateTransactionId();
@@ -51,10 +56,12 @@ export default class PaymentSvc {
         return PaymentRepo.createPayment({
             bookingId: data.bookingId,
             amount: data.amount,
-            currency: data.currency || "USD",
+            currency: data.currency || "PHP",
             method: data.method,
+            paymentType: data.paymentType,
             paymentStatus: data.paymentStatus || PaymentStatus.pending,
             transactionId,
+            expiresAt: data.expiresAt,
         });
     }
 
@@ -65,13 +72,64 @@ export default class PaymentSvc {
             paymentStatus: PaymentStatus;
         }>
     ) {
-        // Check if payment exists
-        const exists = await PaymentRepo.paymentExists(id);
-        if (!exists) {
+        // Check if payment exists and is not expired/cancelled
+        const payment = await PaymentRepo.getPaymentById(id);
+        if (!payment) {
             throw new Error("Payment not found");
         }
 
-        return PaymentRepo.updatePayment(id, data);
+        if (payment.status === PaymentStatus.cancelled) {
+            throw new Error("Cannot update a cancelled payment");
+        }
+
+        if (payment.expiresAt && new Date() > payment.expiresAt && payment.status === PaymentStatus.pending) {
+            await PaymentRepo.cancelExpiredPayments();
+            throw new Error("Payment has expired and is now cancelled");
+        }
+
+        const updated = await PaymentRepo.updatePayment(id, data);
+
+        // If deposit payment is completed, confirm the booking
+        if (data.paymentStatus === PaymentStatus.completed && updated.paymentType === "deposit") {
+            await (require("../utils/prisma").prisma.booking.update({
+                where: { id: updated.bookingId },
+                data: { status: "confirmed" }
+            }));
+        }
+
+        // If full payment is completed, mark booking as completed
+        if (data.paymentStatus === PaymentStatus.completed && updated.paymentType === "full") {
+            await (require("../utils/prisma").prisma.booking.update({
+                where: { id: updated.bookingId },
+                data: { status: "completed" }
+            }));
+        }
+
+        return updated;
+    }
+
+    // CALCULATE REMAINING BALANCE
+    static async getRemainingBalance(bookingId: string) {
+        const BookingRepo = require("../repositories/booking.repository").default;
+        const booking = await BookingRepo.findById(bookingId);
+        if (!booking) throw new Error("Booking not found");
+
+        const totalAgreed = [
+            ...(booking.assetTransactions || []),
+            ...(booking.serviceTransactions || []),
+            ...(booking.venueTransactions || [])
+        ].reduce((sum: number, t: any) => sum + (t.agreedPrice || 0), 0);
+
+        const paidAmount = (booking.payments || [])
+            .filter((p: any) => p.status === PaymentStatus.completed)
+            .reduce((sum: number, p: any) => sum + p.amount, 0);
+
+        return {
+            totalAmount: totalAgreed,
+            paidAmount,
+            remainingBalance: Math.max(0, totalAgreed - paidAmount),
+            currency: (booking.event && booking.event.currency) || "PHP"
+        };
     }
 
     // GET BOOKING PAYMENTS
@@ -79,4 +137,3 @@ export default class PaymentSvc {
         return PaymentRepo.getBookingPayments(bookingId);
     }
 }
-

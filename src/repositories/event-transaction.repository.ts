@@ -13,10 +13,14 @@ export default class EventTransactionRepo {
     });
   }
 
-  static async updateAssetStatus(id: string, status: TransactionStatus) {
+  static async createAssetTransaction(data: any) {
+    return prisma.eventAssetTransaction.create({ data });
+  }
+
+  static async updateAssetStatus(id: string, status: TransactionStatus, agreedPrice?: number, providerId?: string) {
     return prisma.eventAssetTransaction.update({
-      where: { id },
-      data: { status },
+      where: { id, ...(providerId && { providerId }) },
+      data: { status, ...(agreedPrice !== undefined && { agreedPrice }) },
     });
   }
 
@@ -31,10 +35,14 @@ export default class EventTransactionRepo {
     });
   }
 
-  static async updateServiceStatus(id: string, status: TransactionStatus) {
+  static async createServiceTransaction(data: any) {
+    return prisma.eventServiceTransaction.create({ data });
+  }
+
+  static async updateServiceStatus(id: string, status: TransactionStatus, agreedPrice?: number, providerId?: string) {
     return prisma.eventServiceTransaction.update({
-      where: { id },
-      data: { status },
+      where: { id, ...(providerId && { providerId }) },
+      data: { status, ...(agreedPrice !== undefined && { agreedPrice }) },
     });
   }
 
@@ -49,10 +57,14 @@ export default class EventTransactionRepo {
     });
   }
 
-  static async updateVenueStatus(id: string, status: TransactionStatus) {
+  static async createVenueTransaction(data: any) {
+    return prisma.eventVenueTransaction.create({ data });
+  }
+
+  static async updateVenueStatus(id: string, status: TransactionStatus, agreedPrice?: number, providerId?: string) {
     return prisma.eventVenueTransaction.update({
-      where: { id },
-      data: { status },
+      where: { id, ...(providerId && { providerId }) },
+      data: { status, ...(agreedPrice !== undefined && { agreedPrice }) },
     });
   }
 }

@@ -49,4 +49,11 @@ export default class EventRequestRepo {
       data: { eventStatus: status },
     });
   }
+
+  static async updateRequestStatus(id: string, status: any) {
+    return prisma.eventClientRequest.update({
+      where: { id },
+      data: { requestStatus: status },
+    });
+  }
 }
