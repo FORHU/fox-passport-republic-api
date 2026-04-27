@@ -97,7 +97,8 @@ export default class PaymentController {
                 amount: Joi.number().min(0).required(),
                 currency: Joi.string().length(3).uppercase().optional(),
                 paymentMethod: Joi.string().required(),
-                paymentStatus: Joi.string().valid("pending", "completed", "failed", "refunded").optional(),
+                paymentType: Joi.string().valid("deposit", "full").required(),
+                paymentStatus: Joi.string().valid("pending", "completed", "failed", "refunded", "cancelled").optional(),
                 gatewayResponse: Joi.string().optional(),
             });
 
@@ -106,7 +107,11 @@ export default class PaymentController {
                 return res.status(400).json({ message: error.message });
             }
 
-            const payment = await PaymentSvc.createPayment(value);
+            const { paymentMethod, ...rest } = value;
+            const payment = await PaymentSvc.createPayment({
+                ...rest,
+                method: paymentMethod
+            });
             return res.status(201).json({
                 success: true,
                 message: "Payment created successfully",
@@ -134,7 +139,7 @@ export default class PaymentController {
             }
 
             const bodySchema = Joi.object({
-                paymentStatus: Joi.string().valid("pending", "completed", "failed", "refunded").optional(),
+                paymentStatus: Joi.string().valid("pending", "completed", "failed", "refunded", "cancelled").optional(),
                 gatewayResponse: Joi.string().optional(),
             });
 
@@ -188,48 +193,29 @@ export default class PaymentController {
         }
     }
 
-    // CREATE STRIPE PAYMENT INTENT
-    static async createPaymentIntent(req: Request, res: Response) {
+    // GET REMAINING BALANCE
+    static async getRemainingBalance(req: Request, res: Response) {
         try {
             const schema = Joi.object({
-                amount: Joi.number().min(1).required(),
-                currency: Joi.string().length(3).optional().default('php'),
-                bookingId: Joi.string().uuid().optional(),
-                description: Joi.string().optional(),
+                bookingId: Joi.string().uuid().required(),
             });
 
-            const { error, value } = schema.validate(req.body);
+            const { error, value } = schema.validate(req.params);
             if (error) {
-                return res.status(400).json({ success: false, message: error.message });
+                return res.status(400).json({ message: error.message });
             }
 
-            const result = await PaymentSvc.createPaymentIntent(value);
+            const balance = await PaymentSvc.getRemainingBalance(value.bookingId);
             return res.status(200).json({
                 success: true,
-                data: result,
+                data: balance,
             });
         } catch (error: any) {
-            console.error("Create payment intent error:", error);
+            console.error("Get remaining balance error:", error);
             return res.status(500).json({
                 success: false,
-                message: error.message || "Failed to create payment intent",
+                message: error.message || "Failed to calculate balance",
             });
-        }
-    }
-
-    // STRIPE WEBHOOK HANDLER
-    static async handleWebhook(req: Request, res: Response) {
-        const signature = req.headers['stripe-signature'];
-        if (!signature) {
-            return res.status(400).json({ success: false, message: "Missing stripe-signature header" });
-        }
-
-        try {
-            const result = await PaymentSvc.handleWebhookEvent(req.body as Buffer, signature as string);
-            return res.status(200).json(result);
-        } catch (error: any) {
-            console.error("Webhook error:", error);
-            return res.status(400).json({ success: false, message: error.message });
         }
     }
 }

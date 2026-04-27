@@ -19,11 +19,13 @@ export default class PaymentSvc {
         bookingId?: string;
         paymentStatus?: PaymentStatus;
     }) {
+        await PaymentRepo.cancelExpiredPayments();
         return PaymentRepo.getAllPayments(filters);
     }
 
     // GET PAYMENT BY ID
     static async getPaymentById(id: string) {
+        await PaymentRepo.cancelExpiredPayments();
         const payment = await PaymentRepo.getPaymentById(id);
         if (!payment) {
             throw new Error("Payment not found");
@@ -33,6 +35,7 @@ export default class PaymentSvc {
 
     // GET PAYMENT BY TRANSACTION ID
     static async getPaymentByTransactionId(transactionId: string) {
+        await PaymentRepo.cancelExpiredPayments();
         const payment = await PaymentRepo.getPaymentByTransactionId(transactionId);
         if (!payment) {
             throw new Error("Payment not found");
@@ -46,7 +49,9 @@ export default class PaymentSvc {
         amount: number;
         currency: string;
         method: string;
+        paymentType: "deposit" | "full";
         paymentStatus?: PaymentStatus;
+        expiresAt?: Date;
     }) {
         let transactionId = this.generateTransactionId();
         while (await PaymentRepo.transactionIdExists(transactionId)) {
@@ -56,10 +61,12 @@ export default class PaymentSvc {
         return PaymentRepo.createPayment({
             bookingId: data.bookingId,
             amount: data.amount,
-            currency: data.currency || "USD",
+            currency: data.currency || "PHP",
             method: data.method,
+            paymentType: data.paymentType,
             paymentStatus: data.paymentStatus || PaymentStatus.pending,
             transactionId,
+            expiresAt: data.expiresAt,
         });
     }
 
@@ -70,86 +77,68 @@ export default class PaymentSvc {
             paymentStatus: PaymentStatus;
         }>
     ) {
-        const exists = await PaymentRepo.paymentExists(id);
-        if (!exists) {
+        // Check if payment exists and is not expired/cancelled
+        const payment = await PaymentRepo.getPaymentById(id);
+        if (!payment) {
             throw new Error("Payment not found");
         }
 
-        return PaymentRepo.updatePayment(id, data);
+        if (payment.status === PaymentStatus.cancelled) {
+            throw new Error("Cannot update a cancelled payment");
+        }
+
+        if (payment.expiresAt && new Date() > payment.expiresAt && payment.status === PaymentStatus.pending) {
+            await PaymentRepo.cancelExpiredPayments();
+            throw new Error("Payment has expired and is now cancelled");
+        }
+
+        const updated = await PaymentRepo.updatePayment(id, data);
+
+        // If deposit payment is completed, confirm the booking
+        if (data.paymentStatus === PaymentStatus.completed && updated.paymentType === "deposit") {
+            await (require("../utils/prisma").prisma.booking.update({
+                where: { id: updated.bookingId },
+                data: { status: "confirmed" }
+            }));
+        }
+
+        // If full payment is completed, mark booking as completed
+        if (data.paymentStatus === PaymentStatus.completed && updated.paymentType === "full") {
+            await (require("../utils/prisma").prisma.booking.update({
+                where: { id: updated.bookingId },
+                data: { status: "completed" }
+            }));
+        }
+
+        return updated;
+    }
+
+    // CALCULATE REMAINING BALANCE
+    static async getRemainingBalance(bookingId: string) {
+        const BookingRepo = require("../repositories/booking.repository").default;
+        const booking = await BookingRepo.findById(bookingId);
+        if (!booking) throw new Error("Booking not found");
+
+        const totalAgreed = [
+            ...(booking.assetTransactions || []),
+            ...(booking.serviceTransactions || []),
+            ...(booking.venueTransactions || [])
+        ].reduce((sum: number, t: any) => sum + (t.agreedPrice || 0), 0);
+
+        const paidAmount = (booking.payments || [])
+            .filter((p: any) => p.status === PaymentStatus.completed)
+            .reduce((sum: number, p: any) => sum + p.amount, 0);
+
+        return {
+            totalAmount: totalAgreed,
+            paidAmount,
+            remainingBalance: Math.max(0, totalAgreed - paidAmount),
+            currency: (booking.event && booking.event.currency) || "PHP"
+        };
     }
 
     // GET BOOKING PAYMENTS
     static async getBookingPayments(bookingId: string) {
         return PaymentRepo.getBookingPayments(bookingId);
-    }
-
-    // CREATE STRIPE PAYMENT INTENT
-    static async createPaymentIntent(data: {
-        amount: number;
-        currency?: string;
-        bookingId?: string;
-        description?: string;
-    }) {
-        const amountInCentavos = Math.round(data.amount * 100);
-
-        const paymentIntent = await stripe.paymentIntents.create({
-            amount: amountInCentavos,
-            currency: (data.currency || 'php').toLowerCase(),
-            automatic_payment_methods: { enabled: true },
-            metadata: {
-                ...(data.bookingId ? { bookingId: data.bookingId } : {}),
-                ...(data.description ? { description: data.description } : {}),
-            },
-        });
-
-        return { clientSecret: paymentIntent.client_secret, paymentIntentId: paymentIntent.id };
-    }
-
-    // HANDLE STRIPE WEBHOOK EVENT
-    static async handleWebhookEvent(rawBody: Buffer, signature: string) {
-        const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
-
-        let event: Stripe.Event;
-        try {
-            event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
-        } catch (err: any) {
-            throw new Error(`Webhook signature verification failed: ${err.message}`);
-        }
-
-        if (event.type === 'payment_intent.succeeded') {
-            const paymentIntent = event.data.object as Stripe.PaymentIntent;
-            const bookingId = paymentIntent.metadata?.bookingId;
-
-            if (bookingId) {
-                await this.fulfillBookingPayment(bookingId, paymentIntent);
-            }
-        }
-
-        return { received: true, type: event.type };
-    }
-
-    private static async fulfillBookingPayment(bookingId: string, paymentIntent: Stripe.PaymentIntent) {
-        // Idempotency: skip if payment record already exists for this intent
-        const existing = await PaymentRepo.transactionIdExists(paymentIntent.id);
-        if (existing) return;
-
-        const amountInPHP = paymentIntent.amount / 100;
-
-        await prisma.$transaction([
-            prisma.booking.update({
-                where: { id: bookingId },
-                data: { status: 'confirmed' },
-            }),
-            prisma.payment.create({
-                data: {
-                    bookingId,
-                    amount: amountInPHP,
-                    currency: paymentIntent.currency.toUpperCase(),
-                    method: 'stripe',
-                    status: PaymentStatus.completed,
-                    transactionId: paymentIntent.id,
-                },
-            }),
-        ]);
     }
 }
