@@ -34,6 +34,8 @@ model User {
   roleRequests        RoleRequest[]             @relation("Applicant")
   services            Service[]
   venues              Venue[]
+  bookingAttendees BookingAttendee[]
+  invitedAttendees BookingAttendee[] @relation("Inviter")
 }
 
 model RoleRequest {
@@ -449,10 +451,11 @@ model Booking {
   expiresAt   DateTime?
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
-  event       EventClientRequest @relation(fields: [eventId], references: [id])
-  user        User               @relation(fields: [userId], references: [id])
-  attendees   BookingAttendee[]
-  payments    Payment[]
+  isGuestListLocked Boolean          @default(false)
+  event               EventClientRequest @relation(fields: [eventId], references: [id])
+  user                User               @relation(fields: [userId], references: [id])
+  attendees           BookingAttendee[]
+  payments            Payment[]
   assetTransactions   EventAssetTransaction[]
   serviceTransactions EventServiceTransaction[]
   venueTransactions   EventVenueTransaction[]
@@ -461,16 +464,22 @@ model Booking {
 model BookingAttendee {
   id           String       @id @default(uuid())
   bookingId    String
+  userId       String?
+  invitedById  String?
   firstName    String
   lastName     String
   email        String?
   phone        String?
   inviteStatus InviteStatus @default(pending)
-  ticketCode   String       @unique
-  checkedIn    Boolean      @default(false)
+  isDraft      Boolean      @default(true)
+  reasonForRejection       String?
+  ticketCode               String?      @unique
+  checkedIn                Boolean      @default(false)
   createdAt    DateTime     @default(now())
-  updatedAt  DateTime @updatedAt
+  updatedAt    DateTime     @updatedAt
   booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy  User?    @relation("Inviter", fields: [invitedById], references: [id])
 }
 
 model Payment {
