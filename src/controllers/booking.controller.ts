@@ -74,10 +74,20 @@ export default class BookingCtrl {
     // GET ONE
     static async getBookingById(req: Request, res: Response) {
         try {
-            const booking = await BookingSvc.getBookingById(req.params.id);
+            const booking = await BookingSvc.getBookingById(req.params.id, req.user);
             return res.status(200).json({ success: true, data: booking });
         } catch (error: any) {
             return res.status(404).json({ success: false, message: error.message });
+        }
+    }
+
+    // FINALIZE GUESTS
+    static async finalizeGuests(req: Request, res: Response) {
+        try {
+            const result = await BookingSvc.finalizeGuestList(req.params.id, req.user!.userId);
+            return res.status(200).json({ success: true, data: result });
+        } catch (error: any) {
+            return res.status(400).json({ success: false, message: error.message });
         }
     }
 
