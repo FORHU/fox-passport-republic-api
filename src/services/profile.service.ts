@@ -32,7 +32,11 @@ export default class ProfileSvc {
             }
         }
 
-        return ProfileRepo.updateProfile(userId, data);
+        const { profileImage, ...rest } = data;
+        return ProfileRepo.updateProfile(userId, {
+            ...rest,
+            ...(profileImage !== undefined ? { imgId: profileImage } : {}),
+        });
     }
 
     // Change password
