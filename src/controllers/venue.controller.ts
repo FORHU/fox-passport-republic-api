@@ -16,7 +16,7 @@ export default class VenueCtrl {
             city: Joi.string().required(),
             state: Joi.string().optional(),
             country: Joi.string().required(),
-            imgIds: Joi.array().items(Joi.string()).max(5).required(),
+            imgIds: Joi.array().items(Joi.string()).min(1).max(5).required(),
             spaceType: Joi.array().items(Joi.string()).optional(),
             amenities: Joi.array().items(Joi.string()).optional(),
             techAv: Joi.array().items(Joi.string()).optional(),
@@ -50,8 +50,8 @@ export default class VenueCtrl {
     // READ Venues Controller with optional query parameters for filtering
     static async getVenues(req: Request, res: Response) {
         try {
-            const venues = await VenueSvc.getVenues();
-
+            const hostId = req.query.hostId as string | undefined;
+            const venues = await VenueSvc.getVenues(hostId ? { hostId } : undefined);
             return res.status(200).json({ venues });
         } catch (error: any) {
             return res.status(500).json({ message: error.message || error });
@@ -98,11 +98,13 @@ export default class VenueCtrl {
 
         try {
             const requesterId = (req as any).user?.userId as string | undefined;
+            const requesterRole = (req as any).user?.role as string | undefined;
             if (!requesterId) return res.status(401).json({ message: "Unauthorized" });
 
             const venue = await VenueSvc.updateVenue({
                 id: String(req.params.id),
                 requesterId,
+                requesterRole,
                 data: value,
             });
             return res.status(200).json({ message: "Venue updated successfully", venue });

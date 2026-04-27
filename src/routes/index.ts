@@ -16,7 +16,6 @@ import adminRoutes from "./admin.routes";
 import eventTemplateRoutes from "./event-template.routes";
 import eventRequestRoutes from "./event-request.routes";
 import eventTransactionRoutes from "./event-transaction.routes";
-import bookingRoutes from "./booking.routes";
 
 const router = express.Router();
 
@@ -49,10 +48,6 @@ router.use("/v1/file", fileRoutes);
 router.use("/v1/event-templates", eventTemplateRoutes);
 router.use("/v1/event-requests", eventRequestRoutes);
 router.use("/v1/event-transactions", eventTransactionRoutes);
-router.use("/v1/bookings", bookingRoutes);
-router.use("/v1/booking", bookingRoutes);
-
-
 // Feature Routes (Reviews & Favorites)
 router.use("/v1/reviews", reviewRoutes);
 router.use("/v1/favorites", favoriteRoutes);

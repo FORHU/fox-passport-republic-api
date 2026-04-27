@@ -37,6 +37,7 @@ export default class ServiceRepo {
     currency?: string;
     billingRate: BillingRate;
     status?: ServiceStatus;
+    imgIds: string[];
   }) {
     return prisma.service.create({
       data: {
@@ -54,6 +55,9 @@ export default class ServiceRepo {
         currency: data.currency,
         billingRate: data.billingRate,
         status: data.status,
+        ...(data.imgIds && data.imgIds.length > 0 && {
+          images: { connect: data.imgIds.map((id) => ({ id })) },
+        }),
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
@@ -87,6 +91,7 @@ export default class ServiceRepo {
       currency: string;
       billingRate: BillingRate;
       status: ServiceStatus;
+      imgIds: string[];
     }>
   ) {
     return prisma.service.update({
@@ -104,6 +109,9 @@ export default class ServiceRepo {
         currency: data.currency ?? undefined,
         billingRate: data.billingRate ?? undefined,
         status: data.status ?? undefined,
+        ...(data.imgIds && data.imgIds.length > 0 && {
+          images: { connect: data.imgIds.map((id) => ({ id })) },
+        }),
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
