@@ -1,16 +1,19 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import EventTemplateSvc from "../services/event-template.service";
-import { EventType } from "@prisma/client";
+import { EventCategory } from "@prisma/client";
 
 export default class EventTemplateCtrl {
   static async createTemplate(req: Request, res: Response) {
     const schema = Joi.object({
       name: Joi.string().required(),
       description: Joi.string().required(),
-      category: Joi.string().valid(...Object.values(EventType)).required(),
+      category: Joi.string().valid(...Object.values(EventCategory)).required(),
       isPublic: Joi.boolean().optional(),
       imgIds: Joi.array().items(Joi.string().uuid()).max(5).optional(),
+      targetCity: Joi.string().optional(),
+      targetState: Joi.string().optional(),
+      targetCountry: Joi.string().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -32,7 +35,7 @@ export default class EventTemplateCtrl {
     const schema = Joi.object({
       name: Joi.string().optional(),
       description: Joi.string().optional(),
-      category: Joi.string().valid(...Object.values(EventType)).optional(),
+      category: Joi.string().valid(...Object.values(EventCategory)).optional(),
       isPublic: Joi.boolean().optional(),
       imgIds: Joi.array().items(Joi.string().uuid()).max(5).optional(),
     });
@@ -77,16 +80,27 @@ export default class EventTemplateCtrl {
 
   static async attachAsset(req: Request, res: Response) {
     const schema = Joi.object({
-      assetId: Joi.string().required(),
+      assetId: Joi.string().optional(),
       quantity: Joi.number().integer().min(1).optional(),
-    });
+      description: Joi.string().optional(),
+      matchedAt: Joi.date().optional(),
+      date: Joi.date().optional()
+    }).or("assetId", "description");
 
     const { error, value } = schema.validate(req.body);
     if (error) return res.status(400).json({ message: error.message });
 
     try {
       const ownerId = (req as any).user?.userId;
-      const result = await EventTemplateSvc.attachAsset(req.params.id, ownerId, value.assetId, value.quantity);
+      const result = await EventTemplateSvc.attachAsset(
+        req.params.id, 
+        ownerId, 
+        value.assetId, 
+        value.quantity, 
+        value.description, 
+        value.matchedAt, 
+        value.date
+      );
       return res.status(200).json({ message: "Asset attached", result });
     } catch (error: any) {
       return res.status(error.message.includes("Unauthorized") ? 403 : 400).json({ message: error.message });
@@ -105,15 +119,25 @@ export default class EventTemplateCtrl {
 
   static async attachService(req: Request, res: Response) {
     const schema = Joi.object({
-      serviceId: Joi.string().required(),
-    });
+      serviceId: Joi.string().optional(),
+      description: Joi.string().optional(),
+      matchedAt: Joi.date().optional(),
+      date: Joi.date().optional()
+    }).or("serviceId", "description");
 
     const { error, value } = schema.validate(req.body);
     if (error) return res.status(400).json({ message: error.message });
 
     try {
       const ownerId = (req as any).user?.userId;
-      const result = await EventTemplateSvc.attachService(req.params.id, ownerId, value.serviceId);
+      const result = await EventTemplateSvc.attachService(
+        req.params.id, 
+        ownerId, 
+        value.serviceId, 
+        value.description, 
+        value.matchedAt, 
+        value.date
+      );
       return res.status(200).json({ message: "Service attached", result });
     } catch (error: any) {
       return res.status(error.message.includes("Unauthorized") ? 403 : 400).json({ message: error.message });
@@ -132,15 +156,25 @@ export default class EventTemplateCtrl {
 
   static async attachVenue(req: Request, res: Response) {
     const schema = Joi.object({
-      venueId: Joi.string().required(),
-    });
+      venueId: Joi.string().optional(),
+      description: Joi.string().optional(),
+      matchedAt: Joi.date().optional(),
+      date: Joi.date().optional()
+    }).or("venueId", "description");
 
     const { error, value } = schema.validate(req.body);
     if (error) return res.status(400).json({ message: error.message });
 
     try {
       const ownerId = (req as any).user?.userId;
-      const result = await EventTemplateSvc.attachVenue(req.params.id, ownerId, value.venueId);
+      const result = await EventTemplateSvc.attachVenue(
+        req.params.id, 
+        ownerId, 
+        value.venueId, 
+        value.description, 
+        value.matchedAt, 
+        value.date
+      );
       return res.status(200).json({ message: "Venue attached", result });
     } catch (error: any) {
       return res.status(error.message.includes("Unauthorized") ? 403 : 400).json({ message: error.message });
@@ -162,6 +196,48 @@ export default class EventTemplateCtrl {
       const ownerId = (req as any).user?.userId;
       const result = await EventTemplateSvc.deleteTemplate(req.params.id, ownerId);
       return res.status(200).json(result);
+    } catch (error: any) {
+      return res.status(error.message.includes("Unauthorized") ? 403 : 400).json({ message: error.message });
+    }
+  }
+
+  static async matchSearch(req: Request, res: Response) {
+    try {
+      const { templateId, type, scope, category } = req.query;
+      const results = await EventTemplateSvc.matchSearch({
+        templateId: templateId as string,
+        type: type as string,
+        scope: (scope as string) || "state",
+        category: category as string
+      });
+      return res.status(200).json(results);
+    } catch (error: any) {
+      return res.status(400).json({ message: error.message });
+    }
+  }
+
+  static async matchItem(req: Request, res: Response) {
+    const schema = Joi.object({
+      itemId: Joi.string().required(),
+      type: Joi.string().valid("asset", "service", "venue").required(),
+      providerId: Joi.string().required(),
+      forceMatch: Joi.boolean().optional(),
+      description: Joi.string().optional(),
+      matchedAt: Joi.date().optional(),
+      date: Joi.date().optional()
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) return res.status(400).json({ message: error.message });
+
+    try {
+      const ownerId = (req as any).user?.userId;
+      const result = await EventTemplateSvc.matchItem({
+        templateId: req.params.id,
+        ownerId,
+        ...value
+      });
+      return res.status(200).json({ message: "Item matched successfully", result });
     } catch (error: any) {
       return res.status(error.message.includes("Unauthorized") ? 403 : 400).json({ message: error.message });
     }

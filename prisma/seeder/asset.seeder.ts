@@ -1,4 +1,4 @@
-import { PrismaClient, AssetStatus, BillingRate, AssetCondition } from "@prisma/client";
+import { PrismaClient, AssetStatus, BillingRate, AssetCondition, AssetCategory } from "@prisma/client";
 
 export async function seedAssets(prisma: PrismaClient, users: any[]) {
   try {
@@ -9,7 +9,7 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
     const assets = [
       {
         ownerId: admin.id,
-        category: "Audio",
+        category: AssetCategory.sound_system,
         name: "Stage Speakers XL",
         description: "Professional high-output speakers",
         quantity: 4,
@@ -18,10 +18,13 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         billingRate: BillingRate.daily,
         condition: AssetCondition.new,
         status: AssetStatus.available,
+        city: "Manila",
+        state: "Metro Manila",
+        country: "Philippines",
       },
       {
         ownerId: admin.id,
-        category: "Lighting",
+        category: AssetCategory.sound_system,
         name: "LED Flood Lights",
         description: "RGB DMX controllable flood lights",
         quantity: 10,
@@ -30,6 +33,9 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         billingRate: BillingRate.daily,
         condition: AssetCondition.good,
         status: AssetStatus.available,
+        city: "Manila",
+        state: "Metro Manila",
+        country: "Philippines",
       },
     ];
 

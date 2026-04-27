@@ -32,7 +32,8 @@ export default class EventRequestCtrl {
   static async approve(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const updated = await EventRequestSvc.approveRequest(id);
+      const { userId, systemRole } = (req as any).user;
+      const updated = await EventRequestSvc.approveRequest(id, userId, systemRole);
       return res.status(200).json({ message: "Request approved", updated });
     } catch (error: any) {
       return res.status(400).json({ message: error.message });

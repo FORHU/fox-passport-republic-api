@@ -16,13 +16,14 @@ export default class EventRequestSvc {
     const template = await EventTemplateRepo.findTemplateById(data.templateId);
     if (!template) throw new Error("Template not found");
 
-    // 2. Create EventClientRequest without transactions (will be created after confirmation)
+    // 2. Create Event without transactions (will be created after confirmation)
     return EventRequestRepo.create({
       client: { connect: { id: data.clientId } },
       host: { connect: { id: template.ownerId } },
       template: { connect: { id: data.templateId } },
       name: data.name,
       description: data.description,
+      eventCategory: template.category,
       startAt: data.startAt,
       endAt: data.endAt,
       guestCount: data.guestCount,
@@ -30,9 +31,15 @@ export default class EventRequestSvc {
     });
   }
 
-  static async approveRequest(id: string) {
+  static async approveRequest(id: string, userId: string, systemRole: string) {
     const request = await EventRequestRepo.findById(id);
     if (!request) throw new Error("Request not found");
+
+    // Only assigned host or admin can approve
+    if (request.organizerId !== userId && systemRole !== 'admin') {
+      throw new Error("Unauthorized: Only the assigned host can approve this request");
+    }
+
     return EventRequestRepo.updateRequestStatus(id, "approved");
   }
 
