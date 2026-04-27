@@ -16,6 +16,7 @@ import adminRoutes from "./admin.routes";
 import eventTemplateRoutes from "./event-template.routes";
 import eventRequestRoutes from "./event-request.routes";
 import eventTransactionRoutes from "./event-transaction.routes";
+import matchRoutes from "./match.routes";
 
 const router = express.Router();
 
@@ -51,6 +52,7 @@ router.use("/v1/event-transactions", eventTransactionRoutes);
 // Feature Routes (Reviews & Favorites)
 router.use("/v1/reviews", reviewRoutes);
 router.use("/v1/favorites", favoriteRoutes);
+router.use("/v1/matches", matchRoutes);
 
 // Admin Routes
 router.use("/v1/admin", adminRoutes);

@@ -51,10 +51,7 @@ export default class PaymentController {
         } catch (error: any) {
             console.error("Get payment by ID error:", error);
             if (error.message === "Payment not found") {
-                return res.status(404).json({
-                    success: false,
-                    message: error.message,
-                });
+                return res.status(404).json({ success: false, message: error.message });
             }
             return res.status(500).json({
                 success: false,
@@ -83,10 +80,7 @@ export default class PaymentController {
         } catch (error: any) {
             console.error("Get payment by transaction ID error:", error);
             if (error.message === "Payment not found") {
-                return res.status(404).json({
-                    success: false,
-                    message: error.message,
-                });
+                return res.status(404).json({ success: false, message: error.message });
             }
             return res.status(500).json({
                 success: false,
@@ -95,7 +89,7 @@ export default class PaymentController {
         }
     }
 
-    // CREATE PAYMENT
+    // CREATE PAYMENT (manual record)
     static async createPayment(req: Request, res: Response) {
         try {
             const schema = Joi.object({
@@ -150,7 +144,6 @@ export default class PaymentController {
             }
 
             const payment = await PaymentSvc.updatePayment(params.id, body);
-
             return res.status(200).json({
                 success: true,
                 message: "Payment updated successfully",
@@ -159,10 +152,7 @@ export default class PaymentController {
         } catch (error: any) {
             console.error("Update payment error:", error);
             if (error.message === "Payment not found") {
-                return res.status(404).json({
-                    success: false,
-                    message: error.message,
-                });
+                return res.status(404).json({ success: false, message: error.message });
             }
             return res.status(500).json({
                 success: false,
@@ -195,6 +185,51 @@ export default class PaymentController {
                 success: false,
                 message: error.message || "Failed to fetch booking payments",
             });
+        }
+    }
+
+    // CREATE STRIPE PAYMENT INTENT
+    static async createPaymentIntent(req: Request, res: Response) {
+        try {
+            const schema = Joi.object({
+                amount: Joi.number().min(1).required(),
+                currency: Joi.string().length(3).optional().default('php'),
+                bookingId: Joi.string().uuid().optional(),
+                description: Joi.string().optional(),
+            });
+
+            const { error, value } = schema.validate(req.body);
+            if (error) {
+                return res.status(400).json({ success: false, message: error.message });
+            }
+
+            const result = await PaymentSvc.createPaymentIntent(value);
+            return res.status(200).json({
+                success: true,
+                data: result,
+            });
+        } catch (error: any) {
+            console.error("Create payment intent error:", error);
+            return res.status(500).json({
+                success: false,
+                message: error.message || "Failed to create payment intent",
+            });
+        }
+    }
+
+    // STRIPE WEBHOOK HANDLER
+    static async handleWebhook(req: Request, res: Response) {
+        const signature = req.headers['stripe-signature'];
+        if (!signature) {
+            return res.status(400).json({ success: false, message: "Missing stripe-signature header" });
+        }
+
+        try {
+            const result = await PaymentSvc.handleWebhookEvent(req.body as Buffer, signature as string);
+            return res.status(200).json(result);
+        } catch (error: any) {
+            console.error("Webhook error:", error);
+            return res.status(400).json({ success: false, message: error.message });
         }
     }
 }
