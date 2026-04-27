@@ -3,14 +3,14 @@ import EventRequestSvc from "../services/event-request.service";
 import Joi from "joi";
 
 export default class EventRequestCtrl {
-  static async create(req: Request, res: Response) {
+  static async spawnRequest(req: Request, res: Response) {
     const schema = Joi.object({
-      templateId: Joi.string().uuid().required(),
+      templateId: Joi.string().required(),
       name: Joi.string().required(),
       description: Joi.string().required(),
-      startAt: Joi.date().iso().required(),
-      endAt: Joi.date().iso().required().greater(Joi.ref('startAt')),
-      guestCount: Joi.number().integer().min(1).required(),
+      startAt: Joi.date().required(),
+      endAt: Joi.date().required(),
+      guestCount: Joi.number().min(1).required(),
       totalAmount: Joi.number().min(0).required(),
     });
 
@@ -20,10 +20,31 @@ export default class EventRequestCtrl {
     try {
       const clientId = (req as any).user.userId;
       const request = await EventRequestSvc.spawnRequestFromTemplate({
-        clientId,
         ...value,
+        clientId,
       });
-      return res.status(201).json({ message: "Event request created successfully", request });
+      return res.status(201).json(request);
+    } catch (error: any) {
+      return res.status(400).json({ message: error.message });
+    }
+  }
+
+  static async approve(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { userId, systemRole } = (req as any).user;
+      const updated = await EventRequestSvc.approveRequest(id, userId, systemRole);
+      return res.status(200).json({ message: "Request approved", updated });
+    } catch (error: any) {
+      return res.status(400).json({ message: error.message });
+    }
+  }
+
+  static async complete(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const updated = await EventRequestSvc.completeEvent(id);
+      return res.status(200).json({ message: "Event completed", updated });
     } catch (error: any) {
       return res.status(400).json({ message: error.message });
     }
@@ -33,7 +54,7 @@ export default class EventRequestCtrl {
     try {
       const clientId = (req as any).user.userId;
       const requests = await EventRequestSvc.getMyRequests(clientId);
-      return res.status(200).json({ requests });
+      return res.status(200).json(requests);
     } catch (error: any) {
       return res.status(500).json({ message: error.message });
     }
@@ -41,8 +62,9 @@ export default class EventRequestCtrl {
 
   static async getById(req: Request, res: Response) {
     try {
-      const request = await EventRequestSvc.getRequestById(req.params.id);
-      return res.status(200).json({ request });
+      const { id } = req.params;
+      const request = await EventRequestSvc.getRequestById(id);
+      return res.status(200).json(request);
     } catch (error: any) {
       return res.status(404).json({ message: error.message });
     }

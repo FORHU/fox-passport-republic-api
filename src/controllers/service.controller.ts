@@ -1,12 +1,12 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import ServiceSvc from "../services/service.service";
-import { BillingRate, ServiceStatus } from "@prisma/client";
+import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 
 export default class ServiceCtrl {
   static async createService(req: Request, res: Response) {
     const schema = Joi.object({
-      category: Joi.string().required(),
+      category: Joi.string().valid(...Object.values(ServiceCategory)).required(),
       name: Joi.string().required(),
       description: Joi.string().required(),
       city: Joi.string().required(),
@@ -34,8 +34,7 @@ export default class ServiceCtrl {
 
       const service = await ServiceSvc.createService({
         ownerId: String(ownerId),
-        ...value,
-        imgIds: value.imgIds,
+        ...value as any,
       });
       return res.status(201).json({ message: "Service created successfully", service });
     } catch (err: any) {
@@ -49,7 +48,7 @@ export default class ServiceCtrl {
 
       const services = await ServiceSvc.getAllServices({
         ...(ownerId && { ownerId: String(ownerId) }),
-        ...(category && { category: String(category) }),
+        ...(category && { category: category as any }),
         ...(status && { status: status as ServiceStatus }),
       });
 
@@ -75,7 +74,7 @@ export default class ServiceCtrl {
 
   static async updateService(req: Request, res: Response) {
     const schema = Joi.object({
-      category: Joi.string().optional(),
+      category: Joi.string().valid(...Object.values(ServiceCategory)).optional(),
       name: Joi.string().optional(),
       description: Joi.string().optional(),
       city: Joi.string().optional(),
@@ -105,7 +104,7 @@ export default class ServiceCtrl {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const service = await ServiceSvc.updateService(String(id), String(ownerId), value);
+      const service = await ServiceSvc.updateService(String(id), String(ownerId), value as any);
       return res.status(200).json({ message: "Service updated successfully", service });
     } catch (err: any) {
       const status = err.message.includes("Unauthorized") ? 403 : 400;

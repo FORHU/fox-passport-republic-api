@@ -1,5 +1,5 @@
 import VenueRepo from "../repositories/venue.repository";
-import { VenueStatus, BillingRate } from "@prisma/client";
+import { VenueStatus, BillingRate, VenueCategory } from "@prisma/client";
 
 export default class VenueSvc {
     private static isAdminRole(role?: string) {
@@ -14,7 +14,7 @@ export default class VenueSvc {
         hostId: string;
         name: string;
         description: string;
-        category: string;
+        category: VenueCategory;
         capacity: number;
         address: string;
         city: string;
@@ -98,7 +98,7 @@ export default class VenueSvc {
         data: Partial<{
             name: string;
             description: string;
-            category: string;
+            category: VenueCategory;
             capacity: number;
             price: number;
             address: string;
