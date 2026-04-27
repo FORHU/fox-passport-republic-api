@@ -25,4 +25,8 @@ router.delete("/:id/services/:serviceId", authenticate, requireRole(["host"]), E
 router.post("/:id/venues", authenticate, requireRole(["host"]), EventTemplateCtrl.attachVenue);
 router.delete("/:id/venues/:venueId", authenticate, requireRole(["host"]), EventTemplateCtrl.removeVenue);
 
+// Location Matching
+router.get("/matching/search", authenticate, requireRole(["host"]), EventTemplateCtrl.matchSearch);
+router.post("/:id/match", authenticate, requireRole(["host"]), EventTemplateCtrl.matchItem);
+
 export default router;

@@ -1,4 +1,4 @@
-import { AssetCondition, BillingRate } from "@prisma/client";
+import { AssetCondition, BillingRate, AssetCategory, AssetStatus } from "@prisma/client";
 import AssetRepo from "../repositories/asset.repository";
 import { v4 as uuidv4 } from "uuid";
 
@@ -6,7 +6,7 @@ export default class AssetSvc {
   static async createAsset(data: {
     id?: string;
     ownerId: string;
-    category: string;
+    category: AssetCategory;
     name: string;
     description: string;
     quantity?: number;
@@ -14,7 +14,7 @@ export default class AssetSvc {
     price: number;
     currency?: string;
     billingRate?: BillingRate;
-    status?: "draft" | "pending" | "available" | "reserved" | "archived" | "rejected";
+    status?: AssetStatus;
   }) {
     const normalized = {
       ...data,
@@ -22,6 +22,7 @@ export default class AssetSvc {
       quantity: data.quantity ?? 1,
       condition: data.condition ?? AssetCondition.good,
       currency: data.currency ?? "USD",
+      status: data.status ?? AssetStatus.draft,
       billingRate: data.billingRate ?? BillingRate.daily,
     };
 
@@ -29,7 +30,7 @@ export default class AssetSvc {
     return asset;
   }
 
-  static async getAssets(filters?: { ownerId?: string; category?: string }) {
+  static async getAssets(filters?: { ownerId?: string; category?: AssetCategory }) {
     return AssetRepo.findAllAssets(filters);
   }
 
@@ -45,7 +46,7 @@ export default class AssetSvc {
     id: string,
     ownerId: string,
     data: Partial<{
-      category: string;
+      category: AssetCategory;
       name: string;
       description: string;
       quantity: number;
@@ -53,7 +54,7 @@ export default class AssetSvc {
       price?: number;
       currency?: string;
       billingRate?: BillingRate;
-      status?: "draft" | "pending" | "available" | "reserved" | "archived" | "rejected";
+      status?: AssetStatus;
     }>
   ) {
     const existing = await AssetRepo.findAssetById(id);

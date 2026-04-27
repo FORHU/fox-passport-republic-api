@@ -1,12 +1,12 @@
 import ServiceRepo from "../repositories/service.repository";
-import { BillingRate, ServiceStatus } from "@prisma/client";
+import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 
 export default class ServiceSvc {
   static async createService(data: {
     id?: string;
     ownerId: string;
-    category: string;
+    category: ServiceCategory;
     name: string;
     description: string;
     city: string;
@@ -34,7 +34,7 @@ export default class ServiceSvc {
 
   static async getAllServices(filters?: {
     ownerId?: string;
-    category?: string;
+    category?: ServiceCategory;
     status?: ServiceStatus;
   }) {
     return ServiceRepo.getAllServices(filters);
@@ -52,7 +52,7 @@ export default class ServiceSvc {
     id: string,
     ownerId: string,
     data: Partial<{
-      category: string;
+      category: ServiceCategory;
       name: string;
       description: string;
       city: string;

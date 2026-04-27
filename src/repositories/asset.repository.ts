@@ -1,5 +1,5 @@
-import { AssetCondition, AssetStatus, BillingRate } from "@prisma/client";
-import { prisma } from "../utils/prisma";
+import { AssetCondition, AssetStatus, BillingRate, AssetCategory } from "@prisma/client";
+import { prisma } from "../utils/prisma"; 
 
 export default class AssetRepo {
   // READ ALL
@@ -7,7 +7,7 @@ export default class AssetRepo {
     return prisma.asset.findMany({
       where: {
         ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
-        ...(filters?.category && { category: String(filters.category) }),
+        ...(filters?.category && { category: filters.category as any }),
         deletedAt: null,
       },
       include: {
@@ -22,7 +22,7 @@ export default class AssetRepo {
   static async createAsset(data: {
     id?: string;
     ownerId: string;
-    category: string;
+    category: AssetCategory;
     name: string;
     description: string;
     quantity?: number;
@@ -36,7 +36,7 @@ export default class AssetRepo {
       data: {
         id: data.id,
         ownerId: String(data.ownerId),
-        category: String(data.category),
+        category: data.category,
         name: data.name,
         description: data.description,
         quantity: data.quantity,
@@ -68,7 +68,7 @@ export default class AssetRepo {
   static async updateAsset(
     id: string,
     data: Partial<{
-      category: string;
+      category: AssetCategory;
       name: string;
       description: string;
       quantity: number;
