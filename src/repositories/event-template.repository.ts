@@ -1,5 +1,5 @@
 import { prisma } from "../utils/prisma";
-import { EventType } from "@prisma/client";
+import { EventCategory, AssetCategory, ServiceCategory, VenueCategory } from "@prisma/client";
 
 export default class EventTemplateRepo {
   // CREATE
@@ -7,7 +7,7 @@ export default class EventTemplateRepo {
     ownerId: string;
     name: string;
     description: string;
-    category: EventType;
+    category: EventCategory;
     isPublic?: boolean;
     imgIds?: string[];
   }) {
@@ -73,14 +73,35 @@ export default class EventTemplateRepo {
   }
 
   // ASSETS
-  static async attachAsset(templateId: string, assetId: string, quantity: number = 1) {
+  static async attachAsset(templateId: string, assetId?: string, quantity: number = 1, matchData?: any, description?: string, matchedAt?: Date) {
     return prisma.eventTemplateAsset.create({
       data: {
         templateId,
         assetId,
         quantity,
+        description,
+        matchedAt,
+        ...(matchData || {}),
       },
       include: { asset: true },
+    });
+  }
+
+  static async updateAssetMatch(id: string, data: any) {
+    return prisma.eventTemplateAsset.update({
+      where: { id },
+      data,
+      include: { asset: true },
+    });
+  }
+
+  static async searchAssetsByLocation(filters: { state?: string; country?: string; category?: string }) {
+    return prisma.asset.findMany({
+      where: {
+        ...(filters.state && { state: filters.state }),
+        ...(filters.country && { country: filters.country }),
+        ...(filters.category && { category: filters.category as AssetCategory }),
+      },
     });
   }
 
@@ -91,13 +112,34 @@ export default class EventTemplateRepo {
   }
 
   // SERVICES
-  static async attachService(templateId: string, serviceId: string) {
+  static async attachService(templateId: string, serviceId?: string, matchData?: any, description?: string, matchedAt?: Date) {
     return prisma.eventTemplateService.create({
       data: {
         templateId,
         serviceId,
+        description,
+        matchedAt,
+        ...(matchData || {}),
       },
       include: { service: true },
+    });
+  }
+
+  static async updateServiceMatch(id: string, data: any) {
+    return prisma.eventTemplateService.update({
+      where: { id },
+      data,
+      include: { service: true },
+    });
+  }
+
+  static async searchServicesByLocation(filters: { state?: string; country?: string; category?: string }) {
+    return prisma.service.findMany({
+      where: {
+        ...(filters.state && { state: filters.state }),
+        ...(filters.country && { country: filters.country }),
+        ...(filters.category && { category: filters.category as ServiceCategory }),
+      },
     });
   }
 
@@ -108,13 +150,34 @@ export default class EventTemplateRepo {
   }
 
   // VENUES
-  static async attachVenue(templateId: string, venueId: string) {
+  static async attachVenue(templateId: string, venueId?: string, matchData?: any, description?: string, matchedAt?: Date) {
     return prisma.eventTemplateVenue.create({
       data: {
         templateId,
         venueId,
+        description,
+        matchedAt,
+        ...(matchData || {}),
       },
       include: { venue: true },
+    });
+  }
+
+  static async updateVenueMatch(id: string, data: any) {
+    return prisma.eventTemplateVenue.update({
+      where: { id },
+      data,
+      include: { venue: true },
+    });
+  }
+
+  static async searchVenuesByLocation(filters: { state?: string; country?: string; category?: string }) {
+    return prisma.venue.findMany({
+      where: {
+        ...(filters.state && { state: filters.state }),
+        ...(filters.country && { country: filters.country }),
+        ...(filters.category && { category: filters.category as VenueCategory }),
+      },
     });
   }
 

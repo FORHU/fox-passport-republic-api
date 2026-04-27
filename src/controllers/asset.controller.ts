@@ -1,14 +1,14 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import AssetSvc from "../services/asset.service";
-import { AssetCondition, AssetStatus, BillingRate } from "@prisma/client";
+import { AssetCondition, AssetStatus, BillingRate, AssetCategory } from "@prisma/client";
 
 export default class AssetCtrl {
 
   //Create Asset Controller
   static async createAsset(req: Request, res: Response) {
     const schema = Joi.object({
-      category: Joi.string().required(),
+      category: Joi.string().valid(...Object.values(AssetCategory)).required(),
       name: Joi.string().required(),
       description: Joi.string().required(),
       quantity: Joi.number().integer().min(1).optional(),
@@ -33,7 +33,7 @@ export default class AssetCtrl {
 
       const asset = await AssetSvc.createAsset({
         ownerId: String(ownerId),
-        ...value,
+        ...value as any,
       });
       return res.status(201).json({ message: "Asset created successfully", asset });
     } catch (error: any) {
@@ -51,7 +51,7 @@ export default class AssetCtrl {
 
       const assets = await AssetSvc.getAssets({
         ...(ownerId && { ownerId: String(ownerId) }),
-        ...(category && { category: String(category) }),
+        ...(category && { category: category as any }),
       });
 
       return res.status(200).json({ assets });
@@ -80,7 +80,7 @@ export default class AssetCtrl {
   static async updateAsset(req: Request, res: Response) {   
     // request body may include any subset of fields; when `images` is
     const schema = Joi.object({
-      category: Joi.string().optional(),
+      category: Joi.string().valid(...Object.values(AssetCategory)).optional(),
       name: Joi.string().optional(),
       description: Joi.string().optional(),
       quantity: Joi.number().integer().min(1).optional(),
@@ -107,7 +107,7 @@ export default class AssetCtrl {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const asset = await AssetSvc.updateAsset(String(id), String(ownerId), value);
+      const asset = await AssetSvc.updateAsset(String(id), String(ownerId), value as any);
       return res.status(200).json({ message: "Asset updated successfully", asset });
     } catch (error: any) {
       return res.status(400).json({ message: error.message || error });

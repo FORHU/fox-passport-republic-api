@@ -20,7 +20,10 @@ export async function seedUsers(prisma: PrismaClient) {
         name: "Host User",
         username: "testhost",
         systemRole: "user",
-        roleType: ["mayor"],
+        roleType: ["host"],
+        city: "Manila",
+        state: "Metro Manila",
+        country: "Philippines",
       },
       {
         email: "user@example.com",
@@ -47,6 +50,9 @@ export async function seedUsers(prisma: PrismaClient) {
           username: u.username,
           systemRole: u.systemRole as any,
           roleType: u.roleType as any,
+          city: (u as any).city,
+          state: (u as any).state,
+          country: (u as any).country,
         },
         create: {
           email: u.email,
@@ -55,6 +61,9 @@ export async function seedUsers(prisma: PrismaClient) {
           username: u.username,
           systemRole: u.systemRole as any,
           roleType: u.roleType as any,
+          city: (u as any).city,
+          state: (u as any).state,
+          country: (u as any).country,
         },
       });
 

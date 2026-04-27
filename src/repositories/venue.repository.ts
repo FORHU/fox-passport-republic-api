@@ -1,5 +1,5 @@
 import { prisma } from "../utils/prisma";
-import { VenueStatus, BillingRate } from "@prisma/client";
+import { VenueStatus, BillingRate, VenueCategory } from "@prisma/client";
 
 const hostSelect = { select: { id: true, name: true, email: true } } as const;
 
@@ -8,7 +8,7 @@ export default class VenueRepo {
     hostId: string;
     name: string;
     description: string;
-    category: string;
+    category: VenueCategory;
     capacity: number;
     address: string;
     city: string;
@@ -66,7 +66,7 @@ export default class VenueRepo {
     data: Partial<{
       name: string;
       description: string;
-      category: string;
+      category: VenueCategory;
       capacity: number;
       price: number;
       address: string;
