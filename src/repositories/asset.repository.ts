@@ -31,6 +31,7 @@ export default class AssetRepo {
     billingRate: BillingRate;
     condition?: AssetCondition;
     status?: AssetStatus;
+    imgIds: string[];
   }) {
     return prisma.asset.create({
       data: {
@@ -45,6 +46,9 @@ export default class AssetRepo {
         billingRate: data.billingRate,
         condition: data.condition,
         status: data.status,
+        ...(data.imgIds && data.imgIds.length > 0 && {
+          images: { connect: data.imgIds.map((id) => ({ id })) },
+        }),
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
@@ -77,6 +81,7 @@ export default class AssetRepo {
       billingRate: BillingRate;
       condition: AssetCondition;
       status: AssetStatus;
+      imgIds: string[];
     }>
   ) {
     return prisma.asset.update({
@@ -91,6 +96,9 @@ export default class AssetRepo {
         billingRate: data.billingRate ?? undefined,
         condition: data.condition ?? undefined,
         status: data.status ?? undefined,
+        ...(data.imgIds && data.imgIds.length > 0 && {
+          images: { connect: data.imgIds.map((id) => ({ id })) },
+        }),
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },

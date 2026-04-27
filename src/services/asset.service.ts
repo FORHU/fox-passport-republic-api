@@ -14,6 +14,7 @@ export default class AssetSvc {
     price: number;
     currency?: string;
     billingRate?: BillingRate;
+    imgIds: string[];
     status?: "draft" | "pending" | "available" | "reserved" | "archived" | "rejected";
   }) {
     const normalized = {
@@ -25,7 +26,19 @@ export default class AssetSvc {
       billingRate: data.billingRate ?? BillingRate.daily,
     };
 
-    const asset = await AssetRepo.createAsset(normalized);
+    if (!Array.isArray(data.imgIds) || data.imgIds.length === 0) {
+      throw new Error("At least one image is required");
+    }
+    if (data.imgIds.length > 5) {
+      throw new Error("A maximum of 5 images is allowed");
+    }
+
+    const assetData = {
+      ...normalized,
+      imgIds: data.imgIds,
+    };
+
+    const asset = await AssetRepo.createAsset(assetData as any);
     return asset;
   }
 
@@ -54,6 +67,7 @@ export default class AssetSvc {
       currency?: string;
       billingRate?: BillingRate;
       status?: "draft" | "pending" | "available" | "reserved" | "archived" | "rejected";
+      imgIds?: string[];
     }>
   ) {
     const existing = await AssetRepo.findAssetById(id);
