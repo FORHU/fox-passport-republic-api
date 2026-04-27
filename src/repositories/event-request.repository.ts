@@ -2,8 +2,8 @@ import { prisma } from "../utils/prisma";
 import { Prisma } from "@prisma/client";
 
 export default class EventRequestRepo {
-  static async create(data: Prisma.EventClientRequestCreateInput) {
-    return prisma.eventClientRequest.create({
+  static async create(data: Prisma.EventCreateInput) {
+    return prisma.event.create({
       data,
       include: {
         assetTransactions: true,
@@ -14,7 +14,7 @@ export default class EventRequestRepo {
   }
 
   static async findAll(filters: { clientId?: string; organizerId?: string }) {
-    return prisma.eventClientRequest.findMany({
+    return prisma.event.findMany({
       where: {
         ...(filters.clientId && { clientId: filters.clientId }),
         ...(filters.organizerId && { organizerId: filters.organizerId }),
@@ -29,7 +29,7 @@ export default class EventRequestRepo {
   }
 
   static async findById(id: string) {
-    return prisma.eventClientRequest.findUnique({
+    return prisma.event.findUnique({
       where: { id },
       include: {
         template: true,
@@ -44,14 +44,14 @@ export default class EventRequestRepo {
   }
 
   static async updateStatus(id: string, status: any) {
-    return prisma.eventClientRequest.update({
+    return prisma.event.update({
       where: { id },
       data: { eventStatus: status },
     });
   }
 
   static async updateRequestStatus(id: string, status: any) {
-    return prisma.eventClientRequest.update({
+    return prisma.event.update({
       where: { id },
       data: { requestStatus: status },
     });

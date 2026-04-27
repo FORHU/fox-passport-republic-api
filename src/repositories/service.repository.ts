@@ -1,16 +1,16 @@
 import { prisma } from "../utils/prisma";
-import { BillingRate, ServiceStatus } from "@prisma/client";
+import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 
 export default class ServiceRepo {
   static async getAllServices(filters?: {
     ownerId?: string;
-    category?: string;
+    category?: ServiceCategory;
     status?: ServiceStatus;
   }) {
     return prisma.service.findMany({
       where: {
         ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
-        ...(filters?.category && { category: String(filters.category) }),
+        ...(filters?.category && { category: filters.category }),
         ...(filters?.status && { status: filters.status }),
         deletedAt: null,
       },
@@ -25,7 +25,7 @@ export default class ServiceRepo {
   static async createService(data: {
     id?: string;
     ownerId: string;
-    category: string;
+    category: ServiceCategory;
     name: string;
     description: string;
     city: string;
@@ -42,7 +42,7 @@ export default class ServiceRepo {
       data: {
         id: data.id,
         ownerId: String(data.ownerId),
-        category: String(data.category),
+        category: data.category,
         name: data.name,
         description: data.description,
         city: data.city,
@@ -75,7 +75,7 @@ export default class ServiceRepo {
   static async updateService(
     id: string,
     data: Partial<{
-      category: string;
+      category: ServiceCategory;
       name: string;
       description: string;
       city: string;

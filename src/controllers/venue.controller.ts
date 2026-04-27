@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import VenueSvc from "../services/venue.service";
-import { VenueStatus } from "@prisma/client";
+import { VenueStatus, VenueCategory } from "@prisma/client";
 
 export default class VenueCtrl {
 
@@ -10,7 +10,7 @@ export default class VenueCtrl {
         const schema = Joi.object({
             name: Joi.string().required(),
             description: Joi.string().required(),
-            category: Joi.string().required(),
+            category: Joi.string().valid(...Object.values(VenueCategory)).required(),
             capacity: Joi.number().integer().min(1).required(),
             address: Joi.string().required(),
             city: Joi.string().required(),
@@ -40,7 +40,7 @@ export default class VenueCtrl {
             }
 
             const venueData = { ...value, hostId };
-            const venue = await VenueSvc.createVenue(venueData);
+            const venue = await VenueSvc.createVenue(venueData as any);
             return res.status(201).json({ message: "Venue created successfully", venue });
         } catch (error: any) {
             return res.status(400).json({ message: error.message || error });
@@ -73,7 +73,7 @@ export default class VenueCtrl {
         const schema = Joi.object({
             name: Joi.string().optional(),
             description: Joi.string().optional(),
-            category: Joi.string().optional(),
+            category: Joi.string().valid(...Object.values(VenueCategory)).optional(),
             capacity: Joi.number().integer().min(1).optional(),
             price: Joi.number().min(0).optional(),
             
@@ -103,7 +103,7 @@ export default class VenueCtrl {
             const venue = await VenueSvc.updateVenue({
                 id: String(req.params.id),
                 requesterId,
-                data: value,
+                data: value as any,
             });
             return res.status(200).json({ message: "Venue updated successfully", venue });
         } catch (err: any) {
