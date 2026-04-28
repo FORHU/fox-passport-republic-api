@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import PaymentSvc from "../services/payment.service";
+import Stripe from "stripe";
+import { prisma } from "../utils/prisma";
+import { PaymentStatus } from "@prisma/client";
 
 export default class PaymentController {
     // GET ALL PAYMENTS
@@ -51,10 +54,7 @@ export default class PaymentController {
         } catch (error: any) {
             console.error("Get payment by ID error:", error);
             if (error.message === "Payment not found") {
-                return res.status(404).json({
-                    success: false,
-                    message: error.message,
-                });
+                return res.status(404).json({ success: false, message: error.message });
             }
             return res.status(500).json({
                 success: false,
@@ -83,10 +83,7 @@ export default class PaymentController {
         } catch (error: any) {
             console.error("Get payment by transaction ID error:", error);
             if (error.message === "Payment not found") {
-                return res.status(404).json({
-                    success: false,
-                    message: error.message,
-                });
+                return res.status(404).json({ success: false, message: error.message });
             }
             return res.status(500).json({
                 success: false,
@@ -95,7 +92,7 @@ export default class PaymentController {
         }
     }
 
-    // CREATE PAYMENT
+    // CREATE PAYMENT (manual record)
     static async createPayment(req: Request, res: Response) {
         try {
             const schema = Joi.object({
@@ -155,7 +152,6 @@ export default class PaymentController {
             }
 
             const payment = await PaymentSvc.updatePayment(params.id, body);
-
             return res.status(200).json({
                 success: true,
                 message: "Payment updated successfully",
@@ -164,10 +160,7 @@ export default class PaymentController {
         } catch (error: any) {
             console.error("Update payment error:", error);
             if (error.message === "Payment not found") {
-                return res.status(404).json({
-                    success: false,
-                    message: error.message,
-                });
+                return res.status(404).json({ success: false, message: error.message });
             }
             return res.status(500).json({
                 success: false,
@@ -227,5 +220,108 @@ export default class PaymentController {
                 message: error.message || "Failed to calculate balance",
             });
         }
+    }
+
+    // CREATE STRIPE PAYMENT INTENT
+    static async createPaymentIntent(req: Request, res: Response) {
+        try {
+            const schema = Joi.object({
+                amount: Joi.number().min(1).required(),
+                currency: Joi.string().length(3).uppercase().optional(),
+                bookingId: Joi.string().uuid().required(),
+                description: Joi.string().optional(),
+            });
+
+            const { error, value } = schema.validate(req.body);
+            if (error) {
+                return res.status(400).json({ message: error.message });
+            }
+
+            const intentData = await PaymentSvc.createPaymentIntent(value);
+            return res.status(200).json({
+                success: true,
+                data: intentData,
+            });
+        } catch (error: any) {
+            console.error("Create payment intent error:", error);
+            return res.status(500).json({
+                success: false,
+                message: error.message || "Failed to create payment intent",
+            });
+        }
+    }
+
+    // HANDLE STRIPE WEBHOOK
+    static async handleWebhook(req: Request, res: Response) {
+        const sig = req.headers['stripe-signature'];
+        const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+        if (!sig || !webhookSecret) {
+            console.warn("⚠️ Webhook Warning: Missing stripe-signature or webhook secret");
+            return res.status(400).send('Webhook Error: Missing signature or secret');
+        }
+
+        let event: Stripe.Event;
+
+        try {
+            const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+                apiVersion: '2025-08-27.basil',
+            });
+            event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+        } catch (err: any) {
+            console.error(`❌ Webhook signature verification failed: ${err.message}`);
+            return res.status(400).send(`Webhook Error: ${err.message}`);
+        }
+
+        // Handle the event
+        switch (event.type) {
+            case 'payment_intent.succeeded':
+                const paymentIntent = event.data.object as Stripe.PaymentIntent;
+                const bookingId = paymentIntent.metadata.bookingId;
+                
+                console.log(`✅ PaymentIntent succeeded: ${paymentIntent.id} for booking ${bookingId}`);
+                
+                try {
+                    // Find the pending payment for this booking
+                    const payments = await PaymentSvc.getBookingPayments(bookingId);
+                    const pendingPayment = payments.find(p => p.status === PaymentStatus.pending);
+                    
+                    if (pendingPayment) {
+                        await PaymentSvc.updatePayment(pendingPayment.id, {
+                            paymentStatus: PaymentStatus.completed
+                        });
+                        
+                        // Update transaction ID to Stripe's ID
+                        await prisma.payment.update({
+                            where: { id: pendingPayment.id },
+                            data: { transactionId: paymentIntent.id }
+                        });
+                    } else {
+                        // If no pending payment found, create a completed one
+                        await PaymentSvc.createPayment({
+                            bookingId,
+                            amount: paymentIntent.amount / 100,
+                            currency: paymentIntent.currency.toUpperCase(),
+                            method: "stripe",
+                            paymentType: "full",
+                            paymentStatus: PaymentStatus.completed,
+                            transactionId: paymentIntent.id
+                        });
+                    }
+                } catch (error) {
+                    console.error("Error updating payment via webhook:", error);
+                }
+                break;
+
+            case 'payment_intent.payment_failed':
+                const failedIntent = event.data.object as Stripe.PaymentIntent;
+                console.log(`❌ PaymentIntent failed: ${failedIntent.id}`);
+                break;
+
+            default:
+                console.log(`ℹ️ Unhandled event type ${event.type}`);
+        }
+
+        res.json({ received: true });
     }
 }

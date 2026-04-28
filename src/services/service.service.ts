@@ -17,6 +17,7 @@ export default class ServiceSvc {
     price: number;
     currency?: string;
     billingRate?: BillingRate;
+    imgIds: string[];
     status?: ServiceStatus;
   }) {
     const normalized = {
@@ -29,7 +30,19 @@ export default class ServiceSvc {
       billingRate: data.billingRate ?? BillingRate.daily,
     };
 
-    return ServiceRepo.createService(normalized);
+    if (!Array.isArray(data.imgIds) || data.imgIds.length === 0) {
+      throw new Error("At least one image is required");
+    }
+    if (data.imgIds.length > 5) {
+      throw new Error("A maximum of 5 images is allowed");
+    }
+
+    const serviceData = {
+      ...normalized,
+      imgIds: data.imgIds,
+    };
+
+    return ServiceRepo.createService(serviceData as any);
   }
 
   static async getAllServices(filters?: {
@@ -64,6 +77,7 @@ export default class ServiceSvc {
       currency: string;
       billingRate: BillingRate;
       status: ServiceStatus;
+      imgIds?: string[];
     }>
   ) {
     const existing = await ServiceRepo.getServiceById(id);
