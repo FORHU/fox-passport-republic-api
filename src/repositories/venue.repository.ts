@@ -43,10 +43,22 @@ export default class VenueRepo {
     });
   }
 
-  static async findAllVenues(filters?: { hostId?: string }) {
+  static async findAllVenues(filters?: { hostId?: string; status?: VenueStatus }) {
     return prisma.venue.findMany({
       where: {
         ...(filters?.hostId ? { hostId: filters.hostId } : {}),
+        status: filters?.status ?? VenueStatus.available,
+      },
+      orderBy: { createdAt: "desc" },
+      include: { host: hostSelect, images: true },
+    });
+  }
+
+  static async findAllVenuesAdmin(filters?: { hostId?: string; status?: VenueStatus }) {
+    return prisma.venue.findMany({
+      where: {
+        ...(filters?.hostId ? { hostId: filters.hostId } : {}),
+        ...(filters?.status ? { status: filters.status } : {}),
       },
       orderBy: { createdAt: "desc" },
       include: { host: hostSelect, images: true },

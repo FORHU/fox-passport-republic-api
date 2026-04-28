@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import EventRequestSvc from "../services/event-request.service";
+import EventRequestRepo from "../repositories/event-request.repository";
 import Joi from "joi";
 
 export default class EventRequestCtrl {
@@ -47,6 +48,15 @@ export default class EventRequestCtrl {
       return res.status(200).json({ message: "Event completed", updated });
     } catch (error: any) {
       return res.status(400).json({ message: error.message });
+    }
+  }
+
+  static async listApproved(req: Request, res: Response) {
+    try {
+      const events = await EventRequestRepo.findAllApproved();
+      return res.status(200).json({ success: true, data: events });
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
   }
 

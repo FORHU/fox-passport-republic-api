@@ -12,16 +12,60 @@ export async function seedUsers(prisma: PrismaClient) {
         name: "Admin User",
         username: "admin",
         systemRole: "admin",
-        roleType: ["host", "mayor", "foxerAsset", "foxerService"],
+        roleType: [],
+      },
+      {
+        email: "mayor@example.com",
+        password: "Mayor123!",
+        name: "Mayor Santos",
+        username: "mayor_santos",
+        systemRole: "user",
+        roleType: ["mayor"],
+        city: "Manila",
+        state: "Metro Manila",
+        country: "Philippines",
       },
       {
         email: "host@example.com",
         password: "Host123!",
-        name: "Host User",
-        username: "testhost",
+        name: "Host Reyes",
+        username: "host_reyes",
         systemRole: "user",
         roleType: ["host"],
-        city: "Manila",
+        city: "Taguig",
+        state: "Metro Manila",
+        country: "Philippines",
+      },
+      {
+        email: "servicefoxer@example.com",
+        password: "Service123!",
+        name: "Service Foxer Cruz",
+        username: "foxer_service",
+        systemRole: "user",
+        roleType: ["foxerService"],
+        city: "Makati",
+        state: "Metro Manila",
+        country: "Philippines",
+      },
+      {
+        email: "gearfoxer@example.com",
+        password: "Gear123!",
+        name: "Gear Foxer Dela Rosa",
+        username: "foxer_gear",
+        systemRole: "user",
+        roleType: ["foxerAsset"],
+        city: "Quezon City",
+        state: "Metro Manila",
+        country: "Philippines",
+      },
+      {
+        email: "multirole@example.com",
+        password: "Multi123!",
+        name: "Multi Role Villanueva",
+        username: "multirole",
+        systemRole: "user",
+        roleType: ["host", "mayor", "foxerService"],
+        city: "Pasig",
         state: "Metro Manila",
         country: "Philippines",
       },
@@ -32,6 +76,9 @@ export async function seedUsers(prisma: PrismaClient) {
         username: "regular",
         systemRole: "user",
         roleType: [],
+        city: "Manila",
+        state: "Metro Manila",
+        country: "Philippines",
       },
     ];
 
@@ -45,7 +92,6 @@ export async function seedUsers(prisma: PrismaClient) {
       const created = await prisma.user.upsert({
         where: { email: u.email },
         update: {
-          password: hashed,
           name: u.name,
           username: u.username,
           systemRole: u.systemRole as any,
@@ -67,7 +113,7 @@ export async function seedUsers(prisma: PrismaClient) {
         },
       });
 
-      console.log(`✓ Created/Updated user: ${created.email} (${created.id})`);
+      console.log(`✓ ${created.email} — roles: [${u.roleType.join(", ") || u.systemRole}]`);
       seededUsers.push(created);
     }
 
