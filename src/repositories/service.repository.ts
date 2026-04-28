@@ -2,7 +2,28 @@ import { prisma } from "../utils/prisma";
 import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 
 export default class ServiceRepo {
+  // READ ALL (public — available only)
   static async getAllServices(filters?: {
+    ownerId?: string;
+    category?: ServiceCategory;
+  }) {
+    return prisma.service.findMany({
+      where: {
+        ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
+        ...(filters?.category && { category: filters.category }),
+        status: ServiceStatus.available,
+        deletedAt: null,
+      },
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+        images: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  // READ ALL (admin — no status filter)
+  static async getAllServicesAdmin(filters?: {
     ownerId?: string;
     category?: ServiceCategory;
     status?: ServiceStatus;
@@ -37,6 +58,7 @@ export default class ServiceRepo {
     currency?: string;
     billingRate: BillingRate;
     status?: ServiceStatus;
+    imgIds: string[];
   }) {
     return prisma.service.create({
       data: {
@@ -54,6 +76,9 @@ export default class ServiceRepo {
         currency: data.currency,
         billingRate: data.billingRate,
         status: data.status,
+        ...(data.imgIds && data.imgIds.length > 0 && {
+          images: { connect: data.imgIds.map((id) => ({ id })) },
+        }),
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
@@ -87,6 +112,7 @@ export default class ServiceRepo {
       currency: string;
       billingRate: BillingRate;
       status: ServiceStatus;
+      imgIds: string[];
     }>
   ) {
     return prisma.service.update({
@@ -104,6 +130,9 @@ export default class ServiceRepo {
         currency: data.currency ?? undefined,
         billingRate: data.billingRate ?? undefined,
         status: data.status ?? undefined,
+        ...(data.imgIds && data.imgIds.length > 0 && {
+          images: { connect: data.imgIds.map((id) => ({ id })) },
+        }),
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },

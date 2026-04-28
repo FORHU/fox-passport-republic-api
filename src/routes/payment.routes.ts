@@ -3,9 +3,12 @@ import PaymentCtrl from "../controllers/payment.controller";
 
 const router = express.Router();
 
-// Payment routes
+// Stripe
+router.post("/create-intent", PaymentCtrl.createPaymentIntent);
+router.post("/webhook", PaymentCtrl.handleWebhook);
+
+// Payment CRUD
 router.get("/", PaymentCtrl.getAllPayments);
-router.get("/:id", PaymentCtrl.getPaymentById);
 router.get("/transaction/:transactionId", PaymentCtrl.getPaymentByTransactionId);
 router.get("/booking/:bookingId", PaymentCtrl.getBookingPayments);
 router.get("/booking/:bookingId/balance", PaymentCtrl.getRemainingBalance);

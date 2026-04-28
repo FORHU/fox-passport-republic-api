@@ -13,6 +13,28 @@ export default class EventRequestRepo {
     });
   }
 
+  // Shared template include (images come from the template)
+  private static readonly templateInclude = {
+    select: {
+      name: true,
+      category: true,
+      images: true,
+    },
+  } as const;
+
+  // Public landing page — approved events only
+  static async findAllApproved() {
+    return prisma.event.findMany({
+      where: { requestStatus: "approved" },
+      include: {
+        template: EventRequestRepo.templateInclude,
+        host: { select: { name: true, email: true } },
+      },
+      orderBy: { startAt: "asc" },
+    });
+  }
+
+  // Authenticated — own events (as client or host)
   static async findAll(filters: { clientId?: string; organizerId?: string }) {
     return prisma.event.findMany({
       where: {
@@ -20,7 +42,22 @@ export default class EventRequestRepo {
         ...(filters.organizerId && { organizerId: filters.organizerId }),
       },
       include: {
-        template: { select: { name: true, category: true } },
+        template: EventRequestRepo.templateInclude,
+        client: { select: { name: true, email: true } },
+        host: { select: { name: true, email: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  // Admin — all events with any status
+  static async findAllAdmin(filters?: { requestStatus?: string }) {
+    return prisma.event.findMany({
+      where: {
+        ...(filters?.requestStatus && { requestStatus: filters.requestStatus as any }),
+      },
+      include: {
+        template: EventRequestRepo.templateInclude,
         client: { select: { name: true, email: true } },
         host: { select: { name: true, email: true } },
       },
@@ -32,12 +69,27 @@ export default class EventRequestRepo {
     return prisma.event.findUnique({
       where: { id },
       include: {
-        template: true,
+        template: { include: { images: true } },
         client: { select: { name: true, email: true } },
         host: { select: { name: true, email: true } },
-        assetTransactions: { include: { asset: true, provider: { select: { name: true } } } },
-        serviceTransactions: { include: { service: true, provider: { select: { name: true } } } },
-        venueTransactions: { include: { venue: true, provider: { select: { name: true } } } },
+        assetTransactions: {
+          include: {
+            asset: { include: { images: true } },
+            provider: { select: { name: true } },
+          },
+        },
+        serviceTransactions: {
+          include: {
+            service: { include: { images: true } },
+            provider: { select: { name: true } },
+          },
+        },
+        venueTransactions: {
+          include: {
+            venue: { include: { images: true } },
+            provider: { select: { name: true } },
+          },
+        },
         bookings: true,
       },
     });

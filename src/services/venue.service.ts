@@ -40,7 +40,7 @@ export default class VenueSvc {
         if (!Array.isArray(data.imgIds) || data.imgIds.length === 0) {
             throw new Error("At least one image is required");
         }
-        if (data.imgIds.length > 5) {
+        if (data.imgIds && data.imgIds.length > 5) {
             throw new Error("A maximum of 5 images is allowed");
         }
 
@@ -64,8 +64,8 @@ export default class VenueSvc {
     // READ — Delegate all queries to repository
     // ───────────────────────────────────────────────────────────
 
-    static async getVenues() {
-        return VenueRepo.findAllVenues();
+    static async getVenues(filters?: { hostId?: string }) {
+        return VenueRepo.findAllVenues(filters);
     }
 
     static async getVenueById(id: string) {
@@ -94,6 +94,7 @@ export default class VenueSvc {
     static async updateVenue(params: {
         id: string;
         requesterId: string;
+        requesterRole?: string;
         data: Partial<{
             name: string;
             description: string;
@@ -114,12 +115,13 @@ export default class VenueSvc {
             billingRate: BillingRate;
         }>;
     }) {
-        const { id, requesterId, data } = params;
+        const { id, requesterId, requesterRole, data } = params;
 
         const venue = await VenueRepo.findVenueById(id);
         if (!venue) throw new Error("Venue not found");
 
-        if (venue.hostId !== requesterId) {
+        const isAdmin = this.isAdminRole(requesterRole);
+        if (!isAdmin && venue.hostId !== requesterId) {
             throw new Error("Unauthorized");
         }
 

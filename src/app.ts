@@ -34,6 +34,9 @@ app.use(
   })
 );
 
+// Stripe webhook must receive raw body — register BEFORE express.json()
+app.use('/api/v1/payments/webhook', express.raw({ type: 'application/json' }));
+
 // allow larger payloads for base64 image uploads
 app.use(express.json({ limit: '10mb' }));
 

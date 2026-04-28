@@ -1,5 +1,5 @@
 import { prisma } from "../utils/prisma";
-import { EventCategory, AssetCategory, ServiceCategory, VenueCategory } from "@prisma/client";
+import { EventCategory, AssetCategory, ServiceCategory, VenueCategory, AssetStatus, ServiceStatus, VenueStatus } from "@prisma/client";
 
 export default class EventTemplateRepo {
   // CREATE
@@ -101,7 +101,11 @@ export default class EventTemplateRepo {
         ...(filters.state && { state: filters.state }),
         ...(filters.country && { country: filters.country }),
         ...(filters.category && { category: filters.category as AssetCategory }),
+        status: AssetStatus.available,
+        deletedAt: null,
       },
+      include: { owner: { select: { id: true, name: true } }, images: true },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -139,7 +143,11 @@ export default class EventTemplateRepo {
         ...(filters.state && { state: filters.state }),
         ...(filters.country && { country: filters.country }),
         ...(filters.category && { category: filters.category as ServiceCategory }),
+        status: ServiceStatus.available,
+        deletedAt: null,
       },
+      include: { owner: { select: { id: true, name: true } }, images: true },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -177,7 +185,10 @@ export default class EventTemplateRepo {
         ...(filters.state && { state: filters.state }),
         ...(filters.country && { country: filters.country }),
         ...(filters.category && { category: filters.category as VenueCategory }),
+        status: VenueStatus.available,
       },
+      include: { host: { select: { id: true, name: true } }, images: true },
+      orderBy: { createdAt: "desc" },
     });
   }
 

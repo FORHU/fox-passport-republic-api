@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import BookingSvc from "../services/booking.service";
 import Joi from "joi";
+import PaymentSvc from "../services/payment.service";
+import { prisma } from "../utils/prisma";
+import { PaymentStatus } from "@prisma/client";
 
 export default class BookingCtrl {
     // CREATE BOOKING
@@ -98,6 +101,68 @@ export default class BookingCtrl {
             return res.status(200).json({ success: true, data: bookings });
         } catch (error: any) {
             return res.status(500).json({ success: false, message: error.message });
+        }
+    }
+
+    // CONFIRM BOOKING AFTER STRIPE PAYMENT
+    static async confirmBooking(req: Request, res: Response) {
+        try {
+            const schema = Joi.object({
+                amount: Joi.number().min(0).required(),
+                method: Joi.string().required(),
+                transactionId: Joi.string().required(),
+            });
+
+            const { error, value } = schema.validate(req.body);
+            if (error) return res.status(400).json({ message: error.message });
+
+            const bookingId = req.params.id;
+
+            const payment = await PaymentSvc.createPayment({
+                bookingId,
+                amount: value.amount,
+                currency: "PHP",
+                method: value.method,
+                paymentType: "full",
+                paymentStatus: PaymentStatus.completed,
+                transactionId: value.transactionId,
+            });
+
+            const booking = await BookingSvc.getBookingById(bookingId, req.user);
+
+            return res.status(200).json({ success: true, data: { booking, payment } });
+        } catch (error: any) {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+    }
+
+    // APPEND ATTENDEES IN BULK (PUT)
+    static async appendAttendees(req: Request, res: Response) {
+        try {
+            const schema = Joi.object({
+                attendees: Joi.array().items(
+                    Joi.object({
+                        firstName: Joi.string().required(),
+                        lastName: Joi.string().required(),
+                        email: Joi.string().email().optional(),
+                        phone: Joi.string().optional(),
+                    })
+                ).min(1).required(),
+            });
+
+            const { error, value } = schema.validate(req.body);
+            if (error) return res.status(400).json({ message: error.message });
+
+            const bookingId = req.params.id;
+            const results = [];
+            for (const attendee of value.attendees) {
+                const added = await BookingSvc.addAttendee(bookingId, attendee, req.user!.userId);
+                results.push(added);
+            }
+
+            return res.status(200).json({ success: true, data: results });
+        } catch (error: any) {
+            return res.status(400).json({ success: false, message: error.message });
         }
     }
 }

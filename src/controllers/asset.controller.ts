@@ -16,6 +16,7 @@ export default class AssetCtrl {
       price: Joi.number().required(),
       currency: Joi.string().trim().uppercase().length(3).optional(),
       billingRate: Joi.string().valid(...Object.values(BillingRate)).optional(),
+      imgIds: Joi.array().items(Joi.string()).min(1).max(5).required(),
       status: Joi.string().valid(...Object.values(AssetStatus)).optional(),
     });
 

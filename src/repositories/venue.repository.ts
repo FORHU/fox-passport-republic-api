@@ -28,9 +28,9 @@ export default class VenueRepo {
     return prisma.venue.create({
       data: {
         ...venueScalars,
-        images: {
-          connect: imgIds.map((id) => ({ id })),
-        },
+        ...(imgIds && imgIds.length > 0 && {
+          images: { connect: imgIds.map((id) => ({ id })) },
+        }),
       },
       include: { host: hostSelect, images: true },
     });
@@ -43,10 +43,25 @@ export default class VenueRepo {
     });
   }
 
-  static async findAllVenues() {
+  static async findAllVenues(filters?: { hostId?: string; status?: VenueStatus }) {
     return prisma.venue.findMany({
+      where: {
+        ...(filters?.hostId ? { hostId: filters.hostId } : {}),
+        status: filters?.status ?? VenueStatus.available,
+      },
       orderBy: { createdAt: "desc" },
-      include: { images: true },
+      include: { host: hostSelect, images: true },
+    });
+  }
+
+  static async findAllVenuesAdmin(filters?: { hostId?: string; status?: VenueStatus }) {
+    return prisma.venue.findMany({
+      where: {
+        ...(filters?.hostId ? { hostId: filters.hostId } : {}),
+        ...(filters?.status ? { status: filters.status } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+      include: { host: hostSelect, images: true },
     });
   }
 

@@ -2,12 +2,30 @@ import { AssetCondition, AssetStatus, BillingRate, AssetCategory } from "@prisma
 import { prisma } from "../utils/prisma"; 
 
 export default class AssetRepo {
-  // READ ALL
+  // READ ALL (public — available only)
   static async findAllAssets(filters?: { ownerId?: string; category?: string }) {
     return prisma.asset.findMany({
       where: {
         ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
         ...(filters?.category && { category: filters.category as any }),
+        status: AssetStatus.available,
+        deletedAt: null,
+      },
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+        images: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  // READ ALL (admin — no status filter)
+  static async findAllAssetsAdmin(filters?: { ownerId?: string; category?: string; status?: AssetStatus }) {
+    return prisma.asset.findMany({
+      where: {
+        ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
+        ...(filters?.category && { category: filters.category as any }),
+        ...(filters?.status && { status: filters.status }),
         deletedAt: null,
       },
       include: {
@@ -31,6 +49,7 @@ export default class AssetRepo {
     billingRate: BillingRate;
     condition?: AssetCondition;
     status?: AssetStatus;
+    imgIds: string[];
   }) {
     return prisma.asset.create({
       data: {
@@ -45,6 +64,9 @@ export default class AssetRepo {
         billingRate: data.billingRate,
         condition: data.condition,
         status: data.status,
+        ...(data.imgIds && data.imgIds.length > 0 && {
+          images: { connect: data.imgIds.map((id) => ({ id })) },
+        }),
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
@@ -77,6 +99,7 @@ export default class AssetRepo {
       billingRate: BillingRate;
       condition: AssetCondition;
       status: AssetStatus;
+      imgIds: string[];
     }>
   ) {
     return prisma.asset.update({
@@ -91,6 +114,9 @@ export default class AssetRepo {
         billingRate: data.billingRate ?? undefined,
         condition: data.condition ?? undefined,
         status: data.status ?? undefined,
+        ...(data.imgIds && data.imgIds.length > 0 && {
+          images: { connect: data.imgIds.map((id) => ({ id })) },
+        }),
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },

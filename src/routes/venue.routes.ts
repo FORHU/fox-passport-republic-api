@@ -1,6 +1,6 @@
 import express from "express";
 import VenueCtrl from "../controllers/venue.controller";
-import { authenticate } from "../middleware/auth.middleware";
+import { authenticate, requireRole } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -8,10 +8,10 @@ const router = express.Router();
 router.get("/", VenueCtrl.getVenues);
 router.get("/:id", VenueCtrl.getVenueById);
 
-// Protected routes — require JWT
-router.post("/create", authenticate, VenueCtrl.createVenue);
-router.put("/:id", authenticate, VenueCtrl.updateVenue);
-router.delete("/:id", authenticate, VenueCtrl.deleteVenue);
+// Protected routes
+router.post("/create", authenticate, requireRole(["mayor"]), VenueCtrl.createVenue);
+router.put("/:id", authenticate, requireRole(["mayor"]), VenueCtrl.updateVenue);
+router.delete("/:id", authenticate, requireRole(["mayor"]), VenueCtrl.deleteVenue);
 
 
 

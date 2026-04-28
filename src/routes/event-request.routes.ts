@@ -1,13 +1,21 @@
 import express from "express";
 import EventRequestCtrl from "../controllers/event-request.controller";
-import { authenticate } from "../middleware/auth.middleware";
+import { authenticate, requireAdmin, requireRole } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
-router.post("/", authenticate, EventRequestCtrl.spawnRequest);
+// Public — approved events for landing page
+router.get("/", EventRequestCtrl.listApproved);
+
+// Host — create event
+router.post("/", authenticate, requireRole(["host"]), EventRequestCtrl.spawnRequest);
+
+// Authenticated
 router.get("/my", authenticate, EventRequestCtrl.listMyRequests);
-router.patch("/:id/approve", authenticate, EventRequestCtrl.approve);
-router.patch("/:id/complete", authenticate, EventRequestCtrl.complete);
 router.get("/:id", authenticate, EventRequestCtrl.getById);
+
+// Admin only
+router.patch("/:id/approve", authenticate, requireAdmin, EventRequestCtrl.approve);
+router.patch("/:id/complete", authenticate, requireAdmin, EventRequestCtrl.complete);
 
 export default router;
