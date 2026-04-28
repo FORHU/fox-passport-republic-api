@@ -15,6 +15,7 @@ export default class AssetSvc {
     currency?: string;
     billingRate?: BillingRate;
     status?: AssetStatus;
+    imgIds: string[];
   }) {
     const normalized = {
       ...data,

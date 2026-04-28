@@ -5,13 +5,38 @@ import Stripe from "stripe";
 import { prisma } from "../utils/prisma";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-    apiVersion: '2025-04-30.basil',
+    apiVersion: '2025-08-27.basil',
 });
 
 export default class PaymentSvc {
     // Generate unique transaction ID
     static generateTransactionId(): string {
         return `TXN-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+    }
+
+    // CREATE STRIPE PAYMENT INTENT
+    static async createPaymentIntent(data: {
+        amount: number;
+        currency?: string;
+        bookingId: string;
+        description?: string;
+    }) {
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: Math.round(data.amount * 100), // Stripe expects cents
+            currency: (data.currency || 'PHP').toLowerCase(),
+            metadata: {
+                bookingId: data.bookingId,
+            },
+            description: data.description,
+            automatic_payment_methods: {
+                enabled: true,
+            },
+        });
+
+        return {
+            clientSecret: paymentIntent.client_secret,
+            id: paymentIntent.id,
+        };
     }
 
     // GET ALL PAYMENTS
@@ -52,9 +77,10 @@ export default class PaymentSvc {
         paymentType: "deposit" | "full";
         paymentStatus?: PaymentStatus;
         expiresAt?: Date;
+        transactionId?: string;
     }) {
-        let transactionId = this.generateTransactionId();
-        while (await PaymentRepo.transactionIdExists(transactionId)) {
+        let transactionId = data.transactionId || this.generateTransactionId();
+        while (!data.transactionId && await PaymentRepo.transactionIdExists(transactionId)) {
             transactionId = this.generateTransactionId();
         }
 

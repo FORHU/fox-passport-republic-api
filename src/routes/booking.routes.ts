@@ -11,6 +11,7 @@ router.post("/draft", authenticate, BookingCtrl.createDraftBooking);            
 // ========== GUEST MANAGEMENT ROUTES ==========
 router.post("/:id/finalize", authenticate, BookingCtrl.finalizeGuests);
 router.post("/:bookingId/attendees", authenticate, AttendeeCtrl.addGuest);
+router.put("/:id/attendees", authenticate, BookingCtrl.appendAttendees);
 router.delete("/attendees/:id", authenticate, AttendeeCtrl.removeGuest);
 router.patch("/attendees/:id/respond", optionalAuth, AttendeeCtrl.respondToInvite);
 
@@ -19,5 +20,6 @@ router.get("/", BookingCtrl.getAllBookings);
 router.get("/user/:userId", authenticate, BookingCtrl.getUserBookings);
 router.get("/:id", optionalAuth, BookingCtrl.getBookingById);
 router.post("/create", authenticate, BookingCtrl.createBooking);
+router.post("/:id/confirm", authenticate, BookingCtrl.confirmBooking);
 
 export default router;

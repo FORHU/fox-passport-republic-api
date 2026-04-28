@@ -38,20 +38,19 @@ export default class MatchSvc {
         templateId = newTemplate.id;
     }
 
-    // 2. Create the EventClientRequest
-    const eventRequest = await prisma.eventClientRequest.create({
+    // 2. Create the Event (match request)
+    const eventRequest = await prisma.event.create({
       data: {
         clientId: data.clientId,
         organizerId: data.foxerId,
         templateId: templateId,
         name: `Match with ${data.style}`,
         description: data.requestContent || `Custom match for ${data.style}`,
+        eventCategory: 'other',
         startAt: data.date,
-        endAt: new Date(data.date.getTime() + 4 * 60 * 60 * 1000), // 4 hours default
+        endAt: new Date(data.date.getTime() + 4 * 60 * 60 * 1000),
         guestCount: data.guestCount,
         totalAmount: data.totalAmount,
-        eventStatus: 'pending',
-        requestStatus: 'pending'
       }
     });
 
