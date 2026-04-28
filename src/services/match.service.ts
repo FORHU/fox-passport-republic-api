@@ -69,4 +69,28 @@ export default class MatchSvc {
 
     return { eventRequest, booking };
   }
+
+  static async getMyMatches(clientId: string) {
+    return prisma.booking.findMany({
+      where: { userId: clientId },
+      include: {
+        event: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            startAt: true,
+            endAt: true,
+            guestCount: true,
+            totalAmount: true,
+            requestStatus: true,
+            eventStatus: true,
+            host: { select: { id: true, name: true, imgId: true } },
+          },
+        },
+        payments: { select: { id: true, amount: true, status: true, method: true, createdAt: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
 }
