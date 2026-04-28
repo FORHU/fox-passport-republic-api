@@ -226,11 +226,16 @@ export default class EventTemplateSvc {
     else if (params.type === "service") results = await EventTemplateRepo.searchServicesByLocation(filters);
     else if (params.type === "asset") results = await EventTemplateRepo.searchAssetsByLocation(filters);
 
-    return results.map(item => {
-      const isLocationValid = item.state === template.targetState && item.country === template.targetCountry;
-      const matchScope = isLocationValid ? "state" : (item.country === template.targetCountry ? "country" : "manual");
-      return { ...item, isLocationValid, matchScope };
+    const scored = results.map(item => {
+      const sameState = item.state === template.targetState && item.country === template.targetCountry;
+      const sameCountry = !sameState && item.country === template.targetCountry;
+      const matchScope = sameState ? "state" : sameCountry ? "country" : "manual";
+      // Lower sortOrder = higher priority (state match first, then country, then manual)
+      const sortOrder = sameState ? 0 : sameCountry ? 1 : 2;
+      return { ...item, isMatched: sameState || sameCountry, matchScope, sortOrder };
     });
+
+    return scored.sort((a, b) => a.sortOrder - b.sortOrder);
   }
 
   static async matchItem(params: { 

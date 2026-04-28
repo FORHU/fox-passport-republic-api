@@ -2,7 +2,28 @@ import { prisma } from "../utils/prisma";
 import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 
 export default class ServiceRepo {
+  // READ ALL (public — available only)
   static async getAllServices(filters?: {
+    ownerId?: string;
+    category?: ServiceCategory;
+  }) {
+    return prisma.service.findMany({
+      where: {
+        ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
+        ...(filters?.category && { category: filters.category }),
+        status: ServiceStatus.available,
+        deletedAt: null,
+      },
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+        images: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  // READ ALL (admin — no status filter)
+  static async getAllServicesAdmin(filters?: {
     ownerId?: string;
     category?: ServiceCategory;
     status?: ServiceStatus;

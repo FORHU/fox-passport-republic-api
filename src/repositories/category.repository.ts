@@ -16,7 +16,7 @@ type CategorySummary = {
  */
 export default class CategoryRepo {
   static async getAllCategories(): Promise<CategorySummary[]> {
-    const [assetCats, venueCats, serviceCats] = await Promise.all([
+    const [assetCats, venueCats, rawServiceCats] = await Promise.all([
       prisma.asset.groupBy({
         by: ["category"],
         where: { deletedAt: null },
@@ -26,11 +26,19 @@ export default class CategoryRepo {
         by: ["category"],
         _count: { category: true },
       }),
-      prisma.service.groupBy({
-        by: ["category"],
-        _count: { category: true },
-      }),
+      // Raw query bypasses Prisma enum validation — handles legacy/mismatched values in DB
+      prisma.$queryRaw<{ category: string; count: bigint }[]>`
+        SELECT category, COUNT(*)::int AS count
+        FROM services
+        WHERE "deletedAt" IS NULL
+        GROUP BY category
+      `,
     ]);
+
+    const serviceCats = rawServiceCats.map(r => ({
+      category: r.category,
+      _count: { category: Number(r.count) },
+    }));
 
     const map = new Map<string, CategorySummary>();
 
