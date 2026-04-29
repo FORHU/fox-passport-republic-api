@@ -1,4 +1,5 @@
 import { prisma } from "../utils/prisma";
+import { EventCategory } from "@prisma/client";
 
 type CategorySummary = {
   name: string;
@@ -7,16 +8,17 @@ type CategorySummary = {
     assets: number;
     venues: number;
     services: number;
+    events: number;
   };
 };
 
 /**
  * The current schema has no `Category` model. Categories are stored as plain strings
- * on `Asset.category`, `Venue.category`, and `Service.category`.
+ * on `Asset.category`, `Venue.category`, `Service.category`, and `EventTemplate.category`.
  */
 export default class CategoryRepo {
   static async getAllCategories(): Promise<CategorySummary[]> {
-    const [assetCats, venueCats, rawServiceCats] = await Promise.all([
+    const [assetCats, venueCats, rawServiceCats, eventTemplateCats] = await Promise.all([
       prisma.asset.groupBy({
         by: ["category"],
         where: { deletedAt: null },
@@ -33,6 +35,10 @@ export default class CategoryRepo {
         WHERE "deletedAt" IS NULL
         GROUP BY category
       `,
+      prisma.eventTemplate.groupBy({
+        by: ["category"],
+        _count: { category: true },
+      }),
     ]);
 
     const serviceCats = rawServiceCats.map(r => ({
@@ -42,11 +48,16 @@ export default class CategoryRepo {
 
     const map = new Map<string, CategorySummary>();
 
+    // Seed all EventCategory enum values so they always appear on the landing page
+    for (const key of Object.values(EventCategory)) {
+      map.set(key, { name: key, count: 0, sources: { assets: 0, venues: 0, services: 0, events: 0 } });
+    }
+
     for (const row of assetCats) {
       const key = row.category;
       const existing =
         map.get(key) ??
-        ({ name: key, count: 0, sources: { assets: 0, venues: 0, services: 0 } } as CategorySummary);
+        ({ name: key, count: 0, sources: { assets: 0, venues: 0, services: 0, events: 0 } } as CategorySummary);
       existing.sources.assets = row._count.category;
       map.set(key, existing);
     }
@@ -55,7 +66,7 @@ export default class CategoryRepo {
       const key = row.category;
       const existing =
         map.get(key) ??
-        ({ name: key, count: 0, sources: { assets: 0, venues: 0, services: 0 } } as CategorySummary);
+        ({ name: key, count: 0, sources: { assets: 0, venues: 0, services: 0, events: 0 } } as CategorySummary);
       existing.sources.venues = row._count.category;
       map.set(key, existing);
     }
@@ -64,13 +75,22 @@ export default class CategoryRepo {
       const key = row.category;
       const existing =
         map.get(key) ??
-        ({ name: key, count: 0, sources: { assets: 0, venues: 0, services: 0 } } as CategorySummary);
+        ({ name: key, count: 0, sources: { assets: 0, venues: 0, services: 0, events: 0 } } as CategorySummary);
       existing.sources.services = row._count.category;
       map.set(key, existing);
     }
 
+    for (const row of eventTemplateCats) {
+      const key = row.category;
+      const existing =
+        map.get(key) ??
+        ({ name: key, count: 0, sources: { assets: 0, venues: 0, services: 0, events: 0 } } as CategorySummary);
+      existing.sources.events = row._count.category;
+      map.set(key, existing);
+    }
+
     for (const v of map.values()) {
-      v.count = v.sources.assets + v.sources.venues + v.sources.services;
+      v.count = v.sources.assets + v.sources.venues + v.sources.services + v.sources.events;
     }
 
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
