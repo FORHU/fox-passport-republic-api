@@ -144,6 +144,47 @@ export default class AdminCtrl {
     }
   }
 
+  // ─── EVENT TEMPLATES ──────────────────────────────────────────────────────
+
+  static async getAllEventTemplates(req: Request, res: Response) {
+    try {
+      const templates = await prisma.eventTemplate.findMany({
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          images: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      return res.status(200).json({ success: true, data: templates });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  static async approveEventTemplate(req: Request, res: Response) {
+    try {
+      const template = await prisma.eventTemplate.update({
+        where: { id: req.params.id },
+        data: { isPublic: true },
+      });
+      return res.status(200).json({ success: true, data: template });
+    } catch (error: any) {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+  }
+
+  static async rejectEventTemplate(req: Request, res: Response) {
+    try {
+      const template = await prisma.eventTemplate.update({
+        where: { id: req.params.id },
+        data: { isPublic: false },
+      });
+      return res.status(200).json({ success: true, data: template });
+    } catch (error: any) {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+  }
+
   // ─── EVENTS ───────────────────────────────────────────────────────────────
 
   static async getPendingEvents(req: Request, res: Response) {
@@ -170,6 +211,11 @@ export default class AdminCtrl {
   static async approveEvent(req: Request, res: Response) {
     try {
       const event = await EventRequestRepo.updateRequestStatus(req.params.id, "approved");
+      // Make the parent template publicly discoverable
+      await prisma.eventTemplate.update({
+        where: { id: event.templateId },
+        data: { isPublic: true },
+      });
       return res.status(200).json({ success: true, data: event });
     } catch (error: any) {
       return res.status(404).json({ success: false, message: error.message });
@@ -179,6 +225,16 @@ export default class AdminCtrl {
   static async rejectEvent(req: Request, res: Response) {
     try {
       const event = await EventRequestRepo.updateRequestStatus(req.params.id, "rejected");
+      // Hide the template if no other approved events remain for it
+      const approvedCount = await prisma.event.count({
+        where: { templateId: event.templateId, requestStatus: "approved" },
+      });
+      if (approvedCount === 0) {
+        await prisma.eventTemplate.update({
+          where: { id: event.templateId },
+          data: { isPublic: false },
+        });
+      }
       return res.status(200).json({ success: true, data: event });
     } catch (error: any) {
       return res.status(404).json({ success: false, message: error.message });

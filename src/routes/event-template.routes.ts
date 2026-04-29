@@ -4,6 +4,10 @@ import { authenticate, requireRole } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
+// Public browse — no auth, only isPublic templates, supports ?category=
+router.get("/browse", EventTemplateCtrl.browsePublic);
+router.get("/browse/:id", EventTemplateCtrl.browsePublicById);
+
 // Public/Authenticated list
 router.get("/", authenticate, EventTemplateCtrl.getTemplates);
 router.get("/:id", authenticate, EventTemplateCtrl.getTemplateById);

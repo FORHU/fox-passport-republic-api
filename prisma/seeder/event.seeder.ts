@@ -1,170 +1,324 @@
 import { PrismaClient, EventCategory, RequestStatus, EventStatus } from "@prisma/client";
 
+// ── Deterministic IDs ────────────────────────────────────────────────────────
+const TEMPLATE_IDS = {
+  birthday:  "seed-template-birthday",
+  wedding:   "seed-template-wedding",
+  corporate: "seed-template-corporate",
+  social:    "seed-template-social",
+  other:     "seed-template-other",
+};
+
+const ASSET_IDS = {
+  speakers:  "seed-asset-stage-speakers-xl",
+  lights:    "seed-asset-led-flood-lights-rgb",
+  floral:    "seed-asset-floral-arch-setup",
+  chairs:    "seed-asset-tiffany-chairs-(set-of-50)",
+};
+
+const SERVICE_IDS = {
+  photo:     "seed-service-manila-event-photography",
+  catering:  "seed-service-metro-manila-premium-catering",
+  band:      "seed-service-live-band-performance",
+  waitstaff: "seed-service-event-waitstaff-team",
+};
+
+const VENUE_IDS = {
+  palace:  "seed-venue-grand-palace-hall",
+  gazebo:  "seed-venue-garden-gazebo",
+  boracay: "seed-venue-boracay-beach-resort",
+  loft:    "seed-venue-the-loft-bgc",
+};
+
 export async function seedEvents(prisma: PrismaClient, users: any[]) {
   try {
     console.log("Starting event seed...");
 
     const client = users.find(u => u.email === "user@example.com");
-    const host = users.find(u => u.email === "host@example.com");
+    const host   = users.find(u => u.email === "host@example.com");
     if (!client) throw new Error("user@example.com not found for event seeding");
-    if (!host) throw new Error("host@example.com not found for event seeding");
+    if (!host)   throw new Error("host@example.com not found for event seeding");
 
-    // 1. Seed EventTemplates
-    const templates = [
+    // ── 1. EventTemplates ────────────────────────────────────────────────────
+    const templateDefs = [
       {
-        id: "seed-template-birthday",
-        ownerId: host.id,
+        id: TEMPLATE_IDS.birthday,
         name: "Birthday Bash Package",
-        description: "Everything you need for an unforgettable birthday party.",
+        description: "Everything you need for an unforgettable birthday party — from a grand venue and floral setup to live catering and full waitstaff. Let us handle the details while you celebrate.",
         category: EventCategory.birthday,
-        isPublic: true,
-        targetCity: "Manila",
-        targetState: "Metro Manila",
-        targetCountry: "Philippines",
+        targetCity: "Manila", targetState: "Metro Manila", targetCountry: "Philippines",
       },
       {
-        id: "seed-template-corporate",
-        ownerId: host.id,
+        id: TEMPLATE_IDS.wedding,
+        name: "Wedding Celebration Package",
+        description: "An elegant beachfront wedding experience crafted to perfection. Includes a stunning arch, premium catering, Tiffany seating, and professional photography on the shores of Boracay.",
+        category: EventCategory.wedding,
+        targetCity: "Boracay", targetState: "Aklan", targetCountry: "Philippines",
+      },
+      {
+        id: TEMPLATE_IDS.corporate,
         name: "Corporate Event Package",
-        description: "Professional setup for corporate meetings and conferences.",
+        description: "Professional setup for corporate meetings, product launches, and conferences. Full AV, photography coverage, and a premium BGC loft venue included.",
         category: EventCategory.corporate,
-        isPublic: true,
-        targetCity: "Taguig",
-        targetState: "Metro Manila",
-        targetCountry: "Philippines",
+        targetCity: "Taguig", targetState: "Metro Manila", targetCountry: "Philippines",
       },
       {
-        id: "seed-template-social",
-        ownerId: host.id,
+        id: TEMPLATE_IDS.social,
         name: "Social Gathering Package",
-        description: "A relaxed and fun setup for social hangouts.",
+        description: "A relaxed yet vibrant setup for social hangouts, reunions, and celebrations. Featuring live band entertainment, quality sound, and a beautiful outdoor garden venue.",
         category: EventCategory.social,
-        isPublic: true,
+        targetCity: "Cebu City", targetState: "Cebu", targetCountry: "Philippines",
+      },
+      {
+        id: TEMPLATE_IDS.other,
+        name: "Custom Event Package",
+        description: "A fully flexible package for any kind of event. Comes with professional photography and a choice of venue. Add your own flair and build from here.",
+        category: EventCategory.other,
         targetCountry: "Philippines",
       },
     ];
 
-    for (const t of templates) {
+    for (const t of templateDefs) {
       await prisma.eventTemplate.upsert({
         where: { id: t.id },
-        update: { name: t.name, description: t.description },
-        create: t,
+        update: { name: t.name, description: t.description, isPublic: true },
+        create: { ...t, ownerId: host.id, isPublic: true },
       });
     }
-
     console.log("✓ EventTemplates seeded");
 
-    // 2. Seed Events (approved and ready to book)
+    // ── 2. File (images) for each template ──────────────────────────────────
+    const templateImages: Record<string, { id: string; url: string; name: string }[]> = {
+      [TEMPLATE_IDS.birthday]: [
+        { id: "seed-file-birthday-1", url: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&auto=format&fit=crop", name: "Birthday Party Hall" },
+        { id: "seed-file-birthday-2", url: "https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=800&auto=format&fit=crop", name: "Birthday Cake" },
+        { id: "seed-file-birthday-3", url: "https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=800&auto=format&fit=crop", name: "Birthday Celebration" },
+      ],
+      [TEMPLATE_IDS.wedding]: [
+        { id: "seed-file-wedding-1", url: "https://images.unsplash.com/photo-1519741497674-611481863552?w=800&auto=format&fit=crop", name: "Wedding Ceremony" },
+        { id: "seed-file-wedding-2", url: "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?w=800&auto=format&fit=crop", name: "Wedding Reception" },
+        { id: "seed-file-wedding-3", url: "https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?w=800&auto=format&fit=crop", name: "Beachfront Wedding" },
+      ],
+      [TEMPLATE_IDS.corporate]: [
+        { id: "seed-file-corporate-1", url: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop", name: "Corporate Event Stage" },
+        { id: "seed-file-corporate-2", url: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=800&auto=format&fit=crop", name: "Conference Room" },
+        { id: "seed-file-corporate-3", url: "https://images.unsplash.com/photo-1559223607-b4d0555ae227?w=800&auto=format&fit=crop", name: "Team Summit" },
+      ],
+      [TEMPLATE_IDS.social]: [
+        { id: "seed-file-social-1", url: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop", name: "Social Party" },
+        { id: "seed-file-social-2", url: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&auto=format&fit=crop", name: "Live Music Gathering" },
+        { id: "seed-file-social-3", url: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&auto=format&fit=crop", name: "Outdoor Social" },
+      ],
+      [TEMPLATE_IDS.other]: [
+        { id: "seed-file-other-1", url: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&auto=format&fit=crop", name: "Custom Event" },
+        { id: "seed-file-other-2", url: "https://images.unsplash.com/photo-1533174072545-e8d4aa97edf9?w=800&auto=format&fit=crop", name: "Event Setup" },
+      ],
+    };
+
+    for (const [templateId, files] of Object.entries(templateImages)) {
+      for (const f of files) {
+        await prisma.file.upsert({
+          where: { id: f.id },
+          update: { url: f.url, name: f.name, templateId },
+          create: { id: f.id, url: f.url, name: f.name, type: "image/jpeg", templateId },
+        });
+      }
+    }
+    console.log("✓ Template images seeded");
+
+    // ── 3. Attach assets / services / venues to templates ───────────────────
+    type TemplateAttachment = {
+      templateId: string;
+      assets: { id: string; assetId: string; quantity: number }[];
+      services: { id: string; serviceId: string }[];
+      venues: { id: string; venueId: string }[];
+    };
+
+    const attachments: TemplateAttachment[] = [
+      {
+        templateId: TEMPLATE_IDS.birthday,
+        assets:   [
+          { id: "seed-ta-birthday-floral",   assetId: ASSET_IDS.floral,   quantity: 1 },
+          { id: "seed-ta-birthday-speakers", assetId: ASSET_IDS.speakers, quantity: 2 },
+        ],
+        services: [
+          { id: "seed-ts-birthday-catering",  serviceId: SERVICE_IDS.catering },
+          { id: "seed-ts-birthday-waitstaff", serviceId: SERVICE_IDS.waitstaff },
+        ],
+        venues: [{ id: "seed-tv-birthday-palace", venueId: VENUE_IDS.palace }],
+      },
+      {
+        templateId: TEMPLATE_IDS.wedding,
+        assets:   [
+          { id: "seed-ta-wedding-floral",   assetId: ASSET_IDS.floral,  quantity: 2 },
+          { id: "seed-ta-wedding-chairs",   assetId: ASSET_IDS.chairs,  quantity: 1 },
+          { id: "seed-ta-wedding-lights",   assetId: ASSET_IDS.lights,  quantity: 6 },
+        ],
+        services: [
+          { id: "seed-ts-wedding-catering",  serviceId: SERVICE_IDS.catering },
+          { id: "seed-ts-wedding-photo",     serviceId: SERVICE_IDS.photo },
+          { id: "seed-ts-wedding-waitstaff", serviceId: SERVICE_IDS.waitstaff },
+        ],
+        venues: [{ id: "seed-tv-wedding-boracay", venueId: VENUE_IDS.boracay }],
+      },
+      {
+        templateId: TEMPLATE_IDS.corporate,
+        assets:   [
+          { id: "seed-ta-corporate-speakers", assetId: ASSET_IDS.speakers, quantity: 2 },
+          { id: "seed-ta-corporate-lights",   assetId: ASSET_IDS.lights,   quantity: 4 },
+        ],
+        services: [
+          { id: "seed-ts-corporate-photo",     serviceId: SERVICE_IDS.photo },
+          { id: "seed-ts-corporate-catering",  serviceId: SERVICE_IDS.catering },
+          { id: "seed-ts-corporate-waitstaff", serviceId: SERVICE_IDS.waitstaff },
+        ],
+        venues: [{ id: "seed-tv-corporate-loft", venueId: VENUE_IDS.loft }],
+      },
+      {
+        templateId: TEMPLATE_IDS.social,
+        assets:   [
+          { id: "seed-ta-social-speakers", assetId: ASSET_IDS.speakers, quantity: 2 },
+          { id: "seed-ta-social-lights",   assetId: ASSET_IDS.lights,   quantity: 4 },
+        ],
+        services: [
+          { id: "seed-ts-social-band",      serviceId: SERVICE_IDS.band },
+          { id: "seed-ts-social-catering",  serviceId: SERVICE_IDS.catering },
+          { id: "seed-ts-social-waitstaff", serviceId: SERVICE_IDS.waitstaff },
+        ],
+        venues: [{ id: "seed-tv-social-gazebo", venueId: VENUE_IDS.gazebo }],
+      },
+      {
+        templateId: TEMPLATE_IDS.other,
+        assets:   [{ id: "seed-ta-other-speakers", assetId: ASSET_IDS.speakers, quantity: 1 }],
+        services: [{ id: "seed-ts-other-photo", serviceId: SERVICE_IDS.photo }],
+        venues:   [{ id: "seed-tv-other-loft", venueId: VENUE_IDS.loft }],
+      },
+    ];
+
+    for (const att of attachments) {
+      for (const a of att.assets) {
+        await prisma.eventTemplateAsset.upsert({
+          where: { id: a.id },
+          update: { quantity: a.quantity },
+          create: { id: a.id, templateId: att.templateId, assetId: a.assetId, quantity: a.quantity },
+        });
+      }
+      for (const s of att.services) {
+        await prisma.eventTemplateService.upsert({
+          where: { id: s.id },
+          update: {},
+          create: { id: s.id, templateId: att.templateId, serviceId: s.serviceId },
+        });
+      }
+      for (const v of att.venues) {
+        await prisma.eventTemplateVenue.upsert({
+          where: { id: v.id },
+          update: {},
+          create: { id: v.id, templateId: att.templateId, venueId: v.venueId },
+        });
+      }
+    }
+    console.log("✓ Template assets/services/venues attached");
+
+    // ── 4. Events (approved and pending) ────────────────────────────────────
     const now = new Date();
     const events = [
       {
         id: "seed-event-birthday-01",
         clientId: client.id,
         organizerId: host.id,
-        templateId: "seed-template-birthday",
+        templateId: TEMPLATE_IDS.birthday,
         name: "Maria's 30th Birthday Celebration",
         description: "A grand birthday party for 50 guests at Grand Palace Hall.",
         eventCategory: EventCategory.birthday,
-        startAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),  // 7 days from now
-        endAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000 + 6 * 60 * 60 * 1000), // +6 hours
+        startAt: new Date(now.getTime() + 7  * 86400000),
+        endAt:   new Date(now.getTime() + 7  * 86400000 + 6 * 3600000),
         guestCount: 50,
-        totalAmount: 25000,
+        totalAmount: 75000,
         requestStatus: RequestStatus.approved,
-        eventStatus: EventStatus.pending,
-        targetCity: "Manila",
-        targetState: "Metro Manila",
-        targetCountry: "Philippines",
+        eventStatus:   EventStatus.pending,
+        targetCity: "Manila", targetState: "Metro Manila", targetCountry: "Philippines",
       },
       {
         id: "seed-event-corporate-01",
         clientId: client.id,
         organizerId: host.id,
-        templateId: "seed-template-corporate",
+        templateId: TEMPLATE_IDS.corporate,
         name: "Q3 Team Strategy Summit",
-        description: "Quarterly strategy meeting for 30 team members.",
+        description: "Quarterly strategy meeting for 30 team members at The Loft BGC.",
         eventCategory: EventCategory.corporate,
-        startAt: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
-        endAt: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000 + 8 * 60 * 60 * 1000), // +8 hours
+        startAt: new Date(now.getTime() + 14 * 86400000),
+        endAt:   new Date(now.getTime() + 14 * 86400000 + 8 * 3600000),
         guestCount: 30,
-        totalAmount: 40000,
+        totalAmount: 60000,
         requestStatus: RequestStatus.approved,
-        eventStatus: EventStatus.pending,
-        targetCity: "Taguig",
-        targetState: "Metro Manila",
-        targetCountry: "Philippines",
+        eventStatus:   EventStatus.pending,
+        targetCity: "Taguig", targetState: "Metro Manila", targetCountry: "Philippines",
       },
       {
         id: "seed-event-social-01",
         clientId: client.id,
         organizerId: host.id,
-        templateId: "seed-template-social",
+        templateId: TEMPLATE_IDS.social,
         name: "Summer Rooftop Social",
         description: "A chill rooftop social for friends and colleagues.",
         eventCategory: EventCategory.social,
-        startAt: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000),
-        endAt: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000),
+        startAt: new Date(now.getTime() + 3  * 86400000),
+        endAt:   new Date(now.getTime() + 3  * 86400000 + 4 * 3600000),
         guestCount: 80,
-        totalAmount: 60000,
+        totalAmount: 40000,
         requestStatus: RequestStatus.approved,
-        eventStatus: EventStatus.pending,
-        targetCity: "Taguig",
-        targetState: "Metro Manila",
-        targetCountry: "Philippines",
+        eventStatus:   EventStatus.pending,
+        targetCity: "Taguig", targetState: "Metro Manila", targetCountry: "Philippines",
       },
-      // ── Pending (awaiting admin approval) ──────────────────────────────────
+      // ── Pending (awaiting admin approval) ─────────────────────────────────
       {
         id: "seed-event-wedding-pending",
         clientId: client.id,
         organizerId: host.id,
-        templateId: "seed-template-birthday",
+        templateId: TEMPLATE_IDS.wedding,
         name: "Garcia-Reyes Wedding Reception",
         description: "Elegant wedding reception for 120 guests at a beachfront venue.",
         eventCategory: EventCategory.wedding,
-        startAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
-        endAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000 + 8 * 60 * 60 * 1000),
+        startAt: new Date(now.getTime() + 30 * 86400000),
+        endAt:   new Date(now.getTime() + 30 * 86400000 + 8 * 3600000),
         guestCount: 120,
         totalAmount: 150000,
         requestStatus: RequestStatus.pending,
-        eventStatus: EventStatus.pending,
-        targetCity: "Boracay",
-        targetState: "Aklan",
-        targetCountry: "Philippines",
+        eventStatus:   EventStatus.pending,
+        targetCity: "Boracay", targetState: "Aklan", targetCountry: "Philippines",
       },
       {
         id: "seed-event-corporate-pending",
         clientId: client.id,
         organizerId: host.id,
-        templateId: "seed-template-corporate",
+        templateId: TEMPLATE_IDS.corporate,
         name: "Tech Startup Demo Day 2026",
         description: "Annual startup pitch and product demo event for investors and press.",
         eventCategory: EventCategory.corporate,
-        startAt: new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000),
-        endAt: new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000 + 6 * 60 * 60 * 1000),
+        startAt: new Date(now.getTime() + 21 * 86400000),
+        endAt:   new Date(now.getTime() + 21 * 86400000 + 6 * 3600000),
         guestCount: 200,
         totalAmount: 80000,
         requestStatus: RequestStatus.pending,
-        eventStatus: EventStatus.pending,
-        targetCity: "Taguig",
-        targetState: "Metro Manila",
-        targetCountry: "Philippines",
+        eventStatus:   EventStatus.pending,
+        targetCity: "Taguig", targetState: "Metro Manila", targetCountry: "Philippines",
       },
       {
         id: "seed-event-social-pending",
         clientId: client.id,
         organizerId: host.id,
-        templateId: "seed-template-social",
+        templateId: TEMPLATE_IDS.social,
         name: "Cebu Food & Music Festival",
         description: "A weekend social festival featuring local food vendors and live music.",
         eventCategory: EventCategory.social,
-        startAt: new Date(now.getTime() + 45 * 24 * 60 * 60 * 1000),
-        endAt: new Date(now.getTime() + 45 * 24 * 60 * 60 * 1000 + 10 * 60 * 60 * 1000),
+        startAt: new Date(now.getTime() + 45 * 86400000),
+        endAt:   new Date(now.getTime() + 45 * 86400000 + 10 * 3600000),
         guestCount: 500,
         totalAmount: 200000,
         requestStatus: RequestStatus.pending,
-        eventStatus: EventStatus.pending,
-        targetCity: "Cebu City",
-        targetState: "Cebu",
-        targetCountry: "Philippines",
+        eventStatus:   EventStatus.pending,
+        targetCity: "Cebu City", targetState: "Cebu", targetCountry: "Philippines",
       },
     ];
 
@@ -179,6 +333,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
           guestCount: e.guestCount,
           totalAmount: e.totalAmount,
           requestStatus: e.requestStatus,
+          eventStatus: e.eventStatus,
         },
         create: e,
       });
