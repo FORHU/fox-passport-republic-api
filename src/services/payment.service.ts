@@ -1,4 +1,5 @@
 import PaymentRepo from "../repositories/payment.repository";
+import BookingRepo from "../repositories/booking.repository";
 import crypto from "crypto";
 import { PaymentStatus } from "@prisma/client";
 import Stripe from "stripe";
@@ -120,20 +121,12 @@ export default class PaymentSvc {
 
         const updated = await PaymentRepo.updatePayment(id, data);
 
-        // If deposit payment is completed, confirm the booking
         if (data.paymentStatus === PaymentStatus.completed && updated.paymentType === "deposit") {
-            await (require("../utils/prisma").prisma.booking.update({
-                where: { id: updated.bookingId },
-                data: { status: "confirmed" }
-            }));
+            await prisma.booking.update({ where: { id: updated.bookingId }, data: { status: "confirmed" } });
         }
 
-        // If full payment is completed, mark booking as completed
         if (data.paymentStatus === PaymentStatus.completed && updated.paymentType === "full") {
-            await (require("../utils/prisma").prisma.booking.update({
-                where: { id: updated.bookingId },
-                data: { status: "completed" }
-            }));
+            await prisma.booking.update({ where: { id: updated.bookingId }, data: { status: "completed" } });
         }
 
         return updated;
@@ -141,7 +134,6 @@ export default class PaymentSvc {
 
     // CALCULATE REMAINING BALANCE
     static async getRemainingBalance(bookingId: string) {
-        const BookingRepo = require("../repositories/booking.repository").default;
         const booking = await BookingRepo.findById(bookingId);
         if (!booking) throw new Error("Booking not found");
 
@@ -159,7 +151,7 @@ export default class PaymentSvc {
             totalAmount: totalAgreed,
             paidAmount,
             remainingBalance: Math.max(0, totalAgreed - paidAmount),
-            currency: (booking.event && booking.event.currency) || "PHP"
+            currency: "PHP"
         };
     }
 
