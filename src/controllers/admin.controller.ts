@@ -78,7 +78,7 @@ export default class AdminCtrl {
 
   static async getPendingAssets(req: Request, res: Response) {
     try {
-      const assets = await AssetRepo.findAllAssetsAdmin({ status: AssetStatus.draft });
+      const assets = await AssetRepo.findAllAssetsAdmin({ status: AssetStatus.pending });
       return res.status(200).json({ success: true, data: assets });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message });
@@ -113,7 +113,7 @@ export default class AdminCtrl {
 
   static async getPendingServices(req: Request, res: Response) {
     try {
-      const services = await ServiceRepo.getAllServicesAdmin({ status: ServiceStatus.draft });
+      const services = await ServiceRepo.getAllServicesAdmin({ status: ServiceStatus.pending });
       return res.status(200).json({ success: true, data: services });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message });
