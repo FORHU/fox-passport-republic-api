@@ -3,9 +3,9 @@ import UsersRepo from "../repositories/users.repository";
 import { SystemRole } from "@prisma/client";
 
 export default class UsersSvc {
-  // GET ALL USERS
-  static async getAllUsers() {
-    return UsersRepo.getAllUsers();
+  // GET ALL USERS (optionally filtered by roleType)
+  static async getAllUsers(roleTypes?: string[]) {
+    return UsersRepo.getAllUsers(roleTypes as any);
   }
 
   // GET USER BY ID

@@ -2,14 +2,18 @@ import { prisma } from "../utils/prisma";
 import { SystemRole, RoleType } from "@prisma/client";
 
 export default class UsersRepo {
-  // READ ALL
-  static async getAllUsers() {
+  // READ ALL (optionally filtered by roleType)
+  static async getAllUsers(roleTypes?: RoleType[]) {
     return prisma.user.findMany({
+      where: roleTypes && roleTypes.length > 0
+        ? { roleType: { hasSome: roleTypes } }
+        : undefined,
       select: {
         id: true,
         email: true,
         username: true,
         name: true,
+        imgId: true,
         systemRole: true,
         roleType: true,
         createdAt: true,

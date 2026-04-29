@@ -27,7 +27,9 @@ export default class UsersCtrl {
 
   // READ ALL
   static async getAllUsers(req: Request, res: Response) {
-    const users = await UsersSvc.getAllUsers();
+    const roleTypeParam = req.query.roleType as string | undefined;
+    const roleTypes = roleTypeParam ? roleTypeParam.split(',').map(r => r.trim()) : undefined;
+    const users = await UsersSvc.getAllUsers(roleTypes);
     return res.json(users);
   }
 

@@ -5,8 +5,9 @@ import PaymentSvc from "../services/payment.service";
 export default class MatchController {
   static async createMatch(req: Request, res: Response) {
     try {
-      const { foxerId, style, date, guestCount, requestContent, totalAmount } = req.body;
-      const clientId = (req as any).user?.id; // Assuming auth middleware
+      const { style, date, guestCount, requestContent, totalAmount } = req.body;
+      const foxerId = String(req.body.foxerId); // coerce to string — frontend may send numeric IDs
+      const clientId = (req as any).user?.userId || (req as any).user?.id;
 
       if (!clientId) {
         return res.status(401).json({ message: "Unauthorized" });
