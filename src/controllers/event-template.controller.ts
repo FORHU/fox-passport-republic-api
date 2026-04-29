@@ -84,6 +84,19 @@ export default class EventTemplateCtrl {
     }
   }
 
+  // Public single template by ID — no auth required
+  static async browsePublicById(req: Request, res: Response) {
+    try {
+      const template = await EventTemplateSvc.getTemplateById(req.params.id);
+      if (!template.isPublic) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      return res.status(200).json({ success: true, data: template });
+    } catch (error: any) {
+      return res.status(404).json({ message: error.message });
+    }
+  }
+
   static async getTemplateById(req: Request, res: Response) {
     try {
       const template = await EventTemplateSvc.getTemplateById(req.params.id);

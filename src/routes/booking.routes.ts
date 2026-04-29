@@ -6,6 +6,7 @@ import { authenticate, optionalAuth } from "../middleware/auth.middleware";
 const router = express.Router();
 
 // ========== MULTI-STEP BOOKING ROUTES ==========
+router.post("/from-template", authenticate, BookingCtrl.bookFromTemplate);              // Book directly from an approved template
 router.post("/draft", authenticate, BookingCtrl.createDraftBooking);                    // Step 1: Create draft
 
 // ========== GUEST MANAGEMENT ROUTES ==========

@@ -6,6 +6,59 @@ import { prisma } from "../utils/prisma";
 import { PaymentStatus } from "@prisma/client";
 
 export default class BookingCtrl {
+    // BOOK FROM TEMPLATE — creates an Event + Booking in one shot for a logged-in client
+    static async bookFromTemplate(req: Request, res: Response) {
+        try {
+            const schema = Joi.object({
+                templateId: Joi.string().required(),
+                guestCount: Joi.number().integer().min(1).required(),
+                totalAmount: Joi.number().min(0).required(),
+                startAt: Joi.date().iso().required(),
+                endAt: Joi.date().iso().required(),
+            });
+
+            const { error, value } = schema.validate(req.body);
+            if (error) return res.status(400).json({ message: error.message });
+
+            const template = await prisma.eventTemplate.findUnique({
+                where: { id: value.templateId, isPublic: true },
+            });
+            if (!template) return res.status(404).json({ message: "Template not found or not approved" });
+
+            // Create an Event record from the template (already approved)
+            const event = await prisma.event.create({
+                data: {
+                    templateId: template.id,
+                    clientId: req.user!.userId,
+                    organizerId: template.ownerId,
+                    name: template.name,
+                    description: template.description ?? "",
+                    eventCategory: template.category,
+                    startAt: value.startAt,
+                    endAt: value.endAt,
+                    guestCount: value.guestCount,
+                    totalAmount: value.totalAmount,
+                    requestStatus: "approved",
+                    eventStatus: "pending",
+                    targetCity: template.targetCity ?? undefined,
+                    targetState: template.targetState ?? undefined,
+                    targetCountry: template.targetCountry ?? undefined,
+                },
+            });
+
+            const booking = await BookingSvc.createBooking({
+                userId: req.user!.userId,
+                eventId: event.id,
+                guestCount: value.guestCount,
+                totalAmount: value.totalAmount,
+            });
+
+            return res.status(201).json({ success: true, data: { booking, eventId: event.id } });
+        } catch (error: any) {
+            return res.status(500).json({ success: false, message: error.message });
+        }
+    }
+
     // CREATE BOOKING
     static async createBooking(req: Request, res: Response) {
         try {
