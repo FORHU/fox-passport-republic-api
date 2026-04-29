@@ -22,7 +22,12 @@ router.get("/services/pending", authenticate, requireAdmin, AdminCtrl.getPending
 router.patch("/services/:id/approve", authenticate, requireAdmin, AdminCtrl.approveService);
 router.patch("/services/:id/reject", authenticate, requireAdmin, AdminCtrl.rejectService);
 
-// Events
+// Event Templates (content moderation — controls what shows on category pages)
+router.get("/event-templates", authenticate, requireAdmin, AdminCtrl.getAllEventTemplates);
+router.patch("/event-templates/:id/approve", authenticate, requireAdmin, AdminCtrl.approveEventTemplate);
+router.patch("/event-templates/:id/reject", authenticate, requireAdmin, AdminCtrl.rejectEventTemplate);
+
+// Events (booking requests)
 router.get("/events", authenticate, requireAdmin, AdminCtrl.getAllEvents);
 router.get("/events/pending", authenticate, requireAdmin, AdminCtrl.getPendingEvents);
 router.patch("/events/:id/approve", authenticate, requireAdmin, AdminCtrl.approveEvent);

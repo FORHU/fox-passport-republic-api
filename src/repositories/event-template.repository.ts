@@ -25,11 +25,12 @@ export default class EventTemplateRepo {
   }
 
   // FIND ALL
-  static async findAllTemplates(filters?: { ownerId?: string; isPublic?: boolean }) {
+  static async findAllTemplates(filters?: { ownerId?: string; isPublic?: boolean; category?: string }) {
     return prisma.eventTemplate.findMany({
       where: {
         ...(filters?.ownerId && { ownerId: filters.ownerId }),
         ...(filters?.isPublic !== undefined && { isPublic: filters.isPublic }),
+        ...(filters?.category && { category: filters.category as any }),
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },

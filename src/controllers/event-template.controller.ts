@@ -58,12 +58,27 @@ export default class EventTemplateCtrl {
 
   static async getTemplates(req: Request, res: Response) {
     try {
-      const { ownerId, isPublic } = req.query;
+      const { ownerId, isPublic, category } = req.query;
       const templates = await EventTemplateSvc.getTemplates({
         ownerId: ownerId as string,
         isPublic: isPublic === "true" ? true : isPublic === "false" ? false : undefined,
+        category: category as string | undefined,
       });
       return res.status(200).json({ templates });
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  }
+
+  // Public — no auth required, only approved (isPublic) templates
+  static async browsePublic(req: Request, res: Response) {
+    try {
+      const { category } = req.query;
+      const templates = await EventTemplateSvc.getTemplates({
+        isPublic: true,
+        category: category as string | undefined,
+      });
+      return res.status(200).json({ success: true, data: templates });
     } catch (error: any) {
       return res.status(500).json({ message: error.message });
     }

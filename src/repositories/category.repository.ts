@@ -4,6 +4,7 @@ import { EventCategory } from "@prisma/client";
 type CategorySummary = {
   name: string;
   count: number;
+  isEventCategory: boolean;
   sources: {
     assets: number;
     venues: number;
@@ -48,16 +49,18 @@ export default class CategoryRepo {
 
     const map = new Map<string, CategorySummary>();
 
+    const eventCategoryKeys = new Set(Object.values(EventCategory));
+
     // Seed all EventCategory enum values so they always appear on the landing page
-    for (const key of Object.values(EventCategory)) {
-      map.set(key, { name: key, count: 0, sources: { assets: 0, venues: 0, services: 0, events: 0 } });
+    for (const key of eventCategoryKeys) {
+      map.set(key, { name: key, count: 0, isEventCategory: true, sources: { assets: 0, venues: 0, services: 0, events: 0 } });
     }
 
     for (const row of assetCats) {
       const key = row.category;
       const existing =
         map.get(key) ??
-        ({ name: key, count: 0, sources: { assets: 0, venues: 0, services: 0, events: 0 } } as CategorySummary);
+        ({ name: key, count: 0, isEventCategory: false, sources: { assets: 0, venues: 0, services: 0, events: 0 } } as CategorySummary);
       existing.sources.assets = row._count.category;
       map.set(key, existing);
     }
@@ -66,7 +69,7 @@ export default class CategoryRepo {
       const key = row.category;
       const existing =
         map.get(key) ??
-        ({ name: key, count: 0, sources: { assets: 0, venues: 0, services: 0, events: 0 } } as CategorySummary);
+        ({ name: key, count: 0, isEventCategory: eventCategoryKeys.has(key as EventCategory), sources: { assets: 0, venues: 0, services: 0, events: 0 } } as CategorySummary);
       existing.sources.venues = row._count.category;
       map.set(key, existing);
     }
@@ -75,7 +78,7 @@ export default class CategoryRepo {
       const key = row.category;
       const existing =
         map.get(key) ??
-        ({ name: key, count: 0, sources: { assets: 0, venues: 0, services: 0, events: 0 } } as CategorySummary);
+        ({ name: key, count: 0, isEventCategory: eventCategoryKeys.has(key as EventCategory), sources: { assets: 0, venues: 0, services: 0, events: 0 } } as CategorySummary);
       existing.sources.services = row._count.category;
       map.set(key, existing);
     }
@@ -84,7 +87,7 @@ export default class CategoryRepo {
       const key = row.category;
       const existing =
         map.get(key) ??
-        ({ name: key, count: 0, sources: { assets: 0, venues: 0, services: 0, events: 0 } } as CategorySummary);
+        ({ name: key, count: 0, isEventCategory: eventCategoryKeys.has(key as EventCategory), sources: { assets: 0, venues: 0, services: 0, events: 0 } } as CategorySummary);
       existing.sources.events = row._count.category;
       map.set(key, existing);
     }
