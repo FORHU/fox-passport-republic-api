@@ -9,7 +9,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
     if (!client) throw new Error("user@example.com not found for event seeding");
     if (!host) throw new Error("host@example.com not found for event seeding");
 
-    // 1. Seed EventTemplates
+    // 1. Seed EventTemplates — one per EventCategory, all approved (isPublic: true)
     const templates = [
       {
         id: "seed-template-birthday",
@@ -20,6 +20,17 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         isPublic: true,
         targetCity: "Manila",
         targetState: "Metro Manila",
+        targetCountry: "Philippines",
+      },
+      {
+        id: "seed-template-wedding",
+        ownerId: host.id,
+        name: "Wedding Celebration Package",
+        description: "An elegant and memorable wedding experience for your special day.",
+        category: EventCategory.wedding,
+        isPublic: true,
+        targetCity: "Boracay",
+        targetState: "Aklan",
         targetCountry: "Philippines",
       },
       {
@@ -40,6 +51,17 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         description: "A relaxed and fun setup for social hangouts.",
         category: EventCategory.social,
         isPublic: true,
+        targetCity: "Cebu City",
+        targetState: "Cebu",
+        targetCountry: "Philippines",
+      },
+      {
+        id: "seed-template-other",
+        ownerId: host.id,
+        name: "Custom Event Package",
+        description: "A fully customizable package for any kind of event.",
+        category: EventCategory.other,
+        isPublic: true,
         targetCountry: "Philippines",
       },
     ];
@@ -47,7 +69,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
     for (const t of templates) {
       await prisma.eventTemplate.upsert({
         where: { id: t.id },
-        update: { name: t.name, description: t.description },
+        update: { name: t.name, description: t.description, isPublic: t.isPublic },
         create: t,
       });
     }
@@ -116,7 +138,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         id: "seed-event-wedding-pending",
         clientId: client.id,
         organizerId: host.id,
-        templateId: "seed-template-birthday",
+        templateId: "seed-template-wedding",
         name: "Garcia-Reyes Wedding Reception",
         description: "Elegant wedding reception for 120 guests at a beachfront venue.",
         eventCategory: EventCategory.wedding,
