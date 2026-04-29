@@ -2,7 +2,7 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { seedUsers, seedVenues, seedAssets, seedServices, seedEvents } from "./seeder";
+import { seedUsers, seedVenues, seedAssets, seedServices, seedEvents, seedBookings } from "./seeder";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -25,6 +25,9 @@ async function main() {
 
   // 5. Seed Events (templates + approved events)
   await seedEvents(prisma, users);
+
+  // 6. Seed Bookings (pre-existing confirmed bookings for approved events)
+  await seedBookings(prisma, users);
 
   console.log("Seeding completed successfully!");
 }
