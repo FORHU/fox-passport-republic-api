@@ -49,6 +49,14 @@ export default class EventTemplateSvc {
     }));
   }
 
+  // Lightweight browse for landing page — no price calculation, minimal joins
+  static async getPublicTemplatesLite(filters: { category?: string; limit?: number }) {
+    return EventTemplateRepo.findPublicTemplatesLite({
+      category: filters.category,
+      limit: filters.limit ?? 8,
+    });
+  }
+
   static async getTemplateById(id: string) {
     const template = await EventTemplateRepo.findTemplateById(id);
     if (!template) {

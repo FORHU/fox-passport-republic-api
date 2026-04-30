@@ -22,9 +22,11 @@ export default class ReviewSvc {
     }
 
     static async getListingReviews(listingId: string) {
-        // Since listing can be venue or event, we might need a more complex check or just try both.
-        // For simplicity, let's assume it's venue for now if not specified.
-        return ReviewRepo.getVenueReviews(listingId);
+        return ReviewRepo.getListingReviewsWithDistribution(listingId);
+    }
+
+    static async getRecentActivity(limit: number) {
+        return ReviewRepo.getRecentActivity(limit);
     }
 
     static async getUserReviews(userId: string) {

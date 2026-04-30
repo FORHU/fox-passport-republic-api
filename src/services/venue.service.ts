@@ -79,7 +79,68 @@ export default class VenueSvc {
             throw new Error("Venue has been removed");
         }
 
-        return venue;
+        // Compute inclusions from venue arrays
+        const inclusions = VenueSvc.computeInclusions(venue);
+
+        return { ...venue, inclusions };
+    }
+
+    // Derives a displayable inclusions list from venue's structured arrays
+    private static computeInclusions(venue: {
+        amenities: string[];
+        techAv: string[];
+        staffing: string[];
+    }) {
+        const ICON_MAP: Record<string, string> = {
+            // amenities
+            "air conditioning": "ac_unit",
+            "parking": "local_parking",
+            "restrooms": "wc",
+            "catering kitchen": "soup_kitchen",
+            "pool": "pool",
+            "bar": "local_bar",
+            "elevator": "elevator",
+            "wifi": "wifi",
+            "garden lighting": "light_mode",
+            "bridal suite": "king_bed",
+            // techAv
+            "projector": "videocam",
+            "sound system": "speaker",
+            "microphone": "mic",
+            "bluetooth speaker": "bluetooth_audio",
+            "led walls": "tv",
+            "led screen": "monitor",
+            "full av system": "settings_input_hdmi",
+            "live stream setup": "live_tv",
+            "outdoor screen": "outdoor_garden",
+            // staffing
+            "security": "security",
+            "janitor": "cleaning_services",
+            "gardener": "yard",
+            "concierge": "support_agent",
+            "lifeguard": "pool",
+            "event coordinator": "event",
+            "front desk": "contact_support",
+        };
+
+        const items: { name: string; icon: string; desc: string }[] = [];
+
+        const addItems = (arr: string[], category: string) => {
+            for (const raw of arr) {
+                const key = raw.toLowerCase();
+                items.push({
+                    name: raw.charAt(0).toUpperCase() + raw.slice(1),
+                    icon: ICON_MAP[key] ?? "check_circle",
+                    desc: `${category} included`,
+                });
+            }
+        };
+
+        addItems(venue.amenities, "Amenity");
+        addItems(venue.techAv, "Tech & AV");
+        addItems(venue.staffing, "Staffing");
+
+        return items;
     }
 
     static async getVenueByIdForHost(id: string, hostId: string) {

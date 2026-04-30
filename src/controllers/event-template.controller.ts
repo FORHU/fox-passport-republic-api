@@ -70,13 +70,13 @@ export default class EventTemplateCtrl {
     }
   }
 
-  // Public — no auth required, only approved (isPublic) templates
+  // Public — no auth required, lightweight query for landing page cards
   static async browsePublic(req: Request, res: Response) {
     try {
-      const { category } = req.query;
-      const templates = await EventTemplateSvc.getTemplates({
-        isPublic: true,
+      const { category, limit } = req.query;
+      const templates = await EventTemplateSvc.getPublicTemplatesLite({
         category: category as string | undefined,
+        limit: limit ? Math.min(Number(limit), 20) : 8,
       });
       return res.status(200).json({ success: true, data: templates });
     } catch (error: any) {

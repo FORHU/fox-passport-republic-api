@@ -80,7 +80,42 @@ export async function seedUsers(prisma: PrismaClient) {
         state: "Metro Manila",
         country: "Philippines",
       },
+      // ── Foxer Personas (replacing hardcoded data/foxers.ts) ───────────────
+      {
+        email: "jasmine.reyes@foxers.ph",
+        password: "Foxer123!",
+        name: "Jasmine Reyes",
+        username: "jasmine_reyes",
+        systemRole: "user",
+        roleType: ["foxerService"],
+        city: "Taguig",
+        state: "Metro Manila",
+        country: "Philippines",
+      },
+      {
+        email: "marco.santos@foxers.ph",
+        password: "Foxer123!",
+        name: "Marco Santos",
+        username: "marco_santos",
+        systemRole: "user",
+        roleType: ["foxerService"],
+        city: "Makati",
+        state: "Metro Manila",
+        country: "Philippines",
+      },
+      {
+        email: "sarah.lim@foxers.ph",
+        password: "Foxer123!",
+        name: "Sarah Lim",
+        username: "sarah_lim",
+        systemRole: "user",
+        roleType: ["foxerService"],
+        city: "Cebu City",
+        state: "Cebu",
+        country: "Philippines",
+      },
     ];
+
 
     const seededUsers = [];
 
