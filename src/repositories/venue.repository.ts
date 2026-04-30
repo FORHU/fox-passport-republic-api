@@ -39,7 +39,18 @@ export default class VenueRepo {
   static async findVenueById(id: string) {
     return prisma.venue.findUnique({
       where: { id },
-      include: { images: true },
+      include: {
+        images: true,
+        host: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            imgId: true,
+            createdAt: true,
+          },
+        },
+      },
     });
   }
 

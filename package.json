@@ -45,9 +45,10 @@
         "redis": "^4.7.1",
         "socket.io": "^4.7.2",
         "sockets": "^0.4.2",
+        "stripe": "^18.0.0",
+        "tsx": "^4.21.0",
         "uuid": "^13.0.0",
-        "winston": "^3.11.0",
-        "stripe": "^18.0.0"
+        "winston": "^3.11.0"
     },
     "prisma": {
         "seed": "npx tsx prisma/seed.ts"
