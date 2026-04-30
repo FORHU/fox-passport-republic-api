@@ -37,8 +37,18 @@ export default class ReviewCtrl {
     static async getListingReviews(req: Request, res: Response) {
         try {
             const { listingId } = req.params;
-            const reviews = await ReviewSvc.getListingReviews(listingId);
-            return res.status(200).json({ success: true, data: reviews });
+            const result = await ReviewSvc.getListingReviews(listingId);
+            return res.status(200).json({ success: true, data: result });
+        } catch (error: any) {
+            return res.status(500).json({ success: false, message: error.message });
+        }
+    }
+
+    static async getActivity(req: Request, res: Response) {
+        try {
+            const limit = Math.min(Number(req.query.limit) || 10, 20);
+            const activity = await ReviewSvc.getRecentActivity(limit);
+            return res.status(200).json({ success: true, data: activity });
         } catch (error: any) {
             return res.status(500).json({ success: false, message: error.message });
         }

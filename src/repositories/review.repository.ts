@@ -1,33 +1,55 @@
 import { prisma } from "../utils/prisma";
 
+const USER_SELECT = {
+  select: { id: true, name: true, imgId: true },
+} as const;
+
 export default class ReviewRepo {
     // READ ALL
     static async getAllReviews() {
         return prisma.review.findMany({
-            include: {
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                    }
-                }
-            },
-            orderBy: { createdAt: "desc" }
+            include: { user: USER_SELECT },
+            orderBy: { createdAt: "desc" },
         });
+    }
+
+    // RECENT ACTIVITY — latest public reviews across all entities (landing page feed)
+    static async getRecentActivity(limit = 10) {
+        return prisma.review.findMany({
+            include: { user: USER_SELECT },
+            orderBy: { createdAt: "desc" },
+            take: limit,
+        });
+    }
+
+    // LISTING REVIEWS + rating distribution
+    static async getListingReviewsWithDistribution(entityId: string) {
+        const reviews = await prisma.review.findMany({
+            where: { entityId: String(entityId) },
+            include: { user: USER_SELECT },
+            orderBy: { createdAt: "desc" },
+        });
+
+        // Compute rating distribution as percentages
+        const total = reviews.length;
+        const counts: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+        for (const r of reviews) {
+            const star = Math.min(5, Math.max(1, Math.round(r.rating)));
+            counts[star] = (counts[star] || 0) + 1;
+        }
+        const ratingDistribution: Record<number, string> = {};
+        for (const star of [5, 4, 3, 2, 1]) {
+            ratingDistribution[star] = total > 0 ? `${Math.round((counts[star] / total) * 100)}%` : "0%";
+        }
+
+        return { reviews, ratingDistribution };
     }
 
     // READ ONE
     static async getReviewById(id: string) {
         return prisma.review.findUnique({
             where: { id: String(id) },
-            include: {
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                    }
-                }
-            }
+            include: { user: USER_SELECT },
         });
     }
 
@@ -47,14 +69,7 @@ export default class ReviewRepo {
                 rating: data.rating,
                 comment: data.comment,
             },
-            include: {
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                    }
-                }
-            }
+            include: { user: USER_SELECT },
         });
     }
 
@@ -62,15 +77,8 @@ export default class ReviewRepo {
     static async getVenueReviews(venueId: string) {
         return prisma.review.findMany({
             where: { entityType: "venue", entityId: String(venueId) },
-            include: {
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                    }
-                }
-            },
-            orderBy: { createdAt: "desc" }
+            include: { user: USER_SELECT },
+            orderBy: { createdAt: "desc" },
         });
     }
 
@@ -78,15 +86,8 @@ export default class ReviewRepo {
     static async getEventReviews(eventId: string) {
         return prisma.review.findMany({
             where: { entityType: "event", entityId: String(eventId) },
-            include: {
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                    }
-                }
-            },
-            orderBy: { createdAt: "desc" }
+            include: { user: USER_SELECT },
+            orderBy: { createdAt: "desc" },
         });
     }
 
@@ -94,15 +95,8 @@ export default class ReviewRepo {
     static async getUserReviews(userId: string) {
         return prisma.review.findMany({
             where: { userId: String(userId) },
-            include: {
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                    }
-                }
-            },
-            orderBy: { createdAt: "desc" }
+            include: { user: USER_SELECT },
+            orderBy: { createdAt: "desc" },
         });
     }
 

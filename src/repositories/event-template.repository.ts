@@ -43,6 +43,31 @@ export default class EventTemplateRepo {
     });
   }
 
+  // Lightweight browse for the public landing page — only fetches what cards need
+  static async findPublicTemplatesLite(filters: { category?: string; limit: number }) {
+    return prisma.eventTemplate.findMany({
+      where: {
+        isPublic: true,
+        ...(filters.category && { category: filters.category as any }),
+      },
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        targetCity: true,
+        targetState: true,
+        images: { take: 1, select: { url: true } },
+        templateVenues: {
+          take: 1,
+          select: { venue: { select: { city: true, price: true } } },
+        },
+        owner: { select: { id: true, name: true } },
+      },
+      take: filters.limit,
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
   // FIND BY ID
   static async findTemplateById(id: string) {
     return prisma.eventTemplate.findUnique({
