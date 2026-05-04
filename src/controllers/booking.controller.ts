@@ -15,17 +15,29 @@ export default class BookingCtrl {
                 totalAmount: Joi.number().min(0).required(),
                 startAt: Joi.date().iso().required(),
                 endAt: Joi.date().iso().required(),
+                // IDs of optional template items the client chose to exclude
+                excludedAssetIds: Joi.array().items(Joi.string()).optional(),
+                excludedServiceIds: Joi.array().items(Joi.string()).optional(),
+                excludedVenueIds: Joi.array().items(Joi.string()).optional(),
             });
 
             const { error, value } = schema.validate(req.body);
             if (error) return res.status(400).json({ message: error.message });
 
+            const excludedAssetIds: string[] = value.excludedAssetIds ?? [];
+            const excludedServiceIds: string[] = value.excludedServiceIds ?? [];
+            const excludedVenueIds: string[] = value.excludedVenueIds ?? [];
+
             const template = await prisma.eventTemplate.findUnique({
                 where: { id: value.templateId, isPublic: true },
+                include: {
+                    templateAssets: { include: { asset: { include: { owner: true } } } },
+                    templateServices: { include: { service: { include: { owner: true } } } },
+                    templateVenues: { include: { venue: { include: { host: true } } } },
+                },
             });
             if (!template) return res.status(404).json({ message: "Template not found or not approved" });
 
-            // Create an Event record from the template (already approved)
             const event = await prisma.event.create({
                 data: {
                     templateId: template.id,
@@ -52,6 +64,52 @@ export default class BookingCtrl {
                 guestCount: value.guestCount,
                 totalAmount: value.totalAmount,
             });
+
+            // Create per-partner escrow transactions for all matched template items
+            const assetTxPromises = template.templateAssets
+                .filter(ta => ta.assetId && ta.asset?.ownerId)
+                .map(ta => prisma.eventAssetTransaction.create({
+                    data: {
+                        eventId: event.id,
+                        bookingId: booking.id,
+                        assetId: ta.assetId!,
+                        providerId: ta.asset!.ownerId,
+                        quantity: ta.quantity,
+                        agreedPrice: ta.agreedPrice,
+                        included: !excludedAssetIds.includes(ta.id),
+                        status: "pending",
+                    },
+                }));
+
+            const serviceTxPromises = template.templateServices
+                .filter(ts => ts.serviceId && ts.service?.ownerId)
+                .map(ts => prisma.eventServiceTransaction.create({
+                    data: {
+                        eventId: event.id,
+                        bookingId: booking.id,
+                        serviceId: ts.serviceId!,
+                        providerId: ts.service!.ownerId,
+                        agreedPrice: ts.agreedPrice,
+                        included: !excludedServiceIds.includes(ts.id),
+                        status: "pending",
+                    },
+                }));
+
+            const venueTxPromises = template.templateVenues
+                .filter(tv => tv.venueId && tv.venue?.hostId)
+                .map(tv => prisma.eventVenueTransaction.create({
+                    data: {
+                        eventId: event.id,
+                        bookingId: booking.id,
+                        venueId: tv.venueId!,
+                        providerId: tv.venue!.hostId,
+                        agreedPrice: tv.agreedPrice,
+                        included: !excludedVenueIds.includes(tv.id),
+                        status: "pending",
+                    },
+                }));
+
+            await Promise.all([...assetTxPromises, ...serviceTxPromises, ...venueTxPromises]);
 
             return res.status(201).json({ success: true, data: { booking, eventId: event.id } });
         } catch (error: any) {

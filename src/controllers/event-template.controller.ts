@@ -112,7 +112,9 @@ export default class EventTemplateCtrl {
       quantity: Joi.number().integer().min(1).optional(),
       description: Joi.string().optional(),
       matchedAt: Joi.date().optional(),
-      date: Joi.date().optional()
+      date: Joi.date().optional(),
+      agreedPrice: Joi.number().min(0).optional(),
+      isOptional: Joi.boolean().optional(),
     }).or("assetId", "description");
 
     const { error, value } = schema.validate(req.body);
@@ -121,13 +123,15 @@ export default class EventTemplateCtrl {
     try {
       const ownerId = (req as any).user?.userId;
       const result = await EventTemplateSvc.attachAsset(
-        req.params.id, 
-        ownerId, 
-        value.assetId, 
-        value.quantity, 
-        value.description, 
-        value.matchedAt, 
-        value.date
+        req.params.id,
+        ownerId,
+        value.assetId,
+        value.quantity,
+        value.description,
+        value.matchedAt,
+        value.date,
+        value.agreedPrice,
+        value.isOptional,
       );
       return res.status(200).json({ message: "Asset attached", result });
     } catch (error: any) {
@@ -150,7 +154,9 @@ export default class EventTemplateCtrl {
       serviceId: Joi.string().optional(),
       description: Joi.string().optional(),
       matchedAt: Joi.date().optional(),
-      date: Joi.date().optional()
+      date: Joi.date().optional(),
+      agreedPrice: Joi.number().min(0).optional(),
+      isOptional: Joi.boolean().optional(),
     }).or("serviceId", "description");
 
     const { error, value } = schema.validate(req.body);
@@ -159,12 +165,14 @@ export default class EventTemplateCtrl {
     try {
       const ownerId = (req as any).user?.userId;
       const result = await EventTemplateSvc.attachService(
-        req.params.id, 
-        ownerId, 
-        value.serviceId, 
-        value.description, 
-        value.matchedAt, 
-        value.date
+        req.params.id,
+        ownerId,
+        value.serviceId,
+        value.description,
+        value.matchedAt,
+        value.date,
+        value.agreedPrice,
+        value.isOptional,
       );
       return res.status(200).json({ message: "Service attached", result });
     } catch (error: any) {
@@ -187,7 +195,9 @@ export default class EventTemplateCtrl {
       venueId: Joi.string().optional(),
       description: Joi.string().optional(),
       matchedAt: Joi.date().optional(),
-      date: Joi.date().optional()
+      date: Joi.date().optional(),
+      agreedPrice: Joi.number().min(0).optional(),
+      isOptional: Joi.boolean().optional(),
     }).or("venueId", "description");
 
     const { error, value } = schema.validate(req.body);
@@ -196,12 +206,14 @@ export default class EventTemplateCtrl {
     try {
       const ownerId = (req as any).user?.userId;
       const result = await EventTemplateSvc.attachVenue(
-        req.params.id, 
-        ownerId, 
-        value.venueId, 
-        value.description, 
-        value.matchedAt, 
-        value.date
+        req.params.id,
+        ownerId,
+        value.venueId,
+        value.description,
+        value.matchedAt,
+        value.date,
+        value.agreedPrice,
+        value.isOptional,
       );
       return res.status(200).json({ message: "Venue attached", result });
     } catch (error: any) {
