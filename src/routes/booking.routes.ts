@@ -17,6 +17,7 @@ router.delete("/attendees/:id", authenticate, AttendeeCtrl.removeGuest);
 router.patch("/attendees/:id/respond", optionalAuth, AttendeeCtrl.respondToInvite);
 
 // ========== STANDARD BOOKING CRUD ROUTES ==========
+router.get("/availability", BookingCtrl.getAvailability);   // must be before /:id
 router.get("/", BookingCtrl.getAllBookings);
 router.get("/user/:userId", authenticate, BookingCtrl.getUserBookings);
 router.get("/:id", optionalAuth, BookingCtrl.getBookingById);

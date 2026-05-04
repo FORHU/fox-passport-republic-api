@@ -23,6 +23,8 @@ model User {
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
   bookings            Booking[]
+  serviceBookings     ServiceBooking[]
+  assetBookings       AssetBooking[]
   assetTransactions   EventAssetTransaction[]   @relation("AssetProvider")
   clientEvents        Event[]                   @relation("EventClient")
   organizedEvents     Event[]                   @relation("EventOrganizer")
@@ -243,6 +245,7 @@ model Asset {
   deletedAt      DateTime?
   transactions   EventAssetTransaction[]
   images         File[]
+  bookings       AssetBooking[]
   owner          User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   templateAssets EventTemplateAsset[]
 
@@ -270,6 +273,7 @@ model Service {
   transactions      EventServiceTransaction[]
   images            File[]
   templateServices  EventTemplateService[]
+  bookings          ServiceBooking[]
   owner             User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@map("services")
@@ -547,6 +551,51 @@ model Review {
   @@unique([userId, entityId, entityType])
 }
 
+model ServiceBooking {
+  id                   String            @id @default(uuid())
+  serviceId            String
+  userId               String
+  scheduledDate        DateTime
+  endDate              DateTime?
+  guestCount           Int               @default(1)
+  location             String
+  notes                String?
+  totalAmount          Float
+  status               ItemBookingStatus @default(pending)
+  paymentStatus        PaymentStatus     @default(pending)
+  paymentTransactionId String?
+  paymentMethod        String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  service              Service           @relation(fields: [serviceId], references: [id])
+  user                 User              @relation(fields: [userId], references: [id])
+
+  @@map("service_bookings")
+}
+
+model AssetBooking {
+  id                   String            @id @default(uuid())
+  assetId              String
+  userId               String
+  startDate            DateTime
+  endDate              DateTime
+  quantity             Int               @default(1)
+  fulfillmentType      String            @default("pickup")
+  deliveryAddress      String?
+  notes                String?
+  totalAmount          Float
+  status               ItemBookingStatus @default(pending)
+  paymentStatus        PaymentStatus     @default(pending)
+  paymentTransactionId String?
+  paymentMethod        String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  asset                Asset             @relation(fields: [assetId], references: [id])
+  user                 User              @relation(fields: [userId], references: [id])
+
+  @@map("asset_bookings")
+}
+
 enum MatchConstraint {
   SAME_STATE
   BROADER
@@ -694,3 +743,14 @@ enum InviteStatus {
   accepted
   declined
 }
+
+enum ItemBookingStatus {
+  pending
+  confirmed
+  active
+  completed
+  cancelled
+  disputed
+}
+
+
