@@ -117,6 +117,32 @@ export default class BookingCtrl {
     }
 
     // GET ALL BOOKINGS
+    // GET AVAILABILITY — returns booked dates for a given templateId
+    static async getAvailability(req: Request, res: Response) {
+        try {
+            const { templateId } = req.query;
+            if (!templateId || typeof templateId !== 'string') {
+                return res.status(400).json({ success: false, message: 'templateId is required' });
+            }
+            const events = await prisma.event.findMany({
+                where: { templateId },
+                select: { id: true },
+            });
+            const bookings = await prisma.booking.findMany({
+                where: {
+                    eventId: { in: events.map(e => e.id) },
+                    status: { notIn: ['cancelled'] },
+                    startAt: { gte: new Date() },
+                },
+                select: { startAt: true },
+            });
+            const bookedDates = [...new Set(bookings.map(b => b.startAt.toISOString().split('T')[0]))];
+            return res.status(200).json({ success: true, data: { bookedDates } });
+        } catch (error: any) {
+            return res.status(500).json({ success: false, message: error.message });
+        }
+    }
+
     static async getAllBookings(req: Request, res: Response) {
         try {
             // Simplified filters
