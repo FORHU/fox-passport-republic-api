@@ -20,7 +20,8 @@ import eventRequestRoutes from "./event-request.routes";
 import eventTransactionRoutes from "./event-transaction.routes";
 import matchRoutes from "./match.routes";
 import bookingRoutes from "./booking.routes";
-
+import locationRoutes from "./location.routes";
+import searchRoutes from "./search.routes";
 const router = express.Router();
 
 router.get("/health", (req, res) => {
@@ -61,6 +62,9 @@ router.use("/v1/favorites", favoriteRoutes);
 router.use("/v1/matches", matchRoutes);
 router.use("/v1/bookings", bookingRoutes);
 
+// Search & Location Routes
+router.use("/v1/locations", locationRoutes);
+router.use("/v1/search", searchRoutes);
 // Admin Routes
 router.use("/v1/admin", adminRoutes);
 

@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
 }
 
 datasource db {
@@ -228,7 +229,7 @@ model Passport {
 model Asset {
   id             String                  @id @default(uuid())
   ownerId        String
-  category       String
+  category       AssetCategory
   name           String
   description    String
   quantity       Int                     @default(1)
@@ -249,6 +250,7 @@ model Asset {
   owner          User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   templateAssets EventTemplateAsset[]
 
+  @@index([country, city])
   @@map("assets")
 }
 
@@ -276,13 +278,14 @@ model Service {
   bookings          ServiceBooking[]
   owner             User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
+  @@index([country, city])
   @@map("services")
 }
 
 model Venue {
   id             String                  @id @default(uuid())
   hostId         String
-  category       String
+  category       VenueCategory
   name           String
   description    String
   capacity       Int
@@ -305,6 +308,7 @@ model Venue {
   templateVenues EventTemplateVenue[]
   host           User                    @relation(fields: [hostId], references: [id], onDelete: Cascade)
 
+  @@index([country, city])
   @@map("venues")
 }
 
@@ -326,6 +330,8 @@ model EventTemplate {
   templateAssets   EventTemplateAsset[]
   templateServices EventTemplateService[]
   templateVenues   EventTemplateVenue[]
+
+  @@index([targetCountry, targetCity])
 }
 
 model EventTemplateAsset {
