@@ -10,6 +10,8 @@ import reviewRoutes from "./review.routes";
 import favoriteRoutes from "./favorite.routes";
 import assetRoutes from "./asset.routes";
 import serviceRoutes from "./service.routes";
+import serviceBookingRoutes from "./service-booking.routes";
+import assetBookingRoutes from "./asset-booking.routes";
 import s3Routes from "./s3.routes";
 import fileRoutes from "./file.routes";
 import adminRoutes from "./admin.routes";
@@ -43,6 +45,9 @@ router.use("/v1/venue", venueRoutes); // Singular alias
 router.use("/v1/venue/", venueRoutes); // Singular alias with trailing slash
 router.use("/v1/payments", paymentRoutes);
 router.use("/v1/payments/", paymentRoutes); // Trailing slash alias
+// Booking sub-routes must be registered BEFORE the generic /:id routes
+router.use("/v1/service/bookings", serviceBookingRoutes);
+router.use("/v1/asset/bookings", assetBookingRoutes);
 router.use("/v1/asset", assetRoutes);
 router.use("/v1/service", serviceRoutes);
 router.use("/v1/files", fileRoutes);
