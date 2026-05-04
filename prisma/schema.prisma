@@ -335,6 +335,8 @@ model EventTemplateAsset {
   description     String?
   quantity        Int             @default(1)
   currency        String          @default("PHP")
+  agreedPrice     Float           @default(0)
+  isOptional      Boolean         @default(false)
   date            DateTime?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
@@ -353,6 +355,8 @@ model EventTemplateService {
   serviceId       String?
   description     String?
   currency        String          @default("PHP")
+  agreedPrice     Float           @default(0)
+  isOptional      Boolean         @default(false)
   date            DateTime?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
@@ -371,6 +375,8 @@ model EventTemplateVenue {
   venueId         String?
   description     String?
   currency        String          @default("PHP")
+  agreedPrice     Float           @default(0)
+  isOptional      Boolean         @default(false)
   date            DateTime?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
@@ -420,6 +426,7 @@ model EventAssetTransaction {
   quantity    Int               @default(1)
   status      TransactionStatus @default(pending)
   agreedPrice Float
+  included    Boolean           @default(true)
   currency    String            @default("PHP")
   lockedAt    DateTime?
   releasedAt  DateTime?
@@ -439,6 +446,7 @@ model EventServiceTransaction {
   providerId  String
   status      TransactionStatus @default(pending)
   agreedPrice Float
+  included    Boolean           @default(true)
   currency    String            @default("PHP")
   lockedAt    DateTime?
   releasedAt  DateTime?
@@ -458,6 +466,7 @@ model EventVenueTransaction {
   providerId  String
   status      TransactionStatus @default(pending)
   agreedPrice Float
+  included    Boolean           @default(true)
   currency    String            @default("PHP")
   lockedAt    DateTime?
   releasedAt  DateTime?

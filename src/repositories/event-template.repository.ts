@@ -99,7 +99,7 @@ export default class EventTemplateRepo {
   }
 
   // ASSETS
-  static async attachAsset(templateId: string, assetId?: string, quantity: number = 1, matchData?: any, description?: string, matchedAt?: Date) {
+  static async attachAsset(templateId: string, assetId?: string, quantity: number = 1, matchData?: any, description?: string, matchedAt?: Date, agreedPrice?: number, isOptional?: boolean) {
     return prisma.eventTemplateAsset.create({
       data: {
         templateId,
@@ -107,6 +107,8 @@ export default class EventTemplateRepo {
         quantity,
         description,
         matchedAt,
+        agreedPrice: agreedPrice ?? 0,
+        isOptional: isOptional ?? false,
         ...(matchData || {}),
       },
       include: { asset: true },
@@ -142,13 +144,15 @@ export default class EventTemplateRepo {
   }
 
   // SERVICES
-  static async attachService(templateId: string, serviceId?: string, matchData?: any, description?: string, matchedAt?: Date) {
+  static async attachService(templateId: string, serviceId?: string, matchData?: any, description?: string, matchedAt?: Date, agreedPrice?: number, isOptional?: boolean) {
     return prisma.eventTemplateService.create({
       data: {
         templateId,
         serviceId,
         description,
         matchedAt,
+        agreedPrice: agreedPrice ?? 0,
+        isOptional: isOptional ?? false,
         ...(matchData || {}),
       },
       include: { service: true },
@@ -184,13 +188,15 @@ export default class EventTemplateRepo {
   }
 
   // VENUES
-  static async attachVenue(templateId: string, venueId?: string, matchData?: any, description?: string, matchedAt?: Date) {
+  static async attachVenue(templateId: string, venueId?: string, matchData?: any, description?: string, matchedAt?: Date, agreedPrice?: number, isOptional?: boolean) {
     return prisma.eventTemplateVenue.create({
       data: {
         templateId,
         venueId,
         description,
         matchedAt,
+        agreedPrice: agreedPrice ?? 0,
+        isOptional: isOptional ?? false,
         ...(matchData || {}),
       },
       include: { venue: true },
