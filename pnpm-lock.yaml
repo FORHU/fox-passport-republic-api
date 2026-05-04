@@ -50,6 +50,9 @@ importers:
       cors:
         specifier: ^2.8.5
         version: 2.8.5
+      country-state-city:
+        specifier: ^3.2.1
+        version: 3.2.1
       express:
         specifier: ^4.18.2
         version: 4.22.1
@@ -91,7 +94,7 @@ importers:
         version: 7.0.11
       openai:
         specifier: ^6.6.0
-        version: 6.14.0(ws@8.19.0)
+        version: 6.14.0(ws@8.19.0)(zod@4.4.1)
       pg:
         specifier: ^8.18.0
         version: 8.20.0
@@ -116,6 +119,9 @@ importers:
       winston:
         specifier: ^3.11.0
         version: 3.19.0
+      zod:
+        specifier: ^4.4.1
+        version: 4.4.1
     devDependencies:
       '@types/amqplib':
         specifier: ^0.10.8
@@ -1740,6 +1746,9 @@ packages:
     resolution: {integrity: sha512-KIHbLJqu73RGr/hnbrO9uBeixNGuvSQjul/jdFvS/KFSIH1hWVd1ng7zOHx+YrEfInLG7q4n6GHQ9cDtxv/P6g==}
     engines: {node: '>= 0.10'}
 
+  country-state-city@3.2.1:
+    resolution: {integrity: sha512-kxbanqMc6izjhc/EHkGPCTabSPZ2G6eG4/97akAYHJUN4stzzFEvQPZoF8oXDQ+10gM/O/yUmISCR1ZVxyb6EA==}
+
   create-require@1.1.1:
     resolution: {integrity: sha512-dcKFX3jn0MpIaXjisoRvexIJVEKzaq7z2rZKxf+MSr9TkdmHmsU4m2lcLojrj/FHl8mk5VxMmYA+ftRkP/3oKQ==}
 
@@ -3339,6 +3348,9 @@ packages:
 
   zeptomatch@2.1.0:
     resolution: {integrity: sha512-KiGErG2J0G82LSpniV0CtIzjlJ10E04j02VOudJsPyPwNZgGnRKQy7I1R7GMyg/QswnE4l7ohSGrQbQbjXPPDA==}
+
+  zod@4.4.1:
+    resolution: {integrity: sha512-a6ENMBBGZBsnlSebQ/eKCguSBeGKSf4O7BPnqVPmYGtpBYI7VSqoVqw+QcB7kPRjbqPwhYTpFbVj/RqNz/CT0Q==}
 
 snapshots:
 
@@ -5641,6 +5653,8 @@ snapshots:
       object-assign: 4.1.1
       vary: 1.1.2
 
+  country-state-city@3.2.1: {}
+
   create-require@1.1.1: {}
 
   cross-spawn@7.0.6:
@@ -6533,9 +6547,10 @@ snapshots:
     dependencies:
       fn.name: 1.1.0
 
-  openai@6.14.0(ws@8.19.0):
+  openai@6.14.0(ws@8.19.0)(zod@4.4.1):
     optionalDependencies:
       ws: 8.19.0
+      zod: 4.4.1
 
   optionator@0.9.4:
     dependencies:
@@ -7161,3 +7176,5 @@ snapshots:
     dependencies:
       grammex: 3.1.12
       graphmatch: 1.1.1
+
+  zod@4.4.1: {}

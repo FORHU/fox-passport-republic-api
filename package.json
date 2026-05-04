@@ -27,6 +27,7 @@
         "bcryptjs": "^3.0.3",
         "client": "^0.0.1",
         "cors": "^2.8.5",
+        "country-state-city": "^3.2.1",
         "express": "^4.18.2",
         "express-rate-limit": "^7.1.0",
         "express-session": "^1.18.2",
@@ -48,7 +49,8 @@
         "stripe": "^18.0.0",
         "tsx": "^4.21.0",
         "uuid": "^13.0.0",
-        "winston": "^3.11.0"
+        "winston": "^3.11.0",
+        "zod": "^4.4.1"
     },
     "prisma": {
         "seed": "npx tsx prisma/seed.ts"
