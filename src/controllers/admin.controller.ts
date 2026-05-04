@@ -15,14 +15,40 @@ export default class AdminCtrl {
         totalVenues,
         totalEventTemplates,
         pendingRoleRequests,
-        totalRoleRequests,
+        bookings,
+        serviceBookings,
+        assetBookings,
+        categoryGroups,
       ] = await Promise.all([
         prisma.user.count(),
         prisma.venue.count(),
         prisma.eventTemplate.count(),
         prisma.roleRequest.count({ where: { status: RequestStatus.pending } }),
-        prisma.roleRequest.count(),
+        prisma.booking.findMany({
+          where: { status: { not: 'cancelled' as any } },
+          select: { totalAmount: true, createdAt: true, event: { select: { eventCategory: true } } },
+        }),
+        prisma.serviceBooking.aggregate({ _sum: { totalAmount: true } }),
+        prisma.assetBooking.aggregate({ _sum: { totalAmount: true } }),
+        prisma.event.groupBy({ by: ['eventCategory'], _count: { id: true } }),
       ]);
+
+      const eventRevenue = bookings.reduce((sum, b) => sum + (b.totalAmount ?? 0), 0);
+      const serviceRevenue = serviceBookings._sum.totalAmount ?? 0;
+      const assetRevenue = assetBookings._sum.totalAmount ?? 0;
+      const totalRevenue = eventRevenue + serviceRevenue + assetRevenue;
+      const totalBookings = bookings.length;
+
+      // Bookings per day-of-week (0=Sun … 6=Sat), last 30 days
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const recentBookings = bookings.filter(b => new Date(b.createdAt) >= thirtyDaysAgo);
+      const bookingsByDay = [0, 0, 0, 0, 0, 0, 0]; // Sun-Sat
+      recentBookings.forEach(b => { bookingsByDay[new Date(b.createdAt).getDay()]++; });
+
+      const categoryStats = categoryGroups.map(g => ({
+        category: g.eventCategory,
+        count: g._count.id,
+      }));
 
       return res.status(200).json({
         success: true,
@@ -30,8 +56,11 @@ export default class AdminCtrl {
           totalUsers,
           totalVenues,
           activeEvents: totalEventTemplates,
-          pendingRoleRequests,
-          totalRoleRequests,
+          pendingApprovals: pendingRoleRequests,
+          totalRevenue,
+          totalBookings,
+          bookingsByDay,
+          categoryStats,
         },
       });
     } catch (error: any) {

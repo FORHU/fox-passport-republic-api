@@ -100,11 +100,11 @@ export default class EventTemplateSvc {
     return total;
   }
 
-  static async attachAsset(templateId: string, ownerId: string, assetId?: string, quantity: number = 1, description?: string, matchedAt?: Date, date?: Date) {
+  static async attachAsset(templateId: string, ownerId: string, assetId?: string, quantity: number = 1, description?: string, matchedAt?: Date, date?: Date, agreedPrice?: number, isOptional?: boolean) {
     await this.verifyOwnership(templateId, ownerId);
-    
+
     if (!assetId) {
-      return EventTemplateRepo.attachAsset(templateId, undefined, quantity, undefined, description, matchedAt);
+      return EventTemplateRepo.attachAsset(templateId, undefined, quantity, undefined, description, matchedAt, agreedPrice, isOptional);
     }
 
     const template = await EventTemplateRepo.findTemplateById(templateId);
@@ -113,18 +113,16 @@ export default class EventTemplateSvc {
     const asset = await prisma.asset.findUnique({ where: { id: assetId } });
     if (!asset) throw new Error("Asset not found");
 
-    // Location validation for immediate match
     if (asset.state !== template.targetState || asset.country !== template.targetCountry) {
       throw new Error("Asset location mismatch. Please use matching search or override.");
     }
 
-    // Conditional Validation Rule
     this.validateMatchData(true, description, matchedAt);
 
     return EventTemplateRepo.attachAsset(templateId, assetId, quantity, {
       matched: true,
       matchConstraint: MatchConstraint.SAME_STATE
-    }, description, matchedAt);
+    }, description, matchedAt, agreedPrice, isOptional);
   }
 
   static async removeAsset(templateId: string, ownerId: string, assetId: string) {
@@ -133,11 +131,11 @@ export default class EventTemplateSvc {
     return { message: "Asset removed from template" };
   }
 
-  static async attachService(templateId: string, ownerId: string, serviceId?: string, description?: string, matchedAt?: Date, date?: Date) {
+  static async attachService(templateId: string, ownerId: string, serviceId?: string, description?: string, matchedAt?: Date, date?: Date, agreedPrice?: number, isOptional?: boolean) {
     await this.verifyOwnership(templateId, ownerId);
-    
+
     if (!serviceId) {
-      return EventTemplateRepo.attachService(templateId, undefined, undefined, description, matchedAt);
+      return EventTemplateRepo.attachService(templateId, undefined, undefined, description, matchedAt, agreedPrice, isOptional);
     }
 
     const template = await EventTemplateRepo.findTemplateById(templateId);
@@ -146,18 +144,16 @@ export default class EventTemplateSvc {
     const service = await prisma.service.findUnique({ where: { id: serviceId } });
     if (!service) throw new Error("Service not found");
 
-    // Location validation for immediate match
     if (service.state !== template.targetState || service.country !== template.targetCountry) {
       throw new Error("Service location mismatch. Please use matching search or override.");
     }
 
-    // Conditional Validation Rule
     this.validateMatchData(true, description, matchedAt);
 
     return EventTemplateRepo.attachService(templateId, serviceId, {
       matched: true,
       matchConstraint: MatchConstraint.SAME_STATE
-    }, description, matchedAt);
+    }, description, matchedAt, agreedPrice, isOptional);
   }
 
   static async removeService(templateId: string, ownerId: string, serviceId: string) {
@@ -166,11 +162,11 @@ export default class EventTemplateSvc {
     return { message: "Service removed from template" };
   }
 
-  static async attachVenue(templateId: string, ownerId: string, venueId?: string, description?: string, matchedAt?: Date, date?: Date) {
+  static async attachVenue(templateId: string, ownerId: string, venueId?: string, description?: string, matchedAt?: Date, date?: Date, agreedPrice?: number, isOptional?: boolean) {
     await this.verifyOwnership(templateId, ownerId);
-    
+
     if (!venueId) {
-      return EventTemplateRepo.attachVenue(templateId, undefined as any, undefined, description, matchedAt);
+      return EventTemplateRepo.attachVenue(templateId, undefined as any, undefined, description, matchedAt, agreedPrice, isOptional);
     }
 
     const template = await EventTemplateRepo.findTemplateById(templateId);
@@ -179,18 +175,16 @@ export default class EventTemplateSvc {
     const venue = await prisma.venue.findUnique({ where: { id: venueId } });
     if (!venue) throw new Error("Venue not found");
 
-    // Default matching logic for immediate attachment
     if (venue.state !== template.targetState || venue.country !== template.targetCountry) {
       throw new Error("Venue location mismatch. Please use the Matching Search to find compatible venues or override the constraint.");
     }
 
-    // Conditional Validation Rule
     this.validateMatchData(true, description, matchedAt);
 
     return EventTemplateRepo.attachVenue(templateId, venueId, {
       matched: true,
       matchConstraint: MatchConstraint.SAME_STATE
-    }, description, matchedAt);
+    }, description, matchedAt, agreedPrice, isOptional);
   }
 
   static async removeVenue(templateId: string, ownerId: string, venueId: string) {
