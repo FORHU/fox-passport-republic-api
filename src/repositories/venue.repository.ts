@@ -58,7 +58,12 @@ export default class VenueRepo {
     return prisma.venue.findMany({
       where: {
         ...(filters?.hostId ? { hostId: filters.hostId } : {}),
-        status: filters?.status ?? VenueStatus.available,
+        // Public browse (no hostId) → only available venues by default
+        // Host viewing own venues (with hostId) → all statuses unless a specific status is passed
+        ...(filters?.hostId
+          ? (filters?.status ? { status: filters.status } : {})
+          : { status: filters?.status ?? VenueStatus.available }
+        ),
       },
       orderBy: { createdAt: "desc" },
       include: { host: hostSelect, images: true },

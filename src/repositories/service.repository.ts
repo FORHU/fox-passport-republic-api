@@ -11,7 +11,7 @@ export default class ServiceRepo {
       where: {
         ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
         ...(filters?.category && { category: filters.category }),
-        status: ServiceStatus.available,
+        ...(filters?.ownerId ? {} : { status: ServiceStatus.available }),
         deletedAt: null,
       },
       include: {

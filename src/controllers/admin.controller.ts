@@ -138,6 +138,15 @@ export default class AdminCtrl {
     }
   }
 
+  static async getAllAssets(req: Request, res: Response) {
+    try {
+      const assets = await AssetRepo.findAllAssetsAdmin({});
+      return res.status(200).json({ success: true, data: assets });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
   // ─── SERVICES ─────────────────────────────────────────────────────────────
 
   static async getPendingServices(req: Request, res: Response) {
@@ -170,6 +179,15 @@ export default class AdminCtrl {
       return res.status(200).json({ success: true, data: service });
     } catch (error: any) {
       return res.status(404).json({ success: false, message: error.message });
+    }
+  }
+
+  static async getAllServices(req: Request, res: Response) {
+    try {
+      const services = await ServiceRepo.getAllServicesAdmin({});
+      return res.status(200).json({ success: true, data: services });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
