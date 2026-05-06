@@ -13,11 +13,13 @@ router.patch("/venues/:id/approve", authenticate, requireAdmin, AdminCtrl.approv
 router.patch("/venues/:id/reject", authenticate, requireAdmin, AdminCtrl.rejectVenue);
 
 // Assets (equipment)
+router.get("/assets", authenticate, requireAdmin, AdminCtrl.getAllAssets);
 router.get("/assets/pending", authenticate, requireAdmin, AdminCtrl.getPendingAssets);
 router.patch("/assets/:id/approve", authenticate, requireAdmin, AdminCtrl.approveAsset);
 router.patch("/assets/:id/reject", authenticate, requireAdmin, AdminCtrl.rejectAsset);
 
 // Services
+router.get("/services", authenticate, requireAdmin, AdminCtrl.getAllServices);
 router.get("/services/pending", authenticate, requireAdmin, AdminCtrl.getPendingServices);
 router.patch("/services/:id/approve", authenticate, requireAdmin, AdminCtrl.approveService);
 router.patch("/services/:id/reject", authenticate, requireAdmin, AdminCtrl.rejectService);

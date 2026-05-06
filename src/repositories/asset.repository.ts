@@ -8,7 +8,7 @@ export default class AssetRepo {
       where: {
         ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
         ...(filters?.category && { category: filters.category as any }),
-        status: AssetStatus.available,
+        ...(filters?.ownerId ? {} : { status: AssetStatus.available }),
         deletedAt: null,
       },
       include: {
