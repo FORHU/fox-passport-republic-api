@@ -14,12 +14,17 @@ const app = express();
 app.set("trust proxy", 1);
 
 // CORS configuration - allow both localhost ports and production origin
+const extraOrigins = (process.env.FRONTEND_URL || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
   "http://localhost:3002",
-  process.env.FRONTEND_URL || "",
-].filter(Boolean);
+  ...extraOrigins,
+];
 
 app.use(
   cors({
