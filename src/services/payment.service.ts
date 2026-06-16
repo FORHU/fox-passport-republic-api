@@ -125,8 +125,14 @@ export default class PaymentSvc {
             await prisma.booking.update({ where: { id: updated.bookingId }, data: { status: "confirmed" } });
         }
 
+        // Full payment means the citizen has paid in full — it does NOT mean the event
+        // has happened yet. Mirrors AssetBooking/ServiceBooking's confirmPayment, which
+        // also lands on "confirmed": confirmArrival ("confirmed"/"pending" -> "active")
+        // and updateStatus(completed) (-> "completed", which triggers provider payouts)
+        // happen afterward, never automatically on payment. See
+        // docs/adr/0002-stripe-connect-payouts.md ("Payout timing: on status -> completed").
         if (data.paymentStatus === PaymentStatus.completed && updated.paymentType === "full") {
-            await prisma.booking.update({ where: { id: updated.bookingId }, data: { status: "completed" } });
+            await prisma.booking.update({ where: { id: updated.bookingId }, data: { status: "confirmed" } });
         }
 
         return updated;
@@ -137,11 +143,10 @@ export default class PaymentSvc {
         const booking = await BookingRepo.findById(bookingId);
         if (!booking) throw new Error("Booking not found");
 
-        const totalAgreed = [
-            ...(booking.assetTransactions || []),
-            ...(booking.serviceTransactions || []),
-            ...(booking.venueTransactions || [])
-        ].reduce((sum: number, t: any) => sum + (t.agreedPrice || 0), 0);
+        // Use the server-computed, trustworthy Event.totalAmount (itemsTotal +
+        // hostMarkupAmount + platformFeeAmount) rather than re-summing only the item
+        // transactions — re-summing silently excluded Host markup and platform fee.
+        const totalAgreed = (booking as any).event?.totalAmount ?? 0;
 
         const paidAmount = (booking.payments || [])
             .filter((p: any) => p.status === PaymentStatus.completed)

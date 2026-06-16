@@ -7,41 +7,46 @@ datasource db {
 }
 
 model User {
-  id                  String                    @id @default(uuid())
-  email               String                    @unique
-  password            String
-  name                String
-  address             String?
-  city                String?
-  state               String?
-  country             String?                   @default("Philippines")
-  username            String?                   @unique
-  phone               String?
-  imgId               String?
-  systemRole          SystemRole                @default(user)
-  roleType            RoleType[]
-  createdAt           DateTime                  @default(now())
-  updatedAt           DateTime                  @updatedAt
-  bookings            Booking[]
-  serviceBookings     ServiceBooking[]
-  assetBookings       AssetBooking[]
-  assetTransactions   EventAssetTransaction[]   @relation("AssetProvider")
-  clientEvents        Event[]                   @relation("EventClient")
-  organizedEvents     Event[]                   @relation("EventOrganizer")
-  serviceTransactions EventServiceTransaction[] @relation("ServiceProvider")
-  eventTemplates      EventTemplate[]
-  venueTransactions   EventVenueTransaction[]   @relation("VenueProvider")
-  favorites           Favorite[]
-  files               File[]
-  passport            Passport?
-  reviews             Review[]
-  assets              Asset[]
-  reviewsGiven        RoleRequest[]             @relation("Reviewer")
-  roleRequests        RoleRequest[]             @relation("Applicant")
-  services            Service[]
-  venues              Venue[]
-  bookingAttendees    BookingAttendee[]
-  invitedAttendees    BookingAttendee[]         @relation("Inviter")
+  id                       String                    @id @default(uuid())
+  email                    String                    @unique
+  password                 String
+  name                     String
+  address                  String?
+  city                     String?
+  state                    String?
+  country                  String?                   @default("Philippines")
+  username                 String?                   @unique
+  phone                    String?
+  imgId                    String?
+  systemRole               SystemRole                @default(user)
+  roleType                 RoleType[]
+  stripeAccountId          String?                   @unique
+  stripeOnboardingComplete Boolean                   @default(false)
+  stripeChargesEnabled     Boolean                   @default(false)
+  stripePayoutsEnabled     Boolean                   @default(false)
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  bookings                 Booking[]
+  payoutsReceived          Payout[]                  @relation("PayoutRecipient")
+  serviceBookings          ServiceBooking[]
+  assetBookings            AssetBooking[]
+  assetTransactions        EventAssetTransaction[]   @relation("AssetProvider")
+  clientEvents             Event[]                   @relation("EventClient")
+  organizedEvents          Event[]                   @relation("EventOrganizer")
+  serviceTransactions      EventServiceTransaction[] @relation("ServiceProvider")
+  eventTemplates           EventTemplate[]
+  venueTransactions        EventVenueTransaction[]   @relation("VenueProvider")
+  favorites                Favorite[]
+  files                    File[]
+  passport                 Passport?
+  reviews                  Review[]
+  assets                   Asset[]
+  reviewsGiven             RoleRequest[]             @relation("Reviewer")
+  roleRequests             RoleRequest[]             @relation("Applicant")
+  services                 Service[]
+  venues                   Venue[]
+  bookingAttendees         BookingAttendee[]
+  invitedAttendees         BookingAttendee[]         @relation("Inviter")
 }
 
 model RoleRequest {
@@ -281,7 +286,7 @@ model Service {
 
 model Venue {
   id             String                  @id @default(uuid())
-  hostId         String
+  mayorId        String
   category       String
   name           String
   description    String
@@ -303,29 +308,30 @@ model Venue {
   transactions   EventVenueTransaction[]
   images         File[]
   templateVenues EventTemplateVenue[]
-  host           User                    @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  mayor          User                    @relation(fields: [mayorId], references: [id], onDelete: Cascade)
 
   @@map("venues")
 }
 
 model EventTemplate {
-  id               String                 @id @default(uuid())
-  ownerId          String
-  name             String
-  description      String
-  category         EventCategory
-  isPublic         Boolean                @default(false)
-  targetCity       String?
-  targetState      String?
-  targetCountry    String?                @default("Philippines")
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
-  events           Event[]
-  images           File[]
-  owner            User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  templateAssets   EventTemplateAsset[]
-  templateServices EventTemplateService[]
-  templateVenues   EventTemplateVenue[]
+  id                String                 @id @default(uuid())
+  ownerId           String
+  name              String
+  description       String
+  category          EventCategory
+  isPublic          Boolean                @default(false)
+  targetCity        String?
+  targetState       String?
+  targetCountry     String?                @default("Philippines")
+  hostMarkupPercent Float                  @default(0)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  events            Event[]
+  images            File[]
+  owner             User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  templateAssets    EventTemplateAsset[]
+  templateServices  EventTemplateService[]
+  templateVenues    EventTemplateVenue[]
 }
 
 model EventTemplateAsset {
@@ -401,6 +407,9 @@ model Event {
   endAt               DateTime
   guestCount          Int
   totalAmount         Float
+  itemsTotal          Float                     @default(0)
+  hostMarkupAmount    Float                     @default(0)
+  platformFeeAmount   Float                     @default(0)
   eventStatus         EventStatus               @default(pending)
   requestStatus       RequestStatus             @default(pending)
   targetCity          String?
@@ -484,7 +493,7 @@ model Booking {
   userId              String
   guestCount          Int
   totalAmount         Float
-  status              BookingStatus             @default(pending)
+  status              ItemBookingStatus         @default(pending)
   startAt             DateTime
   endAt               DateTime
   expiresAt           DateTime?
@@ -570,6 +579,7 @@ model ServiceBooking {
   location             String
   notes                String?
   totalAmount          Float
+  platformFeeAmount    Float             @default(0)
   status               ItemBookingStatus @default(pending)
   paymentStatus        PaymentStatus     @default(pending)
   paymentTransactionId String?
@@ -593,6 +603,7 @@ model AssetBooking {
   deliveryAddress      String?
   notes                String?
   totalAmount          Float
+  platformFeeAmount    Float             @default(0)
   status               ItemBookingStatus @default(pending)
   paymentStatus        PaymentStatus     @default(pending)
   paymentTransactionId String?
@@ -603,6 +614,33 @@ model AssetBooking {
   user                 User              @relation(fields: [userId], references: [id])
 
   @@map("asset_bookings")
+}
+
+model Payout {
+  id               String       @id @default(uuid())
+  recipientId      String
+  role             RoleType
+  sourceType       String // "assetBooking" | "serviceBooking" | "booking"
+  sourceId         String
+  amount           Float
+  currency         String       @default("PHP")
+  stripeTransferId String?
+  status           PayoutStatus @default(pending)
+  failureReason    String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  recipient        User         @relation("PayoutRecipient", fields: [recipientId], references: [id])
+
+  @@unique([sourceType, sourceId, recipientId, role])
+  @@index([sourceType, sourceId])
+  @@index([recipientId])
+  @@map("payouts")
+}
+
+enum PayoutStatus {
+  pending
+  paid
+  failed
 }
 
 enum MatchConstraint {
@@ -761,5 +799,3 @@ enum ItemBookingStatus {
   cancelled
   disputed
 }
-
-

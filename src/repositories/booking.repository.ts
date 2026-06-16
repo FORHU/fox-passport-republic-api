@@ -1,5 +1,5 @@
 import { prisma } from "../utils/prisma";
-import { Prisma } from "@prisma/client";
+import { Prisma, ItemBookingStatus } from "@prisma/client";
 
 export default class BookingRepo {
     static async create(data: Prisma.BookingCreateInput) {
@@ -112,6 +112,31 @@ export default class BookingRepo {
             include: {
                 event: true
             }
+        });
+    }
+
+    // Mirrors asset-booking.repository.ts's updateStatus/confirmArrival/dispute exactly.
+    static async updateStatus(id: string, status: ItemBookingStatus) {
+        return prisma.booking.update({
+            where: { id },
+            data: { status },
+            include: { event: true, user: { select: { id: true, name: true, email: true } } }
+        });
+    }
+
+    static async confirmArrival(id: string) {
+        return prisma.booking.update({
+            where: { id },
+            data: { status: ItemBookingStatus.active },
+            include: { event: true, user: { select: { id: true, name: true, email: true } } }
+        });
+    }
+
+    static async dispute(id: string) {
+        return prisma.booking.update({
+            where: { id },
+            data: { status: ItemBookingStatus.disputed },
+            include: { event: true, user: { select: { id: true, name: true, email: true } } }
         });
     }
 }
