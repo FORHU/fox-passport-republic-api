@@ -12,7 +12,7 @@ export default class ServiceBookingCtrl {
       guestCount: Joi.number().integer().min(1).optional(),
       location: Joi.string().required(),
       notes: Joi.string().allow("").optional(),
-      totalAmount: Joi.number().min(0).required(),
+      // NOTE: totalAmount intentionally not accepted — always server-computed.
     });
 
     const { error, value } = schema.validate(req.body);

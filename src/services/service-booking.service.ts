@@ -1,6 +1,9 @@
 import ServiceBookingRepo from "../repositories/service-booking.repository";
 import { prisma } from "../utils/prisma";
 import { ItemBookingStatus } from "@prisma/client";
+import { calculateItemsTotal } from "../utils/pricing";
+import { PLATFORM_FEE_PERCENT } from "../config";
+import PayoutSvc from "./payout.service";
 
 export default class ServiceBookingSvc {
   static async getAvailability(serviceId: string) {
@@ -10,6 +13,9 @@ export default class ServiceBookingSvc {
     return { bookedDates };
   }
 
+  // NOTE: totalAmount is never accepted from the client — always computed
+  // server-side from the service's own price/billingRate. See
+  // docs/adr/0001-host-markup-and-server-computed-event-total.md
   static async create(data: {
     serviceId: string;
     userId: string;
@@ -18,20 +24,33 @@ export default class ServiceBookingSvc {
     guestCount?: number;
     location: string;
     notes?: string;
-    totalAmount: number;
   }) {
     const service = await prisma.service.findUnique({ where: { id: data.serviceId } });
     if (!service || service.deletedAt) throw new Error("Service not found or unavailable");
 
+    const scheduledDate = new Date(data.scheduledDate);
+    const endDate = data.endDate ? new Date(data.endDate) : scheduledDate;
+
+    const itemsTotal = calculateItemsTotal({
+      price: service.price,
+      quantity: 1,
+      startDate: scheduledDate,
+      endDate,
+      billingRate: service.billingRate,
+    });
+    const platformFeeAmount = itemsTotal * (PLATFORM_FEE_PERCENT / 100);
+    const totalAmount = itemsTotal + platformFeeAmount;
+
     return ServiceBookingRepo.create({
       serviceId: data.serviceId,
       userId: data.userId,
-      scheduledDate: new Date(data.scheduledDate),
-      endDate: data.endDate ? new Date(data.endDate) : undefined,
+      scheduledDate,
+      endDate: data.endDate ? endDate : undefined,
       guestCount: data.guestCount,
       location: data.location,
       notes: data.notes,
-      totalAmount: data.totalAmount,
+      totalAmount,
+      platformFeeAmount,
     });
   }
 
@@ -66,7 +85,17 @@ export default class ServiceBookingSvc {
     const isBooker = booking.userId === requesterId;
     if (!isOwner && !isBooker) throw new Error("Unauthorized");
 
-    return ServiceBookingRepo.updateStatus(id, status as ItemBookingStatus);
+    const updated = await ServiceBookingRepo.updateStatus(id, status as ItemBookingStatus);
+
+    if (status === ItemBookingStatus.completed) {
+      try {
+        await PayoutSvc.createPayoutsForServiceBooking(id);
+      } catch (err) {
+        console.error(`Payout failed for service booking ${id}`, err);
+      }
+    }
+
+    return updated;
   }
 
   static async cancel(id: string, requesterId: string) {

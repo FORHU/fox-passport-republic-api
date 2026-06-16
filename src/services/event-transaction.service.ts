@@ -73,7 +73,7 @@ export default class EventTransactionSvc {
           eventId,
           bookingId,
           venueId: item.venueId!,
-          providerId: item.venue.hostId,
+          providerId: item.venue.mayorId,
           agreedPrice: item.venue.price,
           currency: item.currency,
         }));

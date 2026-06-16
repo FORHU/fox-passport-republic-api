@@ -8,7 +8,7 @@ export async function seedVenues(prisma: PrismaClient, users: any[]) {
 
     const venues = [
       {
-        hostId: host.id,
+        mayorId: host.id,
         name: "Grand Palace Hall",
         description: "A luxury hall for large events and grand celebrations.",
         category: VenueCategory.indoor,
@@ -27,7 +27,7 @@ export async function seedVenues(prisma: PrismaClient, users: any[]) {
         policies: ["no smoking", "no outside food", "venue hours 6am-12am"],
       },
       {
-        hostId: host.id,
+        mayorId: host.id,
         name: "Garden Gazebo",
         description: "A beautiful outdoor garden space perfect for intimate gatherings.",
         category: VenueCategory.garden,
@@ -46,7 +46,7 @@ export async function seedVenues(prisma: PrismaClient, users: any[]) {
         policies: ["no smoking", "venue hours 7am-10pm"],
       },
       {
-        hostId: host.id,
+        mayorId: host.id,
         name: "Boracay Beach Resort",
         description: "Stunning beachfront venue with panoramic ocean views.",
         category: VenueCategory.beach_resort,
@@ -65,7 +65,7 @@ export async function seedVenues(prisma: PrismaClient, users: any[]) {
         policies: ["no glass on beach", "no smoking in rooms"],
       },
       {
-        hostId: host.id,
+        mayorId: host.id,
         name: "The Loft BGC",
         description: "Trendy rooftop loft in the heart of Bonifacio Global City.",
         category: VenueCategory.indoor,
@@ -85,7 +85,7 @@ export async function seedVenues(prisma: PrismaClient, users: any[]) {
       },
       // ── Pending (awaiting admin approval) ──────────────────────────────────
       {
-        hostId: host.id,
+        mayorId: host.id,
         name: "Casa Veranda Tagaytay",
         description: "Scenic hillside events venue overlooking Taal Lake.",
         category: VenueCategory.outdoor,
@@ -104,7 +104,7 @@ export async function seedVenues(prisma: PrismaClient, users: any[]) {
         policies: ["no confetti", "venue hours 8am-10pm"],
       },
       {
-        hostId: host.id,
+        mayorId: host.id,
         name: "Skyline Function Hall Cebu",
         description: "Modern events hall with panoramic city views in Cebu Business Park.",
         category: VenueCategory.indoor,

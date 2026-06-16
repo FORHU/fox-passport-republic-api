@@ -2,8 +2,9 @@ import BookingRepo from "../repositories/booking.repository";
 import EventRequestRepo from "../repositories/event-request.repository";
 import PaymentSvc from "./payment.service";
 import PaymentRepo from "../repositories/payment.repository";
+import PayoutSvc from "./payout.service";
 import crypto from "crypto";
-import { BookingStatus, PaymentType } from "@prisma/client";
+import { BookingStatus, PaymentType, ItemBookingStatus } from "@prisma/client";
 
 export default class BookingSvc {
     static async createBooking(data: any) {
@@ -136,5 +137,50 @@ export default class BookingSvc {
 
     static async getUserBookings(userId: string) {
         return BookingRepo.findByUserId(userId);
+    }
+
+    // Mirrors asset-booking.service.ts's updateStatus/confirmArrival/dispute exactly,
+    // giving the Event-flow Booking the same active/disputed lifecycle. This is also
+    // the payout trigger point — see docs/adr/0002-stripe-connect-payouts.md.
+    static async updateStatus(id: string, status: string, requesterId: string) {
+        const booking = await BookingRepo.findById(id);
+        if (!booking) throw new Error("Booking not found");
+
+        const isOwner = booking.userId === requesterId;
+        const isOrganizer = (booking.event as any)?.organizerId === requesterId;
+        if (!isOwner && !isOrganizer) throw new Error("Unauthorized");
+
+        const updated = await BookingRepo.updateStatus(id, status as ItemBookingStatus);
+
+        if (status === ItemBookingStatus.completed) {
+            // Payout failures must never fail the status-update response — log and move on.
+            try {
+                await PayoutSvc.createPayoutsForEventBooking(id);
+            } catch (err) {
+                console.error(`Payout failed for booking ${id}`, err);
+            }
+        }
+
+        return updated;
+    }
+
+    static async confirmArrival(id: string, requesterId: string) {
+        const booking = await BookingRepo.findById(id);
+        if (!booking) throw new Error("Booking not found");
+        if (booking.userId !== requesterId) throw new Error("Only the client can confirm arrival");
+        if (!["confirmed", "pending"].includes(booking.status)) {
+            throw new Error("Booking cannot be confirmed at this stage");
+        }
+        return BookingRepo.confirmArrival(id);
+    }
+
+    static async dispute(id: string, requesterId: string) {
+        const booking = await BookingRepo.findById(id);
+        if (!booking) throw new Error("Booking not found");
+        if (booking.userId !== requesterId) throw new Error("Only the client can report a dispute");
+        if (["completed", "cancelled", "disputed"].includes(booking.status)) {
+            throw new Error("Booking cannot be disputed at this stage");
+        }
+        return BookingRepo.dispute(id);
     }
 }

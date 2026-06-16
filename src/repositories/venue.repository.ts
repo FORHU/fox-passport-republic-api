@@ -1,11 +1,11 @@
 import { prisma } from "../utils/prisma";
 import { VenueStatus, BillingRate, VenueCategory } from "@prisma/client";
 
-const hostSelect = { select: { id: true, name: true, email: true } } as const;
+const mayorSelect = { select: { id: true, name: true, email: true } } as const;
 
 export default class VenueRepo {
   static async createVenue(data: {
-    hostId: string;
+    mayorId: string;
     name: string;
     description: string;
     category: VenueCategory;
@@ -32,7 +32,7 @@ export default class VenueRepo {
           images: { connect: imgIds.map((id) => ({ id })) },
         }),
       },
-      include: { host: hostSelect, images: true },
+      include: { mayor: mayorSelect, images: true },
     });
   }
 
@@ -41,7 +41,7 @@ export default class VenueRepo {
       where: { id },
       include: {
         images: true,
-        host: {
+        mayor: {
           select: {
             id: true,
             name: true,
@@ -54,37 +54,43 @@ export default class VenueRepo {
     });
   }
 
-  static async findAllVenues(filters?: { hostId?: string; status?: VenueStatus }) {
+  // NOTE: `hostId` is accepted as a deprecated alias for `mayorId` so the frontend's
+  // existing `?hostId=` query param keeps working unmodified during the transition
+  // (Venues are created by Mayors, not Hosts — `hostId` was a naming holdover. See
+  // CONTEXT.md "Mayor"). Remove the alias once the frontend is updated to send `mayorId`.
+  static async findAllVenues(filters?: { mayorId?: string; hostId?: string; status?: VenueStatus }) {
+    const mayorId = filters?.mayorId ?? filters?.hostId;
     return prisma.venue.findMany({
       where: {
-        ...(filters?.hostId ? { hostId: filters.hostId } : {}),
-        // Public browse (no hostId) → only available venues by default
-        // Host viewing own venues (with hostId) → all statuses unless a specific status is passed
-        ...(filters?.hostId
+        ...(mayorId ? { mayorId } : {}),
+        // Public browse (no mayorId) → only available venues by default
+        // Mayor viewing own venues (with mayorId) → all statuses unless a specific status is passed
+        ...(mayorId
           ? (filters?.status ? { status: filters.status } : {})
           : { status: filters?.status ?? VenueStatus.available }
         ),
       },
       orderBy: { createdAt: "desc" },
-      include: { host: hostSelect, images: true },
+      include: { mayor: mayorSelect, images: true },
     });
   }
 
-  static async findAllVenuesAdmin(filters?: { hostId?: string; status?: VenueStatus }) {
+  static async findAllVenuesAdmin(filters?: { mayorId?: string; hostId?: string; status?: VenueStatus }) {
+    const mayorId = filters?.mayorId ?? filters?.hostId;
     return prisma.venue.findMany({
       where: {
-        ...(filters?.hostId ? { hostId: filters.hostId } : {}),
+        ...(mayorId ? { mayorId } : {}),
         ...(filters?.status ? { status: filters.status } : {}),
       },
       orderBy: { createdAt: "desc" },
-      include: { host: hostSelect, images: true },
+      include: { mayor: mayorSelect, images: true },
     });
   }
 
-  static async findVenueByIdAndOwner(id: string, hostId: string) {
+  static async findVenueByIdAndOwner(id: string, mayorId: string) {
     return prisma.venue.findFirst({
-      where: { id: String(id), hostId: String(hostId) },
-      include: { host: hostSelect, images: true },
+      where: { id: String(id), mayorId: String(mayorId) },
+      include: { mayor: mayorSelect, images: true },
     });
   }
 
@@ -123,7 +129,7 @@ export default class VenueRepo {
           images: { set: imgIds.map((fid) => ({ id: fid })) },
         }),
       },
-      include: { host: hostSelect, images: true },
+      include: { mayor: mayorSelect, images: true },
     });
   }
 

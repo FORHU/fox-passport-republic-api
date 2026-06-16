@@ -14,6 +14,7 @@ export default class EventTemplateCtrl {
       targetCity: Joi.string().optional(),
       targetState: Joi.string().optional(),
       targetCountry: Joi.string().optional(),
+      hostMarkupPercent: Joi.number().min(0).max(100).optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -38,6 +39,7 @@ export default class EventTemplateCtrl {
       category: Joi.string().valid(...Object.values(EventCategory)).optional(),
       isPublic: Joi.boolean().optional(),
       imgIds: Joi.array().items(Joi.string().uuid()).max(5).optional(),
+      hostMarkupPercent: Joi.number().min(0).max(100).optional(),
     });
 
     const { error, value } = schema.validate(req.body);
