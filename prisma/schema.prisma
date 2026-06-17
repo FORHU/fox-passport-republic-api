@@ -42,6 +42,12 @@ model User {
   venues              Venue[]
   bookingAttendees    BookingAttendee[]
   invitedAttendees    BookingAttendee[]         @relation("Inviter")
+  stripeCustomerId     String                   @unique
+  stripedConnectedId   String                   @unique
+  stripeDetailsSubmitted Boolean                @default(false)
+  stripeChargesEnabled      Boolean             @default(false)
+  stripePayoutsEnabled      Boolean             @default(false)
+  transfersReceived        PlatformTransfer[]
 }
 
 model RoleRequest {
@@ -318,6 +324,8 @@ model EventTemplate {
   targetCity       String?
   targetState      String?
   targetCountry    String?                @default("Philippines")
+  hostMarkupPct    Float                  @default(0)
+  platformFeePct    Float                  @default(0.05) //might change later on
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
   events           Event[]
@@ -428,6 +436,9 @@ model EventAssetTransaction {
   agreedPrice Float
   included    Boolean           @default(true)
   currency    String            @default("PHP")
+  stripeTransferId String       @unique
+  disputeReason String
+  disputeAt   DateTime
   lockedAt    DateTime?
   releasedAt  DateTime?
   createdAt   DateTime          @default(now())
@@ -448,6 +459,9 @@ model EventServiceTransaction {
   agreedPrice Float
   included    Boolean           @default(true)
   currency    String            @default("PHP")
+  stripeTransferId String       @unique
+  disputeReason String
+  disputeAt   DateTime
   lockedAt    DateTime?
   releasedAt  DateTime?
   createdAt   DateTime          @default(now())
@@ -468,6 +482,9 @@ model EventVenueTransaction {
   agreedPrice Float
   included    Boolean           @default(true)
   currency    String            @default("PHP")
+  stripeTransferId String       @unique
+  disputeReason String
+  disputeAt   DateTime
   lockedAt    DateTime?
   releasedAt  DateTime?
   createdAt   DateTime          @default(now())
@@ -484,6 +501,7 @@ model Booking {
   userId              String
   guestCount          Int
   totalAmount         Float
+  stripePaymentId     String                    @unique
   status              BookingStatus             @default(pending)
   startAt             DateTime
   endAt               DateTime
@@ -534,6 +552,8 @@ model Payment {
   paidAt        DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+  hostMarkupAmount Float       @default(0)
+  platformFeeAmount Float     @default(0)
   booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }
 
@@ -573,6 +593,7 @@ model ServiceBooking {
   status               ItemBookingStatus @default(pending)
   paymentStatus        PaymentStatus     @default(pending)
   paymentTransactionId String?
+  stripePaymentId      String           @unique
   paymentMethod        String?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
@@ -596,6 +617,7 @@ model AssetBooking {
   status               ItemBookingStatus @default(pending)
   paymentStatus        PaymentStatus     @default(pending)
   paymentTransactionId String?
+  stripePaymentId      String           @unique
   paymentMethod        String?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
