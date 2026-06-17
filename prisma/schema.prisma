@@ -484,6 +484,8 @@ model Booking {
   userId              String
   guestCount          Int
   totalAmount         Float
+  hostMarkup         Float                   @default(0)
+  platformFee        Float                   @default(0)
   status              BookingStatus             @default(pending)
   startAt             DateTime
   endAt               DateTime
@@ -530,6 +532,8 @@ model Payment {
   paymentType   PaymentType
   status        PaymentStatus
   transactionId String?       @unique
+  stripePaymentIntentId String?  @unique
+  stripeClientSecret     String?
   expiresAt     DateTime?
   paidAt        DateTime?
   createdAt     DateTime      @default(now())
@@ -570,10 +574,13 @@ model ServiceBooking {
   location             String
   notes                String?
   totalAmount          Float
+  platformFee          Float            @default(0)
   status               ItemBookingStatus @default(pending)
   paymentStatus        PaymentStatus     @default(pending)
   paymentTransactionId String?
   paymentMethod        String?
+  stripePaymentIntentId  String?           @unique
+  stripeClientSecret     String?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   service              Service           @relation(fields: [serviceId], references: [id])
@@ -593,10 +600,13 @@ model AssetBooking {
   deliveryAddress      String?
   notes                String?
   totalAmount          Float
+  platformFee          Float            @default(0)
   status               ItemBookingStatus @default(pending)
   paymentStatus        PaymentStatus     @default(pending)
   paymentTransactionId String?
   paymentMethod        String?
+  stripePaymentIntentId  String?           @unique
+  stripeClientSecret     String?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   asset                Asset             @relation(fields: [assetId], references: [id])
@@ -680,8 +690,10 @@ enum TransactionStatus {
 enum BookingStatus {
   pending
   confirmed
+  active
   cancelled
   completed
+  disputed
 }
 
 enum PaymentStatus {
