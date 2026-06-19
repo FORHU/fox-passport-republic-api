@@ -19,7 +19,7 @@ export default class AssetBookingRepo {
         assetId: data.assetId,
         userId: data.userId,
         startDate: data.startDate,
-        endDate: data.endDate,
+        endDate: data.endDate, 
         quantity: data.quantity,
         fulfillmentType: data.fulfillmentType,
         deliveryAddress: data.deliveryAddress,
