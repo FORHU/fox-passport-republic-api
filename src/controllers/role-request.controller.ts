@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import RoleRequestService from "../services/role-request.service";
+import S3Controller from "./s3.controller";
 import { RequestStatus, RoleType } from "@prisma/client";
 
 export default class RoleRequestController {
@@ -16,6 +17,14 @@ export default class RoleRequestController {
         return res.status(400).json({ success: false, message: "Invalid role type" });
       }
 
+      //GET URL TO UPLOAD
+
+      //UPLOAD THE FILE
+
+      //GET CLOUDFONT URL
+
+      // CREATE FILE
+      
       const application = await RoleRequestService.submitApplication(userId, roleType, data);
 
       return res.status(201).json({
