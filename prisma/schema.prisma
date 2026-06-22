@@ -7,46 +7,47 @@ datasource db {
 }
 
 model User {
-  id                       String                    @id @default(uuid())
-  email                    String                    @unique
-  password                 String
-  name                     String
-  address                  String?
-  city                     String?
-  state                    String?
-  country                  String?                   @default("Philippines")
-  username                 String?                   @unique
-  phone                    String?
-  imgId                    String?
-  systemRole               SystemRole                @default(user)
-  roleType                 RoleType[]
-  stripeAccountId          String?                   @unique
-  stripeOnboardingComplete Boolean                   @default(false)
-  stripeChargesEnabled     Boolean                   @default(false)
-  stripePayoutsEnabled     Boolean                   @default(false)
-  createdAt                DateTime                  @default(now())
-  updatedAt                DateTime                  @updatedAt
-  bookings                 Booking[]
-  payoutsReceived          Payout[]                  @relation("PayoutRecipient")
-  serviceBookings          ServiceBooking[]
-  assetBookings            AssetBooking[]
-  assetTransactions        EventAssetTransaction[]   @relation("AssetProvider")
-  clientEvents             Event[]                   @relation("EventClient")
-  organizedEvents          Event[]                   @relation("EventOrganizer")
-  serviceTransactions      EventServiceTransaction[] @relation("ServiceProvider")
-  eventTemplates           EventTemplate[]
-  venueTransactions        EventVenueTransaction[]   @relation("VenueProvider")
-  favorites                Favorite[]
-  files                    File[]
-  passport                 Passport?
-  reviews                  Review[]
-  assets                   Asset[]
-  reviewsGiven             RoleRequest[]             @relation("Reviewer")
-  roleRequests             RoleRequest[]             @relation("Applicant")
-  services                 Service[]
-  venues                   Venue[]
-  bookingAttendees         BookingAttendee[]
-  invitedAttendees         BookingAttendee[]         @relation("Inviter")
+  id                  String                    @id @default(uuid())
+  email               String                    @unique
+  password            String
+  name                String
+  address             String?
+  city                String?
+  state               String?
+  country             String?                   @default("Philippines")
+  username            String?                   @unique
+  phone               String?
+  imgId               String?
+  systemRole          SystemRole                @default(user)
+  roleType            RoleType[]
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  bookings            Booking[]
+  serviceBookings     ServiceBooking[]
+  assetBookings       AssetBooking[]
+  assetTransactions   EventAssetTransaction[]   @relation("AssetProvider")
+  clientEvents        Event[]                   @relation("EventClient")
+  organizedEvents     Event[]                   @relation("EventOrganizer")
+  serviceTransactions EventServiceTransaction[] @relation("ServiceProvider")
+  eventTemplates      EventTemplate[]
+  venueTransactions   EventVenueTransaction[]   @relation("VenueProvider")
+  favorites           Favorite[]
+  files               File[]
+  passport            Passport?
+  reviews             Review[]
+  assets              Asset[]
+  reviewsGiven        RoleRequest[]             @relation("Reviewer")
+  roleRequests        RoleRequest[]             @relation("Applicant")
+  services            Service[]
+  venues              Venue[]
+  bookingAttendees    BookingAttendee[]
+  invitedAttendees    BookingAttendee[]         @relation("Inviter")
+  stripeCustomerId     String                   @unique
+  stripedConnectedId   String                   @unique
+  stripeDetailsSubmitted Boolean                @default(false)
+  stripeChargesEnabled      Boolean             @default(false)
+  stripePayoutsEnabled      Boolean             @default(false)
+  transfersReceived        PlatformTransfer[]
 }
 
 model RoleRequest {
@@ -314,24 +315,25 @@ model Venue {
 }
 
 model EventTemplate {
-  id                String                 @id @default(uuid())
-  ownerId           String
-  name              String
-  description       String
-  category          EventCategory
-  isPublic          Boolean                @default(false)
-  targetCity        String?
-  targetState       String?
-  targetCountry     String?                @default("Philippines")
-  hostMarkupPercent Float                  @default(0)
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
-  events            Event[]
-  images            File[]
-  owner             User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  templateAssets    EventTemplateAsset[]
-  templateServices  EventTemplateService[]
-  templateVenues    EventTemplateVenue[]
+  id               String                 @id @default(uuid())
+  ownerId          String
+  name             String
+  description      String
+  category         EventCategory
+  isPublic         Boolean                @default(false)
+  targetCity       String?
+  targetState      String?
+  targetCountry    String?                @default("Philippines")
+  hostMarkupPct    Float                  @default(0)
+  platformFeePct    Float                  @default(0.05) //might change later on
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  events           Event[]
+  images           File[]
+  owner            User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  templateAssets   EventTemplateAsset[]
+  templateServices EventTemplateService[]
+  templateVenues   EventTemplateVenue[]
 }
 
 model EventTemplateAsset {
@@ -437,6 +439,9 @@ model EventAssetTransaction {
   agreedPrice Float
   included    Boolean           @default(true)
   currency    String            @default("PHP")
+  stripeTransferId String       @unique
+  disputeReason String
+  disputeAt   DateTime
   lockedAt    DateTime?
   releasedAt  DateTime?
   createdAt   DateTime          @default(now())
@@ -457,6 +462,9 @@ model EventServiceTransaction {
   agreedPrice Float
   included    Boolean           @default(true)
   currency    String            @default("PHP")
+  stripeTransferId String       @unique
+  disputeReason String
+  disputeAt   DateTime
   lockedAt    DateTime?
   releasedAt  DateTime?
   createdAt   DateTime          @default(now())
@@ -477,6 +485,9 @@ model EventVenueTransaction {
   agreedPrice Float
   included    Boolean           @default(true)
   currency    String            @default("PHP")
+  stripeTransferId String       @unique
+  disputeReason String
+  disputeAt   DateTime
   lockedAt    DateTime?
   releasedAt  DateTime?
   createdAt   DateTime          @default(now())
@@ -493,7 +504,8 @@ model Booking {
   userId              String
   guestCount          Int
   totalAmount         Float
-  status              ItemBookingStatus         @default(pending)
+  stripePaymentId     String                    @unique
+  status              BookingStatus             @default(pending)
   startAt             DateTime
   endAt               DateTime
   expiresAt           DateTime?
@@ -543,6 +555,8 @@ model Payment {
   paidAt        DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+  hostMarkupAmount Float       @default(0)
+  platformFeeAmount Float     @default(0)
   booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }
 
@@ -583,6 +597,7 @@ model ServiceBooking {
   status               ItemBookingStatus @default(pending)
   paymentStatus        PaymentStatus     @default(pending)
   paymentTransactionId String?
+  stripePaymentId      String           @unique
   paymentMethod        String?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
@@ -607,6 +622,7 @@ model AssetBooking {
   status               ItemBookingStatus @default(pending)
   paymentStatus        PaymentStatus     @default(pending)
   paymentTransactionId String?
+  stripePaymentId      String           @unique
   paymentMethod        String?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
