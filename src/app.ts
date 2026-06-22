@@ -5,8 +5,6 @@ import helmet from "helmet";
 import router from "./routes";
 import { isDev, FRONTEND_URL } from "./config";
 import cors from "cors";
-import { createServer } from "http";
-import { Server } from "socket.io";
 import setup from "./setup";
 
 const app = express();
@@ -88,14 +86,4 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-const server = createServer(app);
-
-export const io = new Server(server, {
-  cors: {
-    origin: FRONTEND_URL,
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
-});
-
-export default server;
+export default app;

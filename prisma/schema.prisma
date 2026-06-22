@@ -42,6 +42,7 @@ model User {
   venues              Venue[]
   bookingAttendees    BookingAttendee[]
   invitedAttendees    BookingAttendee[]         @relation("Inviter")
+  notifications       Notification[]
   stripeCustomerId     String                   @unique
   stripedConnectedId   String                   @unique
   stripeDetailsSubmitted Boolean                @default(false)
@@ -49,6 +50,7 @@ model User {
   stripePayoutsEnabled      Boolean             @default(false)
   transfersReceived        PlatformTransfer[]
 }
+
 
 model RoleRequest {
   id                      String                   @id @default(uuid())
@@ -504,6 +506,8 @@ model Booking {
   userId              String
   guestCount          Int
   totalAmount         Float
+  hostMarkup         Float                   @default(0)
+  platformFee        Float                   @default(0)
   stripePaymentId     String                    @unique
   status              BookingStatus             @default(pending)
   startAt             DateTime
@@ -593,6 +597,7 @@ model ServiceBooking {
   location             String
   notes                String?
   totalAmount          Float
+  platformFee          Float            @default(0)
   platformFeeAmount    Float             @default(0)
   status               ItemBookingStatus @default(pending)
   paymentStatus        PaymentStatus     @default(pending)
@@ -618,6 +623,7 @@ model AssetBooking {
   deliveryAddress      String?
   notes                String?
   totalAmount          Float
+  platformFee          Float            @default(0)
   platformFeeAmount    Float             @default(0)
   status               ItemBookingStatus @default(pending)
   paymentStatus        PaymentStatus     @default(pending)
@@ -632,6 +638,18 @@ model AssetBooking {
   @@map("asset_bookings")
 }
 
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 model Payout {
   id               String       @id @default(uuid())
   recipientId      String
@@ -734,8 +752,10 @@ enum TransactionStatus {
 enum BookingStatus {
   pending
   confirmed
+  active
   cancelled
   completed
+  disputed
 }
 
 enum PaymentStatus {
