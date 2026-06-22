@@ -4,6 +4,7 @@ import Joi from "joi";
 import PaymentSvc from "../services/payment.service";
 import { prisma } from "../utils/prisma";
 import { PaymentStatus } from "@prisma/client";
+import EventTemplateSvc from "../services/event-template.service";
 
 export default class BookingCtrl {
     // BOOK FROM TEMPLATE — creates an Event + Booking in one shot for a logged-in client
@@ -12,13 +13,15 @@ export default class BookingCtrl {
             const schema = Joi.object({
                 templateId: Joi.string().required(),
                 guestCount: Joi.number().integer().min(1).required(),
-                totalAmount: Joi.number().min(0).required(),
                 startAt: Joi.date().iso().required(),
                 endAt: Joi.date().iso().required(),
                 // IDs of optional template items the client chose to exclude
                 excludedAssetIds: Joi.array().items(Joi.string()).optional(),
                 excludedServiceIds: Joi.array().items(Joi.string()).optional(),
                 excludedVenueIds: Joi.array().items(Joi.string()).optional(),
+                // NOTE: totalAmount is intentionally NOT accepted here — it is always
+                // computed server-side from the template's items + hostMarkupPercent +
+                // platform fee. See docs/adr/0001-host-markup-and-server-computed-event-total.md
             });
 
             const { error, value } = schema.validate(req.body);
@@ -33,10 +36,13 @@ export default class BookingCtrl {
                 include: {
                     templateAssets: { include: { asset: { include: { owner: true } } } },
                     templateServices: { include: { service: { include: { owner: true } } } },
-                    templateVenues: { include: { venue: { include: { host: true } } } },
+                    templateVenues: { include: { venue: { include: { mayor: true } } } },
                 },
             });
             if (!template) return res.status(404).json({ message: "Template not found or not approved" });
+
+            const { itemsTotal, hostMarkupAmount, platformFeeAmount, totalAmount } =
+                EventTemplateSvc.calculateTotalsBreakdown(template, { excludedAssetIds, excludedServiceIds, excludedVenueIds });
 
             const event = await prisma.event.create({
                 data: {
@@ -49,7 +55,10 @@ export default class BookingCtrl {
                     startAt: value.startAt,
                     endAt: value.endAt,
                     guestCount: value.guestCount,
-                    totalAmount: value.totalAmount,
+                    totalAmount,
+                    itemsTotal,
+                    hostMarkupAmount,
+                    platformFeeAmount,
                     requestStatus: "approved",
                     eventStatus: "pending",
                     targetCity: template.targetCity ?? undefined,
@@ -62,7 +71,7 @@ export default class BookingCtrl {
                 userId: req.user!.userId,
                 eventId: event.id,
                 guestCount: value.guestCount,
-                totalAmount: value.totalAmount,
+                totalAmount,
             });
 
             // Create per-partner escrow transactions for all matched template items
@@ -96,13 +105,13 @@ export default class BookingCtrl {
                 }));
 
             const venueTxPromises = template.templateVenues
-                .filter(tv => tv.venueId && tv.venue?.hostId)
+                .filter(tv => tv.venueId && tv.venue?.mayorId)
                 .map(tv => prisma.eventVenueTransaction.create({
                     data: {
                         eventId: event.id,
                         bookingId: booking.id,
                         venueId: tv.venueId!,
-                        providerId: tv.venue!.hostId,
+                        providerId: tv.venue!.mayorId,
                         agreedPrice: tv.agreedPrice,
                         included: !excludedVenueIds.includes(tv.id),
                         status: "pending",
@@ -270,6 +279,43 @@ export default class BookingCtrl {
             return res.status(200).json({ success: true, data: { booking, payment } });
         } catch (error: any) {
             return res.status(400).json({ success: false, message: error.message });
+        }
+    }
+
+    // PATCH STATUS — mirrors asset-booking.controller.ts:93-107
+    static async updateStatus(req: Request, res: Response) {
+        try {
+            const schema = Joi.object({
+                status: Joi.string().valid("pending", "confirmed", "active", "completed", "cancelled", "disputed").required(),
+            });
+
+            const { error, value } = schema.validate(req.body);
+            if (error) return res.status(400).json({ success: false, message: error.message });
+
+            const booking = await BookingSvc.updateStatus(req.params.id, value.status, req.user!.userId);
+            return res.status(200).json({ success: true, data: booking });
+        } catch (err: any) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
+    }
+
+    // PATCH CONFIRM ARRIVAL — mirrors asset-booking.controller.ts:119-127
+    static async confirmArrival(req: Request, res: Response) {
+        try {
+            const booking = await BookingSvc.confirmArrival(req.params.id, req.user!.userId);
+            return res.status(200).json({ success: true, data: booking });
+        } catch (err: any) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
+    }
+
+    // PATCH DISPUTE — mirrors asset-booking.controller.ts:130-137
+    static async dispute(req: Request, res: Response) {
+        try {
+            const booking = await BookingSvc.dispute(req.params.id, req.user!.userId);
+            return res.status(200).json({ success: true, data: booking });
+        } catch (err: any) {
+            return res.status(400).json({ success: false, message: err.message });
         }
     }
 

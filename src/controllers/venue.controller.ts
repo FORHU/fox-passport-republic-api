@@ -33,13 +33,13 @@ export default class VenueCtrl {
         }
 
         try {
-            // hostId comes from the authenticated user's JWT token
-            const hostId = (req as any).user?.userId;
-            if (!hostId) {
+            // mayorId comes from the authenticated user's JWT token
+            const mayorId = (req as any).user?.userId;
+            if (!mayorId) {
                 return res.status(401).json({ message: "Unauthorized" });
             }
 
-            const venueData = { ...value, hostId };
+            const venueData = { ...value, mayorId };
             const venue = await VenueSvc.createVenue(venueData as any);
             return res.status(201).json({ message: "Venue created successfully", venue });
         } catch (error: any) {
@@ -48,10 +48,11 @@ export default class VenueCtrl {
     }
 
     // READ Venues Controller with optional query parameters for filtering
+    // `hostId` accepted as a deprecated alias for `mayorId` (see venue.repository.ts)
     static async getVenues(req: Request, res: Response) {
         try {
-            const hostId = req.query.hostId as string | undefined;
-            const venues = await VenueSvc.getVenues(hostId ? { hostId } : undefined);
+            const mayorId = (req.query.mayorId ?? req.query.hostId) as string | undefined;
+            const venues = await VenueSvc.getVenues(mayorId ? { mayorId } : undefined);
             return res.status(200).json({ venues });
         } catch (error: any) {
             return res.status(500).json({ message: error.message || error });

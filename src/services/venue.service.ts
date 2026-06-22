@@ -11,7 +11,7 @@ export default class VenueSvc {
     // ───────────────────────────────────────────────────────────
 
     static async createVenue(data: {
-        hostId: string;
+        mayorId: string;
         name: string;
         description: string;
         category: VenueCategory;
@@ -64,7 +64,7 @@ export default class VenueSvc {
     // READ — Delegate all queries to repository
     // ───────────────────────────────────────────────────────────
 
-    static async getVenues(filters?: { hostId?: string }) {
+    static async getVenues(filters?: { mayorId?: string; hostId?: string }) {
         return VenueRepo.findAllVenues(filters);
     }
 
@@ -143,9 +143,9 @@ export default class VenueSvc {
         return items;
     }
 
-    static async getVenueByIdForHost(id: string, hostId: string) {
-        // Host can see their own venues regardless of status
-        const venue = await VenueRepo.findVenueByIdAndOwner(id, hostId);
+    static async getVenueByIdForMayor(id: string, mayorId: string) {
+        // Mayor can see their own venues regardless of status
+        const venue = await VenueRepo.findVenueByIdAndOwner(id, mayorId);
         if (!venue) {
             throw new Error("Venue not found or access denied");
         }
@@ -182,7 +182,7 @@ export default class VenueSvc {
         if (!venue) throw new Error("Venue not found");
 
         const isAdmin = this.isAdminRole(requesterRole);
-        if (!isAdmin && venue.hostId !== requesterId) {
+        if (!isAdmin && venue.mayorId !== requesterId) {
             throw new Error("Unauthorized");
         }
 
@@ -209,7 +209,7 @@ export default class VenueSvc {
         if (!venue) throw new Error("Venue not found");
 
         const isAdmin = this.isAdminRole(requesterRole);
-        if (!isAdmin && venue.hostId !== requesterId) {
+        if (!isAdmin && venue.mayorId !== requesterId) {
             throw new Error("Unauthorized");
         }
 

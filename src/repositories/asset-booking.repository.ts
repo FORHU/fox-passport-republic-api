@@ -12,18 +12,20 @@ export default class AssetBookingRepo {
     deliveryAddress?: string;
     notes?: string;
     totalAmount: number;
+    platformFeeAmount: number;
   }) {
     return prisma.assetBooking.create({
       data: {
         assetId: data.assetId,
         userId: data.userId,
         startDate: data.startDate,
-        endDate: data.endDate,
+        endDate: data.endDate, 
         quantity: data.quantity,
         fulfillmentType: data.fulfillmentType,
         deliveryAddress: data.deliveryAddress,
         notes: data.notes,
         totalAmount: data.totalAmount,
+        platformFeeAmount: data.platformFeeAmount,
       },
       include: {
         asset: { include: { images: true } },

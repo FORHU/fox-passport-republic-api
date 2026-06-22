@@ -93,6 +93,13 @@ export default class EventTemplateRepo {
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
+        // NOTE: must match createTemplate/findTemplateById's include — without these,
+        // calculateTotalsBreakdown() has no template items to sum and silently
+        // returns 0 for itemsTotal/hostMarkupAmount/platformFeeAmount/totalAmount
+        // after every update (pre-existing bug, surfaced while testing hostMarkupPercent).
+        templateAssets: { include: { asset: true } },
+        templateServices: { include: { service: true } },
+        templateVenues: { include: { venue: true } },
         images: true,
       },
     });
@@ -219,7 +226,7 @@ export default class EventTemplateRepo {
         ...(filters.category && { category: filters.category as VenueCategory }),
         status: VenueStatus.available,
       },
-      include: { host: { select: { id: true, name: true } }, images: true },
+      include: { mayor: { select: { id: true, name: true } }, images: true },
       orderBy: { createdAt: "desc" },
     });
   }

@@ -11,6 +11,7 @@ export default class ServiceBookingRepo {
     location: string;
     notes?: string;
     totalAmount: number;
+    platformFeeAmount: number;
   }) {
     return prisma.serviceBooking.create({
       data: {
@@ -22,6 +23,7 @@ export default class ServiceBookingRepo {
         location: data.location,
         notes: data.notes,
         totalAmount: data.totalAmount,
+        platformFeeAmount: data.platformFeeAmount,
       },
       include: {
         service: { include: { images: true } },

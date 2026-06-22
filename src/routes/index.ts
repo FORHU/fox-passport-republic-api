@@ -21,6 +21,7 @@ import eventTransactionRoutes from "./event-transaction.routes";
 import matchRoutes from "./match.routes";
 import bookingRoutes from "./booking.routes";
 import notificationRoutes from "../modules/notifications/user-notification.routes";
+import stripeConnectRoutes from "./stripe-connect.routes";
 
 const router = express.Router();
 
@@ -62,6 +63,7 @@ router.use("/v1/reviews", reviewRoutes);
 router.use("/v1/favorites", favoriteRoutes);
 router.use("/v1/matches", matchRoutes);
 router.use("/v1/bookings", bookingRoutes);
+router.use("/v1/stripe-connect", stripeConnectRoutes);
 
 // Admin Routes
 router.use("/v1/admin", adminRoutes);
