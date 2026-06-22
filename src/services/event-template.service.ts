@@ -14,7 +14,7 @@ export default class EventTemplateSvc {
     targetCity?: string;
     targetState?: string;
     targetCountry?: string;
-    hostMarkupPercent?: number;
+    hostMarkupPct?: number;
   }) {
     const template = await EventTemplateRepo.createTemplate(data);
     return {
@@ -32,7 +32,7 @@ export default class EventTemplateSvc {
       category: EventCategory;
       isPublic: boolean;
       imgIds: string[];
-      hostMarkupPercent: number;
+      hostMarkupPct: number;
     }>;
   }) {
     const { id, ownerId, data } = params;
@@ -133,7 +133,7 @@ export default class EventTemplateSvc {
     platformFeePercent: number = PLATFORM_FEE_PERCENT
   ): { itemsTotal: number; hostMarkupAmount: number; platformFeeAmount: number; totalAmount: number; estimatedTotal: number } {
     const itemsTotal = this.calculateItemsTotal(template, exclusions);
-    const hostMarkupAmount = itemsTotal * ((template.hostMarkupPercent ?? 0) / 100);
+    const hostMarkupAmount = itemsTotal * ((template.hostMarkupPct ?? 0) / 100);
     const platformFeeAmount = (itemsTotal + hostMarkupAmount) * (platformFeePercent / 100);
     const totalAmount = itemsTotal + hostMarkupAmount + platformFeeAmount;
 
