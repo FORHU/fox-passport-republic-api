@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import PaymentSvc from "../services/payment.service";
+import StripeConnectSvc from "../services/stripe-connect.service";
 import Stripe from "stripe";
 import { prisma } from "../utils/prisma";
 import { PaymentStatus } from "@prisma/client";
@@ -316,6 +317,20 @@ export default class PaymentController {
             case 'payment_intent.payment_failed':
                 const failedIntent = event.data.object as Stripe.PaymentIntent;
                 console.log(`❌ PaymentIntent failed: ${failedIntent.id}`);
+                break;
+
+            case 'account.updated':
+                // Keeps User.stripeChargesEnabled/stripePayoutsEnabled/stripeOnboardingComplete
+                // in sync with the connected account's real state. See
+                // docs/adr/0002-stripe-connect-payouts.md. Deployment note: the Stripe
+                // webhook endpoint must also be subscribed to this event type.
+                try {
+                    const account = event.data.object as Stripe.Account;
+                    await StripeConnectSvc.handleAccountUpdated(account);
+                    console.log(`✅ account.updated synced for ${account.id}`);
+                } catch (error) {
+                    console.error("Error syncing account.updated via webhook:", error);
+                }
                 break;
 
             default:

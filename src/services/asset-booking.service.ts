@@ -1,6 +1,9 @@
 import AssetBookingRepo from "../repositories/asset-booking.repository";
 import { prisma } from "../utils/prisma";
 import { ItemBookingStatus } from "@prisma/client";
+import { calculateItemsTotal } from "../utils/pricing";
+import { PLATFORM_FEE_PERCENT } from "../config";
+import PayoutSvc from "./payout.service";
 
 export default class AssetBookingSvc {
   static async getAvailability(assetId: string) {
@@ -9,6 +12,9 @@ export default class AssetBookingSvc {
     return AssetBookingRepo.getBookedRanges(assetId);
   }
 
+  // NOTE: totalAmount is never accepted from the client — always computed
+  // server-side from the asset's own price/billingRate. See
+  // docs/adr/0001-host-markup-and-server-computed-event-total.md
   static async create(data: {
     assetId: string;
     userId: string;
@@ -18,7 +24,6 @@ export default class AssetBookingSvc {
     fulfillmentType: string;
     deliveryAddress?: string;
     notes?: string;
-    totalAmount: number;
   }) {
     const asset = await prisma.asset.findUnique({ where: { id: data.assetId } });
     if (!asset || asset.deletedAt) throw new Error("Asset not found or unavailable");
@@ -27,16 +32,30 @@ export default class AssetBookingSvc {
       throw new Error(`Only ${asset.quantity} unit(s) available`);
     }
 
+    const startDate = new Date(data.startDate);
+    const endDate = new Date(data.endDate);
+
+    const itemsTotal = calculateItemsTotal({
+      price: asset.price,
+      quantity: data.quantity,
+      startDate,
+      endDate,
+      billingRate: asset.billingRate,
+    });
+    const platformFeeAmount = itemsTotal * (PLATFORM_FEE_PERCENT / 100);
+    const totalAmount = itemsTotal + platformFeeAmount;
+
     return AssetBookingRepo.create({
       assetId: data.assetId,
       userId: data.userId,
-      startDate: new Date(data.startDate),
-      endDate: new Date(data.endDate),
+      startDate,
+      endDate,
       quantity: data.quantity,
       fulfillmentType: data.fulfillmentType,
       deliveryAddress: data.deliveryAddress,
       notes: data.notes,
-      totalAmount: data.totalAmount,
+      totalAmount,
+      platformFeeAmount,
     });
   }
 
@@ -71,7 +90,18 @@ export default class AssetBookingSvc {
     const isBooker = booking.userId === requesterId;
     if (!isOwner && !isBooker) throw new Error("Unauthorized");
 
-    return AssetBookingRepo.updateStatus(id, status as ItemBookingStatus);
+    const updated = await AssetBookingRepo.updateStatus(id, status as ItemBookingStatus);
+
+    if (status === ItemBookingStatus.completed) {
+      // Payout failures must never fail the status-update response — log and move on.
+      try {
+        await PayoutSvc.createPayoutsForAssetBooking(id);
+      } catch (err) {
+        console.error(`Payout failed for asset booking ${id}`, err);
+      }
+    }
+
+    return updated;
   }
 
   static async cancel(id: string, requesterId: string) {

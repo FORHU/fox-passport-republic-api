@@ -1,6 +1,7 @@
 import { EventCategory, MatchConstraint } from "@prisma/client";
 import { prisma } from "../utils/prisma";
 import EventTemplateRepo from "../repositories/event-template.repository";
+import { PLATFORM_FEE_PERCENT } from "../config";
 
 export default class EventTemplateSvc {
   static async createTemplate(data: {
@@ -13,11 +14,12 @@ export default class EventTemplateSvc {
     targetCity?: string;
     targetState?: string;
     targetCountry?: string;
+    hostMarkupPercent?: number;
   }) {
     const template = await EventTemplateRepo.createTemplate(data);
     return {
       ...template,
-      estimatedTotal: this.calculateTotalAmount(template)
+      ...this.calculateTotalsBreakdown(template),
     };
   }
 
@@ -30,6 +32,7 @@ export default class EventTemplateSvc {
       category: EventCategory;
       isPublic: boolean;
       imgIds: string[];
+      hostMarkupPercent: number;
     }>;
   }) {
     const { id, ownerId, data } = params;
@@ -37,7 +40,7 @@ export default class EventTemplateSvc {
     const template = await EventTemplateRepo.updateTemplate(id, data);
     return {
       ...template,
-      estimatedTotal: this.calculateTotalAmount(template)
+      ...this.calculateTotalsBreakdown(template),
     };
   }
 
@@ -45,7 +48,7 @@ export default class EventTemplateSvc {
     const templates = await EventTemplateRepo.findAllTemplates(filters);
     return templates.map(t => ({
       ...t,
-      estimatedTotal: this.calculateTotalAmount(t)
+      ...this.calculateTotalsBreakdown(t),
     }));
   }
 
@@ -64,19 +67,28 @@ export default class EventTemplateSvc {
     }
     return {
       ...template,
-      estimatedTotal: this.calculateTotalAmount(template)
+      ...this.calculateTotalsBreakdown(template),
     };
   }
 
   /**
-   * Calculate the total price of all items in the template
+   * Sum the raw price of all (non-excluded) items in the template — no markup,
+   * no platform fee. Used as the base for calculateTotalsBreakdown, and kept
+   * standalone since a few callers only need the raw supplier total.
    */
-  static calculateTotalAmount(template: any): number {
+  static calculateItemsTotal(
+    template: any,
+    exclusions?: { excludedAssetIds?: string[]; excludedServiceIds?: string[]; excludedVenueIds?: string[] }
+  ): number {
+    const excludedAssetIds = exclusions?.excludedAssetIds ?? [];
+    const excludedServiceIds = exclusions?.excludedServiceIds ?? [];
+    const excludedVenueIds = exclusions?.excludedVenueIds ?? [];
     let total = 0;
 
     // Sum Assets
     if (template.templateAssets) {
       template.templateAssets.forEach((ta: any) => {
+        if (excludedAssetIds.includes(ta.id)) return;
         const price = ta.asset?.price || 0;
         const qty = ta.quantity || 1;
         total += price * qty;
@@ -86,6 +98,7 @@ export default class EventTemplateSvc {
     // Sum Services
     if (template.templateServices) {
       template.templateServices.forEach((ts: any) => {
+        if (excludedServiceIds.includes(ts.id)) return;
         total += ts.service?.price || 0;
       });
     }
@@ -93,11 +106,44 @@ export default class EventTemplateSvc {
     // Sum Venues
     if (template.templateVenues) {
       template.templateVenues.forEach((tv: any) => {
+        if (excludedVenueIds.includes(tv.id)) return;
         total += tv.venue?.price || 0;
       });
     }
 
     return total;
+  }
+
+  /** @deprecated use calculateItemsTotal / calculateTotalsBreakdown */
+  static calculateTotalAmount(template: any): number {
+    return this.calculateItemsTotal(template);
+  }
+
+  /**
+   * Full server-computed price breakdown for an EventTemplate. This is the only
+   * source of truth for what a citizen owes when booking from a template — never
+   * trust a client-supplied totalAmount (see docs/adr/0001-host-markup-and-server-computed-event-total.md).
+   *
+   * platformFee is additive on top of itemsTotal + hostMarkup, never carved out of
+   * the Host's or any provider's share (see docs/adr/0002-stripe-connect-payouts.md).
+   */
+  static calculateTotalsBreakdown(
+    template: any,
+    exclusions?: { excludedAssetIds?: string[]; excludedServiceIds?: string[]; excludedVenueIds?: string[] },
+    platformFeePercent: number = PLATFORM_FEE_PERCENT
+  ): { itemsTotal: number; hostMarkupAmount: number; platformFeeAmount: number; totalAmount: number; estimatedTotal: number } {
+    const itemsTotal = this.calculateItemsTotal(template, exclusions);
+    const hostMarkupAmount = itemsTotal * ((template.hostMarkupPercent ?? 0) / 100);
+    const platformFeeAmount = (itemsTotal + hostMarkupAmount) * (platformFeePercent / 100);
+    const totalAmount = itemsTotal + hostMarkupAmount + platformFeeAmount;
+
+    return {
+      itemsTotal,
+      hostMarkupAmount,
+      platformFeeAmount,
+      totalAmount,
+      estimatedTotal: totalAmount, // kept for backward compatibility with existing API consumers
+    };
   }
 
   static async attachAsset(templateId: string, ownerId: string, assetId?: string, quantity: number = 1, description?: string, matchedAt?: Date, date?: Date, agreedPrice?: number, isOptional?: boolean) {
@@ -119,10 +165,17 @@ export default class EventTemplateSvc {
 
     this.validateMatchData(true, description, matchedAt);
 
+    // Default agreedPrice to the asset's own listed price (* quantity) when the Host
+    // doesn't negotiate a different one — without this, agreedPrice silently defaults
+    // to 0 at the repo layer, which is what providers actually get paid (the citizen's
+    // total is computed from the live price, so an unset agreedPrice meant the citizen
+    // was charged correctly but the provider would be paid $0).
+    const finalAgreedPrice = agreedPrice ?? asset.price * quantity;
+
     return EventTemplateRepo.attachAsset(templateId, assetId, quantity, {
       matched: true,
       matchConstraint: MatchConstraint.SAME_STATE
-    }, description, matchedAt, agreedPrice, isOptional);
+    }, description, matchedAt, finalAgreedPrice, isOptional);
   }
 
   static async removeAsset(templateId: string, ownerId: string, assetId: string) {
@@ -150,10 +203,13 @@ export default class EventTemplateSvc {
 
     this.validateMatchData(true, description, matchedAt);
 
+    // See attachAsset's comment — default to the service's own listed price.
+    const finalAgreedPrice = agreedPrice ?? service.price;
+
     return EventTemplateRepo.attachService(templateId, serviceId, {
       matched: true,
       matchConstraint: MatchConstraint.SAME_STATE
-    }, description, matchedAt, agreedPrice, isOptional);
+    }, description, matchedAt, finalAgreedPrice, isOptional);
   }
 
   static async removeService(templateId: string, ownerId: string, serviceId: string) {
@@ -181,10 +237,13 @@ export default class EventTemplateSvc {
 
     this.validateMatchData(true, description, matchedAt);
 
+    // See attachAsset's comment — default to the venue's own listed price.
+    const finalAgreedPrice = agreedPrice ?? venue.price;
+
     return EventTemplateRepo.attachVenue(templateId, venueId, {
       matched: true,
       matchConstraint: MatchConstraint.SAME_STATE
-    }, description, matchedAt, agreedPrice, isOptional);
+    }, description, matchedAt, finalAgreedPrice, isOptional);
   }
 
   static async removeVenue(templateId: string, ownerId: string, venueId: string) {

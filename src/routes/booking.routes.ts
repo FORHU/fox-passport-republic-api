@@ -24,4 +24,9 @@ router.get("/:id", optionalAuth, BookingCtrl.getBookingById);
 router.post("/create", authenticate, BookingCtrl.createBooking);
 router.post("/:id/confirm", authenticate, BookingCtrl.confirmBooking);
 
+// ========== LIFECYCLE ROUTES (mirrors asset-booking.routes.ts / service-booking.routes.ts) ==========
+router.patch("/:id/status", authenticate, BookingCtrl.updateStatus);
+router.patch("/:id/confirm-arrival", authenticate, BookingCtrl.confirmArrival);
+router.patch("/:id/dispute", authenticate, BookingCtrl.dispute);
+
 export default router;

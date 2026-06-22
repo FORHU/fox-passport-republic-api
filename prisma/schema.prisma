@@ -43,6 +43,12 @@ model User {
   bookingAttendees    BookingAttendee[]
   invitedAttendees    BookingAttendee[]         @relation("Inviter")
   notifications       Notification[]
+  stripeCustomerId     String                   @unique
+  stripedConnectedId   String                   @unique
+  stripeDetailsSubmitted Boolean                @default(false)
+  stripeChargesEnabled      Boolean             @default(false)
+  stripePayoutsEnabled      Boolean             @default(false)
+  transfersReceived        PlatformTransfer[]
 }
 
 
@@ -283,7 +289,7 @@ model Service {
 
 model Venue {
   id             String                  @id @default(uuid())
-  hostId         String
+  mayorId        String
   category       String
   name           String
   description    String
@@ -305,7 +311,7 @@ model Venue {
   transactions   EventVenueTransaction[]
   images         File[]
   templateVenues EventTemplateVenue[]
-  host           User                    @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  mayor          User                    @relation(fields: [mayorId], references: [id], onDelete: Cascade)
 
   @@map("venues")
 }
@@ -320,6 +326,8 @@ model EventTemplate {
   targetCity       String?
   targetState      String?
   targetCountry    String?                @default("Philippines")
+  hostMarkupPct    Float                  @default(0)
+  platformFeePct    Float                  @default(0.05) //might change later on
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
   events           Event[]
@@ -403,6 +411,9 @@ model Event {
   endAt               DateTime
   guestCount          Int
   totalAmount         Float
+  itemsTotal          Float                     @default(0)
+  hostMarkupAmount    Float                     @default(0)
+  platformFeeAmount   Float                     @default(0)
   eventStatus         EventStatus               @default(pending)
   requestStatus       RequestStatus             @default(pending)
   targetCity          String?
@@ -430,6 +441,9 @@ model EventAssetTransaction {
   agreedPrice Float
   included    Boolean           @default(true)
   currency    String            @default("PHP")
+  stripeTransferId String       @unique
+  disputeReason String
+  disputeAt   DateTime
   lockedAt    DateTime?
   releasedAt  DateTime?
   createdAt   DateTime          @default(now())
@@ -450,6 +464,9 @@ model EventServiceTransaction {
   agreedPrice Float
   included    Boolean           @default(true)
   currency    String            @default("PHP")
+  stripeTransferId String       @unique
+  disputeReason String
+  disputeAt   DateTime
   lockedAt    DateTime?
   releasedAt  DateTime?
   createdAt   DateTime          @default(now())
@@ -470,6 +487,9 @@ model EventVenueTransaction {
   agreedPrice Float
   included    Boolean           @default(true)
   currency    String            @default("PHP")
+  stripeTransferId String       @unique
+  disputeReason String
+  disputeAt   DateTime
   lockedAt    DateTime?
   releasedAt  DateTime?
   createdAt   DateTime          @default(now())
@@ -488,6 +508,7 @@ model Booking {
   totalAmount         Float
   hostMarkup         Float                   @default(0)
   platformFee        Float                   @default(0)
+  stripePaymentId     String                    @unique
   status              BookingStatus             @default(pending)
   startAt             DateTime
   endAt               DateTime
@@ -538,6 +559,8 @@ model Payment {
   paidAt        DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+  hostMarkupAmount Float       @default(0)
+  platformFeeAmount Float     @default(0)
   booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }
 
@@ -575,9 +598,11 @@ model ServiceBooking {
   notes                String?
   totalAmount          Float
   platformFee          Float            @default(0)
+  platformFeeAmount    Float             @default(0)
   status               ItemBookingStatus @default(pending)
   paymentStatus        PaymentStatus     @default(pending)
   paymentTransactionId String?
+  stripePaymentId      String           @unique
   paymentMethod        String?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
@@ -599,9 +624,11 @@ model AssetBooking {
   notes                String?
   totalAmount          Float
   platformFee          Float            @default(0)
+  platformFeeAmount    Float             @default(0)
   status               ItemBookingStatus @default(pending)
   paymentStatus        PaymentStatus     @default(pending)
   paymentTransactionId String?
+  stripePaymentId      String           @unique
   paymentMethod        String?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
@@ -623,6 +650,31 @@ model Notification {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+model Payout {
+  id               String       @id @default(uuid())
+  recipientId      String
+  role             RoleType
+  sourceType       String // "assetBooking" | "serviceBooking" | "booking"
+  sourceId         String
+  amount           Float
+  currency         String       @default("PHP")
+  stripeTransferId String?
+  status           PayoutStatus @default(pending)
+  failureReason    String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  recipient        User         @relation("PayoutRecipient", fields: [recipientId], references: [id])
+
+  @@unique([sourceType, sourceId, recipientId, role])
+  @@index([sourceType, sourceId])
+  @@index([recipientId])
+  @@map("payouts")
+}
+
+enum PayoutStatus {
+  pending
+  paid
+  failed
 }
 
 enum MatchConstraint {
@@ -689,7 +741,7 @@ enum EventStatus {
   completed
   cancelled
 }
-
+ 
 enum TransactionStatus {
   pending
   approved
@@ -783,5 +835,3 @@ enum ItemBookingStatus {
   cancelled
   disputed
 }
-
-
