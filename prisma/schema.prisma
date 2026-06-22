@@ -42,7 +42,9 @@ model User {
   venues              Venue[]
   bookingAttendees    BookingAttendee[]
   invitedAttendees    BookingAttendee[]         @relation("Inviter")
+  notifications       Notification[]
 }
+
 
 model RoleRequest {
   id                      String                   @id @default(uuid())
@@ -532,8 +534,6 @@ model Payment {
   paymentType   PaymentType
   status        PaymentStatus
   transactionId String?       @unique
-  stripePaymentIntentId String?  @unique
-  stripeClientSecret     String?
   expiresAt     DateTime?
   paidAt        DateTime?
   createdAt     DateTime      @default(now())
@@ -579,8 +579,6 @@ model ServiceBooking {
   paymentStatus        PaymentStatus     @default(pending)
   paymentTransactionId String?
   paymentMethod        String?
-  stripePaymentIntentId  String?           @unique
-  stripeClientSecret     String?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   service              Service           @relation(fields: [serviceId], references: [id])
@@ -605,14 +603,26 @@ model AssetBooking {
   paymentStatus        PaymentStatus     @default(pending)
   paymentTransactionId String?
   paymentMethod        String?
-  stripePaymentIntentId  String?           @unique
-  stripeClientSecret     String?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   asset                Asset             @relation(fields: [assetId], references: [id])
   user                 User              @relation(fields: [userId], references: [id])
 
   @@map("asset_bookings")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 }
 
 enum MatchConstraint {
