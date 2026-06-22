@@ -85,7 +85,7 @@ export default class PaymentSvc {
             transactionId = this.generateTransactionId();
         }
 
-        return PaymentRepo.createPayment({
+        const payment = await PaymentRepo.createPayment({
             bookingId: data.bookingId,
             amount: data.amount,
             currency: data.currency || "PHP",
@@ -95,6 +95,24 @@ export default class PaymentSvc {
             transactionId,
             expiresAt: data.expiresAt,
         });
+
+        // If this payment is a Stripe payment (either method explicitly 'stripe'
+        // or the transactionId looks like a Stripe PaymentIntent ID), store the
+        // Stripe id on the Booking.stripePaymentId field so the booking is linked
+        // to the Stripe payment externally. This keeps booking.stripePaymentId
+        // populated for downstream reporting and idempotency checks.
+        try {
+            const looksLikeStripeId = String(transactionId).startsWith('pi_') || data.method === 'stripe';
+            if (looksLikeStripeId) {
+                await prisma.booking.update({ where: { id: data.bookingId }, data: { stripePaymentId: transactionId } });
+            }
+        } catch (err) {
+            // Non-fatal: log and continue. Do not fail the payment creation because
+            // booking stripePaymentId couldn't be written (unique constraint, etc).
+            console.error('Failed to write stripePaymentId to booking:', err);
+        }
+
+        return payment;
     }
 
     // UPDATE PAYMENT
