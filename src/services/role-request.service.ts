@@ -1,0 +1,106 @@
+import RoleRequestRepo from "../repositories/role-request.repository";
+import UsersRepo from "../repositories/users.repository";
+import { RoleType, RequestStatus } from "@prisma/client";
+import { prisma } from "../utils/prisma";
+import NotificationService from "../modules/notifications/user-notification.service";
+
+export default class RoleRequestService {
+  /**
+   * Submit an application for a specific role
+   */
+  static async submitApplication(userId: string, roleType: RoleType, applicationData: any) {
+    // 1. Check if user already has this role
+    const user = await UsersRepo.findUserById(userId);
+    if (!user) throw new Error("User not found");
+    
+    if (user.roleType.includes(roleType)) {
+      throw new Error(`User already has the ${roleType} role`);
+    }
+
+    // 2. Check for existing pending application for this role
+    const pending = await RoleRequestRepo.findPendingRequest(userId, roleType);
+    if (pending) {
+      throw new Error(`An application for the ${roleType} role is already pending`);
+    }
+
+    // 3. Map roleType to the correct application model name in Prisma
+    const modelMapping: Record<RoleType, string> = {
+      [RoleType.mayor]: "mayorApplication",
+      [RoleType.host]: "hostApplication",
+      [RoleType.foxerAsset]: "foxerAssetApplication",
+      [RoleType.foxerService]: "foxerServiceApplication",
+      [RoleType.investor]: "investorApplication",
+    };
+
+    // Convert empty strings to null so optional FK fields don't violate constraints
+    const cleanedData = Object.fromEntries(
+      Object.entries(applicationData).map(([k, v]) => [k, v === "" ? null : v])
+    );
+
+    return RoleRequestRepo.createRequest(userId, roleType, cleanedData, modelMapping[roleType]);
+  }
+
+  /**
+   * Admin review of an application
+   */
+  static async reviewApplication(
+  requestId: string,
+  adminId: string,
+  status: RequestStatus,
+  rejectionReason?: string
+) {
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Fetch request
+    const request = await RoleRequestRepo.findRequestById(requestId);
+    if (!request) throw new Error("Application not found");
+    if (request.status !== RequestStatus.pending) {
+      throw new Error("This application has already been processed");
+    }
+
+    // 2. Update status
+    const updatedRequest = await RoleRequestRepo.updateRequestStatus(requestId, {
+      status,
+      reviewedBy: adminId,
+      reviewedAt: new Date(),
+      rejectionReason: status === RequestStatus.rejected ? rejectionReason : undefined,
+    });
+
+    // 3. If approved, grant the role
+    if (status === RequestStatus.approved) {
+      await tx.user.update({
+        where: { id: request.userId },
+        data: {
+          roleType: {
+            push: request.roleType,
+          },
+        },
+      });
+    }
+
+    return { updatedRequest, userId: request.userId, roleType: request.roleType };
+  });
+
+  // 4. Notify the applicant — outside the transaction, since this is a
+  // side effect (DB write + socket push), not something that needs to
+  // roll back together with the application status update
+  await NotificationService.create({
+    userId: result.userId,
+    type: status === RequestStatus.approved ? "role_request_approved" : "role_request_rejected",
+    title: status === RequestStatus.approved ? "Application approved" : "Application rejected",
+    message:
+      status === RequestStatus.approved
+        ? `Your ${result.roleType} application has been approved!`
+        : `Your ${result.roleType} application was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`,
+    metadata: { requestId, roleType: result.roleType, status },
+  });
+
+  return result.updatedRequest;
+}
+
+  /**
+   * Get all requests (for admin dashboard)
+   */
+  static async getRequests(status?: RequestStatus) {
+    return RoleRequestRepo.getAllRequests(status);
+  }
+}

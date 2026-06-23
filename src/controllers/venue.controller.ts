@@ -1,371 +1,134 @@
 import { Request, Response } from "express";
-import VenueService from "../services/venue.service";
-import { VenueStatus } from "@prisma/client";
+import Joi from "joi";
+import VenueSvc from "../services/venue.service";
+import { VenueStatus, VenueCategory } from "@prisma/client";
 
-export default class VenueController {
-  // Create a new venue
-  static async createVenue(req: Request, res: Response) {
-    try {
-      const hostId = req.body.userId || (req as any).user?.userId; // Get from auth middleware
+export default class VenueCtrl {
 
-      if (!hostId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized: Host ID is required",
+    // Create Venue Controller
+    static async createVenue(req: Request, res: Response) {
+        const schema = Joi.object({
+            name: Joi.string().required(),
+            description: Joi.string().required(),
+            category: Joi.string().valid(...Object.values(VenueCategory)).required(),
+            capacity: Joi.number().integer().min(1).required(),
+            address: Joi.string().required(),
+            city: Joi.string().required(),
+            state: Joi.string().optional(),
+            country: Joi.string().required(),
+            imgIds: Joi.array().items(Joi.string()).min(1).max(5).required(),
+            spaceType: Joi.array().items(Joi.string()).optional(),
+            amenities: Joi.array().items(Joi.string()).optional(),
+            techAv: Joi.array().items(Joi.string()).optional(),
+            staffing: Joi.array().items(Joi.string()).optional(),
+            policies: Joi.array().items(Joi.string()).optional(),
+            status: Joi.string().valid(...Object.values(VenueStatus)).optional(),
+            price: Joi.number().min(0).optional(),
+            billingRate: Joi.string().valid("hourly", "daily", "weekly", "monthly", "yearly", "one_time").default("daily"),
         });
-      }
 
-      // Remove userId from body before passing to service (Venue model uses hostId, not userId)
-      const { userId, ...venueData } = req.body;
+        const { error, value } = schema.validate(req.body);
+        if (error) {
+            return res.status(400).json({ message: error.message });
+        }
 
-      const venue = await VenueService.createVenue({
-        hostId,
-        ...venueData,
-      });
+        try {
+            // mayorId comes from the authenticated user's JWT token
+            const mayorId = (req as any).user?.userId;
+            if (!mayorId) {
+                return res.status(401).json({ message: "Unauthorized" });
+            }
 
-      return res.status(201).json({
-        success: true,
-        message: "Venue created successfully",
-        data: venue,
-      });
-    } catch (error: any) {
-      console.error("Error creating venue:", error);
-      return res.status(400).json({
-        success: false,
-        message: error.message || "Failed to create venue",
-      });
+            const venueData = { ...value, mayorId };
+            const venue = await VenueSvc.createVenue(venueData as any);
+            return res.status(201).json({ message: "Venue created successfully", venue });
+        } catch (error: any) {
+            return res.status(400).json({ message: error.message || error });
+        }
     }
-  }
 
-  // Get all venues with filters
-  static async getAllVenues(req: Request, res: Response) {
-    try {
-      const filters: {
-        hostId?: string;
-        categoryId?: string;
-        city?: string;
-        status?: VenueStatus;
-        isPublished?: boolean;
-      } = {};
-
-      // Extract query parameters
-      if (req.query.hostId) filters.hostId = req.query.hostId as string;
-      if (req.query.categoryId)
-        filters.categoryId = req.query.categoryId as string;
-      if (req.query.city) filters.city = req.query.city as string;
-      if (req.query.status) filters.status = req.query.status as VenueStatus;
-      if (req.query.isPublished !== undefined) {
-        filters.isPublished = req.query.isPublished === "true";
-      }
-
-      const venues = await VenueService.getAllVenues(filters);
-
-      return res.status(200).json({
-        success: true,
-        data: venues,
-        count: venues.length,
-      });
-    } catch (error: any) {
-      console.error("Error fetching venues:", error);
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to fetch venues",
-      });
+    // READ Venues Controller with optional query parameters for filtering
+    // `hostId` accepted as a deprecated alias for `mayorId` (see venue.repository.ts)
+    static async getVenues(req: Request, res: Response) {
+        try {
+            const mayorId = (req.query.mayorId ?? req.query.hostId) as string | undefined;
+            const venues = await VenueSvc.getVenues(mayorId ? { mayorId } : undefined);
+            return res.status(200).json({ venues });
+        } catch (error: any) {
+            return res.status(500).json({ message: error.message || error });
+        }
     }
-  }
 
-  // Get venue by ID
-  static async getVenueById(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-
-      const venue = await VenueService.getVenueById(id);
-
-      return res.status(200).json({
-        success: true,
-        data: venue,
-      });
-    } catch (error: any) {
-      console.error("Error fetching venue:", error);
-      const statusCode = error.message === "Venue not found" ? 404 : 500;
-      return res.status(statusCode).json({
-        success: false,
-        message: error.message || "Failed to fetch venue",
-      });
+    // READ Venue by ID Controller
+    static async getVenueById(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const venue = await VenueSvc.getVenueById(id);
+            return res.status(200).json({ venue });
+        } catch (error: any) {
+            return res.status(404).json({ message: error.message || error });
+        }
     }
-  }
 
-  // Get venues by category slug
-  static async getVenuesByCategory(req: Request, res: Response) {
-    try {
-      const { categorySlug } = req.params;
+    static async updateVenue(req: Request, res: Response) {
+        const schema = Joi.object({
+            name: Joi.string().optional(),
+            description: Joi.string().optional(),
+            category: Joi.string().valid(...Object.values(VenueCategory)).optional(),
+            capacity: Joi.number().integer().min(1).optional(),
+            price: Joi.number().min(0).optional(),
+            
+            address: Joi.string().optional(),
+            city: Joi.string().optional(),
+            state: Joi.string().optional(),
+            country: Joi.string().optional(),
+            imgIds: Joi.array().items(Joi.string()).max(5).optional(),
+            spaceType: Joi.array().items(Joi.string()).optional(),
+            amenities: Joi.array().items(Joi.string()).optional(),
+            techAv: Joi.array().items(Joi.string()).optional(),
+            staffing: Joi.array().items(Joi.string()).optional(),
+            policies: Joi.array().items(Joi.string()).optional(),
+            status: Joi.string().valid(...Object.values(VenueStatus)).optional(),
+            billingRate: Joi.string().valid("hourly", "daily", "weekly", "monthly", "yearly", "one_time").optional(),
+        }).min(1);
 
-      const venues = await VenueService.getVenuesByCategory(categorySlug);
+        const { error, value } = schema.validate(req.body);
+        if (error) {
+            return res.status(400).json({ message: error.message });
+        }
 
-      return res.status(200).json({
-        success: true,
-        data: venues,
-        count: venues.length,
-      });
-    } catch (error: any) {
-      console.error("Error fetching venues by category:", error);
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to fetch venues by category",
-      });
+        try {
+            const requesterId = (req as any).user?.userId as string | undefined;
+            const requesterRole = (req as any).user?.role as string | undefined;
+            if (!requesterId) return res.status(401).json({ message: "Unauthorized" });
+
+            const venue = await VenueSvc.updateVenue({
+                id: String(req.params.id),
+                requesterId,
+                data: value as any,
+            });
+            return res.status(200).json({ message: "Venue updated successfully", venue });
+        } catch (err: any) {
+            const status = err.message === "Unauthorized" ? 403 : err.message === "Venue not found" ? 404 : 400;
+            return res.status(status).json({ message: err.message || err });
+        }
     }
-  }
 
-  // Update venue
-  static async updateVenue(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const hostId = req.body.userId || (req as any).user?.userId; // Get from auth middleware
+    static async deleteVenue(req: Request, res: Response) {
+        try {
+            const requesterId = (req as any).user?.userId as string | undefined;
+            const requesterRole = (req as any).user?.role as string | undefined;
+            if (!requesterId) return res.status(401).json({ message: "Unauthorized" });
 
-      if (!hostId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized: Host ID is required",
-        });
-      }
-
-      const venue = await VenueService.updateVenue(id, hostId, req.body);
-
-      return res.status(200).json({
-        success: true,
-        message: "Venue updated successfully",
-        data: venue,
-      });
-    } catch (error: any) {
-      console.error("Error updating venue:", error);
-      const statusCode =
-        error.message === "Venue not found"
-          ? 404
-          : error.message.includes("Unauthorized")
-            ? 403
-            : 400;
-
-      return res.status(statusCode).json({
-        success: false,
-        message: error.message || "Failed to update venue",
-      });
+            await VenueSvc.deleteVenue({
+                id: String(req.params.id),
+                requesterId,
+                requesterRole,
+            });
+            return res.status(200).json({ message: "Venue deleted successfully" });
+        } catch (err: any) {
+            const status = err.message === "Unauthorized" ? 403 : err.message === "Venue not found" ? 404 : 400;
+            return res.status(status).json({ message: err.message || err });
+        }
     }
-  }
-
-  // Delete venue
-  static async deleteVenue(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const hostId = req.body.userId || (req as any).user?.userId; // Get from auth middleware
-
-      if (!hostId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized: Host ID is required",
-        });
-      }
-
-      await VenueService.deleteVenue(id, hostId);
-
-      return res.status(200).json({
-        success: true,
-        message: "Venue deleted successfully",
-      });
-    } catch (error: any) {
-      console.error("Error deleting venue:", error);
-      const statusCode =
-        error.message === "Venue not found"
-          ? 404
-          : error.message.includes("Unauthorized")
-            ? 403
-            : 400;
-
-      return res.status(statusCode).json({
-        success: false,
-        message: error.message || "Failed to delete venue",
-      });
-    }
-  }
-
-  // Add amenity to venue
-  static async addAmenity(req: Request, res: Response) {
-    try {
-      const { venueId } = req.params;
-      const hostId = req.body.userId || (req as any).user?.userId; // Get from auth middleware
-
-      if (!hostId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized: Host ID is required",
-        });
-      }
-
-      const amenity = await VenueService.addAmenity(venueId, hostId, req.body);
-
-      return res.status(201).json({
-        success: true,
-        message: "Amenity added successfully",
-        data: amenity,
-      });
-    } catch (error: any) {
-      console.error("Error adding amenity:", error);
-      const statusCode = error.message.includes("Unauthorized") ? 403 : 400;
-
-      return res.status(statusCode).json({
-        success: false,
-        message: error.message || "Failed to add amenity",
-      });
-    }
-  }
-
-  // Remove amenity
-  static async removeAmenity(req: Request, res: Response) {
-    try {
-      const { amenityId } = req.params;
-      const hostId = req.body.userId || (req as any).user?.userId; // Get from auth middleware
-
-      if (!hostId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized: Host ID is required",
-        });
-      }
-
-      await VenueService.removeAmenity(amenityId, hostId);
-
-      return res.status(200).json({
-        success: true,
-        message: "Amenity removed successfully",
-      });
-    } catch (error: any) {
-      console.error("Error removing amenity:", error);
-      const statusCode =
-        error.message === "Amenity not found"
-          ? 404
-          : error.message.includes("Unauthorized")
-            ? 403
-            : 400;
-
-      return res.status(statusCode).json({
-        success: false,
-        message: error.message || "Failed to remove amenity",
-      });
-    }
-  }
-
-  // Add image to venue
-  static async addImage(req: Request, res: Response) {
-    try {
-      const { venueId } = req.params;
-      const hostId = req.body.userId || (req as any).user?.userId; // Get from auth middleware
-
-      if (!hostId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized: Host ID is required",
-        });
-      }
-
-      const image = await VenueService.addImage(venueId, hostId, req.body);
-
-      return res.status(201).json({
-        success: true,
-        message: "Image added successfully",
-        data: image,
-      });
-    } catch (error: any) {
-      console.error("Error adding image:", error);
-      const statusCode = error.message.includes("Unauthorized") ? 403 : 400;
-
-      return res.status(statusCode).json({
-        success: false,
-        message: error.message || "Failed to add image",
-      });
-    }
-  }
-
-  // Remove image
-  static async removeImage(req: Request, res: Response) {
-    try {
-      const { imageId } = req.params;
-      const hostId = req.body.userId || (req as any).user?.userId; // Get from auth middleware
-
-      if (!hostId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized: Host ID is required",
-        });
-      }
-
-      await VenueService.removeImage(imageId, hostId);
-
-      return res.status(200).json({
-        success: true,
-        message: "Image removed successfully",
-      });
-    } catch (error: any) {
-      console.error("Error removing image:", error);
-      const statusCode =
-        error.message === "Image not found"
-          ? 404
-          : error.message.includes("Unauthorized")
-            ? 403
-            : 400;
-
-      return res.status(statusCode).json({
-        success: false,
-        message: error.message || "Failed to remove image",
-      });
-    }
-  }
-
-  // Add review
-  static async addReview(req: Request, res: Response) {
-    try {
-      const { venueId } = req.params;
-      const userId = req.body.userId || (req as any).user?.id; // Get from auth middleware
-
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized: User ID is required",
-        });
-      }
-
-      const review = await VenueService.addReview(venueId, userId, req.body);
-
-      return res.status(201).json({
-        success: true,
-        message: "Review added successfully",
-        data: review,
-      });
-    } catch (error: any) {
-      console.error("Error adding review:", error);
-      return res.status(400).json({
-        success: false,
-        message: error.message || "Failed to add review",
-      });
-    }
-  }
-
-  // Get venue reviews
-  static async getVenueReviews(req: Request, res: Response) {
-    try {
-      const { venueId } = req.params;
-
-      const reviews = await VenueService.getVenueReviews(venueId);
-
-      return res.status(200).json({
-        success: true,
-        data: reviews,
-        count: reviews.length,
-      });
-    } catch (error: any) {
-      console.error("Error fetching reviews:", error);
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to fetch reviews",
-      });
-    }
-  }
 }

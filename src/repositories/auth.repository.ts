@@ -19,21 +19,24 @@ export default class AuthRepo {
         username: data.username,
         name: data.name,
         phone: data.mobileNumber,
+        updatedAt: new Date(),
       },
       select: {
         id: true,
         email: true,
         username: true,
         name: true,
+        systemRole: true,
+        roleType: true,
         createdAt: true,
       },
     });
   }
 
-  static async findUserByEmail(username: string) {
+  static async findUserByEmail(email: string) {
     return prisma.user.findUnique({
       where: {
-        username,
+        email,
       },
     });
   }
@@ -41,50 +44,26 @@ export default class AuthRepo {
   static async updateUserLoginStatus(userId: string) {
     return prisma.user.update({
       where: {
-        id: userId,
+        id: String(userId),
       },
       data: {
-        // lastLoginAt field doesn't exist in schema, removing for now
+        updatedAt: new Date(),
       },
       select: {
         id: true,
         email: true,
         username: true,
         name: true,
+        systemRole: true,
+        roleType: true,
       },
     });
   }
 
-  // static async createSession(data: {
-  //   userId: string;
-  //   refreshToken: string;
-  //   expiresAt: Date;
-  // }) {
-  //   return prisma.session.create({
-  //     data: {
-  //       ...data,
-  //     },
-  //   });
-  // }
-
-  // static async findValidSession(refreshToken: string) {
-  //   return prisma.session.findFirst({
-  //     where: {
-  //       refreshToken,
-  //       expiresAt: {
-  //         gt: new Date(),
-  //       },
-  //     },
-  //     include: {
-  //       user: true,
-  //     },
-  //   });
-  // }
-
   static async findUserById(userId: string) {
     return prisma.user.findUnique({
       where: {
-        id: userId,
+        id: String(userId),
       },
     });
   }
@@ -97,23 +76,26 @@ export default class AuthRepo {
     });
   }
 
-  static async updateUser(userId: string, data: any) {
+  static async updateUser(userId: number | string, data: any) {
     return prisma.user.update({
       where: {
-        id: userId,
+        id: String(userId),
       },
       data: data,
     });
   }
-  static async getAuthUser(userId: string) {
+
+  static async getAuthUser(userId: number | string) {
     return prisma.user.findUnique({
       where: {
-        id: userId,
+        id: String(userId),
       },
       select: {
         id: true,
         name: true,
         username: true,
+        systemRole: true,
+        roleType: true,
       },
     });
   }

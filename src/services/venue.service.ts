@@ -1,282 +1,218 @@
-import VenueRepository from "../repositories/venue.repository";
-import { VenueStatus } from "@prisma/client";
+import VenueRepo from "../repositories/venue.repository";
+import { VenueStatus, BillingRate, VenueCategory } from "@prisma/client";
 
-export default class VenueService {
-  // Create a new venue
-  static async createVenue(data: {
-    hostId: string;
-    categoryId?: string;
-    name: string;
-    description: string;
-    venueType: string;
-    capacity?: number;
-    status?: VenueStatus;
-    isPublished?: boolean;
-    address: string;
-    city: string;
-    state: string;
-    country: string;
-    latitude?: number;
-    longitude?: number;
-    pricing?: {
-      pricePerDay: number;
-      pricePerHour?: number;
-      currency?: string;
-      minHours?: number;
-    };
-    amenities?: Array<{ name: string; icon?: string }>;
-    images?: Array<{
-      imageUrl: string;
-      altText?: string;
-      displayOrder?: number;
-      isPrimary?: boolean;
-    }>;
-  }) {
-    // Validate required fields
-    if (!data.name || !data.description || !data.address || !data.city || !data.state) {
-      throw new Error("Missing required fields");
+export default class VenueSvc {
+    private static isAdminRole(role?: string) {
+        return role ? ["admin", "super_admin", "mayor"].includes(role) : false;
     }
 
-    // Validate venue type
-    const validVenueTypes = [
-      "hotel",
-      "land",
-      "hall",
-      "outdoor_space",
-      "restaurant",
-      "conference_room",
-      "beach",
-      "garden",
-      "rooftop",
-      "warehouse",
-      "other",
-    ];
+    // ───────────────────────────────────────────────────────────
+    // CREATE
+    // ───────────────────────────────────────────────────────────
 
-    if (!validVenueTypes.includes(data.venueType.toLowerCase())) {
-      throw new Error(
-        `Invalid venue type. Must be one of: ${validVenueTypes.join(", ")}`
-      );
+    static async createVenue(data: {
+        mayorId: string;
+        name: string;
+        description: string;
+        category: VenueCategory;
+        capacity: number;
+        address: string;
+        city: string;
+        state?: string;
+        country: string;
+        imgIds: string[];
+        spaceType?: string[];
+        amenities?: string[];
+        techAv?: string[];
+        staffing?: string[];
+        policies?: string[];
+        status?: VenueStatus;
+        price?: number;
+        billingRate?: BillingRate;
+    }) {
+        // Business logic: validate business rules before creation
+        if (data.price && data.price < 0) {
+            throw new Error("Price cannot be negative");
+        }
+        if (data.capacity < 1) {
+            throw new Error("Capacity must be at least 1");
+        }
+        if (!Array.isArray(data.imgIds) || data.imgIds.length === 0) {
+            throw new Error("At least one image is required");
+        }
+        if (data.imgIds && data.imgIds.length > 5) {
+            throw new Error("A maximum of 5 images is allowed");
+        }
+
+        // Normalize defaults (previously done inside repository)
+        return VenueRepo.createVenue({
+            ...data,
+            state: data.state ?? undefined,
+            imgIds: data.imgIds,
+            spaceType: data.spaceType ?? [],
+            amenities: data.amenities ?? [],
+            techAv: data.techAv ?? [],
+            staffing: data.staffing ?? [],
+            policies: data.policies ?? [],
+            status: data.status ?? VenueStatus.pending,
+            price: data.price ?? 0,
+            billingRate: (data.billingRate as BillingRate) ?? BillingRate.daily,
+        });
     }
 
-    // Validate capacity if provided
-    if (data.capacity !== undefined && data.capacity < 1) {
-      throw new Error("Capacity must be at least 1");
+    // ───────────────────────────────────────────────────────────
+    // READ — Delegate all queries to repository
+    // ───────────────────────────────────────────────────────────
+
+    static async getVenues(filters?: { mayorId?: string; hostId?: string }) {
+        return VenueRepo.findAllVenues(filters);
     }
 
-    // Validate coordinates if provided
-    if (data.latitude !== undefined) {
-      if (data.latitude < -90 || data.latitude > 90) {
-        throw new Error("Latitude must be between -90 and 90");
-      }
+    static async getVenueById(id: string) {
+        const venue = await VenueRepo.findVenueById(id);
+
+        // Business logic: check if venue is accessible
+        if (!venue) {
+            throw new Error("Venue not found");
+        }
+        if (venue.status === VenueStatus.archived) {
+            throw new Error("Venue has been removed");
+        }
+
+        // Compute inclusions from venue arrays
+        const inclusions = VenueSvc.computeInclusions(venue);
+
+        return { ...venue, inclusions };
     }
 
-    if (data.longitude !== undefined) {
-      if (data.longitude < -180 || data.longitude > 180) {
-        throw new Error("Longitude must be between -180 and 180");
-      }
+    // Derives a displayable inclusions list from venue's structured arrays
+    private static computeInclusions(venue: {
+        amenities: string[];
+        techAv: string[];
+        staffing: string[];
+    }) {
+        const ICON_MAP: Record<string, string> = {
+            // amenities
+            "air conditioning": "ac_unit",
+            "parking": "local_parking",
+            "restrooms": "wc",
+            "catering kitchen": "soup_kitchen",
+            "pool": "pool",
+            "bar": "local_bar",
+            "elevator": "elevator",
+            "wifi": "wifi",
+            "garden lighting": "light_mode",
+            "bridal suite": "king_bed",
+            // techAv
+            "projector": "videocam",
+            "sound system": "speaker",
+            "microphone": "mic",
+            "bluetooth speaker": "bluetooth_audio",
+            "led walls": "tv",
+            "led screen": "monitor",
+            "full av system": "settings_input_hdmi",
+            "live stream setup": "live_tv",
+            "outdoor screen": "outdoor_garden",
+            // staffing
+            "security": "security",
+            "janitor": "cleaning_services",
+            "gardener": "yard",
+            "concierge": "support_agent",
+            "lifeguard": "pool",
+            "event coordinator": "event",
+            "front desk": "contact_support",
+        };
+
+        const items: { name: string; icon: string; desc: string }[] = [];
+
+        const addItems = (arr: string[], category: string) => {
+            for (const raw of arr) {
+                const key = raw.toLowerCase();
+                items.push({
+                    name: raw.charAt(0).toUpperCase() + raw.slice(1),
+                    icon: ICON_MAP[key] ?? "check_circle",
+                    desc: `${category} included`,
+                });
+            }
+        };
+
+        addItems(venue.amenities, "Amenity");
+        addItems(venue.techAv, "Tech & AV");
+        addItems(venue.staffing, "Staffing");
+
+        return items;
     }
 
-    // Validate pricing if provided
-    if (data.pricing) {
-      if (data.pricing.pricePerDay <= 0) {
-        throw new Error("Price per day must be greater than 0");
-      }
-
-      if (data.pricing.pricePerHour !== undefined && data.pricing.pricePerHour <= 0) {
-        throw new Error("Price per hour must be greater than 0");
-      }
-
-      if (data.pricing.minHours !== undefined && data.pricing.minHours < 1) {
-        throw new Error("Minimum hours must be at least 1");
-      }
+    static async getVenueByIdForMayor(id: string, mayorId: string) {
+        // Mayor can see their own venues regardless of status
+        const venue = await VenueRepo.findVenueByIdAndOwner(id, mayorId);
+        if (!venue) {
+            throw new Error("Venue not found or access denied");
+        }
+        return venue;
     }
 
-    // Create venue
-    return await VenueRepository.createVenue(data);
-  }
+    static async updateVenue(params: {
+        id: string;
+        requesterId: string;
+        requesterRole?: string;
+        data: Partial<{
+            name: string;
+            description: string;
+            category: VenueCategory;
+            capacity: number;
+            price: number;
+            address: string;
+            city: string;
+            state?: string;
+            country: string;
+            imgIds: string[];
+            spaceType: string[];
+            amenities: string[];
+            techAv: string[];
+            staffing: string[];
+            policies: string[];
+            status: VenueStatus;
+            billingRate: BillingRate;
+        }>;
+    }) {
+        const { id, requesterId, requesterRole, data } = params;
 
-  // Get all venues with filters
-  static async getAllVenues(filters?: {
-    hostId?: string;
-    categoryId?: string;
-    city?: string;
-    status?: VenueStatus;
-    isPublished?: boolean;
-  }) {
-    return await VenueRepository.getAllVenues(filters);
-  }
+        const venue = await VenueRepo.findVenueById(id);
+        if (!venue) throw new Error("Venue not found");
 
-  // Get venue by ID
-  static async getVenueById(id: string) {
-    if (!id) {
-      throw new Error("Venue ID is required");
+        const isAdmin = this.isAdminRole(requesterRole);
+        if (!isAdmin && venue.mayorId !== requesterId) {
+            throw new Error("Unauthorized");
+        }
+
+        if (data.price !== undefined && data.price < 0) {
+            throw new Error("Price cannot be negative");
+        }
+        if (data.capacity !== undefined && data.capacity < 1) {
+            throw new Error("Capacity must be at least 1");
+        }
+        if (data.imgIds && data.imgIds.length > 5) {
+            throw new Error("A maximum of 5 images is allowed");
+        }
+
+        return VenueRepo.updateVenue(id, data);
     }
 
-    const venue = await VenueRepository.getVenueById(id);
+    static async deleteVenue(params: {
+        id: string;
+        requesterId: string;
+        requesterRole?: string;
+    }) {
+        const { id, requesterId, requesterRole } = params;
+        const venue = await VenueRepo.findVenueById(id);
+        if (!venue) throw new Error("Venue not found");
 
-    if (!venue) {
-      throw new Error("Venue not found");
+        const isAdmin = this.isAdminRole(requesterRole);
+        if (!isAdmin && venue.mayorId !== requesterId) {
+            throw new Error("Unauthorized");
+        }
+
+        return VenueRepo.archiveVenue(id);
     }
-
-    return venue;
-  }
-
-  // Get venues by category slug
-  static async getVenuesByCategory(categorySlug: string) {
-    if (!categorySlug) {
-      throw new Error("Category slug is required");
-    }
-
-    return await VenueRepository.getVenuesByCategory(categorySlug);
-  }
-
-  // Update venue
-  static async updateVenue(
-    id: string,
-    hostId: string,
-    data: Partial<{
-      categoryId: string;
-      name: string;
-      description: string;
-      venueType: string;
-      capacity: number;
-      status: VenueStatus;
-      isPublished: boolean;
-      address: string;
-      city: string;
-      state: string;
-      country: string;
-      latitude: number;
-      longitude: number;
-    }>
-  ) {
-    if (!id || !hostId) {
-      throw new Error("Venue ID and Host ID are required");
-    }
-
-    // Validate data if provided
-    if (data.capacity !== undefined && data.capacity < 1) {
-      throw new Error("Capacity must be at least 1");
-    }
-
-    if (data.latitude !== undefined) {
-      if (data.latitude < -90 || data.latitude > 90) {
-        throw new Error("Latitude must be between -90 and 90");
-      }
-    }
-
-    if (data.longitude !== undefined) {
-      if (data.longitude < -180 || data.longitude > 180) {
-        throw new Error("Longitude must be between -180 and 180");
-      }
-    }
-
-    return await VenueRepository.updateVenue(id, hostId, data);
-  }
-
-  // Delete venue
-  static async deleteVenue(id: string, hostId: string) {
-    if (!id || !hostId) {
-      throw new Error("Venue ID and Host ID are required");
-    }
-
-    await VenueRepository.deleteVenue(id, hostId);
-    return { message: "Venue deleted successfully" };
-  }
-
-  // Add amenity to venue
-  static async addAmenity(
-    venueId: string,
-    hostId: string,
-    amenityData: { name: string; icon?: string }
-  ) {
-    if (!venueId || !hostId) {
-      throw new Error("Venue ID and Host ID are required");
-    }
-
-    if (!amenityData.name) {
-      throw new Error("Amenity name is required");
-    }
-
-    return await VenueRepository.addAmenity(venueId, hostId, amenityData);
-  }
-
-  // Remove amenity
-  static async removeAmenity(amenityId: string, hostId: string) {
-    if (!amenityId || !hostId) {
-      throw new Error("Amenity ID and Host ID are required");
-    }
-
-    await VenueRepository.removeAmenity(amenityId, hostId);
-    return { message: "Amenity removed successfully" };
-  }
-
-  // Add image to venue
-  static async addImage(
-    venueId: string,
-    hostId: string,
-    imageData: {
-      imageUrl: string;
-      altText?: string;
-      displayOrder?: number;
-      isPrimary?: boolean;
-    }
-  ) {
-    if (!venueId || !hostId) {
-      throw new Error("Venue ID and Host ID are required");
-    }
-
-    if (!imageData.imageUrl) {
-      throw new Error("Image URL is required");
-    }
-
-    // Validate URL format
-    try {
-      new URL(imageData.imageUrl);
-    } catch (error) {
-      throw new Error("Invalid image URL format");
-    }
-
-    return await VenueRepository.addImage(venueId, hostId, imageData);
-  }
-
-  // Remove image
-  static async removeImage(imageId: string, hostId: string) {
-    if (!imageId || !hostId) {
-      throw new Error("Image ID and Host ID are required");
-    }
-
-    await VenueRepository.removeImage(imageId, hostId);
-    return { message: "Image removed successfully" };
-  }
-
-  // Add review
-  static async addReview(
-    venueId: string,
-    userId: string,
-    reviewData: { rating: number; comment?: string }
-  ) {
-    if (!venueId || !userId) {
-      throw new Error("Venue ID and User ID are required");
-    }
-
-    if (!reviewData.rating) {
-      throw new Error("Rating is required");
-    }
-
-    if (reviewData.rating < 1 || reviewData.rating > 5) {
-      throw new Error("Rating must be between 1 and 5");
-    }
-
-    return await VenueRepository.addReview(venueId, userId, reviewData);
-  }
-
-  // Get venue reviews
-  static async getVenueReviews(venueId: string) {
-    if (!venueId) {
-      throw new Error("Venue ID is required");
-    }
-
-    return await VenueRepository.getVenueReviews(venueId);
-  }
 }

@@ -71,7 +71,8 @@ export default class AuthSvc {
     const accessToken = jwt.sign(
       {
         userId: user.id,
-        role: "user", // New users default to 'user' role
+        systemRole: (user as any).systemRole || "user",
+        roleType: (user as any).roleType || [],
         email: user.email,
       },
       ACCESS_TOKEN_SECRET,
@@ -83,7 +84,8 @@ export default class AuthSvc {
     const refreshToken = jwt.sign(
       {
         userId: user.id,
-        role: "user",
+        systemRole: (user as any).systemRole || "user",
+        roleType: (user as any).roleType || [],
         email: user.email,
       },
       REFRESH_TOKEN_SECRET,
@@ -128,14 +130,13 @@ export default class AuthSvc {
   }
 
   static async login({
-    username,
+    email,
     password,
   }: {
-    username: string;
+    email: string;
     password: string;
   }) {
-    const user = await AuthRepo.findUserByEmail(username);
-    console.log("+++++++++", user);
+    const user = await AuthRepo.findUserByEmail(email);
     if (!user) {
       throw "Invalid credentials";
     }
@@ -157,7 +158,8 @@ export default class AuthSvc {
     const accessToken = jwt.sign(
       {
         userId: user.id,
-        role: (user as any).role || "user",
+        systemRole: (user as any).systemRole || "user",
+        roleType: (user as any).roleType || [],
         email: user.email,
       },
       ACCESS_TOKEN_SECRET,
@@ -169,7 +171,8 @@ export default class AuthSvc {
     const refreshToken = jwt.sign(
       {
         userId: user.id,
-        role: (user as any).role || "user",
+        systemRole: (user as any).systemRole || "user",
+        roleType: (user as any).roleType || [],
         email: user.email,
       },
       REFRESH_TOKEN_SECRET,
@@ -191,8 +194,8 @@ export default class AuthSvc {
         email: user.email,
         username: user.username,
         name: user.name,
-        role: (user as any).role || "user",
-        isHost: (user as any).isHost || false,
+        systemRole: (user as any).systemRole || "user",
+        roleType: (user as any).roleType || [],
       },
     };
   }
@@ -212,7 +215,7 @@ export default class AuthSvc {
       // }
 
       // Get user
-      const user = await AuthRepo.findUserById(decoded.userId);
+      const user = await AuthRepo.findUserById(String(decoded.userId));
       if (!user) {
         throw "User not found";
       }
@@ -221,7 +224,8 @@ export default class AuthSvc {
       const accessToken = jwt.sign(
         {
           userId: user.id,
-          role: (user as any).role || "user",
+          systemRole: (user as any).systemRole || "user",
+          roleType: (user as any).roleType || [],
           email: user.email,
         },
         ACCESS_TOKEN_SECRET,
@@ -350,6 +354,6 @@ export default class AuthSvc {
     };
   }
   static async getAuthUser(userId: string) {
-    return AuthRepo.getAuthUser(userId);
+    return AuthRepo.getAuthUser(String(userId));
   }
 }

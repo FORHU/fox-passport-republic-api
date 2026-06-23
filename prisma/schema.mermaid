@@ -1,0 +1,528 @@
+erDiagram
+    User {
+        string id PK
+        string email UK
+        string password
+        string name
+        string address
+        string city
+        string state
+        string country
+        string username UK
+        string phone
+        string imgId
+        SystemRole systemRole
+        RoleTypeArr roleType
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    RoleRequest {
+        string id PK
+        string userId FK
+        RoleType roleType
+        RequestStatus status
+        string reviewedBy FK
+        DateTime reviewedAt
+        string rejectionReason
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    MayorApplication {
+        string id PK
+        string requestId FK, UK
+        string businessName
+        string contactNumber
+        string address
+        string tinNumber
+        string description
+        string validId1FileId FK
+        string nbiFileId FK
+        string tinIdFileId FK
+        string birPermitFileId FK
+        string selfieFileId FK
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    FoxerAssetApplication {
+        string id PK
+        string requestId FK, UK
+        string businessName
+        stringArr assetTypes
+        string tinNumber
+        string validId1FileId FK
+        string nbiFileId FK
+        string tinIdFileId FK
+        string birPermitFileId FK
+        string selfieFileId FK
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    FoxerServiceApplication {
+        string id PK
+        string requestId FK, UK
+        stringArr serviceTypes
+        stringArr portfolioUrls
+        int experience
+        string nbiClearanceIdNumber
+        string tinNumber
+        string validId1FileId FK
+        string nbiFileId FK
+        string tinIdFileId FK
+        string birPermitFileId FK
+        string selfieFileId FK
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    InvestorApplication {
+        string id PK
+        string requestId FK, UK
+        string companyName
+        float investmentRange
+        stringArr interests
+        string proofFileId FK
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    HostApplication {
+        string id PK
+        string requestId FK, UK
+        string bio
+        string experience
+        string location
+        string validId1FileId FK
+        string nbiFileId FK
+        string tinIdFileId FK
+        string birPermitFileId FK
+        string selfieFileId FK
+        string portfolioFileId FK
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    File {
+        string id PK
+        string url
+        string name
+        string type
+        string uploadedBy FK
+        string venueId FK
+        string assetId FK
+        string serviceId FK
+        string templateId FK
+        DateTime createdAt
+        DateTime updatedAt
+        DateTime deletedAt
+    }
+
+    Passport {
+        string id PK
+        string userId FK, UK
+        int totalStamps
+        int totalMileage
+        int level
+        json achievements
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    Asset {
+        string id PK
+        string ownerId FK
+        string category
+        string name
+        string description
+        int quantity
+        float price
+        string currency
+        BillingRate billingRate
+        AssetCondition condition
+        AssetStatus status
+        string city
+        string state
+        string country
+        DateTime createdAt
+        DateTime updatedAt
+        DateTime deletedAt
+    }
+
+    Service {
+        string id PK
+        string ownerId FK
+        ServiceCategory category
+        string name
+        string description
+        string city
+        string state
+        string country
+        boolean isWillingToTravel
+        stringArr tags
+        float price
+        string currency
+        BillingRate billingRate
+        ServiceStatus status
+        DateTime createdAt
+        DateTime updatedAt
+        DateTime deletedAt
+    }
+
+    Venue {
+        string id PK
+        string hostId FK
+        string category
+        string name
+        string description
+        int capacity
+        float price
+        BillingRate billingRate
+        string address
+        string city
+        string state
+        string country
+        VenueStatus status
+        stringArr spaceType
+        stringArr amenities
+        stringArr techAv
+        stringArr staffing
+        stringArr policies
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    EventTemplate {
+        string id PK
+        string ownerId FK
+        string name
+        string description
+        EventCategory category
+        boolean isPublic
+        string targetCity
+        string targetState
+        string targetCountry
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    EventTemplateAsset {
+        string id PK
+        string templateId FK
+        string assetId FK
+        string description
+        int quantity
+        string currency
+        float agreedPrice
+        boolean isOptional
+        DateTime date
+        DateTime createdAt
+        DateTime updatedAt
+        boolean matched
+        DateTime matchedAt
+        MatchConstraint matchConstraint
+    }
+
+    EventTemplateService {
+        string id PK
+        string templateId FK
+        string serviceId FK
+        string description
+        string currency
+        float agreedPrice
+        boolean isOptional
+        DateTime date
+        DateTime createdAt
+        DateTime updatedAt
+        boolean matched
+        DateTime matchedAt
+        MatchConstraint matchConstraint
+    }
+
+    EventTemplateVenue {
+        string id PK
+        string templateId FK
+        string venueId FK
+        string description
+        string currency
+        float agreedPrice
+        boolean isOptional
+        DateTime date
+        DateTime createdAt
+        DateTime updatedAt
+        boolean matched
+        DateTime matchedAt
+        MatchConstraint matchConstraint
+    }
+
+    Event {
+        string id PK
+        string clientId FK
+        string organizerId FK
+        string templateId FK
+        string name
+        string description
+        EventCategory eventCategory
+        DateTime startAt
+        DateTime endAt
+        int guestCount
+        float totalAmount
+        EventStatus eventStatus
+        RequestStatus requestStatus
+        string targetCity
+        string targetState
+        string targetCountry
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    EventAssetTransaction {
+        string id PK
+        string eventId FK
+        string bookingId FK
+        string assetId FK
+        string providerId FK
+        int quantity
+        TransactionStatus status
+        float agreedPrice
+        boolean included
+        string currency
+        DateTime lockedAt
+        DateTime releasedAt
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    EventServiceTransaction {
+        string id PK
+        string eventId FK
+        string bookingId FK
+        string serviceId FK
+        string providerId FK
+        TransactionStatus status
+        float agreedPrice
+        boolean included
+        string currency
+        DateTime lockedAt
+        DateTime releasedAt
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    EventVenueTransaction {
+        string id PK
+        string eventId FK
+        string bookingId FK
+        string venueId FK
+        string providerId FK
+        TransactionStatus status
+        float agreedPrice
+        boolean included
+        string currency
+        DateTime lockedAt
+        DateTime releasedAt
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    Booking {
+        string id PK
+        string eventId FK
+        string userId FK
+        int guestCount
+        float totalAmount
+        BookingStatus status
+        DateTime startAt
+        DateTime endAt
+        DateTime expiresAt
+        DateTime createdAt
+        DateTime updatedAt
+        boolean isGuestListLocked
+    }
+
+    BookingAttendee {
+        string id PK
+        string bookingId FK
+        string userId FK
+        string invitedById FK
+        string firstName
+        string lastName
+        string email
+        string phone
+        InviteStatus inviteStatus
+        boolean isDraft
+        string reasonForRejection
+        string ticketCode UK
+        boolean checkedIn
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    Payment {
+        string id PK
+        string bookingId FK
+        float amount
+        string currency
+        string method
+        PaymentType paymentType
+        PaymentStatus status
+        string transactionId UK
+        DateTime expiresAt
+        DateTime paidAt
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    Favorite {
+        string id PK
+        string userId FK
+        string entityId
+        string entityType
+        DateTime createdAt
+    }
+
+    Review {
+        string id PK
+        string userId FK
+        string entityId
+        string entityType
+        int rating
+        string comment
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    ServiceBooking {
+        string id PK
+        string serviceId FK
+        string userId FK
+        DateTime scheduledDate
+        DateTime endDate
+        int guestCount
+        string location
+        string notes
+        float totalAmount
+        ItemBookingStatus status
+        PaymentStatus paymentStatus
+        string paymentTransactionId
+        string paymentMethod
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    AssetBooking {
+        string id PK
+        string assetId FK
+        string userId FK
+        DateTime startDate
+        DateTime endDate
+        int quantity
+        string fulfillmentType
+        string deliveryAddress
+        string notes
+        float totalAmount
+        ItemBookingStatus status
+        PaymentStatus paymentStatus
+        string paymentTransactionId
+        string paymentMethod
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    User ||--o{ RoleRequest : applicant
+    User |o--o{ RoleRequest : reviewer
+    
+    RoleRequest ||--o| MayorApplication : mayorRequest
+    RoleRequest ||--o| FoxerAssetApplication : assetRequest
+    RoleRequest ||--o| FoxerServiceApplication : serviceRequest
+    RoleRequest ||--o| InvestorApplication : investorRequest
+    RoleRequest ||--o| HostApplication : hostRequest
+
+    File ||--o{ MayorApplication : validId1_mayor
+    File ||--o{ MayorApplication : nbi_mayor
+    File ||--o{ MayorApplication : tinId_mayor
+    File ||--o{ MayorApplication : birPermit_mayor
+    File ||--o{ MayorApplication : selfie_mayor
+
+    File ||--o{ FoxerAssetApplication : validId1_asset
+    File ||--o{ FoxerAssetApplication : nbi_asset
+    File ||--o{ FoxerAssetApplication : tinId_asset
+    File ||--o{ FoxerAssetApplication : birPermit_asset
+    File ||--o{ FoxerAssetApplication : selfie_asset
+
+    File ||--o{ FoxerServiceApplication : validId1_service
+    File ||--o{ FoxerServiceApplication : nbi_service
+    File ||--o{ FoxerServiceApplication : tinId_service
+    File ||--o{ FoxerServiceApplication : birPermit_service
+    File ||--o{ FoxerServiceApplication : selfie_service
+
+    File ||--o{ InvestorApplication : proofOfFunds
+
+    File ||--o{ HostApplication : validId1_host
+    File ||--o{ HostApplication : nbi_host
+    File ||--o{ HostApplication : birPermit_host
+    File ||--o{ HostApplication : selfie_host
+    File ||--o{ HostApplication : tinId_host
+    File ||--o{ HostApplication : portfolio_host
+    HostApplication }o--o{ File : portfolioMany
+
+    User ||--o{ File : uploadedBy
+    Venue ||--o{ File : venue
+    Asset ||--o{ File : asset
+    Service ||--o{ File : service
+    EventTemplate ||--o{ File : template
+
+    User ||--|| Passport : passport
+
+    User ||--o{ Asset : owner
+    User ||--o{ Service : owner
+    User ||--o{ Venue : host
+
+    User ||--o{ EventTemplate : owner
+    EventTemplate ||--o{ EventTemplateAsset : template
+    Asset ||--o{ EventTemplateAsset : asset
+
+    EventTemplate ||--o{ EventTemplateService : template
+    Service ||--o{ EventTemplateService : service
+
+    EventTemplate ||--o{ EventTemplateVenue : template
+    Venue ||--o{ EventTemplateVenue : venue
+
+    User ||--o{ Event : client
+    User ||--o{ Event : organizer
+    EventTemplate ||--o{ Event : template
+
+    Event ||--o{ EventAssetTransaction : event
+    Booking ||--o{ EventAssetTransaction : booking
+    Asset ||--o{ EventAssetTransaction : asset
+    User ||--o{ EventAssetTransaction : provider
+
+    Event ||--o{ EventServiceTransaction : event
+    Booking ||--o{ EventServiceTransaction : booking
+    Service ||--o{ EventServiceTransaction : service
+    User ||--o{ EventServiceTransaction : provider
+
+    Event ||--o{ EventVenueTransaction : event
+    Booking ||--o{ EventVenueTransaction : booking
+    Venue ||--o{ EventVenueTransaction : venue
+    User ||--o{ EventVenueTransaction : provider
+
+    Event ||--o{ Booking : event
+    User ||--o{ Booking : user
+
+    Booking ||--o{ BookingAttendee : booking
+    User ||--o{ BookingAttendee : user
+    User ||--o{ BookingAttendee : invitedBy
+
+    Booking ||--o{ Payment : booking
+
+    User ||--o{ Favorite : user
+    User ||--o{ Review : user
+
+    Service ||--o{ ServiceBooking : service
+    User ||--o{ ServiceBooking : user
+
+    Asset ||--o{ AssetBooking : asset
+    User ||--o{ AssetBooking : user

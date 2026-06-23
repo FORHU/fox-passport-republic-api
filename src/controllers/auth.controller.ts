@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import AuthSvc from "../services/auth.service";
-import AuthRepo from "../repositories/auth.repository";
 
 export default class AuthCtrl {
     static async register(req: Request, res: Response) {
@@ -48,36 +47,25 @@ export default class AuthCtrl {
     }
 
     static async login(req: Request, res: Response) {
-        const { username, password } = req.body;
+        const { email, password } = req.body;
 
         const schema = Joi.object({
-            username: Joi.string().required(),
+            email: Joi.string().email().required(),
             password: Joi.string().required()
         });
 
-        const { error } = schema.validate({ username, password });
+        const { error } = schema.validate({ email, password });
         if (error) {
             return res.status(400).json({ message: error.message });
         }
 
         try {
-            const result = await AuthSvc.login({ username, password });
+            const result = await AuthSvc.login({ email, password });
             return res.json(result);
         } catch (error: any) {
             console.error('Login error:', error);
             return res.status(401).json({
-                message:
-
-
-
-
-
-
-
-
-
-
-                    error.message || error
+                message: error.message || error
             });
         }
     }
@@ -166,6 +154,23 @@ export default class AuthCtrl {
             return res.status(200).json(result);
         } catch (error: any) {
             return res.status(400).json({ message: error.message });
+        }
+    }
+
+
+    static async logout(req: Request, res: Response) {
+        try {
+            // In a stateless JWT system, logout is handled client-side by removing the token
+            // Optionally, you can blacklist the token here if using Redis
+            return res.status(200).json({
+                success: true,
+                message: "Logged out successfully"
+            });
+        } catch (error: any) {
+            return res.status(500).json({
+                success: false,
+                message: error.message || "Failed to logout"
+            });
         }
     }
 }
