@@ -20,7 +20,7 @@ export default class MatchController {
       if (error) return res.status(400).json({ message: error.message });
 
       const { style, date, guestCount, requestContent, totalAmount, venueId } = value;
-      const foxerId = String(req.body.foxerId); // coerce to string — frontend may send numeric IDs
+      const foxerId = value.foxerId;
       const clientId = (req as any).user?.userId || (req as any).user?.id;
 
       if (!clientId) {
