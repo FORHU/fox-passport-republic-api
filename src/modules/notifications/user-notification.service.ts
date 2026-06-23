@@ -6,9 +6,9 @@ import { emitToUser } from "../../infrastructure/socket/socket.utils";
 export default class NotificationService {
   static async create(input: CreateNotificationInput) {
     const notification = await NotificationRepository.create({
-  ...input,
-    metadata: (input.metadata ?? undefined) as any,
-});
+      ...input,
+      metadata: (input.metadata ?? undefined) as any,
+    });
     emitToUser(io, input.userId, "new_notification", {
       ...notification,
       metadata: notification.metadata as Record<string, unknown> | null | undefined,
@@ -21,8 +21,8 @@ export default class NotificationService {
     return NotificationRepository.findByUserId(userId);
   }
 
-  static async markAsRead(notificationId: string) {
-    return NotificationRepository.markAsRead(notificationId);
+  static async markAsRead(notificationId: string, userId: string) {
+    return NotificationRepository.markAsRead(notificationId, userId);
   }
 
   static async markAllAsRead(userId: string) {
