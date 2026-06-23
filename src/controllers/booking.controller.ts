@@ -264,15 +264,70 @@ export default class BookingCtrl {
 
             const bookingId = req.params.id;
 
-            const payment = await PaymentSvc.createPayment({
-                bookingId,
-                amount: value.amount,
-                currency: "PHP",
-                method: value.method,
-                paymentType: "full",
-                paymentStatus: PaymentStatus.completed,
-                transactionId: value.transactionId,
-            });
+            // If there's an existing pending payment for this booking, update it
+            // instead of creating a new one (avoids unique transactionId conflicts
+            // and preserves the deposit -> full payment transition).
+            const payments = await PaymentSvc.getBookingPayments(bookingId);
+            const pendingPayment = payments.find(p => p.status === PaymentStatus.pending);
+            const existingTransaction = payments.find(p => p.transactionId === value.transactionId);
+
+            let payment;
+            const looksLikeStripeId = String(value.transactionId).startsWith('pi_') || value.method === 'stripe';
+
+            if (existingTransaction) {
+                // If this transaction already exists for the booking, use it.
+                if (existingTransaction.status !== PaymentStatus.completed) {
+                    await PaymentSvc.updatePayment(existingTransaction.id, { paymentStatus: PaymentStatus.completed });
+                }
+
+                if (looksLikeStripeId) {
+                    try {
+                        await prisma.booking.update({ where: { id: bookingId }, data: { stripePaymentId: value.transactionId } });
+                    } catch (err) {
+                        console.error('Failed to set booking.stripePaymentId during confirmBooking:', err);
+                    }
+                }
+
+                payment = await PaymentSvc.getPaymentById(existingTransaction.id);
+            } else if (pendingPayment) {
+                // mark pending payment as completed
+                await PaymentSvc.updatePayment(pendingPayment.id, { paymentStatus: PaymentStatus.completed });
+                // set the transaction id to the one provided by client
+                await prisma.payment.update({ where: { id: pendingPayment.id }, data: { transactionId: value.transactionId, method: value.method } });
+                // If this came from Stripe, link booking.stripePaymentId as well
+                if (looksLikeStripeId) {
+                    try {
+                        await prisma.booking.update({ where: { id: bookingId }, data: { stripePaymentId: value.transactionId } });
+                    } catch (err) {
+                        console.error('Failed to set booking.stripePaymentId during confirmBooking:', err);
+                    }
+                }
+
+                // Re-fetch payment so the included booking reflects the updated stripePaymentId
+                payment = await PaymentSvc.getPaymentById(pendingPayment.id);
+            } else {
+                // No pending payment found — create a fresh completed payment record
+                payment = await PaymentSvc.createPayment({
+                    bookingId,
+                    amount: value.amount,
+                    currency: "PHP",
+                    method: value.method,
+                    paymentType: "full",
+                    paymentStatus: PaymentStatus.completed,
+                    transactionId: value.transactionId,
+                });
+
+                if (looksLikeStripeId) {
+                    try {
+                        await prisma.booking.update({ where: { id: bookingId }, data: { stripePaymentId: value.transactionId } });
+                    } catch (err) {
+                        console.error('Failed to set booking.stripePaymentId during confirmBooking:', err);
+                    }
+                }
+
+                // Ensure returned payment includes latest booking data
+                payment = await PaymentSvc.getPaymentById(payment.id);
+            }
 
             const booking = await BookingSvc.getBookingById(bookingId, req.user);
 
