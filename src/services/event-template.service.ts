@@ -89,7 +89,7 @@ export default class EventTemplateSvc {
     if (template.templateAssets) {
       template.templateAssets.forEach((ta: any) => {
         if (excludedAssetIds.includes(ta.id)) return;
-        const price = ta.asset?.price || 0;
+        const price = ta.agreedPrice || ta.asset?.price || 0;
         const qty = ta.quantity || 1;
         total += price * qty;
       });
@@ -99,7 +99,8 @@ export default class EventTemplateSvc {
     if (template.templateServices) {
       template.templateServices.forEach((ts: any) => {
         if (excludedServiceIds.includes(ts.id)) return;
-        total += ts.service?.price || 0;
+        const price = ts.agreedPrice || ts.service?.price || 0;
+        total += price;
       });
     }
 
@@ -107,7 +108,8 @@ export default class EventTemplateSvc {
     if (template.templateVenues) {
       template.templateVenues.forEach((tv: any) => {
         if (excludedVenueIds.includes(tv.id)) return;
-        total += tv.venue?.price || 0;
+        const price = tv.agreedPrice || tv.venue?.price || 0;
+        total += price;
       });
     }
 
