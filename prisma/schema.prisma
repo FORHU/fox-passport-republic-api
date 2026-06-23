@@ -43,12 +43,14 @@ model User {
   bookingAttendees    BookingAttendee[]
   invitedAttendees    BookingAttendee[]         @relation("Inviter")
   notifications       Notification[]
-  stripeCustomerId     String                   @unique
-  stripedConnectedId   String                   @unique
+  stripeCustomerId     String?                   @unique
+  stripedConnectedId   String?                   @unique
   stripeDetailsSubmitted Boolean                @default(false)
   stripeChargesEnabled      Boolean             @default(false)
   stripePayoutsEnabled      Boolean             @default(false)
-  transfersReceived        PlatformTransfer[]
+  payouts                   Payout[]
+  stripeAccountId          String?   @unique
+  stripeOnboardingComplete Boolean   @default(false)
 }
 
 
@@ -441,9 +443,9 @@ model EventAssetTransaction {
   agreedPrice Float
   included    Boolean           @default(true)
   currency    String            @default("PHP")
-  stripeTransferId String       @unique
-  disputeReason String
-  disputeAt   DateTime
+  stripeTransferId String?       @unique
+  disputeReason String?
+  disputeAt   DateTime?
   lockedAt    DateTime?
   releasedAt  DateTime?
   createdAt   DateTime          @default(now())
@@ -464,9 +466,9 @@ model EventServiceTransaction {
   agreedPrice Float
   included    Boolean           @default(true)
   currency    String            @default("PHP")
-  stripeTransferId String       @unique
-  disputeReason String
-  disputeAt   DateTime
+  stripeTransferId String?       @unique
+  disputeReason String?
+  disputeAt   DateTime?
   lockedAt    DateTime?
   releasedAt  DateTime?
   createdAt   DateTime          @default(now())
@@ -487,9 +489,9 @@ model EventVenueTransaction {
   agreedPrice Float
   included    Boolean           @default(true)
   currency    String            @default("PHP")
-  stripeTransferId String       @unique
-  disputeReason String
-  disputeAt   DateTime
+  stripeTransferId String?       @unique
+  disputeReason String?
+  disputeAt   DateTime?
   lockedAt    DateTime?
   releasedAt  DateTime?
   createdAt   DateTime          @default(now())
@@ -508,7 +510,7 @@ model Booking {
   totalAmount         Float
   hostMarkup         Float                   @default(0)
   platformFee        Float                   @default(0)
-  stripePaymentId     String                    @unique
+  stripePaymentId     String?                    @unique
   status              BookingStatus             @default(pending)
   startAt             DateTime
   endAt               DateTime
@@ -602,7 +604,7 @@ model ServiceBooking {
   status               ItemBookingStatus @default(pending)
   paymentStatus        PaymentStatus     @default(pending)
   paymentTransactionId String?
-  stripePaymentId      String           @unique
+  stripePaymentId      String?           @unique
   paymentMethod        String?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
@@ -628,7 +630,7 @@ model AssetBooking {
   status               ItemBookingStatus @default(pending)
   paymentStatus        PaymentStatus     @default(pending)
   paymentTransactionId String?
-  stripePaymentId      String           @unique
+  stripePaymentId      String?           @unique
   paymentMethod        String?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
@@ -650,6 +652,7 @@ model Notification {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+} 
 model Payout {
   id               String       @id @default(uuid())
   recipientId      String
@@ -663,7 +666,7 @@ model Payout {
   failureReason    String?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
-  recipient        User         @relation("PayoutRecipient", fields: [recipientId], references: [id])
+  recipient        User         @relation(fields: [recipientId], references: [id])
 
   @@unique([sourceType, sourceId, recipientId, role])
   @@index([sourceType, sourceId])

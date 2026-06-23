@@ -297,6 +297,12 @@ export default class PaymentController {
                             where: { id: pendingPayment.id },
                             data: { transactionId: paymentIntent.id }
                         });
+                            // Also link the Stripe PaymentIntent id to the Booking
+                            try {
+                                await prisma.booking.update({ where: { id: bookingId }, data: { stripePaymentId: paymentIntent.id } });
+                            } catch (err) {
+                                console.error('Failed to set booking.stripePaymentId in webhook:', err);
+                            }
                     } else {
                         // If no pending payment found, create a completed one
                         await PaymentSvc.createPayment({
@@ -308,6 +314,12 @@ export default class PaymentController {
                             paymentStatus: PaymentStatus.completed,
                             transactionId: paymentIntent.id
                         });
+                            // Ensure booking.stripePaymentId is set (createPayment will also attempt this)
+                            try {
+                                await prisma.booking.update({ where: { id: bookingId }, data: { stripePaymentId: paymentIntent.id } });
+                            } catch (err) {
+                                console.error('Failed to set booking.stripePaymentId after createPayment in webhook:', err);
+                            }
                     }
                 } catch (error) {
                     console.error("Error updating payment via webhook:", error);
