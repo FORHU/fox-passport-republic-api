@@ -77,6 +77,7 @@ export default class PaymentRepo {
         paymentStatus: PaymentStatus;
         transactionId: string;
         expiresAt?: Date;
+        paidAt?: Date;
     }) {
         return prisma.payment.create({
             data: {
@@ -88,6 +89,7 @@ export default class PaymentRepo {
                 status: data.paymentStatus,
                 transactionId: data.transactionId,
                 expiresAt: data.expiresAt,
+                paidAt: data.paidAt,
             },
             include: {
                 booking: true,
@@ -100,12 +102,14 @@ export default class PaymentRepo {
         id: string,
         data: Partial<{
             paymentStatus: PaymentStatus;
+            paidAt?: Date;
         }>
     ) {
         return prisma.payment.update({
             where: { id: String(id) },
             data: {
                 ...(data.paymentStatus ? { status: data.paymentStatus } : {}),
+                ...(data.paidAt ? { paidAt: data.paidAt } : {}),
             },
             include: {
                 booking: true,

@@ -1,7 +1,7 @@
 import PaymentRepo from "../repositories/payment.repository";
 import BookingRepo from "../repositories/booking.repository";
 import crypto from "crypto";
-import { PaymentStatus } from "@prisma/client";
+import { PaymentStatus, TransactionStatus } from "@prisma/client";
 import Stripe from "stripe";
 import { prisma } from "../utils/prisma";
 
@@ -79,21 +79,24 @@ export default class PaymentSvc {
         paymentStatus?: PaymentStatus;
         expiresAt?: Date;
         transactionId?: string;
+        paidAt?: Date;
     }) {
         let transactionId = data.transactionId || this.generateTransactionId();
         while (!data.transactionId && await PaymentRepo.transactionIdExists(transactionId)) {
             transactionId = this.generateTransactionId();
         }
 
+        const paymentStatus = data.paymentStatus || PaymentStatus.pending;
         const payment = await PaymentRepo.createPayment({
             bookingId: data.bookingId,
             amount: data.amount,
             currency: data.currency || "PHP",
             method: data.method,
             paymentType: data.paymentType,
-            paymentStatus: data.paymentStatus || PaymentStatus.pending,
+            paymentStatus,
             transactionId,
             expiresAt: data.expiresAt,
+            paidAt: data.paidAt || (paymentStatus === PaymentStatus.completed ? new Date() : undefined),
         });
 
         // If this payment is a Stripe payment (either method explicitly 'stripe'
@@ -137,20 +140,24 @@ export default class PaymentSvc {
             throw new Error("Payment has expired and is now cancelled");
         }
 
-        const updated = await PaymentRepo.updatePayment(id, data);
+        const updated = await PaymentRepo.updatePayment(id, {
+            paymentStatus: data.paymentStatus,
+            paidAt: data.paymentStatus === PaymentStatus.completed ? (payment.paidAt ?? new Date()) : undefined,
+        });
 
-        if (data.paymentStatus === PaymentStatus.completed && updated.paymentType === "deposit") {
+        if (data.paymentStatus === PaymentStatus.completed && (updated.paymentType === "deposit" || updated.paymentType === "full")) {
+            // Full payment means the citizen has paid in full — it does NOT mean the event
+            // has happened yet. Mirrors AssetBooking/ServiceBooking's confirmPayment, which
+            // also lands on "confirmed": confirmArrival ("confirmed"/"pending" -> "active")
+            // and updateStatus(completed) (-> "completed", which triggers provider payouts)
+            // happen afterward, never automatically on payment. See
+            // docs/adr/0002-stripe-connect-payouts.md ("Payout timing: on status -> completed").
             await prisma.booking.update({ where: { id: updated.bookingId }, data: { status: "confirmed" } });
-        }
 
-        // Full payment means the citizen has paid in full — it does NOT mean the event
-        // has happened yet. Mirrors AssetBooking/ServiceBooking's confirmPayment, which
-        // also lands on "confirmed": confirmArrival ("confirmed"/"pending" -> "active")
-        // and updateStatus(completed) (-> "completed", which triggers provider payouts)
-        // happen afterward, never automatically on payment. See
-        // docs/adr/0002-stripe-connect-payouts.md ("Payout timing: on status -> completed").
-        if (data.paymentStatus === PaymentStatus.completed && updated.paymentType === "full") {
-            await prisma.booking.update({ where: { id: updated.bookingId }, data: { status: "confirmed" } });
+            // Auto-approve all included pending item transactions now that payment is confirmed.
+            // Without this, venue/asset/service transactions stay "pending" forever and
+            // providers won't receive payouts (payout fan-out iterates included txns).
+            await this.approveBookingTransactions(updated.bookingId);
         }
 
         return updated;
@@ -181,5 +188,33 @@ export default class PaymentSvc {
     // GET BOOKING PAYMENTS
     static async getBookingPayments(bookingId: string) {
         return PaymentRepo.getBookingPayments(bookingId);
+    }
+
+    /**
+     * Bulk-approve all included pending item transactions for a booking.
+     * Called when payment is completed → booking confirmed, so that providers
+     * are eligible for payouts when the booking later moves to "completed".
+     */
+    private static async approveBookingTransactions(bookingId: string) {
+        try {
+            await prisma.$transaction([
+                prisma.eventAssetTransaction.updateMany({
+                    where: { bookingId, included: true, status: TransactionStatus.pending },
+                    data: { status: TransactionStatus.approved },
+                }),
+                prisma.eventServiceTransaction.updateMany({
+                    where: { bookingId, included: true, status: TransactionStatus.pending },
+                    data: { status: TransactionStatus.approved },
+                }),
+                prisma.eventVenueTransaction.updateMany({
+                    where: { bookingId, included: true, status: TransactionStatus.pending },
+                    data: { status: TransactionStatus.approved },
+                }),
+            ]);
+        } catch (err) {
+            // Non-fatal: log but don't fail the payment update. Providers can still
+            // be approved manually via the reviewItem endpoint.
+            console.error(`Failed to auto-approve transactions for booking ${bookingId}:`, err);
+        }
     }
 }

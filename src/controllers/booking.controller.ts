@@ -114,7 +114,7 @@ export default class BookingCtrl {
                         providerId: tv.venue!.mayorId,
                         agreedPrice: tv.agreedPrice,
                         included: !excludedVenueIds.includes(tv.id),
-                        status: "pending",
+                        status: tv.matched ? "approved" : "pending",
                     },
                 }));
 
