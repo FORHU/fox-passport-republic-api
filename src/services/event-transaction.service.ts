@@ -76,6 +76,7 @@ export default class EventTransactionSvc {
           providerId: item.venue.mayorId,
           agreedPrice: item.venue.price,
           currency: item.currency,
+          status: item.matched ? TransactionStatus.approved : TransactionStatus.pending,
         }));
       }
     }
