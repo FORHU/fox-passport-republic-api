@@ -80,9 +80,8 @@ export default class RoleRequestService {
     return { updatedRequest, userId: request.userId, roleType: request.roleType };
   });
 
-  // 4. Notify the applicant — outside the transaction, since this is a
-  // side effect (DB write + socket push), not something that needs to
-  // roll back together with the application status update
+  console.log("About to create notification for userId:", result.userId);
+
   await NotificationService.create({
     userId: result.userId,
     type: status === RequestStatus.approved ? "role_request_approved" : "role_request_rejected",
@@ -93,6 +92,8 @@ export default class RoleRequestService {
         : `Your ${result.roleType} application was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`,
     metadata: { requestId, roleType: result.roleType, status },
   });
+
+  console.log("Notification created successfully");
 
   return result.updatedRequest;
 }
