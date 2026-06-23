@@ -1,113 +1,54 @@
 import { prisma } from "../utils/prisma";
 
 export default class FavoriteRepo {
-  // READ ALL user favorites
+  // TOGGLE
+  static async toggleFavorite(userId: string, targetId: string, type: string) {
+    const where = { userId: String(userId), entityId: String(targetId), entityType: String(type) };
+
+    const existing = await prisma.favorite.findFirst({ where });
+
+    if (existing) {
+      await prisma.favorite.delete({ where: { id: existing.id } });
+      return { added: false };
+    } else {
+      await prisma.favorite.create({
+        data: {
+          userId: String(userId),
+          entityId: String(targetId),
+          entityType: String(type),
+        }
+      });
+      return { added: true };
+    }
+  }
+
+  // LIST USER FAVORITES
   static async getUserFavorites(userId: string) {
     return prisma.favorite.findMany({
-      where: { userId },
-      include: {
-        event: {
-          include: {
-            foxer: {
-              select: {
-                id: true,
-                name: true,
-                username: true,
-              },
-            },
-            category: true,
-            images: {
-              where: {
-                isPrimary: true,
-              },
-              take: 1,
-            },
-            details: true,
-          },
-        },
-      },
-      orderBy: {
-        savedAt: "desc",
-      },
+      where: { userId: String(userId) },
+      include: {}
     });
   }
 
-  // CREATE (Add to favorites)
-  static async addFavorite(data: { userId: string; eventId: string }) {
-    return prisma.favorite.create({
-      data: {
-        userId: data.userId,
-        eventId: data.eventId,
-      },
-      include: {
-        event: {
-          select: {
-            id: true,
-            title: true,
-            description: true,
-          },
-        },
-      },
-    });
+  // CHECK
+  static async isFavorite(userId: string, targetId: string, type: string) {
+    const where = { userId: String(userId), entityId: String(targetId), entityType: String(type) };
+
+    const favorite = await prisma.favorite.findFirst({ where });
+    return !!favorite;
   }
 
-  // DELETE (Remove from favorites)
+  // REMOVE BY ID
   static async removeFavorite(id: string) {
     return prisma.favorite.delete({
-      where: { id },
+      where: { id: String(id) }
     });
   }
 
-  // DELETE by userId and eventId
-  static async removeFavoriteByUserAndEvent(userId: string, eventId: string) {
-    return prisma.favorite.deleteMany({
-      where: {
-        userId,
-        eventId,
-      },
-    });
-  }
+  // REMOVE BY LISTING
+  static async removeFavoriteByListing(userId: string, targetId: string, type: string) {
+    const where = { userId: String(userId), entityId: String(targetId), entityType: String(type) };
 
-  // Check if favorite exists
-  static async favoriteExists(id: string) {
-    const favorite = await prisma.favorite.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-    return !!favorite;
-  }
-
-  // Check if user favorited event
-  static async isFavorited(userId: string, eventId: string) {
-    const favorite = await prisma.favorite.findFirst({
-      where: {
-        userId,
-        eventId,
-      },
-      select: { id: true },
-    });
-    return !!favorite;
-  }
-
-  // Get favorite by userId and eventId
-  static async getFavoriteByUserAndEvent(userId: string, eventId: string) {
-    return prisma.favorite.findFirst({
-      where: {
-        userId,
-        eventId,
-      },
-    });
-  }
-
-  // Check if user owns favorite
-  static async isFavoriteOwner(favoriteId: string, userId: string) {
-    const favorite = await prisma.favorite.findFirst({
-      where: {
-        id: favoriteId,
-        userId: userId,
-      },
-      select: { id: true },
-    });
-    return !!favorite;
+    return prisma.favorite.deleteMany({ where });
   }
 }

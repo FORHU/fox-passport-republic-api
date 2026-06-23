@@ -1,24 +1,27 @@
 FROM node:22-alpine
 
+# Install pnpm globally
+RUN npm install -g pnpm
+
 WORKDIR /app
 
-# Install tzdata so the container supports timezones
-RUN apk add --no-cache tzdata
+# Copy package files and prisma schema first for better caching
+COPY package*.json pnpm-lock.yaml ./
+COPY prisma ./prisma/
 
-# Set default timezone
-ENV TZ=Asia/Manila
+# Install dependencies using pnpm
+RUN pnpm install --frozen-lockfile
 
-COPY package*.json tsconfig.json ./
+# Generate Prisma client
+RUN pnpm prisma generate
 
-RUN npm install 
-
+# Copy project files
 COPY . .
 
-RUN npx prisma generate
-
-RUN npm run build
+# Build the application
+RUN pnpm build
 
 # Optional: expose port for readability
-EXPOSE 3000
+EXPOSE 3002
 
-CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
+CMD ["sh", "-c", "pnpm prisma migrate deploy && pnpm start"]

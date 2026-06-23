@@ -1,16 +1,28 @@
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import UsersRepo from "../repositories/users.repository";
-import { UserRole } from "@prisma/client";
+import { SystemRole } from "@prisma/client";
 
 export default class UsersSvc {
-  // GET ALL USERS
-  static async getAllUsers() {
-    return UsersRepo.getAllUsers();
+  // GET ALL USERS (optionally filtered by roleType)
+  static async getAllUsers(roleTypes?: string[]) {
+    return UsersRepo.getAllUsers(roleTypes as any);
+  }
+
+  // GET FOXERS (public listing, optionally filtered by roleType)
+  static async getFoxers(limit = 9, page = 1, roleType?: string) {
+    return UsersRepo.findFoxers(limit, page, roleType as any);
+  }
+
+  // GET SINGLE FOXER BY ID (public profile with services)
+  static async getFoxerById(id: string) {
+    const foxer = await UsersRepo.findFoxerById(id);
+    if (!foxer) throw new Error("Foxer not found");
+    return foxer;
   }
 
   // GET USER BY ID
   static async getUserById(id: string) {
-    const user = await UsersRepo.getUserById(id);
+    const user = await UsersRepo.findUserById(id);
     if (!user) {
       throw new Error("User not found");
     }
@@ -23,7 +35,7 @@ export default class UsersSvc {
     username: string;
     password: string;
     name: string;
-    role?: UserRole;
+    role?: SystemRole;
   }) {
     const existingUser = await UsersRepo.getUserByEmail(data.email);
     if (existingUser) throw new Error("Email already exists");
@@ -43,12 +55,12 @@ export default class UsersSvc {
       email: string;
       username: string;
       password: string;
-      role: UserRole;
+      systemRole: SystemRole;
       name: string;
       isActive: boolean;
     }>
   ) {
-    const user = await UsersRepo.getUserById(id);
+    const user = await UsersRepo.findUserById(id);
     if (!user) throw new Error("User not found");
 
     return UsersRepo.updateUser(id, data);
@@ -56,9 +68,10 @@ export default class UsersSvc {
 
   // DELETE
   static async deleteUser(id: string) {
-    const user = await UsersRepo.getUserById(id);
+    const user = await UsersRepo.findUserById(id);
     if (!user) throw new Error("User not found");
 
     return UsersRepo.deleteUser(id);
   }
 }
+

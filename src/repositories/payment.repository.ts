@@ -9,8 +9,8 @@ export default class PaymentRepo {
     }) {
         return prisma.payment.findMany({
             where: {
-                ...(filters?.bookingId && { bookingId: filters.bookingId }),
-                ...(filters?.paymentStatus && { paymentStatus: filters.paymentStatus }),
+                ...(filters?.bookingId && { bookingId: String(filters.bookingId) }),
+                ...(filters?.paymentStatus && { status: filters.paymentStatus }),
             },
             include: {
                 booking: {
@@ -25,14 +25,14 @@ export default class PaymentRepo {
                         event: {
                             select: {
                                 id: true,
-                                title: true,
+                                name: true,
                             },
                         },
                     },
                 },
             },
             orderBy: {
-                paymentDate: "desc",
+                paidAt: "desc",
             },
         });
     }
@@ -40,7 +40,7 @@ export default class PaymentRepo {
     // READ ONE by ID
     static async getPaymentById(id: string) {
         return prisma.payment.findUnique({
-            where: { id },
+            where: { id: String(id) },
             include: {
                 booking: {
                     include: {
@@ -72,20 +72,22 @@ export default class PaymentRepo {
         bookingId: string;
         amount: number;
         currency: string;
-        paymentMethod: string;
+        method: string;
+        paymentType: "deposit" | "full";
         paymentStatus: PaymentStatus;
         transactionId: string;
-        gatewayResponse?: string;
+        expiresAt?: Date;
     }) {
         return prisma.payment.create({
             data: {
-                bookingId: data.bookingId,
+                bookingId: String(data.bookingId),
                 amount: data.amount,
                 currency: data.currency,
-                paymentMethod: data.paymentMethod,
-                paymentStatus: data.paymentStatus,
+                method: data.method,
+                paymentType: data.paymentType,
+                status: data.paymentStatus,
                 transactionId: data.transactionId,
-                gatewayResponse: data.gatewayResponse,
+                expiresAt: data.expiresAt,
             },
             include: {
                 booking: true,
@@ -98,12 +100,13 @@ export default class PaymentRepo {
         id: string,
         data: Partial<{
             paymentStatus: PaymentStatus;
-            gatewayResponse: string;
         }>
     ) {
         return prisma.payment.update({
-            where: { id },
-            data,
+            where: { id: String(id) },
+            data: {
+                ...(data.paymentStatus ? { status: data.paymentStatus } : {}),
+            },
             include: {
                 booking: true,
             },
@@ -113,7 +116,7 @@ export default class PaymentRepo {
     // Check if payment exists
     static async paymentExists(id: string) {
         const payment = await prisma.payment.findUnique({
-            where: { id },
+            where: { id: String(id) },
             select: { id: true },
         });
         return !!payment;
@@ -131,10 +134,46 @@ export default class PaymentRepo {
     // Get booking payments
     static async getBookingPayments(bookingId: string) {
         return prisma.payment.findMany({
-            where: { bookingId },
+            where: { bookingId: String(bookingId) },
             orderBy: {
-                paymentDate: "desc",
+                createdAt: "desc",
             },
         });
+    }
+
+    // Lazy cancellation of expired payments
+    static async cancelExpiredPayments() {
+        const now = new Date();
+        
+        // 1. Find expired pending payments
+        const expiredPayments = await prisma.payment.findMany({
+            where: {
+                status: PaymentStatus.pending,
+                expiresAt: { lt: now }
+            },
+            select: { id: true, bookingId: true }
+        });
+
+        if (expiredPayments.length === 0) return 0;
+
+        const paymentIds = expiredPayments.map(p => p.id);
+        const bookingIds = [...new Set(expiredPayments.map(p => p.bookingId))];
+
+        // 2. Batch cancel payments and their related bookings
+        await prisma.$transaction([
+            prisma.payment.updateMany({
+                where: { id: { in: paymentIds } },
+                data: { status: PaymentStatus.cancelled }
+            }),
+            prisma.booking.updateMany({
+                where: { 
+                    id: { in: bookingIds },
+                    status: "pending" // Only cancel if it's still pending
+                },
+                data: { status: "cancelled" }
+            })
+        ]);
+
+        return expiredPayments.length;
     }
 }

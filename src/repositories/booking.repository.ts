@@ -1,230 +1,142 @@
 import { prisma } from "../utils/prisma";
-import { BookingStatus } from "@prisma/client";
+import { Prisma, BookingStatus } from "@prisma/client";
 
 export default class BookingRepo {
-  // READ ALL with filters
-  static async getAllBookings(filters?: {
-    userId?: string;
-    eventId?: string;
-    bookingStatus?: BookingStatus;
-  }) {
-    return prisma.booking.findMany({
-      where: {
-        ...(filters?.userId && { userId: filters.userId }),
-        ...(filters?.eventId && { eventId: filters.eventId }),
-        ...(filters?.bookingStatus && { bookingStatus: filters.bookingStatus }),
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-          },
-        },
-        event: {
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            status: true,
-            foxer: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
+    static async create(data: Prisma.BookingCreateInput) {
+        return prisma.booking.create({
+            data,
+            include: {
+                event: true,
+                user: { select: { name: true, email: true } },
+                attendees: true
+            }
+        });
+    }
+
+    static async findAll(filters: any) {
+        return prisma.booking.findMany({
+            where: filters,
+            include: {
+                event: true,
+                user: { select: { name: true, email: true } }
             },
-          },
-        },
-        attendees: true,
-        payments: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-  }
+            orderBy: { createdAt: 'desc' }
+        });
+    }
 
-  // READ ONE by ID
-  static async getBookingById(id: string) {
-    return prisma.booking.findUnique({
-      where: { id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-          },
-        },
-        event: {
-          include: {
-            foxer: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
+    static async findById(id: string) {
+        return prisma.booking.findUnique({
+            where: { id },
+            include: {
+                event: {
+                    include: {
+                        host: { select: { id: true, name: true } }
+                    }
+                },
+                user: { select: { id: true, name: true, email: true } },
+                attendees: {
+                    include: {
+                        invitedBy: { select: { id: true, name: true } }
+                    }
+                },
+                payments: true,
+                assetTransactions: true,
+                serviceTransactions: true,
+                venueTransactions: true
+            }
+        });
+    }
+
+    static async update(id: string, data: Prisma.BookingUncheckedUpdateInput) {
+        return prisma.booking.update({
+            where: { id },
+            data,
+            include: { attendees: true }
+        });
+    }
+
+    static async addAttendee(bookingId: string, data: Prisma.BookingAttendeeUncheckedCreateWithoutBookingInput) {
+        return prisma.bookingAttendee.create({
+            data: {
+                ...data,
+                bookingId: bookingId
             },
-            details: true,
-          },
-        },
-        attendees: true,
-        payments: true,
-      },
-    });
-  }
+            include: {
+                invitedBy: { select: { id: true, name: true } }
+            }
+        });
+    }
 
-  // READ ONE by Confirmation Code
-  static async getBookingByConfirmationCode(confirmationCode: string) {
-    return prisma.booking.findUnique({
-      where: { confirmationCode },
-      include: {
-        user: true,
-        event: {
-          include: {
-            details: true,
-          },
-        },
-        attendees: true,
-        payments: true,
-      },
-    });
-  }
+    static async removeAttendee(attendeeId: string) {
+        return prisma.bookingAttendee.delete({
+            where: { id: attendeeId }
+        });
+    }
 
-  // CREATE
-  static async createBooking(data: {
-    eventId: string;
-    userId: string;
-    numberOfTickets: number;
-    totalAmount: number;
-    bookingStatus: BookingStatus;
-    confirmationCode: string;
-    specialRequests?: string;
-  }) {
-    return prisma.booking.create({
-      data: {
-        eventId: data.eventId,
-        userId: data.userId,
-        numberOfTickets: data.numberOfTickets,
-        totalAmount: data.totalAmount,
-        bookingStatus: data.bookingStatus,
-        confirmationCode: data.confirmationCode,
-        specialRequests: data.specialRequests,
-      },
-      include: {
-        user: true,
-        event: true,
-      },
-    });
-  }
+    static async findAttendeeById(id: string) {
+        return prisma.bookingAttendee.findUnique({
+            where: { id },
+            include: { booking: true }
+        });
+    }
 
-  // UPDATE
-  static async updateBooking(
-    id: string,
-    data: Partial<{
-      numberOfTickets: number;
-      totalAmount: number;
-      bookingStatus: BookingStatus;
-      specialRequests: string;
-    }>
-  ) {
-    return prisma.booking.update({
-      where: { id },
-      data,
-      include: {
-        user: true,
-        event: true,
-        attendees: true,
-        payments: true,
-      },
-    });
-  }
+    static async findAttendeeByTicketCode(ticketCode: string) {
+        return prisma.bookingAttendee.findUnique({
+            where: { ticketCode }
+        });
+    }
 
-  // DELETE (Cancel)
-  static async deleteBooking(id: string) {
-    return prisma.booking.delete({
-      where: { id },
-    });
-  }
+    static async updateAttendee(id: string, data: Prisma.BookingAttendeeUncheckedUpdateInput) {
+        return prisma.bookingAttendee.update({
+            where: { id },
+            data
+        });
+    }
 
-  // Check if booking exists
-  static async bookingExists(id: string) {
-    const booking = await prisma.booking.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-    return !!booking;
-  }
+    static async finalizeAttendees(bookingId: string) {
+        return prisma.$transaction([
+            prisma.booking.update({
+                where: { id: bookingId },
+                data: { isGuestListLocked: true }
+            }),
+            prisma.bookingAttendee.updateMany({
+                where: { bookingId, isDraft: true },
+                data: { isDraft: false }
+            })
+        ]);
+    }
 
-  // Check if user owns booking
-  static async isBookingOwner(bookingId: string, userId: string) {
-    const booking = await prisma.booking.findFirst({
-      where: {
-        id: bookingId,
-        userId: userId,
-      },
-      select: { id: true },
-    });
-    return !!booking;
-  }
+    static async findByUserId(userId: string) {
+        return prisma.booking.findMany({
+            where: { userId },
+            include: {
+                event: true
+            }
+        });
+    }
 
-  // Check if confirmation code exists
-  static async confirmationCodeExists(confirmationCode: string) {
-    const booking = await prisma.booking.findUnique({
-      where: { confirmationCode },
-      select: { id: true },
-    });
-    return !!booking;
-  }
+    // Mirrors asset-booking.repository.ts's updateStatus/confirmArrival/dispute exactly.
+    static async updateStatus(id: string, status: BookingStatus) {
+        return prisma.booking.update({
+            where: { id },
+            data: { status },
+            include: { event: true, user: { select: { id: true, name: true, email: true } } }
+        });
+    }
 
-  // Get user bookings
-  static async getUserBookings(userId: string) {
-    return prisma.booking.findMany({
-      where: { userId },
-      include: {
-        event: {
-          include: {
-            details: true,
-            images: {
-              where: {
-                isPrimary: true,
-              },
-              take: 1,
-            },
-          },
-        },
-        attendees: true,
-        payments: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-  }
+    static async confirmArrival(id: string) {
+        return prisma.booking.update({
+            where: { id },
+            data: { status: BookingStatus.active },
+            include: { event: true, user: { select: { id: true, name: true, email: true } } }
+        });
+    }
 
-  // Get event bookings (for event host)
-  static async getEventBookings(eventId: string) {
-    return prisma.booking.findMany({
-      where: { eventId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-          },
-        },
-        attendees: true,
-        payments: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-  }
+    static async dispute(id: string) {
+        return prisma.booking.update({
+            where: { id },
+            data: { status: BookingStatus.disputed },
+            include: { event: true, user: { select: { id: true, name: true, email: true } } }
+        });
+    }
 }

@@ -4,37 +4,761 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
-// Enums for better type safety
-enum UserRole {
+model User {
+  id                  String                    @id @default(uuid())
+  email               String                    @unique
+  password            String
+  name                String
+  address             String?
+  city                String?
+  state               String?
+  country             String?                   @default("Philippines")
+  username            String?                   @unique
+  phone               String?
+  imgId               String?
+  systemRole          SystemRole                @default(user)
+  roleType            RoleType[]
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  bookings            Booking[]
+  serviceBookings     ServiceBooking[]
+  assetBookings       AssetBooking[]
+  assetTransactions   EventAssetTransaction[]   @relation("AssetProvider")
+  clientEvents        Event[]                   @relation("EventClient")
+  organizedEvents     Event[]                   @relation("EventOrganizer")
+  serviceTransactions EventServiceTransaction[] @relation("ServiceProvider")
+  eventTemplates      EventTemplate[]
+  venueTransactions   EventVenueTransaction[]   @relation("VenueProvider")
+  favorites           Favorite[]
+  files               File[]
+  passport            Passport?
+  reviews             Review[]
+  assets              Asset[]
+  reviewsGiven        RoleRequest[]             @relation("Reviewer")
+  roleRequests        RoleRequest[]             @relation("Applicant")
+  services            Service[]
+  venues              Venue[]
+  bookingAttendees    BookingAttendee[]
+  invitedAttendees    BookingAttendee[]         @relation("Inviter")
+  notifications       Notification[]
+  stripeCustomerId     String?                   @unique
+  stripedConnectedId   String?                   @unique
+  stripeDetailsSubmitted Boolean                @default(false)
+  stripeChargesEnabled      Boolean             @default(false)
+  stripePayoutsEnabled      Boolean             @default(false)
+  payouts                   Payout[]
+  stripeAccountId          String?   @unique
+  stripeOnboardingComplete Boolean   @default(false)
+}
+
+
+model RoleRequest {
+  id                      String                   @id @default(uuid())
+  userId                  String
+  roleType                RoleType
+  status                  RequestStatus            @default(pending)
+  reviewedBy              String?
+  reviewedAt              DateTime?
+  rejectionReason         String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  foxerAssetApplication   FoxerAssetApplication?
+  foxerServiceApplication FoxerServiceApplication?
+  hostApplication         HostApplication?
+  investorApplication     InvestorApplication?
+  mayorApplication        MayorApplication?
+  reviewer                User?                    @relation("Reviewer", fields: [reviewedBy], references: [id])
+  user                    User                     @relation("Applicant", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, roleType])
+  @@map("role_requests")
+}
+
+model MayorApplication {
+  id              String      @id @default(uuid())
+  requestId       String      @unique
+  businessName    String
+  contactNumber   String
+  address         String
+  tinNumber       String
+  description     String?
+  validId1FileId  String?
+  nbiFileId       String?
+  tinIdFileId     String?
+  birPermitFileId String?
+  selfieFileId    String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  birPermitFile   File?       @relation("MayorBirPermit", fields: [birPermitFileId], references: [id])
+  nbiFile         File?       @relation("MayorNBI", fields: [nbiFileId], references: [id])
+  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  selfieFile      File?       @relation("MayorSelfie", fields: [selfieFileId], references: [id])
+  tinIdFile       File?       @relation("MayorTinId", fields: [tinIdFileId], references: [id])
+  validId1        File?       @relation("MayorValidId1", fields: [validId1FileId], references: [id])
+}
+
+model FoxerAssetApplication {
+  id              String      @id @default(uuid())
+  requestId       String      @unique
+  businessName    String
+  assetTypes      String[]
+  tinNumber       String
+  validId1FileId  String?
+  nbiFileId       String?
+  tinIdFileId     String?
+  birPermitFileId String?
+  selfieFileId    String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  birPermitFile   File?       @relation("FoxerAssetBirPermit", fields: [birPermitFileId], references: [id])
+  nbiFile         File?       @relation("FoxerAssetNBI", fields: [nbiFileId], references: [id])
+  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  selfieFile      File?       @relation("FoxerAssetSelfie", fields: [selfieFileId], references: [id])
+  tinIdFile       File?       @relation("FoxerAssetTinId", fields: [tinIdFileId], references: [id])
+  validId1        File?       @relation("FoxerAssetValidId1", fields: [validId1FileId], references: [id])
+}
+
+model FoxerServiceApplication {
+  id                   String      @id @default(uuid())
+  requestId            String      @unique
+  serviceTypes         String[]
+  portfolioUrls        String[]
+  experience           Int
+  nbiClearanceIdNumber String
+  tinNumber            String?
+  validId1FileId       String?
+  nbiFileId            String?
+  tinIdFileId          String?
+  birPermitFileId      String?
+  selfieFileId         String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  birPermitFile        File?       @relation("ServiceBirPermit", fields: [birPermitFileId], references: [id])
+  nbiFile              File?       @relation("ServiceNBI", fields: [nbiFileId], references: [id])
+  request              RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  selfieFile           File?       @relation("ServiceSelfie", fields: [selfieFileId], references: [id])
+  tinIdFile            File?       @relation("ServiceTinId", fields: [tinIdFileId], references: [id])
+  validId1             File?       @relation("ServiceValidId1", fields: [validId1FileId], references: [id])
+}
+
+model InvestorApplication {
+  id              String      @id @default(uuid())
+  requestId       String      @unique
+  companyName     String?
+  investmentRange Float
+  interests       String[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  proofFileId     String?
+  proofOfFunds    File?       @relation("InvestorProof", fields: [proofFileId], references: [id])
+  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+model HostApplication {
+  id              String      @id @default(uuid())
+  requestId       String      @unique
+  bio             String?
+  experience      String?
+  location        String?
+  validId1FileId  String?
+  nbiFileId       String?
+  tinIdFileId     String?
+  birPermitFileId String?
+  selfieFileId    String?
+  portfolioFileId String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  birPermitFile   File?       @relation("HostBirPermit", fields: [birPermitFileId], references: [id])
+  nbiFile         File?       @relation("HostNBI", fields: [nbiFileId], references: [id])
+  portfolioFile   File?       @relation("HostPortfolio", fields: [portfolioFileId], references: [id])
+  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  selfieFile      File?       @relation("HostSelfie", fields: [selfieFileId], references: [id])
+  tinIdFile       File?       @relation("HostTinId", fields: [tinIdFileId], references: [id])
+  validId1        File?       @relation("HostValidId1", fields: [validId1FileId], references: [id])
+  files           File[]      @relation("HostPortfolioMany")
+}
+
+model File {
+  id                    String                    @id @default(uuid())
+  url                   String
+  name                  String
+  type                  String
+  uploadedBy            String?
+  venueId               String?
+  assetId               String?
+  serviceId             String?
+  templateId            String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  deletedAt             DateTime?
+  asset                 Asset?                    @relation(fields: [assetId], references: [id])
+  service               Service?                  @relation(fields: [serviceId], references: [id])
+  template              EventTemplate?            @relation(fields: [templateId], references: [id])
+  user                  User?                     @relation(fields: [uploadedBy], references: [id])
+  venue                 Venue?                    @relation(fields: [venueId], references: [id])
+  foxerAssetBirPermit   FoxerAssetApplication[]   @relation("FoxerAssetBirPermit")
+  foxerAssetNbi         FoxerAssetApplication[]   @relation("FoxerAssetNBI")
+  foxerAssetSelfie      FoxerAssetApplication[]   @relation("FoxerAssetSelfie")
+  foxerAssetTinId       FoxerAssetApplication[]   @relation("FoxerAssetTinId")
+  foxerAssetValidId1    FoxerAssetApplication[]   @relation("FoxerAssetValidId1")
+  foxerServiceBirPermit FoxerServiceApplication[] @relation("ServiceBirPermit")
+  foxerServiceNbi       FoxerServiceApplication[] @relation("ServiceNBI")
+  foxerServiceSelfie    FoxerServiceApplication[] @relation("ServiceSelfie")
+  foxerServiceTinId     FoxerServiceApplication[] @relation("ServiceTinId")
+  foxerServiceValidId1  FoxerServiceApplication[] @relation("ServiceValidId1")
+  hostBirPermit         HostApplication[]         @relation("HostBirPermit")
+  hostNbi               HostApplication[]         @relation("HostNBI")
+  hostPortfolio         HostApplication[]         @relation("HostPortfolio")
+  hostSelfie            HostApplication[]         @relation("HostSelfie")
+  hostTinId             HostApplication[]         @relation("HostTinId")
+  hostValidId1          HostApplication[]         @relation("HostValidId1")
+  investorProof         InvestorApplication[]     @relation("InvestorProof")
+  mayorBirPermit        MayorApplication[]        @relation("MayorBirPermit")
+  mayorNbi              MayorApplication[]        @relation("MayorNBI")
+  mayorSelfie           MayorApplication[]        @relation("MayorSelfie")
+  mayorTinId            MayorApplication[]        @relation("MayorTinId")
+  mayorValidId1         MayorApplication[]        @relation("MayorValidId1")
+  hostPortfolioMany     HostApplication[]         @relation("HostPortfolioMany")
+}
+
+model Passport {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  totalStamps  Int      @default(0)
+  totalMileage Int      @default(0)
+  level        Int      @default(1)
+  achievements Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Asset {
+  id             String                  @id @default(uuid())
+  ownerId        String
+  category       String
+  name           String
+  description    String
+  quantity       Int                     @default(1)
+  price          Float
+  currency       String                  @default("USD")
+  billingRate    BillingRate
+  condition      AssetCondition          @default(good)
+  status         AssetStatus             @default(available)
+  city           String?
+  state          String?
+  country        String?                 @default("Philippines")
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  deletedAt      DateTime?
+  transactions   EventAssetTransaction[]
+  images         File[]
+  bookings       AssetBooking[]
+  owner          User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  templateAssets EventTemplateAsset[]
+
+  @@map("assets")
+}
+
+model Service {
+  id                String                    @id @default(uuid())
+  ownerId           String
+  category          ServiceCategory
+  name              String
+  description       String
+  city              String                    @default("Unknown City")
+  state             String?
+  country           String                    @default("Unknown Country")
+  isWillingToTravel Boolean                   @default(false)
+  tags              String[]
+  price             Float
+  currency          String                    @default("USD")
+  billingRate       BillingRate
+  status            ServiceStatus             @default(draft)
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  deletedAt         DateTime?
+  transactions      EventServiceTransaction[]
+  images            File[]
+  templateServices  EventTemplateService[]
+  bookings          ServiceBooking[]
+  owner             User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@map("services")
+}
+
+model Venue {
+  id             String                  @id @default(uuid())
+  mayorId        String
+  category       String
+  name           String
+  description    String
+  capacity       Int
+  price          Float
+  billingRate    BillingRate
+  address        String
+  city           String
+  state          String?
+  country        String
+  status         VenueStatus             @default(draft)
+  spaceType      String[]
+  amenities      String[]
+  techAv         String[]
+  staffing       String[]
+  policies       String[]
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  transactions   EventVenueTransaction[]
+  images         File[]
+  templateVenues EventTemplateVenue[]
+  mayor          User                    @relation(fields: [mayorId], references: [id], onDelete: Cascade)
+
+  @@map("venues")
+}
+
+model EventTemplate {
+  id               String                 @id @default(uuid())
+  ownerId          String
+  name             String
+  description      String
+  category         EventCategory
+  isPublic         Boolean                @default(false)
+  targetCity       String?
+  targetState      String?
+  targetCountry    String?                @default("Philippines")
+  hostMarkupPct    Float                  @default(0)
+  platformFeePct    Float                  @default(0.05) //might change later on
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  events           Event[]
+  images           File[]
+  owner            User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  templateAssets   EventTemplateAsset[]
+  templateServices EventTemplateService[]
+  templateVenues   EventTemplateVenue[]
+}
+
+model EventTemplateAsset {
+  id              String          @id @default(uuid())
+  templateId      String
+  assetId         String?
+  description     String?
+  quantity        Int             @default(1)
+  currency        String          @default("PHP")
+  agreedPrice     Float           @default(0)
+  isOptional      Boolean         @default(false)
+  date            DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  matched         Boolean         @default(false)
+  matchedAt       DateTime?
+  matchConstraint MatchConstraint @default(NONE)
+  asset           Asset?          @relation(fields: [assetId], references: [id])
+  template        EventTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@map("event_template_assets")
+}
+
+model EventTemplateService {
+  id              String          @id @default(uuid())
+  templateId      String
+  serviceId       String?
+  description     String?
+  currency        String          @default("PHP")
+  agreedPrice     Float           @default(0)
+  isOptional      Boolean         @default(false)
+  date            DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  matched         Boolean         @default(false)
+  matchedAt       DateTime?
+  matchConstraint MatchConstraint @default(NONE)
+  service         Service?        @relation(fields: [serviceId], references: [id])
+  template        EventTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@map("event_template_services")
+}
+
+model EventTemplateVenue {
+  id              String          @id @default(uuid())
+  templateId      String
+  venueId         String?
+  description     String?
+  currency        String          @default("PHP")
+  agreedPrice     Float           @default(0)
+  isOptional      Boolean         @default(false)
+  date            DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  matched         Boolean         @default(false)
+  matchedAt       DateTime?
+  matchConstraint MatchConstraint @default(NONE)
+  template        EventTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  venue           Venue?          @relation(fields: [venueId], references: [id])
+
+  @@map("event_template_venues")
+}
+
+model Event {
+  id                  String                    @id @default(uuid())
+  clientId            String
+  organizerId         String
+  templateId          String
+  name                String
+  description         String
+  eventCategory       EventCategory
+  startAt             DateTime
+  endAt               DateTime
+  guestCount          Int
+  totalAmount         Float
+  itemsTotal          Float                     @default(0)
+  hostMarkupAmount    Float                     @default(0)
+  platformFeeAmount   Float                     @default(0)
+  eventStatus         EventStatus               @default(pending)
+  requestStatus       RequestStatus             @default(pending)
+  targetCity          String?
+  targetState         String?
+  targetCountry       String?                   @default("Philippines")
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  bookings            Booking[]
+  assetTransactions   EventAssetTransaction[]
+  client              User                      @relation("EventClient", fields: [clientId], references: [id])
+  host                User                      @relation("EventOrganizer", fields: [organizerId], references: [id])
+  template            EventTemplate             @relation(fields: [templateId], references: [id])
+  serviceTransactions EventServiceTransaction[]
+  venueTransactions   EventVenueTransaction[]
+}
+
+model EventAssetTransaction {
+  id          String            @id @default(uuid())
+  eventId     String
+  bookingId   String?
+  assetId     String
+  providerId  String
+  quantity    Int               @default(1)
+  status      TransactionStatus @default(pending)
+  agreedPrice Float
+  included    Boolean           @default(true)
+  currency    String            @default("PHP")
+  stripeTransferId String?       @unique
+  disputeReason String?
+  disputeAt   DateTime?
+  lockedAt    DateTime?
+  releasedAt  DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  asset       Asset             @relation(fields: [assetId], references: [id])
+  event       Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  booking     Booking?          @relation(fields: [bookingId], references: [id])
+  provider    User              @relation("AssetProvider", fields: [providerId], references: [id])
+}
+
+model EventServiceTransaction {
+  id          String            @id @default(uuid())
+  eventId     String
+  bookingId   String?
+  serviceId   String
+  providerId  String
+  status      TransactionStatus @default(pending)
+  agreedPrice Float
+  included    Boolean           @default(true)
+  currency    String            @default("PHP")
+  stripeTransferId String?       @unique
+  disputeReason String?
+  disputeAt   DateTime?
+  lockedAt    DateTime?
+  releasedAt  DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  event       Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  booking     Booking?          @relation(fields: [bookingId], references: [id])
+  provider    User              @relation("ServiceProvider", fields: [providerId], references: [id])
+  service     Service           @relation(fields: [serviceId], references: [id])
+}
+
+model EventVenueTransaction {
+  id          String            @id @default(uuid())
+  eventId     String
+  bookingId   String?
+  venueId     String
+  providerId  String
+  status      TransactionStatus @default(pending)
+  agreedPrice Float
+  included    Boolean           @default(true)
+  currency    String            @default("PHP")
+  stripeTransferId String?       @unique
+  disputeReason String?
+  disputeAt   DateTime?
+  lockedAt    DateTime?
+  releasedAt  DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  event       Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  booking     Booking?          @relation(fields: [bookingId], references: [id])
+  provider    User              @relation("VenueProvider", fields: [providerId], references: [id])
+  venue       Venue             @relation(fields: [venueId], references: [id])
+}
+
+model Booking {
+  id                  String                    @id @default(uuid())
+  eventId             String
+  userId              String
+  guestCount          Int
+  totalAmount         Float
+  hostMarkup         Float                   @default(0)
+  platformFee        Float                   @default(0)
+  stripePaymentId     String?                    @unique
+  status              BookingStatus             @default(pending)
+  startAt             DateTime
+  endAt               DateTime
+  expiresAt           DateTime?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  isGuestListLocked   Boolean                   @default(false)
+  event               Event                     @relation(fields: [eventId], references: [id])
+  user                User                      @relation(fields: [userId], references: [id])
+  attendees           BookingAttendee[]
+  payments            Payment[]
+  assetTransactions   EventAssetTransaction[]
+  serviceTransactions EventServiceTransaction[]
+  venueTransactions   EventVenueTransaction[]
+}
+
+model BookingAttendee {
+  id                 String       @id @default(uuid())
+  bookingId          String
+  userId             String?
+  invitedById        String?
+  firstName          String
+  lastName           String
+  email              String?
+  phone              String?
+  inviteStatus       InviteStatus @default(pending)
+  isDraft            Boolean      @default(true)
+  reasonForRejection String?
+  ticketCode         String?      @unique
+  checkedIn          Boolean      @default(false)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  booking            Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user               User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy          User?        @relation("Inviter", fields: [invitedById], references: [id])
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  bookingId     String
+  amount        Float
+  currency      String
+  method        String
+  paymentType   PaymentType
+  status        PaymentStatus
+  transactionId String?       @unique
+  expiresAt     DateTime?
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  hostMarkupAmount Float       @default(0)
+  platformFeeAmount Float     @default(0)
+  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model Favorite {
+  id         String   @id @default(uuid())
+  userId     String
+  entityId   String
+  entityType String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  userId     String
+  entityId   String
+  entityType String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, entityId, entityType])
+}
+
+model ServiceBooking {
+  id                   String            @id @default(uuid())
+  serviceId            String
+  userId               String
+  scheduledDate        DateTime
+  endDate              DateTime?
+  guestCount           Int               @default(1)
+  location             String
+  notes                String?
+  totalAmount          Float
+  platformFee          Float            @default(0)
+  platformFeeAmount    Float             @default(0)
+  status               ItemBookingStatus @default(pending)
+  paymentStatus        PaymentStatus     @default(pending)
+  paymentTransactionId String?
+  stripePaymentId      String?           @unique
+  paymentMethod        String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  service              Service           @relation(fields: [serviceId], references: [id])
+  user                 User              @relation(fields: [userId], references: [id])
+
+  @@map("service_bookings")
+}
+
+model AssetBooking {
+  id                   String            @id @default(uuid())
+  assetId              String
+  userId               String
+  startDate            DateTime
+  endDate              DateTime
+  quantity             Int               @default(1)
+  fulfillmentType      String            @default("pickup")
+  deliveryAddress      String?
+  notes                String?
+  totalAmount          Float
+  platformFee          Float            @default(0)
+  platformFeeAmount    Float             @default(0)
+  status               ItemBookingStatus @default(pending)
+  paymentStatus        PaymentStatus     @default(pending)
+  paymentTransactionId String?
+  stripePaymentId      String?           @unique
+  paymentMethod        String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  asset                Asset             @relation(fields: [assetId], references: [id])
+  user                 User              @relation(fields: [userId], references: [id])
+
+  @@map("asset_bookings")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+} 
+model Payout {
+  id               String       @id @default(uuid())
+  recipientId      String
+  role             RoleType
+  sourceType       String // "assetBooking" | "serviceBooking" | "booking"
+  sourceId         String
+  amount           Float
+  currency         String       @default("PHP")
+  stripeTransferId String?
+  status           PayoutStatus @default(pending)
+  failureReason    String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  recipient        User         @relation(fields: [recipientId], references: [id])
+
+  @@unique([sourceType, sourceId, recipientId, role])
+  @@index([sourceType, sourceId])
+  @@index([recipientId])
+  @@map("payouts")
+}
+
+enum PayoutStatus {
+  pending
+  paid
+  failed
+}
+
+enum MatchConstraint {
+  SAME_STATE
+  BROADER
+  MANUAL_OVERRIDE
+  NONE
+}
+
+enum ServiceCategory {
+  design
+  catering
+  entertainment
+  service_staff
+  other
+}
+
+enum AssetCategory {
+  furnitures
+  sound_system
+  decorations
+  other
+}
+
+enum VenueCategory {
+  indoor
+  outdoor
+  mix
+  hotel
+  beach_resort
+  garden
+  other
+}
+
+enum ComponentType {
+  asset
+  service
+  venue
+}
+
+enum SystemRole {
   user
-  host
-  foxer
   admin
-  super_admin
+}
+
+enum RoleType {
+  mayor
+  host
+  foxerAsset
+  foxerService
+  investor
+}
+
+enum RequestStatus {
+  pending
+  approved
+  rejected
 }
 
 enum EventStatus {
   draft
-  active
-  cancelled
+  pending
+  ongoing
   completed
+  cancelled
 }
-
-enum VenueStatus {
-  draft
-  active
-  inactive
-  under_maintenance
+ 
+enum TransactionStatus {
+  pending
+  approved
+  rejected
+  cancelled
 }
 
 enum BookingStatus {
   pending
   confirmed
+  active
   cancelled
   completed
+  disputed
 }
 
 enum PaymentStatus {
@@ -42,362 +766,75 @@ enum PaymentStatus {
   completed
   failed
   refunded
+  cancelled
 }
 
-model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  password     String
-  name         String
-  username     String    @unique
-  phone        String?
-  profileImage String?
-  dateOfBirth  DateTime?
-  role         UserRole  @default(user)
-  isHost       Boolean   @default(false)
-  isFoxer      Boolean   @default(false)
-  isVerified   Boolean   @default(false)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime? @updatedAt
-
-  // Relations
-  venues    Venue[]   @relation("HostVenues")
-  events    Event[]    @relation("FoxerEvents")
-  bookings  Booking[]
-  reviews   Review[]
-  favorites Favorite[]
-
-  @@index([email])
-  @@index([username])
-  @@index([role])
+enum PaymentType {
+  deposit
+  full
 }
 
-// Venues created by Hosts
-model Venue {
-  id           String       @id @default(uuid())
-  hostId       String
-  categoryId   String?
-  name         String
-  description  String
-  venueType    String       // hotel, land, hall, outdoor space, etc.
-  capacity     Int?
-  status       VenueStatus  @default(draft)
-  isPublished  Boolean      @default(false)
-  address      String
-  city         String
-  state        String
-  country      String
-  latitude     Decimal?
-  longitude    Decimal?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-
-  // Relations
-  host         User         @relation("HostVenues", fields: [hostId], references: [id], onDelete: Cascade)
-  category     Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  amenities    VenueAmenity[]
-  pricing      VenuePricing[]
-  images       VenueImage[]
-  reviews      VenueReview[]
-  events       Event[]      // Events using this venue
-
-  @@index([hostId])
-  @@index([categoryId])
-  @@index([status])
-  @@index([isPublished])
-  @@index([city])
-  @@index([createdAt])
+enum AssetCondition {
+  new
+  good
+  fair
+  refurbished
 }
 
-model VenueAmenity {
-  id        String   @id @default(uuid())
-  venueId   String
-  name      String   // WiFi, Parking, Kitchen, etc.
-  icon      String?
-  createdAt DateTime @default(now())
-
-  // Relations
-  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
-
-  @@index([venueId])
+enum AssetStatus {
+  draft
+  pending
+  available
+  reserved
+  archived
+  rejected
 }
 
-model VenuePricing {
-  id            String   @id @default(uuid())
-  venueId       String
-  pricePerDay   Decimal
-  pricePerHour  Decimal?
-  currency      String   @default("PHP")
-  minHours      Int?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relations
-  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
-
-  @@index([venueId])
+enum ServiceStatus {
+  draft
+  pending
+  available
+  paused
+  archived
+  rejected
 }
 
-model VenueImage {
-  id           String   @id @default(uuid())
-  venueId      String
-  imageUrl     String
-  altText      String?
-  displayOrder Int?
-  isPrimary    Boolean  @default(false)
-  uploadedAt   DateTime @default(now())
-
-  // Relations
-  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
-
-  @@index([venueId])
-  @@index([isPrimary])
+enum VenueStatus {
+  draft
+  pending
+  available
+  archived
+  rejected
 }
 
-model VenueReview {
-  id        String   @id @default(uuid())
-  venueId   String
-  userId    String
-  rating    Int
-  comment   String?
-  createdAt DateTime @default(now())
-
-  // Relations
-  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
-
-  @@index([venueId])
-  @@index([userId])
+enum BillingRate {
+  hourly
+  daily
+  weekly
+  monthly
+  yearly
+  one_time
 }
 
-// Events created by Foxers (using Venues)
-model Event {
-  id           String      @id @default(uuid())
-  foxerId      String      // Foxer who created the event
-  venueId      String?     // Optional: Link to venue if using one
-  categoryId   String?
-  title        String
-  description  String
-  status       EventStatus @default(draft)
-  maxAttendees Int?
-  isPublished  Boolean     @default(false)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-
-  // Relations
-  foxer        User                @relation("FoxerEvents", fields: [foxerId], references: [id], onDelete: Cascade)
-  venue        Venue?              @relation(fields: [venueId], references: [id], onDelete: SetNull)
-  category     Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  details      EventDetails?
-  pricing      EventPricing[]
-  availability EventAvailability[]
-  images       EventImage[]
-  reviews      Review[]
-  bookings     Booking[]
-  favorites    Favorite[]
-
-  @@index([foxerId])
-  @@index([venueId])
-  @@index([categoryId])
-  @@index([status])
-  @@index([isPublished])
-  @@index([createdAt])
+enum EventCategory {
+  corporate
+  birthday
+  wedding
+  social
+  other
 }
 
-model EventDetails {
-  id                 String   @id @default(uuid())
-  eventId            String   @unique
-  locationAddress    String
-  city               String
-  state              String
-  country            String
-  latitude           Decimal?
-  longitude          Decimal?
-  startDatetime      DateTime
-  endDatetime        DateTime
-  durationMinutes    Int?
-  requirements       String?
-  cancellationPolicy String?
-  itineraryJson      String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  // Relations
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
-
-  @@index([startDatetime])
-  @@index([city])
-  @@index([country])
+enum InviteStatus {
+  pending
+  accepted
+  declined
 }
 
-model EventPricing {
-  id                String    @id @default(uuid())
-  eventId           String
-  basePrice         Decimal
-  currency          String
-  serviceFeePercent Decimal
-  taxPercent        Decimal
-  pricingTiers      Json?
-  earlyBirdDiscount Json?
-  earlyBirdDeadline DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  // Relations
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
-
-  @@index([eventId])
-}
-
-model EventAvailability {
-  id             String   @id @default(uuid())
-  eventId        String
-  availableDate  DateTime
-  availableSlots Int
-  bookedSlots    Int
-  isAvailable    Boolean
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  // Relations
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
-
-  @@index([eventId])
-  @@index([availableDate])
-}
-
-model EventImage {
-  id           String   @id @default(uuid())
-  eventId      String
-  imageUrl     String
-  altText      String?
-  displayOrder Int?
-  isPrimary    Boolean  @default(false)
-  uploadedAt   DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  // Relations
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
-
-  @@index([eventId])
-  @@index([isPrimary])
-}
-
-model Category {
-  id               String   @id @default(uuid())
-  name             String
-  slug             String   @unique
-  description      String?
-  icon             String?
-  parentCategoryId String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  // Relations
-  parentCategory Category?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id], onDelete: SetNull)
-  subCategories  Category[] @relation("CategoryHierarchy")
-  venues         Venue[]
-  events         Event[]
-
-  @@index([slug])
-  @@index([parentCategoryId])
-}
-
-model Booking {
-  id               String        @id @default(uuid())
-  eventId          String
-  userId           String
-  numberOfTickets  Int
-  totalAmount      Decimal
-  bookingStatus    BookingStatus @default(pending)
-  confirmationCode String        @unique
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  specialRequests  String?
-
-  // Relations
-  user      User              @relation(fields: [userId], references: [id], onDelete: Restrict)
-  event     Event             @relation(fields: [eventId], references: [id], onDelete: Restrict)
-  attendees BookingAttendee[]
-  payments  Payment[]
-
-  @@index([userId])
-  @@index([eventId])
-  @@index([bookingStatus])
-  @@index([confirmationCode])
-  @@index([createdAt])
-}
-
-model BookingAttendee {
-  id          String    @id @default(uuid())
-  bookingId   String
-  firstName   String
-  lastName    String
-  email       String
-  phone       String
-  ticketCode  String    @unique
-  checkedIn   Boolean   @default(false)
-  checkInTime DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  // Relations
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  @@index([bookingId])
-  @@index([ticketCode])
-  @@index([checkedIn])
-}
-
-model Payment {
-  id              String        @id @default(uuid())
-  bookingId       String
-  amount          Decimal
-  currency        String
-  paymentMethod   String
-  paymentStatus   PaymentStatus @default(pending)
-  transactionId   String        @unique
-  paymentDate     DateTime      @default(now())
-  gatewayResponse String?
-
-  // Relations
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  @@index([bookingId])
-  @@index([transactionId])
-  @@index([paymentStatus])
-}
-
-model Review {
-  id                 String   @id @default(uuid())
-  eventId            String
-  userId             String
-  rating             Int
-  comment            String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  isVerifiedAttendee Boolean  @default(false)
-
-  // Relations
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, eventId])
-  @@index([eventId])
-  @@index([userId])
-  @@index([rating])
-}
-
-model Favorite {
-  id      String   @id @default(uuid())
-  userId  String
-  eventId String
-  savedAt DateTime @default(now())
-
-  // Relations
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, eventId])
-  @@index([userId])
-  @@index([eventId])
+enum ItemBookingStatus {
+  pending
+  confirmed
+  active
+  completed
+  cancelled
+  disputed
 }

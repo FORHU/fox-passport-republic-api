@@ -94,8 +94,7 @@ export default class CategorySvc {
             throw new Error("Category not found");
         }
 
-        // Note: This will fail if there are events or subcategories
-        // You may want to add logic to handle this
+        // Note: This will fail if there are listings or subcategories
         return CategoryRepo.deleteCategory(id);
     }
 

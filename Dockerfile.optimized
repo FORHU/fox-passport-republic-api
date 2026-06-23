@@ -47,6 +47,7 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy built application and generated Prisma client from build stage
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /app/prisma ./prisma
 
 # Change ownership
 RUN chown -R nodejs:nodejs /app
@@ -59,4 +60,4 @@ EXPOSE 3000
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["npm", "start"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]

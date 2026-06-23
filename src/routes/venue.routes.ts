@@ -1,48 +1,18 @@
-import { Router } from "express";
-import VenueController from "../controllers/venue.controller";
-import { authenticate, requireHost } from "../middleware/auth.middleware";
+import express from "express";
+import VenueCtrl from "../controllers/venue.controller";
+import { authenticate, requireRole } from "../middleware/auth.middleware";
 
-const router = Router();
+const router = express.Router();
 
-// Venue CRUD routes
-router.post("/", authenticate, requireHost, VenueController.createVenue);
-router.get("/", VenueController.getAllVenues);
-// IMPORTANT: Specific routes must come before parameterized routes
-router.get("/category/:categorySlug", VenueController.getVenuesByCategory);
-router.get("/:id", VenueController.getVenueById);
-router.put("/:id", authenticate, requireHost, VenueController.updateVenue);
-router.delete("/:id", authenticate, requireHost, VenueController.deleteVenue);
+// Public routes
+router.get("/", VenueCtrl.getVenues);
+router.get("/:id", VenueCtrl.getVenueById);
 
-// Amenity routes
-router.post(
-  "/:venueId/amenities",
-  authenticate,
-  requireHost,
-  VenueController.addAmenity
-);
-router.delete(
-  "/amenities/:amenityId",
-  authenticate,
-  requireHost,
-  VenueController.removeAmenity
-);
+// Protected routes
+router.post("/create", authenticate, requireRole(["mayor"]), VenueCtrl.createVenue);
+router.put("/:id", authenticate, requireRole(["mayor"]), VenueCtrl.updateVenue);
+router.delete("/:id", authenticate, requireRole(["mayor"]), VenueCtrl.deleteVenue);
 
-// Image routes
-router.post(
-  "/:venueId/images",
-  authenticate,
-  requireHost,
-  VenueController.addImage
-);
-router.delete(
-  "/images/:imageId",
-  authenticate,
-  requireHost,
-  VenueController.removeImage
-);
 
-// Review routes
-router.post("/:venueId/reviews", authenticate, VenueController.addReview); // Any authenticated user can review? Or just guests? Assuming auth for now.
-router.get("/:venueId/reviews", VenueController.getVenueReviews);
 
 export default router;
