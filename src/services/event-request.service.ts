@@ -1,5 +1,6 @@
 import EventRequestRepo from "../repositories/event-request.repository";
 import EventTemplateRepo from "../repositories/event-template.repository";
+import EventTemplateSvc from "./event-template.service";
 
 export default class EventRequestSvc {
   static async spawnRequestFromTemplate(data: {
@@ -10,11 +11,22 @@ export default class EventRequestSvc {
     startAt: Date;
     endAt: Date;
     guestCount: number;
-    totalAmount: number;
+    totalAmount?: number;
   }) {
     // 1. Fetch Template
     const template = await EventTemplateRepo.findTemplateById(data.templateId);
     if (!template) throw new Error("Template not found");
+
+    const templateTotals = EventTemplateSvc.calculateTotalsBreakdown(template);
+    const hasTemplateItems = 
+      (template.templateAssets?.length ?? 0) > 0 ||
+      (template.templateServices?.length ?? 0) > 0 ||
+      (template.templateVenues?.length ?? 0) > 0;
+
+    const totalAmount = hasTemplateItems ? templateTotals.totalAmount : (data.totalAmount ?? 0);
+    const itemsTotal = hasTemplateItems ? templateTotals.itemsTotal : 0;
+    const hostMarkupAmount = hasTemplateItems ? templateTotals.hostMarkupAmount : 0;
+    const platformFeeAmount = hasTemplateItems ? templateTotals.platformFeeAmount : 0;
 
     // 2. Create Event without transactions (will be created after confirmation)
     return EventRequestRepo.create({
@@ -27,7 +39,13 @@ export default class EventRequestSvc {
       startAt: data.startAt,
       endAt: data.endAt,
       guestCount: data.guestCount,
-      totalAmount: data.totalAmount
+      totalAmount,
+      itemsTotal,
+      hostMarkupAmount,
+      platformFeeAmount,
+      targetCity: template.targetCity ?? undefined,
+      targetState: template.targetState ?? undefined,
+      targetCountry: template.targetCountry ?? undefined,
     });
   }
 
