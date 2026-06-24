@@ -19,8 +19,7 @@ export default class MatchController {
       const { error, value } = schema.validate(req.body);
       if (error) return res.status(400).json({ message: error.message });
 
-      const { style, date, guestCount, requestContent, totalAmount, venueId } = value;
-      const foxerId = value.foxerId;
+      const { style, date, guestCount, requestContent, totalAmount, venueId, foxerId } = value;
       const clientId = (req as any).user?.userId || (req as any).user?.id;
 
       if (!clientId) {
