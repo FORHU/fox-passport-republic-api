@@ -1,7 +1,7 @@
 import AuthRepo from "../repositories/auth.repository";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
-import { generateOTP, getOTPExpiry, isOTPExpired } from "../utils/otp.utils";
+import { generateOTP, saveOTP, verifyOTP, deleteOTP } from "../utils/otp.utils";
 import { sendTemplatedEmail } from "../utils/helpers";
 
 import {
@@ -36,36 +36,30 @@ export default class AuthSvc {
       .toString("hex");
     const hashedPassword = `${salt}:${hash}`;
 
-    // GENERATE OTP
-    // const otp = generateOTP(); // "582941"
-    //const otpExpiry = getOTPExpiry(); // 5 minutes from now
-
-    // Create user with OTP
     const user = await AuthRepo.createUser({
       email: data.email,
       password: hashedPassword,
       username: data.username,
       name: data.name,
       mobileNumber: data.mobileNumber,
-      //  otpCode: otp, // Save OTP
-      // otpExpiry: otpExpiry, // Save expiry
     });
 
-    // Send verification email with OTP
-    // try {
-    //     sendTemplatedEmail({
-    //         subject: `Verify Your Email Address`,
-    //         email_data: {
-    //             email: user.email,
-    //             OTP_CODE: otp.toString(),
-    //         },
-    //         template_name: "verification-email.html",
-    //     });
-    // } catch (error) {
-    //     console.error("Failed to send verification email:", error);
-    //     // Still log to console as backup
-    //     console.log(`Backup - OTP for ${user.email}: ${otp}`);
-    // }
+    const otp = generateOTP();
+    await saveOTP(data.email, otp);
+
+    try {
+      sendTemplatedEmail({
+        subject: `Verify Your Email Address`,
+        email_data: {
+          email: user.email,
+          OTP_CODE: otp.toString(),
+        },
+        template_name: "verification-email.html",
+      });
+    } catch (error) {
+      console.error("Failed to send verification email:", error);
+      console.log(`Backup - OTP for ${user.email}: ${otp}`);
+    }
 
     // Generate tokens
     const accessToken = jwt.sign(
@@ -92,13 +86,6 @@ export default class AuthSvc {
       { expiresIn: "7d" }
     );
 
-    // Save refresh token
-    // await AuthRepo.createSession({
-    //     userId: user.id,
-    //     refreshToken,
-    //     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    // });
-
     return {
       id: user.id,
       email: user.email,
@@ -118,11 +105,13 @@ export default class AuthSvc {
       throw new Error("User not found");
     }
 
-    await AuthRepo.updateUser(user.id, {
-      isEmailVerified: true,
-      otpCode: null,
-      otpExpiry: null,
-    });
+    const isValid = await verifyOTP(email, otpCode);
+    if (!isValid) {
+      throw new Error("Invalid or expired verification code");
+    }
+
+    await AuthRepo.updateUser(user.id, { isEmailVerified: true });
+    await deleteOTP(email);
 
     return {
       message: "Email verified successfully! You can now login.",
@@ -179,13 +168,6 @@ export default class AuthSvc {
       { expiresIn: "7d" }
     );
 
-    // Create session with refresh token
-    // await AuthRepo.createSession({
-    //     userId: user.id,
-    //     refreshToken: refreshToken,
-    //     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    // });
-
     return {
       accessToken,
       refreshToken,
@@ -207,12 +189,6 @@ export default class AuthSvc {
         refreshToken,
         process.env.REFRESH_TOKEN_SECRET!
       ) as { userId: string };
-
-      // Find valid session
-      // const session = await AuthRepo.findValidSession(refreshToken);
-      // if (!session) {
-      //     throw "Invalid refresh token";
-      // }
 
       // Get user
       const user = await AuthRepo.findUserById(String(decoded.userId));
@@ -245,6 +221,7 @@ export default class AuthSvc {
       throw "Invalid refresh token";
     }
   }
+
   // Send OTP to reset password
   static async forgotPassword(email: string) {
     // Find user by email
@@ -258,18 +235,9 @@ export default class AuthSvc {
       };
     }
 
-    // Generate OTP
     const otp = generateOTP();
-    const otpExpiry = getOTPExpiry();
+    await saveOTP(email, otp);
 
-    // Save OTP to user
-    await AuthRepo.updateUser(user.id, {
-      otpCode: otp,
-      otpExpiry: otpExpiry,
-    });
-
-    // Send email with OTP
-    // Send email with OTP
     try {
       sendTemplatedEmail({
         subject: "Password Reset Code",
@@ -302,6 +270,11 @@ export default class AuthSvc {
       throw new Error("Invalid request");
     }
 
+    const isValid = await verifyOTP(email, otpCode);
+    if (!isValid) {
+      throw new Error("Invalid or expired reset code");
+    }
+
     // Hash new password (same method as registration)
     const salt = crypto.randomBytes(16).toString("hex");
     const hash = crypto
@@ -309,12 +282,8 @@ export default class AuthSvc {
       .toString("hex");
     const hashedPassword = `${salt}:${hash}`;
 
-    // Update password and clear OTP
-    await AuthRepo.updateUser(user.id, {
-      password: hashedPassword,
-      otpCode: null,
-      otpExpiry: null,
-    });
+    await AuthRepo.updateUser(user.id, { password: hashedPassword });
+    await deleteOTP(email);
 
     return {
       message:
@@ -330,12 +299,7 @@ export default class AuthSvc {
     }
 
     const otp = generateOTP();
-    const otpExpiry = getOTPExpiry();
-
-    await AuthRepo.updateUser(user.id, {
-      otpCode: otp,
-      otpExpiry: otpExpiry,
-    });
+    await saveOTP(email, otp);
 
     try {
       sendTemplatedEmail({
@@ -353,6 +317,7 @@ export default class AuthSvc {
       message: "New verification code sent to your email",
     };
   }
+
   static async getAuthUser(userId: string) {
     return AuthRepo.getAuthUser(String(userId));
   }

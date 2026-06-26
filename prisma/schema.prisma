@@ -48,6 +48,7 @@ model User {
   stripeDetailsSubmitted Boolean                @default(false)
   stripeChargesEnabled      Boolean             @default(false)
   stripePayoutsEnabled      Boolean             @default(false)
+  isEmailVerified     Boolean                   @default(false)
   payouts                   Payout[]
   stripeAccountId          String?   @unique
   stripeOnboardingComplete Boolean   @default(false)
