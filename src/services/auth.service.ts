@@ -2,6 +2,7 @@ import AuthRepo from "../repositories/auth.repository";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { generateOTP, saveOTP, verifyOTP, deleteOTP } from "../utils/otp.utils";
+import { generateOTP, saveOTP, verifyOTP, deleteOTP } from "../utils/otp.utils";
 import { sendTemplatedEmail } from "../utils/helpers";
 
 import {
@@ -105,6 +106,13 @@ export default class AuthSvc {
       throw new Error("User not found");
     }
 
+    const isValid = await verifyOTP(email, otpCode);
+    if (!isValid) {
+      throw new Error("Invalid or expired verification code");
+    }
+
+    await AuthRepo.updateUser(user.id, { isEmailVerified: true });
+    await deleteOTP(email);
     const isValid = await verifyOTP(email, otpCode);
     if (!isValid) {
       throw new Error("Invalid or expired verification code");
@@ -222,6 +230,7 @@ export default class AuthSvc {
     }
   }
 
+
   // Send OTP to reset password
   static async forgotPassword(email: string) {
     // Find user by email
@@ -275,6 +284,11 @@ export default class AuthSvc {
       throw new Error("Invalid or expired reset code");
     }
 
+    const isValid = await verifyOTP(email, otpCode);
+    if (!isValid) {
+      throw new Error("Invalid or expired reset code");
+    }
+
     // Hash new password (same method as registration)
     const salt = crypto.randomBytes(16).toString("hex");
     const hash = crypto
@@ -282,6 +296,8 @@ export default class AuthSvc {
       .toString("hex");
     const hashedPassword = `${salt}:${hash}`;
 
+    await AuthRepo.updateUser(user.id, { password: hashedPassword });
+    await deleteOTP(email);
     await AuthRepo.updateUser(user.id, { password: hashedPassword });
     await deleteOTP(email);
 
@@ -317,6 +333,7 @@ export default class AuthSvc {
       message: "New verification code sent to your email",
     };
   }
+
 
   static async getAuthUser(userId: string) {
     return AuthRepo.getAuthUser(String(userId));

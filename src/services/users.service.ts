@@ -66,6 +66,18 @@ export default class UsersSvc {
     return UsersRepo.updateUser(id, data);
   }
 
+  // BECOME HOST — adds "host" to roleType array
+  static async becomeHost(userId: string) {
+    return UsersRepo.addRoleType(userId, "host");
+  }
+
+  // FOXER STATS
+  static async getFoxerStats(userId: string) {
+    const user = await UsersRepo.findUserById(userId);
+    if (!user) throw new Error("User not found");
+    return UsersRepo.getFoxerStats(userId);
+  }
+
   // DELETE
   static async deleteUser(id: string) {
     const user = await UsersRepo.findUserById(id);
