@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import redisUtil from './redis.util';
 
 /**
  * OTP UTILITIES
@@ -20,4 +21,26 @@ export const getOTPExpiry = (): Date => {
 export const isOTPExpired = (expiry: Date | null): boolean => {
     if (!expiry) return true;
     return new Date() > expiry;
+};
+
+const OTP_TTL_SECONDS = 5 * 60; // 5 minutes
+const OTP_PREFIX = 'otp:';
+
+export const saveOTP = async (email: string, otp: string): Promise<void> => {
+    const client = redisUtil.getClient();
+    if (!client) throw new Error('OTP service is temporarily unavailable. Please try again.');
+    await client.set(`${OTP_PREFIX}${email}`, otp, { EX: OTP_TTL_SECONDS });
+};
+
+export const verifyOTP = async (email: string, otp: string): Promise<boolean> => {
+    const client = redisUtil.getClient();
+    if (!client) throw new Error('OTP service is temporarily unavailable. Please try again.');
+    const stored = await client.get(`${OTP_PREFIX}${email}`);
+    return stored === otp;
+};
+
+export const deleteOTP = async (email: string): Promise<void> => {
+    const client = redisUtil.getClient();
+    if (!client) return;
+    await client.del(`${OTP_PREFIX}${email}`);
 };
