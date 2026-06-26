@@ -32,10 +32,11 @@ export const saveOTP = async (email: string, otp: string): Promise<void> => {
     await client.set(`${OTP_PREFIX}${email}`, otp, { EX: OTP_TTL_SECONDS });
 };
 
+// getDel atomically gets and deletes — prevents the same OTP being used twice
 export const verifyOTP = async (email: string, otp: string): Promise<boolean> => {
     const client = redisUtil.getClient();
     if (!client) throw new Error('OTP service is temporarily unavailable. Please try again.');
-    const stored = await client.get(`${OTP_PREFIX}${email}`);
+    const stored = await client.getDel(`${OTP_PREFIX}${email}`);
     return stored === otp;
 };
 
