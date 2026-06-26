@@ -2,7 +2,6 @@ import AuthRepo from "../repositories/auth.repository";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { generateOTP, saveOTP, verifyOTP, deleteOTP } from "../utils/otp.utils";
-import { generateOTP, saveOTP, verifyOTP, deleteOTP } from "../utils/otp.utils";
 import { sendTemplatedEmail } from "../utils/helpers";
 
 import {
@@ -117,11 +116,6 @@ export default class AuthSvc {
 
     await AuthRepo.updateUser(user.id, { isEmailVerified: true });
     await deleteOTP(email);
-    const isValid = await verifyOTP(email, otpCode);
-    if (!isValid) {
-      throw new Error("Invalid or expired verification code");
-    }
-
     await AuthRepo.updateUser(user.id, { isEmailVerified: true });
     await deleteOTP(email);
 
@@ -286,11 +280,6 @@ export default class AuthSvc {
 
     if (!user) {
       throw new Error("Invalid request");
-    }
-
-    const isValid = await verifyOTP(email, otpCode);
-    if (!isValid) {
-      throw new Error("Invalid or expired reset code");
     }
 
     const isValid = await verifyOTP(email, otpCode);
