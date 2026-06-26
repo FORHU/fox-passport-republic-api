@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import redisUtil from './redis.util';
+import redisUtil from './redis.util';
 
 /**
  * OTP UTILITIES

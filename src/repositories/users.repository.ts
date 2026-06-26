@@ -182,6 +182,66 @@ export default class UsersRepo {
   }
 
 
+  // ADD ROLE TYPE (e.g. become host)
+  static async addRoleType(id: string, roleType: RoleType) {
+    const user = await prisma.user.findUnique({ where: { id }, select: { roleType: true } });
+    if (!user) throw new Error("User not found");
+    if (user.roleType.includes(roleType)) return prisma.user.findUnique({ where: { id } });
+    return prisma.user.update({
+      where: { id },
+      data: { roleType: { push: roleType } },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        name: true,
+        systemRole: true,
+        roleType: true,
+      },
+    });
+  }
+
+  // FOXER STATS — bookings + revenue + avg rating for owned services/assets
+  static async getFoxerStats(userId: string) {
+    const [serviceAgg, assetAgg, userItems] = await Promise.all([
+      prisma.serviceBooking.aggregate({
+        where: { service: { ownerId: userId }, status: { in: ["confirmed", "active", "completed"] } },
+        _count: { id: true },
+        _sum: { totalAmount: true },
+      }),
+      prisma.assetBooking.aggregate({
+        where: { asset: { ownerId: userId }, status: { in: ["confirmed", "active", "completed"] } },
+        _count: { id: true },
+        _sum: { totalAmount: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          services: { select: { id: true } },
+          assets: { select: { id: true } },
+        },
+      }),
+    ]);
+
+    const entityIds = [
+      ...(userItems?.services.map((s) => s.id) ?? []),
+      ...(userItems?.assets.map((a) => a.id) ?? []),
+    ];
+
+    const reviewAgg = entityIds.length > 0
+      ? await prisma.review.aggregate({
+          where: { entityId: { in: entityIds } },
+          _avg: { rating: true },
+        })
+      : { _avg: { rating: null } };
+
+    return {
+      totalBookings: (serviceAgg._count.id ?? 0) + (assetAgg._count.id ?? 0),
+      totalRevenue: (serviceAgg._sum.totalAmount ?? 0) + (assetAgg._sum.totalAmount ?? 0),
+      rating: reviewAgg._avg.rating ?? 5.0,
+    };
+  }
+
   // DELETE
   static async deleteUser(id: string) {
     return prisma.user.delete({
