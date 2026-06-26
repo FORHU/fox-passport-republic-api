@@ -1,9 +1,0 @@
--- AlterTable
-ALTER TABLE "Booking" ADD COLUMN     "hostMarkup" DOUBLE PRECISION NOT NULL DEFAULT 0,
-ADD COLUMN     "platformFee" DOUBLE PRECISION NOT NULL DEFAULT 0;
-
--- AlterTable
-ALTER TABLE "asset_bookings" ADD COLUMN     "platformFee" DOUBLE PRECISION NOT NULL DEFAULT 0;
-
--- AlterTable
-ALTER TABLE "service_bookings" ADD COLUMN     "platformFee" DOUBLE PRECISION NOT NULL DEFAULT 0;
