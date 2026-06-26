@@ -46,7 +46,11 @@ export default class AuthSvc {
     });
 
     const otp = generateOTP();
-    await saveOTP(data.email, otp);
+    try {
+      await saveOTP(data.email, otp);
+    } catch (error) {
+      console.error("OTP save failed, skipping email verification:", error);
+    }
 
     try {
       sendTemplatedEmail({
@@ -245,7 +249,12 @@ export default class AuthSvc {
     }
 
     const otp = generateOTP();
-    await saveOTP(email, otp);
+    try {
+      await saveOTP(email, otp);
+    } catch (error) {
+      console.error("OTP save failed:", error);
+      return { message: "If an account exists with this email, you will receive a password reset code." };
+    }
 
     try {
       sendTemplatedEmail({
@@ -315,7 +324,12 @@ export default class AuthSvc {
     }
 
     const otp = generateOTP();
-    await saveOTP(email, otp);
+    try {
+      await saveOTP(email, otp);
+    } catch (error) {
+      console.error("OTP save failed:", error);
+      throw new Error("Verification service temporarily unavailable. Please try again.");
+    }
 
     try {
       sendTemplatedEmail({
