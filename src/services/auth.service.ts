@@ -116,6 +116,8 @@ export default class AuthSvc {
 
     await AuthRepo.updateUser(user.id, { isEmailVerified: true });
     await deleteOTP(email);
+    await AuthRepo.updateUser(user.id, { isEmailVerified: true });
+    await deleteOTP(email);
 
     return {
       message: "Email verified successfully! You can now login.",
@@ -226,6 +228,7 @@ export default class AuthSvc {
     }
   }
 
+
   // Send OTP to reset password
   static async forgotPassword(email: string) {
     // Find user by email
@@ -291,6 +294,8 @@ export default class AuthSvc {
 
     await AuthRepo.updateUser(user.id, { password: hashedPassword });
     await deleteOTP(email);
+    await AuthRepo.updateUser(user.id, { password: hashedPassword });
+    await deleteOTP(email);
 
     return {
       message:
@@ -330,6 +335,7 @@ export default class AuthSvc {
       message: "New verification code sent to your email",
     };
   }
+
 
   static async getAuthUser(userId: string) {
     return AuthRepo.getAuthUser(String(userId));
