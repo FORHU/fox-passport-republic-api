@@ -8,7 +8,7 @@ export async function seedUsers(prisma: PrismaClient) {
     const users = [
       {
         email: "admin@example.com",
-        password: "Admin1234567890!",
+        password: "Adminjun1234567890!",
         name: "Admin User",
         username: "admin",
         systemRole: "admin",
@@ -16,7 +16,7 @@ export async function seedUsers(prisma: PrismaClient) {
       },
       {
         email: "mayor@example.com",
-        password: "Mayor1234567890!",
+        password: "Mayormamamo1234567890!",
         name: "Mayor Santos",
         username: "mayor_santos",
         systemRole: "user",
@@ -27,7 +27,7 @@ export async function seedUsers(prisma: PrismaClient) {
       },
       {
         email: "host@example.com",
-        password: "Host1234567890!",
+        password: "Hostpangani1234567890!",
         name: "Host Reyes",
         username: "host_reyes",
         systemRole: "user",
@@ -60,7 +60,7 @@ export async function seedUsers(prisma: PrismaClient) {
       },
       {
         email: "multirole@example.com",
-        password: "Multi1234567890!",
+        password: "Multijungkwan1234567890!",
         name: "Multi Role Villanueva",
         username: "multirole",
         systemRole: "user",
@@ -71,7 +71,7 @@ export async function seedUsers(prisma: PrismaClient) {
       },
       {
         email: "user@example.com",
-        password: "User@1234567890!",
+        password: "Usernanaymo@1234567890!",
         name: "Regular User",
         username: "regular",
         systemRole: "user",
@@ -83,7 +83,7 @@ export async function seedUsers(prisma: PrismaClient) {
       // ── Foxer Personas (replacing hardcoded data/foxers.ts) ───────────────
       {
         email: "jasmine.reyes@foxers.ph",
-        password: "Foxer1234567890!",
+        password: "Foxerkupals1234567890!",
         name: "Jasmine Reyes",
         username: "jasmine_reyes",
         systemRole: "user",
@@ -94,7 +94,7 @@ export async function seedUsers(prisma: PrismaClient) {
       },
       {
         email: "marco.santos@foxers.ph",
-        password: "Foxer@123456789!",
+        password: "Foxerkupalska@123456789!",
         name: "Marco Santos",
         username: "marco_santos",
         systemRole: "user",
@@ -105,7 +105,7 @@ export async function seedUsers(prisma: PrismaClient) {
       },
       {
         email: "sarah.lim@foxers.ph",
-        password: "Foxer1234567890@!",
+        password: "Foxerkupalskanga1234567890@!",
         name: "Sarah Lim",
         username: "sarah_lim",
         systemRole: "user",
