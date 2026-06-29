@@ -89,6 +89,43 @@ export default class UsersCtrl {
     }
   }
 
+  // BECOME HOST
+  static async becomeHost(req: Request, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+
+      const user = await UsersSvc.becomeHost(userId) as any;
+      return res.status(200).json({
+        success: true,
+        message: "You are now a host!",
+        data: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          name: user.name,
+          role: user.systemRole,
+          isHost: (user.roleType as string[]).includes("host"),
+        },
+      });
+    } catch (err: any) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+  }
+
+  // FOXER STATS
+  static async getFoxerStats(req: Request, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+
+      const stats = await UsersSvc.getFoxerStats(userId);
+      return res.status(200).json({ success: true, data: stats });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
   // DELETE
   static async deleteUserById(req: Request, res: Response) {
     await UsersSvc.deleteUser(req.params.id);
