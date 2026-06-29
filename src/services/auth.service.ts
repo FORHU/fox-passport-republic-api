@@ -52,7 +52,7 @@ export default class AuthSvc {
     }
 
     try {
-      sendTemplatedEmail({
+      await sendTemplatedEmail({
         subject: `Verify Your Email Address`,
         email_data: {
           email: user.email,
@@ -62,7 +62,7 @@ export default class AuthSvc {
       });
     } catch (error) {
       console.error("Failed to send verification email:", error);
-      console.log(`Backup - OTP for ${user.email}: ${otp}`);
+      console.log(`[DEV] Verification OTP for ${user.email}: ${otp}`);
     }
 
     // Generate tokens
@@ -243,15 +243,12 @@ export default class AuthSvc {
     }
 
     const otp = generateOTP();
-    try {
-      await saveOTP(email, otp);
-    } catch (error) {
-      console.error("OTP save failed:", error);
-      return { message: "If an account exists with this email, you will receive a password reset code." };
-    }
+    // Let Redis failure propagate — returning success when OTP was never saved
+    // would show a toast to the user but the reset code would never work.
+    await saveOTP(email, otp);
 
     try {
-      sendTemplatedEmail({
+      await sendTemplatedEmail({
         subject: "Password Reset Code",
         email_data: {
           email: user.email,
@@ -260,7 +257,8 @@ export default class AuthSvc {
         template_name: "forgot-password.html",
       });
     } catch (error) {
-      console.log(`Password Reset OTP for ${user.email}: ${otp}`);
+      console.error("Failed to send password reset email:", error);
+      console.log(`[DEV] Password reset OTP for ${user.email}: ${otp}`);
     }
 
     return {
@@ -321,7 +319,7 @@ export default class AuthSvc {
     }
 
     try {
-      sendTemplatedEmail({
+      await sendTemplatedEmail({
         subject: "Verify Your Email Address",
         email_data: {
           email: user.email,
@@ -330,7 +328,8 @@ export default class AuthSvc {
         template_name: "verification-email.html",
       });
     } catch (error) {
-      console.log(`OTP for ${user.email}: ${otp}`);
+      console.error("Failed to resend verification email:", error);
+      console.log(`[DEV] Resend OTP for ${user.email}: ${otp}`);
     }
     return {
       message: "New verification code sent to your email",
