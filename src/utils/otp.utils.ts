@@ -15,6 +15,7 @@ export const generateOTP = (): string => {
 export const getOTPExpiry = (): Date => {
     const expiry = new Date();
     expiry.setMinutes(expiry.getMinutes() + 5);
+    return expiry;
 };
 
 export const isOTPExpired = (expiry: Date | null): boolean => {
