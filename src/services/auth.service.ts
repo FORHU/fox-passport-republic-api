@@ -240,12 +240,9 @@ export default class AuthSvc {
     }
 
     const otp = generateOTP();
-    try {
-      await saveOTP(email, otp);
-    } catch (error) {
-      console.error("OTP save failed:", error);
-      return { message: "If an account exists with this email, you will receive a password reset code." };
-    }
+    // Let Redis failure propagate — returning success when OTP was never saved
+    // would show a toast to the user but the reset code would never work.
+    await saveOTP(email, otp);
 
     try {
       sendTemplatedEmail({
