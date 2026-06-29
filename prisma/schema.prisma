@@ -44,8 +44,6 @@ model User {
   invitedAttendees    BookingAttendee[]         @relation("Inviter")
   notifications       Notification[]
   stripeCustomerId     String?                   @unique
-  stripedConnectedId   String?                   @unique
-  stripeDetailsSubmitted Boolean                @default(false)
   stripeChargesEnabled      Boolean             @default(false)
   stripePayoutsEnabled      Boolean             @default(false)
   isEmailVerified     Boolean                   @default(false)
