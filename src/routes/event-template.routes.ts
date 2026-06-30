@@ -14,6 +14,7 @@ router.get("/:id", authenticate, EventTemplateCtrl.getTemplateById);
 
 // Organizer only actions
 router.post("/", authenticate, requireRole(["host"]), EventTemplateCtrl.createTemplate);
+router.post("/:id/submit", authenticate, requireRole(["host"]), EventTemplateCtrl.submitTemplate);
 router.put("/:id", authenticate, requireRole(["host"]), EventTemplateCtrl.updateTemplate);
 router.delete("/:id", authenticate, requireRole(["host"]), EventTemplateCtrl.deleteTemplate);
 

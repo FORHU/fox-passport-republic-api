@@ -325,6 +325,7 @@ model EventTemplate {
   name             String
   description      String
   category         EventCategory
+  status           EventTemplateStatus    @default(draft)
   isPublic         Boolean                @default(false)
   targetCity       String?
   targetState      String?
@@ -806,6 +807,14 @@ enum VenueStatus {
   available
   archived
   rejected
+}
+
+enum EventTemplateStatus {
+  draft
+  pending
+  published
+  rejected
+  archived
 }
 
 enum BillingRate {

@@ -105,6 +105,19 @@ export default class EventTemplateRepo {
     });
   }
 
+  // SUBMIT FOR REVIEW
+  static async submitTemplate(id: string, ownerId: string) {
+    const template = await prisma.eventTemplate.findUnique({ where: { id } });
+    if (!template) throw new Error("Template not found");
+    if (template.ownerId !== ownerId) throw new Error("Unauthorized");
+    if (template.status !== "draft") throw new Error("Template is not in draft — already submitted or published");
+    return prisma.eventTemplate.update({
+      where: { id },
+      data: { status: "pending" },
+      select: { id: true, name: true, status: true, ownerId: true, createdAt: true, updatedAt: true },
+    });
+  }
+
   // ASSETS
   static async attachAsset(templateId: string, assetId?: string, quantity: number = 1, matchData?: any, description?: string, matchedAt?: Date, agreedPrice?: number, isOptional?: boolean) {
     return prisma.eventTemplateAsset.create({

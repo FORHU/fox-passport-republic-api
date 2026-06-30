@@ -233,6 +233,18 @@ export default class EventTemplateCtrl {
     }
   }
 
+  static async submitTemplate(req: Request, res: Response) {
+    try {
+      const ownerId = (req as any).user?.userId;
+      const template = await EventTemplateSvc.submitTemplate(req.params.id, ownerId);
+      return res.status(200).json({ message: "Template submitted for review", template });
+    } catch (error: any) {
+      if (error.message.includes("not found")) return res.status(404).json({ message: error.message });
+      if (error.message.includes("Unauthorized")) return res.status(403).json({ message: error.message });
+      return res.status(400).json({ message: error.message });
+    }
+  }
+
   static async deleteTemplate(req: Request, res: Response) {
     try {
       const ownerId = (req as any).user?.userId;

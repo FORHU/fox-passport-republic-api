@@ -44,6 +44,10 @@ export default class EventTemplateSvc {
     };
   }
 
+  static async submitTemplate(id: string, ownerId: string) {
+    return EventTemplateRepo.submitTemplate(id, ownerId);
+  }
+
   static async getTemplates(filters?: { ownerId?: string; isPublic?: boolean; category?: string }) {
     const templates = await EventTemplateRepo.findAllTemplates(filters);
     return templates.map(t => ({
