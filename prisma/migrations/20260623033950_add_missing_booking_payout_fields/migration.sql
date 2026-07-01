@@ -1,4 +1,4 @@
--- AlterTable (safe: columns may already exist from a prior migration)
+
 ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "hostMarkup" DOUBLE PRECISION NOT NULL DEFAULT 0,
 ADD COLUMN IF NOT EXISTS "platformFee" DOUBLE PRECISION NOT NULL DEFAULT 0;
 
