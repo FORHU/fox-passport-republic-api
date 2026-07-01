@@ -159,15 +159,18 @@ export default class BookingCtrl {
         }
     }
 
-    // CREATE DRAFT (Step 1)
+    // CREATE DRAFT (Step 1) — supports both event-based and direct venue booking
     static async createDraftBooking(req: Request, res: Response) {
         try {
             const schema = Joi.object({
-                eventId: Joi.string().uuid().required(),
+                eventId: Joi.string().uuid().optional(),
+                venueId: Joi.string().optional(),
+                startDate: Joi.date().iso().when('venueId', { is: Joi.exist(), then: Joi.required() }),
+                endDate: Joi.date().iso().when('venueId', { is: Joi.exist(), then: Joi.required() }),
                 guestCount: Joi.number().min(1).optional(),
                 totalAmount: Joi.number().min(0).optional(),
                 specialRequests: Joi.string().optional()
-            });
+            }).xor('venueId', 'eventId');
 
             const { error, value } = schema.validate(req.body);
             if (error) return res.status(400).json({ message: error.message });
@@ -212,9 +215,20 @@ export default class BookingCtrl {
 
     static async getAllBookings(req: Request, res: Response) {
         try {
-            // Simplified filters
-            const bookings = await BookingSvc.getAllBookings(req.query);
-            return res.status(200).json({ success: true, data: bookings });
+            const limit = Math.min(Number(req.query.limit) || 4, 20);
+            const page = Math.max(Number(req.query.page) || 1, 1);
+            const { page: _p, limit: _l, ...filters } = req.query;
+            const { bookings, total } = await BookingSvc.getAllBookings(filters, page, limit);
+            return res.status(200).json({
+                success: true,
+                data: bookings,
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.ceil(total / limit),
+                },
+            });
         } catch (error: any) {
             return res.status(500).json({ success: false, message: error.message });
         }
@@ -243,8 +257,19 @@ export default class BookingCtrl {
     // GET USER BOOKINGS
     static async getUserBookings(req: Request, res: Response) {
         try {
-            const bookings = await BookingSvc.getUserBookings(req.user!.userId);
-            return res.status(200).json({ success: true, data: bookings });
+            const limit = Math.min(Number(req.query.limit) || 4, 20);
+            const page = Math.max(Number(req.query.page) || 1, 1);
+            const { bookings, total } = await BookingSvc.getUserBookings(req.user!.userId, page, limit);
+            return res.status(200).json({
+                success: true,
+                data: bookings,
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.ceil(total / limit),
+                },
+            });
         } catch (error: any) {
             return res.status(500).json({ success: false, message: error.message });
         }

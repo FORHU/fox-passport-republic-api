@@ -13,15 +13,21 @@ export default class BookingRepo {
         });
     }
 
-    static async findAll(filters: any) {
-        return prisma.booking.findMany({
-            where: filters,
-            include: {
-                event: true,
-                user: { select: { name: true, email: true } }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
+    static async findAll(filters: any, skip = 0, take = 10) {
+        const [bookings, total] = await Promise.all([
+            prisma.booking.findMany({
+                where: filters,
+                include: {
+                    event: true,
+                    user: { select: { name: true, email: true } }
+                },
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take,
+            }),
+            prisma.booking.count({ where: filters }),
+        ]);
+        return { bookings, total };
     }
 
     static async findById(id: string) {
@@ -106,13 +112,19 @@ export default class BookingRepo {
         ]);
     }
 
-    static async findByUserId(userId: string) {
-        return prisma.booking.findMany({
-            where: { userId },
-            include: {
-                event: true
-            }
-        });
+    static async findByUserId(userId: string, skip = 0, take = 10) {
+        const where = { userId };
+        const [bookings, total] = await Promise.all([
+            prisma.booking.findMany({
+                where,
+                include: { event: true },
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take,
+            }),
+            prisma.booking.count({ where }),
+        ]);
+        return { bookings, total };
     }
 
     // Mirrors asset-booking.repository.ts's updateStatus/confirmArrival/dispute exactly.
