@@ -31,6 +31,7 @@ export default class EventTransactionSvc {
   static async createTransactionsFromTemplate(eventId: string, bookingId: string) {
     const event = await EventRequestRepo.findById(eventId);
     if (!event) throw new Error("Event not found");
+    if (!event.templateId) throw new Error("Event has no template — cannot create template-based transactions");
 
     const template = await EventTemplateRepo.findTemplateById(event.templateId);
     if (!template) throw new Error("Template not found");

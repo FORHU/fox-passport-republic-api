@@ -3,16 +3,103 @@ import EventRequestRepo from "../repositories/event-request.repository";
 import PaymentSvc from "./payment.service";
 import PaymentRepo from "../repositories/payment.repository";
 import PayoutSvc from "./payout.service";
+import { prisma } from "../utils/prisma";
 import crypto from "crypto";
 import { BookingStatus, PaymentType, ItemBookingStatus } from "@prisma/client";
 
 export default class BookingSvc {
     static async createBooking(data: any) {
-        // Fetch event details to get start/end times
+        const { attendees, eventId, venueId, startDate, endDate, userId, ...rest } = data;
+
+        // ── Venue direct booking path ────────────────────────────────────────
+        if (venueId && !eventId) {
+            const venue = await prisma.venue.findUnique({
+                where: { id: venueId },
+                include: { mayor: true },
+            });
+            if (!venue) throw new Error("Venue not found");
+
+            const startAt = new Date(startDate);
+            const endAt = new Date(endDate);
+            const days = Math.max(1, Math.ceil((endAt.getTime() - startAt.getTime()) / (1000 * 60 * 60 * 24)));
+            const rateMultiplier =
+                venue.billingRate === "hourly" ? days * 24 :
+                venue.billingRate === "daily" ? days :
+                venue.billingRate === "weekly" ? Math.ceil(days / 7) :
+                venue.billingRate === "monthly" ? Math.ceil(days / 30) :
+                1;
+            const itemsTotal = venue.price * rateMultiplier;
+            const platformFeeAmount = Math.round(itemsTotal * 0.05 * 100) / 100;
+            const totalAmount = data.totalAmount || itemsTotal + platformFeeAmount;
+
+            // Create a minimal Event (no template — direct venue booking)
+            const event = await prisma.event.create({
+                data: {
+                    clientId: userId,
+                    organizerId: venue.mayorId,
+                    name: `${venue.name} Booking`,
+                    description: venue.description,
+                    eventCategory: "other" as any,
+                    startAt,
+                    endAt,
+                    guestCount: data.guestCount || 1,
+                    totalAmount,
+                    itemsTotal,
+                    hostMarkupAmount: 0,
+                    platformFeeAmount,
+                    requestStatus: "approved",
+                    eventStatus: "pending",
+                    targetCity: venue.city,
+                    targetState: venue.state,
+                    targetCountry: venue.country,
+                },
+            });
+
+            // Create EventVenueTransaction
+            await prisma.eventVenueTransaction.create({
+                data: {
+                    eventId: event.id,
+                    venueId: venue.id,
+                    providerId: venue.mayorId,
+                    agreedPrice: itemsTotal,
+                    status: "pending",
+                    currency: "PHP",
+                },
+            });
+
+            // Create Booking
+            const expiresAt = new Date();
+            expiresAt.setHours(expiresAt.getHours() + 24);
+
+            const depositAmount = totalAmount * 0.5;
+
+            const { specialRequests, ...bookingData } = rest;
+
+            const booking = await BookingRepo.create({
+                ...bookingData,
+                totalAmount,
+                startAt,
+                endAt,
+                expiresAt,
+                event: { connect: { id: event.id } },
+                user: { connect: { id: userId } },
+            });
+
+            await PaymentSvc.createPayment({
+                bookingId: booking.id,
+                amount: depositAmount,
+                currency: data.currency || "PHP",
+                method: "pending",
+                paymentType: "deposit",
+                expiresAt,
+            });
+
+            return booking;
+        }
+
+        // ── Existing event-based booking path ────────────────────────────────
         const event = await EventRequestRepo.findById(data.eventId);
         if (!event) throw new Error("Event not found");
-
-        const { attendees, eventId, userId, ...rest } = data;
 
         const attendeesWithTickets = (attendees || []).map((a: any) => ({
             ...a,
@@ -21,16 +108,16 @@ export default class BookingSvc {
             ticketCode: `TKT-${crypto.randomBytes(4).toString("hex").toUpperCase()}`
         }));
         
-        // Calculate expiration (24 hours from now)
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 24);
 
-        // Calculate 50% deposit
         const totalAmount = data.totalAmount || 0;
         const depositAmount = totalAmount * 0.5;
 
+        const { specialRequests: _, ...cleanRest } = rest;
+
         const booking = await BookingRepo.create({
-            ...rest,
+            ...cleanRest,
             totalAmount,
             startAt: event.startAt,
             endAt: event.endAt,
@@ -40,12 +127,11 @@ export default class BookingSvc {
             attendees: { create: attendeesWithTickets }
         });
 
-        // Automatically create the deposit payment record
         await PaymentSvc.createPayment({
             bookingId: booking.id,
             amount: depositAmount,
             currency: data.currency || "PHP",
-            method: "pending", // Placeholder until user selects method
+            method: "pending",
             paymentType: "deposit",
             expiresAt,
         });
@@ -53,10 +139,10 @@ export default class BookingSvc {
         return booking;
     }
 
-    static async getAllBookings(filters: any) {
-        // Lazy cleanup before listing
+    static async getAllBookings(filters: any, page = 1, limit = 10) {
         await PaymentRepo.cancelExpiredPayments();
-        return BookingRepo.findAll(filters);
+        const skip = (page - 1) * limit;
+        return BookingRepo.findAll(filters, skip, limit);
     }
 
     static async getBookingById(id: string, userContext?: any) {
@@ -135,8 +221,9 @@ export default class BookingSvc {
         });
     }
 
-    static async getUserBookings(userId: string) {
-        return BookingRepo.findByUserId(userId);
+    static async getUserBookings(userId: string, page = 1, limit = 10) {
+        const skip = (page - 1) * limit;
+        return BookingRepo.findByUserId(userId, skip, limit);
     }
 
     // Mirrors asset-booking.service.ts's updateStatus/confirmArrival/dispute exactly,
