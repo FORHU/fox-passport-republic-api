@@ -6,10 +6,10 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
     const serviceFoxer = users.find(u => u.email === "servicefoxer@example.com");
     if (!serviceFoxer) throw new Error("Service foxer user not found for service seeding");
 
-    const gearFoxer    = users.find(u => u.email === "gearfoxer@example.com");
-    const jasmine      = users.find(u => u.email === "jasmine.reyes@foxers.ph");
-    const marco        = users.find(u => u.email === "marco.santos@foxers.ph");
-    const sarah        = users.find(u => u.email === "sarah.lim@foxers.ph");
+    const gearFoxer = users.find(u => u.email === "gearfoxer@example.com");
+    const jasmine = users.find(u => u.email === "jasmine.reyes@foxers.ph");
+    const marco = users.find(u => u.email === "marco.santos@foxers.ph");
+    const sarah = users.find(u => u.email === "sarah.lim@foxers.ph");
 
     const services = [
       // ── serviceFoxer Cruz (existing) ──────────────────────────────────────
@@ -452,7 +452,6 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
       ] : []),
     ];
 
-
     for (const s of services) {
       const { id, ...rest } = s as any;
       const serviceId = id || `seed-service-${s.name.toLowerCase().replace(/\s+/g, '-')}`;
@@ -464,35 +463,52 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
       console.log(`✓ Seeded service: ${s.name}`);
     }
 
-    // ── Portfolio images for foxer services ───────────────────────────────────
+    // ── Portfolio images for ALL services ───────────────────────────────────
     const serviceImages = [
+      // NEW: serviceFoxer Portfolio Images
+      { id: "seed-img-manila-photo-1", serviceId: "seed-service-manila-event-photography", url: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&auto=format&fit=crop", name: "event-photo.jpg", type: "image/jpeg" },
+      { id: "seed-img-premium-catering-1", serviceId: "seed-service-metro-manila-premium-catering", url: "https://images.unsplash.com/photo-1555244162-803834f70033?w=800&auto=format&fit=crop", name: "buffet-setup.jpg", type: "image/jpeg" },
+      { id: "seed-img-live-band-1", serviceId: "seed-service-live-band-performance", url: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=800&auto=format&fit=crop", name: "live-band-show.jpg", type: "image/jpeg" },
+      { id: "seed-img-waitstaff-1", serviceId: "seed-service-event-waitstaff-team", url: "https://images.unsplash.com/photo-1578474846511-04ba529f0b88?w=800&auto=format&fit=crop", name: "waitstaff.jpg", type: "image/jpeg" },
+      { id: "seed-img-neon-cocktail-1", serviceId: "seed-service-neon-cocktail-bar", url: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=800&auto=format&fit=crop", name: "neon-drinks.jpg", type: "image/jpeg" },
+      { id: "seed-img-ramen-station-1", serviceId: "seed-service-midnight-ramen-station", url: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800&auto=format&fit=crop", name: "ramen-bar.jpg", type: "image/jpeg" },
+      { id: "seed-img-sushi-deluxe-1", serviceId: "seed-service-sushi-platter-deluxe", url: "https://images.unsplash.com/photo-1611143669185-af224c5e3252?w=800&auto=format&fit=crop", name: "sushi-platter.jpg", type: "image/jpeg" },
+      { id: "seed-img-funktion-sound-1", serviceId: "seed-service-funktion-one-sound", url: "https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&auto=format&fit=crop", name: "funktion-speakers.jpg", type: "image/jpeg" },
+      { id: "seed-img-silent-disco-1", serviceId: "seed-service-silent-disco-gear", url: "https://images.unsplash.com/photo-1516873240891-4bf014598ab4?w=800&auto=format&fit=crop", name: "silent-disco.jpg", type: "image/jpeg" },
+      { id: "seed-img-cyberpunk-props-1", serviceId: "seed-service-cyberpunk-props", url: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=800&auto=format&fit=crop", name: "neon-props.jpg", type: "image/jpeg" },
+      { id: "seed-img-lounge-seating-1", serviceId: "seed-service-luxury-lounge-seating", url: "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&auto=format&fit=crop", name: "lounge-furniture.jpg", type: "image/jpeg" },
+      { id: "seed-img-film-booth-1", serviceId: "seed-service-film-photo-booth", url: "https://images.unsplash.com/photo-1533142266415-ac591a4deae9?w=800&auto=format&fit=crop", name: "vintage-booth.jpg", type: "image/jpeg" },
+      { id: "seed-img-drone-aftermovie-1", serviceId: "seed-service-aftermovie-drone", url: "https://images.unsplash.com/photo-1508614589041-895b88991e3e?w=800&auto=format&fit=crop", name: "drone-aerial.jpg", type: "image/jpeg" },
+      { id: "seed-img-event-styling-1", serviceId: "seed-service-event-styling-design", url: "https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?w=800&auto=format&fit=crop", name: "design-setup.jpg", type: "image/jpeg" },
+      { id: "seed-img-cebu-lechon-1", serviceId: "seed-service-cebu-lechon-kamayan", url: "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop", name: "kamayan-feast.jpg", type: "image/jpeg" },
+
       // Gear Foxer — sound & lighting portfolio
-      { id: "seed-img-gear-sound-1",    serviceId: "seed-service-gear-lacoustics-sound",  url: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&auto=format&fit=crop", name: "stage-sound.jpg", type: "image/jpeg" },
-      { id: "seed-img-gear-sound-2",    serviceId: "seed-service-gear-lacoustics-sound",  url: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=800&auto=format&fit=crop", name: "concert-rig.jpg",  type: "image/jpeg" },
-      { id: "seed-img-gear-lighting-1", serviceId: "seed-service-gear-dmx-lighting",      url: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop", name: "dmx-lights.jpg",  type: "image/jpeg" },
-      { id: "seed-img-gear-lighting-2", serviceId: "seed-service-gear-dmx-lighting",      url: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop", name: "stage-rig.jpg",   type: "image/jpeg" },
-      { id: "seed-img-gear-gen-1",      serviceId: "seed-service-gear-generator-power",   url: "https://images.unsplash.com/photo-1504805572947-34fad45aed93?w=800&auto=format&fit=crop", name: "outdoor-setup.jpg", type: "image/jpeg" },
+      { id: "seed-img-gear-sound-1", serviceId: "seed-service-gear-lacoustics-sound", url: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&auto=format&fit=crop", name: "stage-sound.jpg", type: "image/jpeg" },
+      { id: "seed-img-gear-sound-2", serviceId: "seed-service-gear-lacoustics-sound", url: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=800&auto=format&fit=crop", name: "concert-rig.jpg", type: "image/jpeg" },
+      { id: "seed-img-gear-lighting-1", serviceId: "seed-service-gear-dmx-lighting", url: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop", name: "dmx-lights.jpg", type: "image/jpeg" },
+      { id: "seed-img-gear-lighting-2", serviceId: "seed-service-gear-dmx-lighting", url: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop", name: "stage-rig.jpg", type: "image/jpeg" },
+      { id: "seed-img-gear-gen-1", serviceId: "seed-service-gear-generator-power", url: "https://images.unsplash.com/photo-1504805572947-34fad45aed93?w=800&auto=format&fit=crop", name: "outdoor-setup.jpg", type: "image/jpeg" },
 
       // Jasmine Reyes — event styling portfolio
-      { id: "seed-img-jasmine-prod-1",  serviceId: "seed-service-jasmine-event-production", url: "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=800&auto=format&fit=crop", name: "event-styled.jpg", type: "image/jpeg" },
-      { id: "seed-img-jasmine-prod-2",  serviceId: "seed-service-jasmine-event-production", url: "https://images.unsplash.com/photo-1478146896981-b80fe463b330?w=800&auto=format&fit=crop", name: "floral-decor.jpg",  type: "image/jpeg" },
-      { id: "seed-img-jasmine-table-1", serviceId: "seed-service-jasmine-table-styling",   url: "https://images.unsplash.com/photo-1469371670807-013ccf25f16a?w=800&auto=format&fit=crop", name: "tablescape.jpg",   type: "image/jpeg" },
-      { id: "seed-img-jasmine-table-2", serviceId: "seed-service-jasmine-table-styling",   url: "https://images.unsplash.com/photo-1561489413-985b06da5bee?w=800&auto=format&fit=crop", name: "reception.jpg",    type: "image/jpeg" },
+      { id: "seed-img-jasmine-prod-1", serviceId: "seed-service-jasmine-event-production", url: "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=800&auto=format&fit=crop", name: "event-styled.jpg", type: "image/jpeg" },
+      { id: "seed-img-jasmine-prod-2", serviceId: "seed-service-jasmine-event-production", url: "https://images.unsplash.com/photo-1478146896981-b80fe463b330?w=800&auto=format&fit=crop", name: "floral-decor.jpg", type: "image/jpeg" },
+      { id: "seed-img-jasmine-table-1", serviceId: "seed-service-jasmine-table-styling", url: "https://images.unsplash.com/photo-1469371670807-013ccf25f16a?w=800&auto=format&fit=crop", name: "tablescape.jpg", type: "image/jpeg" },
+      { id: "seed-img-jasmine-table-2", serviceId: "seed-service-jasmine-table-styling", url: "https://images.unsplash.com/photo-1561489413-985b06da5bee?w=800&auto=format&fit=crop", name: "reception.jpg", type: "image/jpeg" },
       { id: "seed-img-jasmine-coord-1", serviceId: "seed-service-jasmine-vendor-coordination", url: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&auto=format&fit=crop", name: "coordination.jpg", type: "image/jpeg" },
 
       // Marco Santos — outdoor / team building portfolio
-      { id: "seed-img-marco-trek-1",  serviceId: "seed-service-marco-live-trekking",  url: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&auto=format&fit=crop", name: "mountain-trek.jpg", type: "image/jpeg" },
-      { id: "seed-img-marco-trek-2",  serviceId: "seed-service-marco-live-trekking",  url: "https://images.unsplash.com/photo-1551632436-cbf8dd35adfa?w=800&auto=format&fit=crop", name: "outdoor-group.jpg", type: "image/jpeg" },
-      { id: "seed-img-marco-team-1",  serviceId: "seed-service-marco-team-building", url: "https://images.unsplash.com/photo-1522163182402-834f871fd851?w=800&auto=format&fit=crop", name: "team-activity.jpg", type: "image/jpeg" },
-      { id: "seed-img-marco-team-2",  serviceId: "seed-service-marco-team-building", url: "https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=800&auto=format&fit=crop", name: "workshop.jpg",      type: "image/jpeg" },
+      { id: "seed-img-marco-trek-1", serviceId: "seed-service-marco-live-trekking", url: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&auto=format&fit=crop", name: "mountain-trek.jpg", type: "image/jpeg" },
+      { id: "seed-img-marco-trek-2", serviceId: "seed-service-marco-live-trekking", url: "https://images.unsplash.com/photo-1551632436-cbf8dd35adfa?w=800&auto=format&fit=crop", name: "outdoor-group.jpg", type: "image/jpeg" },
+      { id: "seed-img-marco-team-1", serviceId: "seed-service-marco-team-building", url: "https://images.unsplash.com/photo-1522163182402-834f871fd851?w=800&auto=format&fit=crop", name: "team-activity.jpg", type: "image/jpeg" },
+      { id: "seed-img-marco-team-2", serviceId: "seed-service-marco-team-building", url: "https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=800&auto=format&fit=crop", name: "workshop.jpg", type: "image/jpeg" },
 
       // Sarah Lim — music & audio portfolio
-      { id: "seed-img-sarah-dj-1",    serviceId: "seed-service-sarah-dj-set",      url: "https://images.unsplash.com/photo-1571266028253-6c7f4f97fbc1?w=800&auto=format&fit=crop", name: "dj-performance.jpg", type: "image/jpeg" },
-      { id: "seed-img-sarah-dj-2",    serviceId: "seed-service-sarah-dj-set",      url: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&auto=format&fit=crop", name: "mixing-board.jpg",   type: "image/jpeg" },
-      { id: "seed-img-sarah-band-1",  serviceId: "seed-service-sarah-live-band",   url: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&auto=format&fit=crop", name: "live-band.jpg",      type: "image/jpeg" },
-      { id: "seed-img-sarah-band-2",  serviceId: "seed-service-sarah-live-band",   url: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800&auto=format&fit=crop", name: "band-stage.jpg",     type: "image/jpeg" },
-      { id: "seed-img-sarah-sound-1", serviceId: "seed-service-sarah-soundcheck",  url: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&auto=format&fit=crop", name: "foh-mixing.jpg",     type: "image/jpeg" },
-      { id: "seed-img-sarah-sound-2", serviceId: "seed-service-sarah-soundcheck",  url: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&auto=format&fit=crop", name: "stage-monitors.jpg", type: "image/jpeg" },
+      { id: "seed-img-sarah-dj-1", serviceId: "seed-service-sarah-dj-set", url: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&auto=format&fit=crop", name: "dj-performance.jpg", type: "image/jpeg" },
+      { id: "seed-img-sarah-dj-2", serviceId: "seed-service-sarah-dj-set", url: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&auto=format&fit=crop", name: "mixing-board.jpg", type: "image/jpeg" },
+      { id: "seed-img-sarah-band-1", serviceId: "seed-service-sarah-live-band", url: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&auto=format&fit=crop", name: "live-band.jpg", type: "image/jpeg" },
+      { id: "seed-img-sarah-band-2", serviceId: "seed-service-sarah-live-band", url: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800&auto=format&fit=crop", name: "band-stage.jpg", type: "image/jpeg" },
+      { id: "seed-img-sarah-sound-1", serviceId: "seed-service-sarah-soundcheck", url: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&auto=format&fit=crop", name: "foh-mixing.jpg", type: "image/jpeg" },
+      { id: "seed-img-sarah-sound-2", serviceId: "seed-service-sarah-soundcheck", url: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&auto=format&fit=crop", name: "stage-monitors.jpg", type: "image/jpeg" },
     ];
 
     for (const img of serviceImages) {
