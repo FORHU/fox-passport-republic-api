@@ -258,11 +258,13 @@ export default class AdminCtrl {
   static async approveEvent(req: Request, res: Response) {
     try {
       const event = await EventRequestRepo.updateRequestStatus(req.params.id, "approved");
-      // Make the parent template publicly discoverable
-      await prisma.eventTemplate.update({
-        where: { id: event.templateId },
-        data: { isPublic: true },
-      });
+      // Make the parent template publicly discoverable (skip for template-less events)
+      if (event.templateId) {
+        await prisma.eventTemplate.update({
+          where: { id: event.templateId },
+          data: { isPublic: true },
+        });
+      }
       return res.status(200).json({ success: true, data: event });
     } catch (error: any) {
       return res.status(404).json({ success: false, message: error.message });
@@ -272,15 +274,17 @@ export default class AdminCtrl {
   static async rejectEvent(req: Request, res: Response) {
     try {
       const event = await EventRequestRepo.updateRequestStatus(req.params.id, "rejected");
-      // Hide the template if no other approved events remain for it
-      const approvedCount = await prisma.event.count({
-        where: { templateId: event.templateId, requestStatus: "approved" },
-      });
-      if (approvedCount === 0) {
-        await prisma.eventTemplate.update({
-          where: { id: event.templateId },
-          data: { isPublic: false },
+      // Hide the template if no other approved events remain for it (skip for template-less events)
+      if (event.templateId) {
+        const approvedCount = await prisma.event.count({
+          where: { templateId: event.templateId, requestStatus: "approved" },
         });
+        if (approvedCount === 0) {
+          await prisma.eventTemplate.update({
+            where: { id: event.templateId },
+            data: { isPublic: false },
+          });
+        }
       }
       return res.status(200).json({ success: true, data: event });
     } catch (error: any) {
