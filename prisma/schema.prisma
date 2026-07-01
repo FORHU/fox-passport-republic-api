@@ -405,7 +405,7 @@ model Event {
   id                  String                    @id @default(uuid())
   clientId            String
   organizerId         String
-  templateId          String
+  templateId          String?
   name                String
   description         String
   eventCategory       EventCategory
@@ -427,7 +427,7 @@ model Event {
   assetTransactions   EventAssetTransaction[]
   client              User                      @relation("EventClient", fields: [clientId], references: [id])
   host                User                      @relation("EventOrganizer", fields: [organizerId], references: [id])
-  template            EventTemplate             @relation(fields: [templateId], references: [id])
+  template            EventTemplate?             @relation(fields: [templateId], references: [id])
   serviceTransactions EventServiceTransaction[]
   venueTransactions   EventVenueTransaction[]
 }
