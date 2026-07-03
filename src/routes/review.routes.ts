@@ -13,6 +13,7 @@ router.get("/user/:userId", authenticate, ReviewCtrl.getUserReviews);
 router.get("/", ReviewCtrl.getAllReviews);
 router.get("/:id", ReviewCtrl.getReviewById);
 router.post("/create", authenticate, ReviewCtrl.createReview);
+router.post("/:id/reply", authenticate, ReviewCtrl.replyToReview);
 router.put("/:id", authenticate, ReviewCtrl.updateReview);
 router.delete("/:id", authenticate, ReviewCtrl.deleteReview);
 
