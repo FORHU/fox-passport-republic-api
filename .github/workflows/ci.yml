@@ -29,17 +29,17 @@ jobs:
     env:
       NODE_ENV: development
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-      JWT_SECRET: ${{ secrets.JWT_SECRET }}
-      JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID || 'test-key-id' }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY || 'test-secret-key' }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET || 'ci-jwt-secret' }}
+      JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET || 'ci-jwt-refresh-secret' }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://placeholder.supabase.co' }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'ci-supabase-anon-key' }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID || 'ci-aws-key-id' }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY || 'ci-aws-secret-key' }}
       AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
-      AWS_BUCKET_NAME: ${{ secrets.AWS_BUCKET_NAME || 'test-bucket' }}
-      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      REDIS_URL: ${{ secrets.REDIS_URL }}
+      AWS_BUCKET_NAME: ${{ secrets.AWS_BUCKET_NAME || 'ci-bucket' }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY || 'sk_test_ci_dummy_key' }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'ci-openai-key' }}
+      REDIS_URL: ${{ secrets.REDIS_URL || 'redis://localhost:6379' }}
 
     steps:
       - name: Checkout
