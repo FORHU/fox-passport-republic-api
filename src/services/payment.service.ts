@@ -36,7 +36,7 @@ export default class PaymentSvc {
 
         return {
             clientSecret: paymentIntent.client_secret,
-            id: paymentIntent.id,
+            paymentIntentId: paymentIntent.id,
         };
     }
 

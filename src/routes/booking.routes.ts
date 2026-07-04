@@ -19,6 +19,7 @@ router.patch("/attendees/:id/respond", optionalAuth, AttendeeCtrl.respondToInvit
 // ========== STANDARD BOOKING CRUD ROUTES ==========
 router.get("/availability", BookingCtrl.getAvailability);   // must be before /:id
 router.get("/", BookingCtrl.getAllBookings);
+router.get("/upcoming", authenticate, BookingCtrl.getUpcomingBookings);   // must be before /:id
 router.get("/user/:userId", authenticate, BookingCtrl.getUserBookings);
 router.get("/:id", optionalAuth, BookingCtrl.getBookingById);
 router.post("/create", authenticate, BookingCtrl.createBooking);
@@ -26,6 +27,7 @@ router.post("/:id/confirm", authenticate, BookingCtrl.confirmBooking);
 
 // ========== LIFECYCLE ROUTES (mirrors asset-booking.routes.ts / service-booking.routes.ts) ==========
 router.patch("/:id/status", authenticate, BookingCtrl.updateStatus);
+router.patch("/:id/cancel", authenticate, BookingCtrl.cancelBooking);
 router.patch("/:id/confirm-arrival", authenticate, BookingCtrl.confirmArrival);
 router.patch("/:id/dispute", authenticate, BookingCtrl.dispute);
 
