@@ -6,7 +6,11 @@ export default class ReviewCtrl {
         try {
             const review = await ReviewSvc.createReview({
                 userId: req.user!.userId,
-                ...req.body
+                bookingId: req.body.bookingId,
+                entityId: req.body.targetId || req.body.entityId,
+                entityType: req.body.targetType || req.body.type || req.body.entityType,
+                rating: req.body.rating,
+                comment: req.body.comment,
             });
             return res.status(201).json({ success: true, data: review });
         } catch (error: any) {

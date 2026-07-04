@@ -226,6 +226,14 @@ export default class BookingSvc {
         return BookingRepo.findByUserId(userId, skip, limit);
     }
 
+    static async getUpcomingBookings(userId: string) {
+        return BookingRepo.findUpcomingByUserId(userId);
+    }
+
+    static async cancelBooking(id: string, requesterId: string) {
+        return this.updateStatus(id, "cancelled", requesterId);
+    }
+
     // Mirrors asset-booking.service.ts's updateStatus/confirmArrival/dispute exactly,
     // giving the Event-flow Booking the same active/disputed lifecycle. This is also
     // the payout trigger point — see docs/adr/0002-stripe-connect-payouts.md.

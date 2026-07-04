@@ -3,6 +3,31 @@ import EventTemplateRepo from "../repositories/event-template.repository";
 import EventTemplateSvc from "./event-template.service";
 
 export default class EventRequestSvc {
+  static async createDirectEvent(data: {
+    clientId: string;
+    name: string;
+    description: string;
+    eventCategory: string;
+    startAt: Date;
+    endAt: Date;
+    guestCount: number;
+    totalAmount?: number;
+    currency?: string;
+  }) {
+    return EventRequestRepo.create({
+      client: { connect: { id: data.clientId } },
+      host: { connect: { id: data.clientId } },
+      name: data.name,
+      description: data.description,
+      eventCategory: data.eventCategory as any,
+      startAt: data.startAt,
+      endAt: data.endAt,
+      guestCount: data.guestCount,
+      totalAmount: data.totalAmount ?? 0,
+      requestStatus: "approved",
+    });
+  }
+
   static async spawnRequestFromTemplate(data: {
     clientId: string;
     templateId: string;
