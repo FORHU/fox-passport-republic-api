@@ -25,12 +25,13 @@ export async function seedReviews(prisma: PrismaClient, users: any[]) {
 
     if (!regularUser) throw new Error("user@example.com not found for review seeding");
 
-    // Each (userId, entityId, entityType) must be unique
+    // One review per bookingId (unique constraint)
     const reviews = [
       // ── Grand Palace Hall ─────────────────────────────────────────────────
       {
         id: "seed-review-palace-1",
         userId: regularUser.id,
+        bookingId: "seed-booking-birthday-01",
         entityId: VENUE_IDS.palace,
         entityType: "venue",
         rating: 5,
@@ -39,6 +40,7 @@ export async function seedReviews(prisma: PrismaClient, users: any[]) {
       ...(gearFoxer ? [{
         id: "seed-review-palace-2",
         userId: gearFoxer.id,
+        bookingId: "seed-booking-may-birthday-02",
         entityId: VENUE_IDS.palace,
         entityType: "venue",
         rating: 5,
@@ -49,6 +51,7 @@ export async function seedReviews(prisma: PrismaClient, users: any[]) {
       {
         id: "seed-review-loft-1",
         userId: regularUser.id,
+        bookingId: "seed-booking-corporate-01",
         entityId: VENUE_IDS.loft,
         entityType: "venue",
         rating: 4,
@@ -57,6 +60,7 @@ export async function seedReviews(prisma: PrismaClient, users: any[]) {
       ...(multiRole ? [{
         id: "seed-review-loft-2",
         userId: multiRole.id,
+        bookingId: "seed-booking-may-corporate-01",
         entityId: VENUE_IDS.loft,
         entityType: "venue",
         rating: 5,
@@ -67,63 +71,24 @@ export async function seedReviews(prisma: PrismaClient, users: any[]) {
       {
         id: "seed-review-boracay-1",
         userId: regularUser.id,
+        bookingId: "seed-booking-may-wedding-01",
         entityId: VENUE_IDS.boracay,
         entityType: "venue",
         rating: 5,
         comment: "Our beach wedding was a dream. The sunset backdrop was out of this world. Worth every peso.",
       },
-      ...(jasmine ? [{
-        id: "seed-review-boracay-2",
-        userId: jasmine.id,
-        entityId: VENUE_IDS.boracay,
-        entityType: "venue",
-        rating: 4,
-        comment: "Beautiful resort venue. Logistics were smooth, staff was accommodating. Slight issue with parking but nothing that ruined the day.",
-      }] : []),
 
       // ── Garden Gazebo ─────────────────────────────────────────────────────
       {
         id: "seed-review-gazebo-1",
         userId: regularUser.id,
+        bookingId: "seed-booking-may-birthday-01",
         entityId: VENUE_IDS.gazebo,
         entityType: "venue",
         rating: 5,
         comment: "Perfect for an intimate garden party. The lights at night made everything so magical. Will definitely come back.",
       },
-      ...(marco ? [{
-        id: "seed-review-gazebo-2",
-        userId: marco.id,
-        entityId: VENUE_IDS.gazebo,
-        entityType: "venue",
-        rating: 4,
-        comment: "Charming outdoor venue. The gazebo setup was elegant and the staff was very attentive.",
-      }] : []),
 
-      // ── Event Reviews ─────────────────────────────────────────────────────
-      {
-        id: "seed-review-event-birthday",
-        userId: regularUser.id,
-        entityId: EVENT_IDS.birthday,
-        entityType: "event",
-        rating: 5,
-        comment: "Best birthday party I've ever attended! The decor, food, and live band were all incredible. The team nailed every detail.",
-      },
-      {
-        id: "seed-review-event-corporate",
-        userId: regularUser.id,
-        entityId: EVENT_IDS.corporate,
-        entityType: "event",
-        rating: 4,
-        comment: "Great corporate summit experience. Very professional setup. The catering was top-notch and the AV never had any hiccups.",
-      },
-      {
-        id: "seed-review-event-social",
-        userId: regularUser.id,
-        entityId: EVENT_IDS.social,
-        entityType: "event",
-        rating: 5,
-        comment: "The Summer Rooftop Social was absolutely fire! Live music + great vibes + beautiful night sky. 10/10 would attend again.",
-      },
     ];
 
     for (const r of reviews) {

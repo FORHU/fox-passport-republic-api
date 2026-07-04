@@ -35,6 +35,7 @@ model User {
   files               File[]
   passport            Passport?
   reviews             Review[]
+  reviewReplies       ReviewReply[]
   assets              Asset[]
   reviewsGiven        RoleRequest[]             @relation("Reviewer")
   roleRequests        RoleRequest[]             @relation("Applicant")
@@ -518,6 +519,7 @@ model Booking {
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
   isGuestListLocked   Boolean                   @default(false)
+  hasReview           Boolean                   @default(false)
   event               Event                     @relation(fields: [eventId], references: [id])
   user                User                      @relation(fields: [userId], references: [id])
   attendees           BookingAttendee[]
@@ -525,6 +527,7 @@ model Booking {
   assetTransactions   EventAssetTransaction[]
   serviceTransactions EventServiceTransaction[]
   venueTransactions   EventVenueTransaction[]
+  reviews             Review[]
 }
 
 model BookingAttendee {
@@ -578,6 +581,7 @@ model Favorite {
 model Review {
   id         String   @id @default(uuid())
   userId     String
+  bookingId  String
   entityId   String
   entityType String
   rating     Int
@@ -585,8 +589,23 @@ model Review {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, entityId, entityType])
+  @@unique([bookingId])
+  @@index([userId, entityId, entityType])
+
+  reviewReplies ReviewReply[]
+}
+
+model ReviewReply {
+  id        String   @id @default(uuid())
+  reviewId  String
+  userId    String
+  text      String
+  createdAt DateTime @default(now())
+
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ServiceBooking {
