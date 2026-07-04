@@ -127,6 +127,18 @@ export default class BookingRepo {
         return { bookings, total };
     }
 
+    static async findUpcomingByUserId(userId: string) {
+        return prisma.booking.findMany({
+            where: {
+                userId,
+                status: { notIn: ['cancelled', 'completed'] },
+                startAt: { gte: new Date() },
+            },
+            include: { event: true },
+            orderBy: { startAt: 'asc' },
+        });
+    }
+
     // Mirrors asset-booking.repository.ts's updateStatus/confirmArrival/dispute exactly.
     static async updateStatus(id: string, status: BookingStatus) {
         return prisma.booking.update({

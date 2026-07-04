@@ -7,8 +7,8 @@ const router = express.Router();
 // Public — approved events for landing page
 router.get("/", EventRequestCtrl.listApproved);
 
-// Host — create event
-router.post("/", authenticate, requireRole(["host"]), EventRequestCtrl.spawnRequest);
+// Authenticated — create event context (booking flow step 1)
+router.post("/", authenticate, EventRequestCtrl.spawnRequest);
 
 // Authenticated
 router.get("/my", authenticate, EventRequestCtrl.listMyRequests);
