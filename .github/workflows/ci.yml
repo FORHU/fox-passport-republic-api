@@ -45,19 +45,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: latest
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+          cache: npm
 
       - name: Install dependencies
-        run: pnpm install
+        run: npm install
 
       - name: Generate Prisma client
         run: npx prisma generate
@@ -66,10 +61,10 @@ jobs:
         run: npx prisma migrate deploy
 
       - name: Lint
-        run: pnpm lint
+        run: npm run lint
 
       - name: Build
-        run: pnpm build
+        run: npm run build
 
       - name: Test
-        run: pnpm test
+        run: npm test
