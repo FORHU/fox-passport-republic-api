@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, updates-api, staging, ayisha-FE, sofia-FE]
+    branches: [main, updates-api, staging, onboard_ayisha, sofia-branchapi]
   pull_request:
     branches: [main]
 
