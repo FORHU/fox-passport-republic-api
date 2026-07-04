@@ -13,7 +13,14 @@ export default class ReviewSvc {
         let bookingId = data.bookingId;
 
         if (bookingId) {
-            const booking = await prisma.booking.findUnique({ where: { id: String(bookingId) } });
+            const booking = await prisma.booking.findUnique({
+                where: { id: String(bookingId) },
+                include: {
+                    event: {
+                        include: { venueTransactions: { take: 1 } },
+                    },
+                },
+            });
             if (!booking) throw new Error("Booking not found");
             if (booking.userId !== String(data.userId)) throw new Error("This booking does not belong to you");
             if (booking.status === "cancelled" || booking.status === "pending") {
@@ -21,8 +28,19 @@ export default class ReviewSvc {
             }
             const existing = await prisma.review.findUnique({ where: { bookingId: String(bookingId) } });
             if (existing) throw new Error("A review for this booking already exists");
+
+            if (!data.entityId) {
+                const venueTx = booking.event?.venueTransactions?.[0];
+                if (venueTx?.venueId) {
+                    data.entityId = venueTx.venueId;
+                    data.entityType = "venue";
+                }
+            }
         } else {
-            const event = await prisma.event.findFirst({ orderBy: { createdAt: "desc" } });
+            const event = await prisma.event.findFirst({
+                orderBy: { createdAt: "desc" },
+                include: { venueTransactions: { take: 1 } },
+            });
             if (!event) throw new Error("No event available to link this review to");
             const booking = await prisma.booking.create({
                 data: {
@@ -36,8 +54,20 @@ export default class ReviewSvc {
                 },
             });
             bookingId = booking.id;
+            if (!data.entityId) {
+                const venueTx = event.venueTransactions?.[0];
+                if (venueTx?.venueId) {
+                    data.entityId = venueTx.venueId;
+                    data.entityType = "venue";
+                }
+            }
         }
 
+        if (!data.entityId) {
+            throw new Error("Could not determine target entity from booking. Ensure the booking has an associated venue.");
+        }
+
+        console.log("Saving review with entityId:", data.entityId);
         const review = await ReviewRepo.createReview({ ...data, bookingId });
 
         if (data.bookingId) {
@@ -71,6 +101,7 @@ export default class ReviewSvc {
     }
 
     static async getListingReviews(listingId: string, includeReplies = false) {
+        console.log("Querying reviews for entityId:", listingId);
         return ReviewRepo.getListingReviewsWithDistribution(listingId, includeReplies);
     }
 
