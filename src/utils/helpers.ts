@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { sendEmail } from "./mailer";
+import { LOGO_DATA_URI } from "./emails/base";
 
 /**
  
@@ -43,9 +44,9 @@ Generates HTML content by replacing placeholders in an email template with provi
 export const getHTMLContents = ({ template_name, email_data }: any): string => {
   const filePath = path.join(process.cwd(), `email-template/${template_name}`);
   let html = fs.readFileSync(filePath, "utf8");
-  for (const key in email_data) {
-    const placeholder = `${key}`;
-    html = html.replace(new RegExp(placeholder, "g"), email_data[key]);
+  const data = { ...email_data, LOGO_URL: LOGO_DATA_URI };
+  for (const key in data) {
+    html = html.replace(new RegExp(key, "g"), data[key]);
   }
   return html;
 };

@@ -71,8 +71,6 @@ export default class BookingSvc {
             const expiresAt = new Date();
             expiresAt.setHours(expiresAt.getHours() + 24);
 
-            const depositAmount = totalAmount * 0.5;
-
             const { specialRequests, ...bookingData } = rest;
 
             const booking = await BookingRepo.create({
@@ -87,10 +85,10 @@ export default class BookingSvc {
 
             await PaymentSvc.createPayment({
                 bookingId: booking.id,
-                amount: depositAmount,
+                amount: totalAmount,
                 currency: data.currency || "PHP",
                 method: "pending",
-                paymentType: "deposit",
+                paymentType: "full",
                 expiresAt,
             });
 
@@ -112,7 +110,6 @@ export default class BookingSvc {
         expiresAt.setHours(expiresAt.getHours() + 24);
 
         const totalAmount = data.totalAmount || 0;
-        const depositAmount = totalAmount * 0.5;
 
         const { specialRequests: _, ...cleanRest } = rest;
 
@@ -129,10 +126,10 @@ export default class BookingSvc {
 
         await PaymentSvc.createPayment({
             bookingId: booking.id,
-            amount: depositAmount,
+            amount: totalAmount,
             currency: data.currency || "PHP",
             method: "pending",
-            paymentType: "deposit",
+            paymentType: "full",
             expiresAt,
         });
 

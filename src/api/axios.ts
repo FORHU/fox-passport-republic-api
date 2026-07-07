@@ -37,6 +37,12 @@ api.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
+        // Handle 404 Not Found errors
+        if (error.response?.status === 404) {
+            console.error(`❌ 404 NOT FOUND: ${error.config?.method?.toUpperCase()} ${error.config?.baseURL}${error.config?.url}`);
+            console.error('Response data:', error.response?.data);
+        }
+
         // Handle 401 Unauthorized errors (session expiration, etc.)
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
