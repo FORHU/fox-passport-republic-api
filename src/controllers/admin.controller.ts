@@ -5,8 +5,148 @@ import EventRequestRepo from "../repositories/event-request.repository";
 import VenueRepo from "../repositories/venue.repository";
 import AssetRepo from "../repositories/asset.repository";
 import ServiceRepo from "../repositories/service.repository";
+import RefundSvc from "../services/refund.service";
+import Joi from "joi";
 
 export default class AdminCtrl {
+  // ─── DISPUTES ────────────────────────────────────────────────────────────
+
+  static async getDisputes(req: Request, res: Response) {
+    try {
+      const refunds = await prisma.refund.findMany({
+        where: { status: { in: ["failed", "pending"] } },
+        include: {
+          booking: {
+            include: {
+              user: { select: { id: true, name: true, email: true } },
+              event: { select: { id: true, name: true, startAt: true } },
+            },
+          },
+          payment: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const disputes = refunds.map((r) => ({
+        id: r.id,
+        bookingId: r.bookingId,
+        bookingType: "event" as const,
+        reason: r.failureReason || "Refund failed",
+        description: r.adminNotes || undefined,
+        status: (r.status === "failed" ? "refund_failed" : r.status) as any,
+        createdAt: r.createdAt.toISOString(),
+        resolvedAt: r.resolvedAt?.toISOString(),
+        resolvedBy: r.resolvedBy || undefined,
+        adminNotes: r.adminNotes || undefined,
+        citizen: {
+          id: r.booking.user?.id ?? "",
+          name: r.booking.user?.name ?? "Unknown",
+          email: r.booking.user?.email ?? "",
+        },
+        booking: {
+          totalAmount: r.booking.totalAmount,
+          status: r.booking.status,
+          startAt: r.booking.startAt?.toISOString(),
+          event: r.booking.event ? { name: r.booking.event.name } : undefined,
+        },
+        refunds: r.payment
+          ? [{ id: r.id, bookingId: r.bookingId, amount: r.amount, status: r.status, method: "stripe", createdAt: r.createdAt.toISOString() }]
+          : [],
+      }));
+
+      return res.status(200).json({ success: true, data: disputes });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  static async getAllRefunds(req: Request, res: Response) {
+    try {
+      const refunds = await prisma.refund.findMany({
+        include: {
+          booking: { select: { id: true, totalAmount: true } },
+          payment: { select: { method: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const mapped = refunds.map((r) => ({
+        id: r.id,
+        bookingId: r.bookingId,
+        amount: r.amount,
+        status: r.status,
+        method: r.payment?.method ?? "stripe",
+        failureReason: r.failureReason || undefined,
+        adminNotes: r.adminNotes || undefined,
+        createdAt: r.createdAt.toISOString(),
+        processedAt: r.resolvedAt?.toISOString(),
+      }));
+
+      return res.status(200).json({ success: true, data: mapped });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  static async resolveDispute(req: Request, res: Response) {
+    try {
+      const schema = Joi.object({
+        action: Joi.string().valid("approve", "reject").required(),
+        adminNotes: Joi.string().optional(),
+      });
+      const { error, value } = schema.validate(req.body);
+      if (error) return res.status(400).json({ message: error.message });
+
+      if (value.action === "approve") {
+        const updated = await RefundSvc.retryRefund(req.params.id, req.user!.userId);
+        return res.status(200).json({ success: true, data: updated });
+      }
+
+      const updated = await prisma.refund.update({
+        where: { id: req.params.id },
+        data: {
+          status: "succeeded",
+          resolved: true,
+          resolvedBy: req.user!.userId,
+          resolvedAt: new Date(),
+          adminNotes: value.adminNotes || "Rejected by admin",
+        },
+      });
+      return res.status(200).json({ success: true, data: updated });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  static async manualRefund(req: Request, res: Response) {
+    try {
+      const schema = Joi.object({
+        bookingId: Joi.string().required(),
+        amount: Joi.number().min(0).required(),
+        reason: Joi.string().required(),
+      });
+      const { error, value } = schema.validate(req.body);
+      if (error) return res.status(400).json({ message: error.message });
+
+      const refund = await prisma.refund.create({
+        data: {
+          bookingId: value.bookingId,
+          amount: value.amount,
+          currency: "PHP",
+          status: "succeeded",
+          initiatedBy: req.user!.userId,
+          adminNotes: value.reason,
+          resolved: true,
+          resolvedBy: req.user!.userId,
+          resolvedAt: new Date(),
+        },
+      });
+      return res.status(201).json({ success: true, data: refund });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
   // STATS
   static async getStats(req: Request, res: Response) {
     try {
@@ -69,6 +209,15 @@ export default class AdminCtrl {
   }
 
   // ─── VENUES ───────────────────────────────────────────────────────────────
+
+  static async getAllVenues(req: Request, res: Response) {
+    try {
+      const venues = await VenueRepo.findAllVenuesAdmin();
+      return res.status(200).json({ success: true, data: venues });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
 
   static async getPendingVenues(req: Request, res: Response) {
     try {
@@ -289,6 +438,50 @@ export default class AdminCtrl {
       return res.status(200).json({ success: true, data: event });
     } catch (error: any) {
       return res.status(404).json({ success: false, message: error.message });
+    }
+  }
+
+  // ─── REFUNDS ─────────────────────────────────────────────────────────────
+
+  static async getFailedRefunds(req: Request, res: Response) {
+    try {
+      const refunds = await RefundSvc.getFailedRefunds();
+      return res.status(200).json({ success: true, data: refunds });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  static async getRefundFailureReason(req: Request, res: Response) {
+    try {
+      const result = await RefundSvc.getFailureReason(req.params.id);
+      return res.status(200).json({ success: true, data: result });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  static async retryRefund(req: Request, res: Response) {
+    try {
+      const result = await RefundSvc.retryRefund(req.params.id, req.user!.userId);
+      return res.status(200).json({ success: true, data: result });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  static async resolveManualRefund(req: Request, res: Response) {
+    try {
+      const schema = Joi.object({
+        notes: Joi.string().required(),
+      });
+      const { error, value } = schema.validate(req.body);
+      if (error) return res.status(400).json({ message: error.message });
+
+      const result = await RefundSvc.resolveManual(req.params.id, req.user!.userId, value.notes);
+      return res.status(200).json({ success: true, data: result });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, message: error.message });
     }
   }
 }

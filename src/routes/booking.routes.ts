@@ -9,6 +9,10 @@ const router = express.Router();
 router.post("/from-template", authenticate, BookingCtrl.bookFromTemplate);              // Book directly from an approved template
 router.post("/draft", authenticate, BookingCtrl.createDraftBooking);                    // Step 1: Create draft
 
+// ========== CANCELLATION & REFUND ROUTES ==========
+router.post("/:id/cancel/check", authenticate, BookingCtrl.cancelCheck);
+router.post("/:id/cancel", authenticate, BookingCtrl.cancelBooking);
+
 // ========== GUEST MANAGEMENT ROUTES ==========
 router.post("/:id/finalize", authenticate, BookingCtrl.finalizeGuests);
 router.post("/:bookingId/attendees", authenticate, AttendeeCtrl.addGuest);

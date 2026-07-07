@@ -26,7 +26,7 @@ export default class ReviewSvc {
             if (booking.status === "cancelled" || booking.status === "pending") {
                 throw new Error("Cannot review a booking that is pending or cancelled");
             }
-            const existing = await prisma.review.findUnique({ where: { bookingId: String(bookingId) } });
+            const existing = await prisma.review.findFirst({ where: { bookingId: String(bookingId) } });
             if (existing) throw new Error("A review for this booking already exists");
 
             if (!data.entityId) {
@@ -73,7 +73,7 @@ export default class ReviewSvc {
         if (data.bookingId) {
             await prisma.booking.update({
                 where: { id: String(data.bookingId) },
-                data: { hasReview: true },
+                data: { hasReview: true } as any,
             });
         }
 
