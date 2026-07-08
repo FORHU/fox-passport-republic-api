@@ -29,7 +29,9 @@ class RedisUtil {
       await this.client.connect();
       console.log("✅ Redis connected successfully");
     } catch (error) {
-      console.error("❌ Redis connection failed — app will continue without Redis");
+      console.error(
+        "❌ Redis connection failed — app will continue without Redis",
+      );
       this.client = null;
     }
   }

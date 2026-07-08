@@ -7,7 +7,13 @@ export default class EventTransactionRepo {
     return prisma.eventAssetTransaction.findMany({
       where: { providerId },
       include: {
-        event: { select: { name: true, startAt: true, client: { select: { name: true } } } },
+        event: {
+          select: {
+            name: true,
+            startAt: true,
+            client: { select: { name: true } },
+          },
+        },
         asset: { select: { name: true, images: true } },
       },
     });
@@ -17,7 +23,12 @@ export default class EventTransactionRepo {
     return prisma.eventAssetTransaction.create({ data });
   }
 
-  static async updateAssetStatus(id: string, status: TransactionStatus, agreedPrice?: number, providerId?: string) {
+  static async updateAssetStatus(
+    id: string,
+    status: TransactionStatus,
+    agreedPrice?: number,
+    providerId?: string,
+  ) {
     return prisma.eventAssetTransaction.update({
       where: { id, ...(providerId && { providerId }) },
       data: { status, ...(agreedPrice !== undefined && { agreedPrice }) },
@@ -29,7 +40,13 @@ export default class EventTransactionRepo {
     return prisma.eventServiceTransaction.findMany({
       where: { providerId },
       include: {
-        event: { select: { name: true, startAt: true, client: { select: { name: true } } } },
+        event: {
+          select: {
+            name: true,
+            startAt: true,
+            client: { select: { name: true } },
+          },
+        },
         service: { select: { name: true, images: true } },
       },
     });
@@ -39,7 +56,12 @@ export default class EventTransactionRepo {
     return prisma.eventServiceTransaction.create({ data });
   }
 
-  static async updateServiceStatus(id: string, status: TransactionStatus, agreedPrice?: number, providerId?: string) {
+  static async updateServiceStatus(
+    id: string,
+    status: TransactionStatus,
+    agreedPrice?: number,
+    providerId?: string,
+  ) {
     return prisma.eventServiceTransaction.update({
       where: { id, ...(providerId && { providerId }) },
       data: { status, ...(agreedPrice !== undefined && { agreedPrice }) },
@@ -51,7 +73,13 @@ export default class EventTransactionRepo {
     return prisma.eventVenueTransaction.findMany({
       where: { providerId },
       include: {
-        event: { select: { name: true, startAt: true, client: { select: { name: true } } } },
+        event: {
+          select: {
+            name: true,
+            startAt: true,
+            client: { select: { name: true } },
+          },
+        },
         venue: { select: { name: true, images: true } },
       },
     });
@@ -61,7 +89,12 @@ export default class EventTransactionRepo {
     return prisma.eventVenueTransaction.create({ data });
   }
 
-  static async updateVenueStatus(id: string, status: TransactionStatus, agreedPrice?: number, providerId?: string) {
+  static async updateVenueStatus(
+    id: string,
+    status: TransactionStatus,
+    agreedPrice?: number,
+    providerId?: string,
+  ) {
     return prisma.eventVenueTransaction.update({
       where: { id, ...(providerId && { providerId }) },
       data: { status, ...(agreedPrice !== undefined && { agreedPrice }) },

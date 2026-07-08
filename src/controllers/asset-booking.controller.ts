@@ -21,7 +21,8 @@ export default class AssetBookingCtrl {
     });
 
     const { error, value } = schema.validate(req.body);
-    if (error) return res.status(400).json({ success: false, message: error.message });
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
 
     try {
       const userId = req.user!.userId;
@@ -35,7 +36,10 @@ export default class AssetBookingCtrl {
   // GET /asset/bookings/availability?assetId=xxx
   static async getAvailability(req: Request, res: Response) {
     const { assetId } = req.query as Record<string, string>;
-    if (!assetId) return res.status(400).json({ success: false, message: "assetId is required" });
+    if (!assetId)
+      return res
+        .status(400)
+        .json({ success: false, message: "assetId is required" });
     try {
       const data = await AssetBookingSvc.getAvailability(assetId);
       return res.status(200).json({ success: true, data });
@@ -48,7 +52,11 @@ export default class AssetBookingCtrl {
   static async getAll(req: Request, res: Response) {
     try {
       const { userId, ownerId, status } = req.query as Record<string, string>;
-      const bookings = await AssetBookingSvc.getAll({ userId, ownerId, status });
+      const bookings = await AssetBookingSvc.getAll({
+        userId,
+        ownerId,
+        status,
+      });
       return res.status(200).json({ success: true, data: bookings });
     } catch (err: any) {
       return res.status(500).json({ success: false, message: err.message });
@@ -74,14 +82,15 @@ export default class AssetBookingCtrl {
     });
 
     const { error, value } = schema.validate(req.body);
-    if (error) return res.status(400).json({ success: false, message: error.message });
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
 
     try {
       const booking = await AssetBookingSvc.confirmPayment(
         req.params.id,
         value.transactionId,
         value.method,
-        req.user!.userId
+        req.user!.userId,
       );
       return res.status(200).json({ success: true, data: booking });
     } catch (err: any) {
@@ -92,14 +101,21 @@ export default class AssetBookingCtrl {
   // PATCH /asset/bookings/:id/status
   static async updateStatus(req: Request, res: Response) {
     const schema = Joi.object({
-      status: Joi.string().valid("pending", "confirmed", "active", "completed", "cancelled").required(),
+      status: Joi.string()
+        .valid("pending", "confirmed", "active", "completed", "cancelled")
+        .required(),
     });
 
     const { error, value } = schema.validate(req.body);
-    if (error) return res.status(400).json({ success: false, message: error.message });
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
 
     try {
-      const booking = await AssetBookingSvc.updateStatus(req.params.id, value.status, req.user!.userId);
+      const booking = await AssetBookingSvc.updateStatus(
+        req.params.id,
+        value.status,
+        req.user!.userId,
+      );
       return res.status(200).json({ success: true, data: booking });
     } catch (err: any) {
       return res.status(400).json({ success: false, message: err.message });
@@ -109,7 +125,10 @@ export default class AssetBookingCtrl {
   // DELETE /asset/bookings/:id
   static async cancel(req: Request, res: Response) {
     try {
-      const booking = await AssetBookingSvc.cancel(req.params.id, req.user!.userId);
+      const booking = await AssetBookingSvc.cancel(
+        req.params.id,
+        req.user!.userId,
+      );
       return res.status(200).json({ success: true, data: booking });
     } catch (err: any) {
       return res.status(400).json({ success: false, message: err.message });
@@ -119,7 +138,10 @@ export default class AssetBookingCtrl {
   // PATCH /asset/bookings/:id/confirm-arrival
   static async confirmArrival(req: Request, res: Response) {
     try {
-      const booking = await AssetBookingSvc.confirmArrival(req.params.id, req.user!.userId);
+      const booking = await AssetBookingSvc.confirmArrival(
+        req.params.id,
+        req.user!.userId,
+      );
       return res.status(200).json({ success: true, data: booking });
     } catch (err: any) {
       return res.status(400).json({ success: false, message: err.message });
@@ -129,7 +151,10 @@ export default class AssetBookingCtrl {
   // PATCH /asset/bookings/:id/dispute
   static async dispute(req: Request, res: Response) {
     try {
-      const booking = await AssetBookingSvc.dispute(req.params.id, req.user!.userId);
+      const booking = await AssetBookingSvc.dispute(
+        req.params.id,
+        req.user!.userId,
+      );
       return res.status(200).json({ success: true, data: booking });
     } catch (err: any) {
       return res.status(400).json({ success: false, message: err.message });

@@ -8,6 +8,11 @@ router.get("/", CancellationPolicyCtrl.getAll);
 router.get("/:id", CancellationPolicyCtrl.getById);
 router.post("/", authenticate, requireAdmin, CancellationPolicyCtrl.create);
 router.put("/:id", authenticate, requireAdmin, CancellationPolicyCtrl.update);
-router.delete("/:id", authenticate, requireAdmin, CancellationPolicyCtrl.remove);
+router.delete(
+  "/:id",
+  authenticate,
+  requireAdmin,
+  CancellationPolicyCtrl.remove,
+);
 
 export default router;

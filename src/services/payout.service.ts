@@ -66,7 +66,8 @@ export default class PayoutSvc {
         where: { id: payoutId },
         data: {
           status: PayoutStatus.failed,
-          failureReason: "Recipient has not completed Stripe Connect onboarding",
+          failureReason:
+            "Recipient has not completed Stripe Connect onboarding",
         },
       });
       return;
@@ -81,12 +82,19 @@ export default class PayoutSvc {
       });
       await prisma.payout.update({
         where: { id: payoutId },
-        data: { status: PayoutStatus.paid, stripeTransferId: transfer.id, failureReason: null },
+        data: {
+          status: PayoutStatus.paid,
+          stripeTransferId: transfer.id,
+          failureReason: null,
+        },
       });
     } catch (err: any) {
       await prisma.payout.update({
         where: { id: payoutId },
-        data: { status: PayoutStatus.failed, failureReason: err.message ?? "Stripe transfer failed" },
+        data: {
+          status: PayoutStatus.failed,
+          failureReason: err.message ?? "Stripe transfer failed",
+        },
       });
     }
   }
@@ -169,50 +177,65 @@ export default class PayoutSvc {
     // on the (sourceType, sourceId, recipientId, role) unique constraint and silently
     // drop the second item's payout.
     for (const tx of booking.assetTransactions) {
-      jobs.push(this.createAndFire({
-        recipientId: tx.providerId,
-        role: RoleType.foxerAsset,
-        sourceType: "eventAssetTransaction",
-        sourceId: tx.id,
-        amount: tx.agreedPrice,
-      }));
+      jobs.push(
+        this.createAndFire({
+          recipientId: tx.providerId,
+          role: RoleType.foxerAsset,
+          sourceType: "eventAssetTransaction",
+          sourceId: tx.id,
+          amount: tx.agreedPrice,
+        }),
+      );
     }
     for (const tx of booking.serviceTransactions) {
-      jobs.push(this.createAndFire({
-        recipientId: tx.providerId,
-        role: RoleType.foxerService,
-        sourceType: "eventServiceTransaction",
-        sourceId: tx.id,
-        amount: tx.agreedPrice,
-      }));
+      jobs.push(
+        this.createAndFire({
+          recipientId: tx.providerId,
+          role: RoleType.foxerService,
+          sourceType: "eventServiceTransaction",
+          sourceId: tx.id,
+          amount: tx.agreedPrice,
+        }),
+      );
     }
     for (const tx of booking.venueTransactions) {
-      jobs.push(this.createAndFire({
-        recipientId: tx.providerId,
-        role: RoleType.mayor,
-        sourceType: "eventVenueTransaction",
-        sourceId: tx.id,
-        amount: tx.agreedPrice,
-      }));
+      jobs.push(
+        this.createAndFire({
+          recipientId: tx.providerId,
+          role: RoleType.mayor,
+          sourceType: "eventVenueTransaction",
+          sourceId: tx.id,
+          amount: tx.agreedPrice,
+        }),
+      );
     }
     // Host's own cut — one per booking (sourceId = booking.id is fine here, there's
     // only ever one Host per Event).
-    jobs.push(this.createAndFire({
-      recipientId: booking.event.organizerId,
-      role: RoleType.host,
-      sourceType: "eventHostMarkup",
-      sourceId: booking.id,
-      amount: booking.event.hostMarkupAmount,
-    }));
+    jobs.push(
+      this.createAndFire({
+        recipientId: booking.event.organizerId,
+        role: RoleType.host,
+        sourceType: "eventHostMarkup",
+        sourceId: booking.id,
+        amount: booking.event.hostMarkupAmount,
+      }),
+    );
 
     const results = await Promise.allSettled(jobs);
     this.logFailures(results, "booking", bookingId);
   }
 
-  private static logFailures(results: PromiseSettledResult<void>[], sourceType: string, sourceId: string) {
+  private static logFailures(
+    results: PromiseSettledResult<void>[],
+    sourceType: string,
+    sourceId: string,
+  ) {
     for (const r of results) {
       if (r.status === "rejected") {
-        console.error(`Payout job failed for ${sourceType} ${sourceId}`, r.reason);
+        console.error(
+          `Payout job failed for ${sourceType} ${sourceId}`,
+          r.reason,
+        );
       }
     }
   }

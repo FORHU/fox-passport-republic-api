@@ -29,7 +29,10 @@ export default class ProfileRepo {
     });
   }
 
-  static async findByUsernameExcludingUserId(username: string, excludeUserId: string) {
+  static async findByUsernameExcludingUserId(
+    username: string,
+    excludeUserId: string,
+  ) {
     return prisma.user.findFirst({
       where: {
         username,
@@ -46,7 +49,7 @@ export default class ProfileRepo {
       username?: string;
       phone?: string;
       imgId?: string;
-    }
+    },
   ) {
     return prisma.user.update({
       where: { id: String(userId) },
@@ -80,4 +83,3 @@ export default class ProfileRepo {
     });
   }
 }
-

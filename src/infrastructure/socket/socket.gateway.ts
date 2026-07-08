@@ -1,6 +1,6 @@
 import { Server, Socket } from "socket.io";
 import jwt from "jsonwebtoken";
-import { ACCESS_TOKEN_SECRET} from "../../config";
+import { ACCESS_TOKEN_SECRET } from "../../config";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -16,7 +16,9 @@ export const registerSocketGateway = (io: Server) => {
     }
 
     try {
-      const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET) as { userId: string };
+      const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET) as {
+        userId: string;
+      };
       socket.userId = decoded.userId;
       next();
     } catch (err) {

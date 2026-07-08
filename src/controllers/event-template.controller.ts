@@ -9,7 +9,9 @@ export default class EventTemplateCtrl {
     const schema = Joi.object({
       name: Joi.string().required(),
       description: Joi.string().required(),
-      category: Joi.string().valid(...Object.values(EventCategory)).required(),
+      category: Joi.string()
+        .valid(...Object.values(EventCategory))
+        .required(),
       isPublic: Joi.boolean().optional(),
       imgIds: Joi.array().items(Joi.string().uuid()).max(5).optional(),
       targetCity: Joi.string().optional(),
@@ -28,7 +30,9 @@ export default class EventTemplateCtrl {
         ownerId,
         ...value,
       });
-      return res.status(201).json({ message: "Template created successfully", template });
+      return res
+        .status(201)
+        .json({ message: "Template created successfully", template });
     } catch (error: any) {
       return res.status(400).json({ message: error.message });
     }
@@ -38,7 +42,9 @@ export default class EventTemplateCtrl {
     const schema = Joi.object({
       name: Joi.string().optional(),
       description: Joi.string().optional(),
-      category: Joi.string().valid(...Object.values(EventCategory)).optional(),
+      category: Joi.string()
+        .valid(...Object.values(EventCategory))
+        .optional(),
       isPublic: Joi.boolean().optional(),
       imgIds: Joi.array().items(Joi.string().uuid()).max(5).optional(),
       hostMarkupPct: Joi.number().min(0).max(100).optional(),
@@ -55,9 +61,13 @@ export default class EventTemplateCtrl {
         ownerId,
         data: value,
       });
-      return res.status(200).json({ message: "Template updated successfully", template });
+      return res
+        .status(200)
+        .json({ message: "Template updated successfully", template });
     } catch (error: any) {
-      return res.status(error.message.includes("Unauthorized") ? 403 : 400).json({ message: error.message });
+      return res
+        .status(error.message.includes("Unauthorized") ? 403 : 400)
+        .json({ message: error.message });
     }
   }
 
@@ -66,7 +76,8 @@ export default class EventTemplateCtrl {
       const { ownerId, isPublic, category } = req.query;
       const templates = await EventTemplateSvc.getTemplates({
         ownerId: ownerId as string,
-        isPublic: isPublic === "true" ? true : isPublic === "false" ? false : undefined,
+        isPublic:
+          isPublic === "true" ? true : isPublic === "false" ? false : undefined,
         category: category as string | undefined,
       });
       return res.status(200).json({ templates });
@@ -140,17 +151,25 @@ export default class EventTemplateCtrl {
       );
       return res.status(200).json({ message: "Asset attached", result });
     } catch (error: any) {
-      return res.status(error.message.includes("Unauthorized") ? 403 : 400).json({ message: error.message });
+      return res
+        .status(error.message.includes("Unauthorized") ? 403 : 400)
+        .json({ message: error.message });
     }
   }
 
   static async removeAsset(req: Request, res: Response) {
     try {
       const ownerId = (req as any).user?.userId;
-      const result = await EventTemplateSvc.removeAsset(req.params.id, ownerId, req.params.assetId);
+      const result = await EventTemplateSvc.removeAsset(
+        req.params.id,
+        ownerId,
+        req.params.assetId,
+      );
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(error.message.includes("Unauthorized") ? 403 : 400).json({ message: error.message });
+      return res
+        .status(error.message.includes("Unauthorized") ? 403 : 400)
+        .json({ message: error.message });
     }
   }
 
@@ -181,17 +200,25 @@ export default class EventTemplateCtrl {
       );
       return res.status(200).json({ message: "Service attached", result });
     } catch (error: any) {
-      return res.status(error.message.includes("Unauthorized") ? 403 : 400).json({ message: error.message });
+      return res
+        .status(error.message.includes("Unauthorized") ? 403 : 400)
+        .json({ message: error.message });
     }
   }
 
   static async removeService(req: Request, res: Response) {
     try {
       const ownerId = (req as any).user?.userId;
-      const result = await EventTemplateSvc.removeService(req.params.id, ownerId, req.params.serviceId);
+      const result = await EventTemplateSvc.removeService(
+        req.params.id,
+        ownerId,
+        req.params.serviceId,
+      );
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(error.message.includes("Unauthorized") ? 403 : 400).json({ message: error.message });
+      return res
+        .status(error.message.includes("Unauthorized") ? 403 : 400)
+        .json({ message: error.message });
     }
   }
 
@@ -222,28 +249,43 @@ export default class EventTemplateCtrl {
       );
       return res.status(200).json({ message: "Venue attached", result });
     } catch (error: any) {
-      return res.status(error.message.includes("Unauthorized") ? 403 : 400).json({ message: error.message });
+      return res
+        .status(error.message.includes("Unauthorized") ? 403 : 400)
+        .json({ message: error.message });
     }
   }
 
   static async removeVenue(req: Request, res: Response) {
     try {
       const ownerId = (req as any).user?.userId;
-      const result = await EventTemplateSvc.removeVenue(req.params.id, ownerId, req.params.venueId);
+      const result = await EventTemplateSvc.removeVenue(
+        req.params.id,
+        ownerId,
+        req.params.venueId,
+      );
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(error.message.includes("Unauthorized") ? 403 : 400).json({ message: error.message });
+      return res
+        .status(error.message.includes("Unauthorized") ? 403 : 400)
+        .json({ message: error.message });
     }
   }
 
   static async submitTemplate(req: Request, res: Response) {
     try {
       const ownerId = (req as any).user?.userId;
-      const template = await EventTemplateSvc.submitTemplate(req.params.id, ownerId);
-      return res.status(200).json({ message: "Template submitted for review", template });
+      const template = await EventTemplateSvc.submitTemplate(
+        req.params.id,
+        ownerId,
+      );
+      return res
+        .status(200)
+        .json({ message: "Template submitted for review", template });
     } catch (error: any) {
-      if (error.message.includes("not found")) return res.status(404).json({ message: error.message });
-      if (error.message.includes("Unauthorized")) return res.status(403).json({ message: error.message });
+      if (error.message.includes("not found"))
+        return res.status(404).json({ message: error.message });
+      if (error.message.includes("Unauthorized"))
+        return res.status(403).json({ message: error.message });
       return res.status(400).json({ message: error.message });
     }
   }
@@ -251,10 +293,15 @@ export default class EventTemplateCtrl {
   static async deleteTemplate(req: Request, res: Response) {
     try {
       const ownerId = (req as any).user?.userId;
-      const result = await EventTemplateSvc.deleteTemplate(req.params.id, ownerId);
+      const result = await EventTemplateSvc.deleteTemplate(
+        req.params.id,
+        ownerId,
+      );
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(error.message.includes("Unauthorized") ? 403 : 400).json({ message: error.message });
+      return res
+        .status(error.message.includes("Unauthorized") ? 403 : 400)
+        .json({ message: error.message });
     }
   }
 
@@ -265,7 +312,7 @@ export default class EventTemplateCtrl {
         templateId: templateId as string,
         type: type as string,
         scope: (scope as string) || "state",
-        category: category as string
+        category: category as string,
       });
       return res.status(200).json(results);
     } catch (error: any) {
@@ -281,7 +328,7 @@ export default class EventTemplateCtrl {
       forceMatch: Joi.boolean().optional(),
       description: Joi.string().optional(),
       matchedAt: Joi.date().optional(),
-      date: Joi.date().optional()
+      date: Joi.date().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -292,11 +339,15 @@ export default class EventTemplateCtrl {
       const result = await EventTemplateSvc.matchItem({
         templateId: req.params.id,
         ownerId,
-        ...value
+        ...value,
       });
-      return res.status(200).json({ message: "Item matched successfully", result });
+      return res
+        .status(200)
+        .json({ message: "Item matched successfully", result });
     } catch (error: any) {
-      return res.status(error.message.includes("Unauthorized") ? 403 : 400).json({ message: error.message });
+      return res
+        .status(error.message.includes("Unauthorized") ? 403 : 400)
+        .json({ message: error.message });
     }
   }
 
@@ -304,13 +355,17 @@ export default class EventTemplateCtrl {
     try {
       const user = (req as any).user;
       if (!user || user.systemRole !== "admin") {
-        return res.status(403).json({ message: "Forbidden: Admin access required" });
+        return res
+          .status(403)
+          .json({ message: "Forbidden: Admin access required" });
       }
       const template = await prisma.eventTemplate.update({
         where: { id: req.params.id },
         data: { status: EventTemplateStatus.published },
       });
-      return res.status(200).json({ message: "Event template approved successfully", template });
+      return res
+        .status(200)
+        .json({ message: "Event template approved successfully", template });
     } catch (error: any) {
       return res.status(404).json({ message: error.message || error });
     }
@@ -320,17 +375,23 @@ export default class EventTemplateCtrl {
     try {
       const user = (req as any).user;
       if (!user || user.systemRole !== "admin") {
-        return res.status(403).json({ message: "Forbidden: Admin access required" });
+        return res
+          .status(403)
+          .json({ message: "Forbidden: Admin access required" });
       }
       const { reason } = req.body;
       if (!reason) {
-        return res.status(400).json({ message: "Rejection reason is required" });
+        return res
+          .status(400)
+          .json({ message: "Rejection reason is required" });
       }
       const template = await prisma.eventTemplate.update({
         where: { id: req.params.id },
         data: { status: EventTemplateStatus.rejected, rejectionReason: reason },
       });
-      return res.status(200).json({ message: "Event template rejected successfully", template });
+      return res
+        .status(200)
+        .json({ message: "Event template rejected successfully", template });
     } catch (error: any) {
       return res.status(404).json({ message: error.message || error });
     }

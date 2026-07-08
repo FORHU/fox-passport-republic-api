@@ -1,5 +1,13 @@
 import { prisma } from "../utils/prisma";
-import { EventCategory, AssetCategory, ServiceCategory, VenueCategory, AssetStatus, ServiceStatus, VenueStatus } from "@prisma/client";
+import {
+  EventCategory,
+  AssetCategory,
+  ServiceCategory,
+  VenueCategory,
+  AssetStatus,
+  ServiceStatus,
+  VenueStatus,
+} from "@prisma/client";
 
 export default class EventTemplateRepo {
   // CREATE
@@ -15,7 +23,7 @@ export default class EventTemplateRepo {
     return prisma.eventTemplate.create({
       data: {
         ...rest,
-        images: imgIds ? { connect: imgIds.map(id => ({ id })) } : undefined,
+        images: imgIds ? { connect: imgIds.map((id) => ({ id })) } : undefined,
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
@@ -25,7 +33,11 @@ export default class EventTemplateRepo {
   }
 
   // FIND ALL
-  static async findAllTemplates(filters?: { ownerId?: string; isPublic?: boolean; category?: string }) {
+  static async findAllTemplates(filters?: {
+    ownerId?: string;
+    isPublic?: boolean;
+    category?: string;
+  }) {
     return prisma.eventTemplate.findMany({
       where: {
         ...(filters?.ownerId && { ownerId: filters.ownerId }),
@@ -44,7 +56,10 @@ export default class EventTemplateRepo {
   }
 
   // Lightweight browse for the public landing page — only fetches what cards need
-  static async findPublicTemplatesLite(filters: { category?: string; limit: number }) {
+  static async findPublicTemplatesLite(filters: {
+    category?: string;
+    limit: number;
+  }) {
     return prisma.eventTemplate.findMany({
       where: {
         isPublic: true,
@@ -89,7 +104,9 @@ export default class EventTemplateRepo {
       where: { id },
       data: {
         ...rest,
-        images: imgIds ? { set: imgIds.map((id: string) => ({ id })) } : undefined,
+        images: imgIds
+          ? { set: imgIds.map((id: string) => ({ id })) }
+          : undefined,
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
@@ -110,16 +127,35 @@ export default class EventTemplateRepo {
     const template = await prisma.eventTemplate.findUnique({ where: { id } });
     if (!template) throw new Error("Template not found");
     if (template.ownerId !== ownerId) throw new Error("Unauthorized");
-    if (template.status !== "draft") throw new Error("Template is not in draft — already submitted or published");
+    if (template.status !== "draft")
+      throw new Error(
+        "Template is not in draft — already submitted or published",
+      );
     return prisma.eventTemplate.update({
       where: { id },
       data: { status: "pending" },
-      select: { id: true, name: true, status: true, ownerId: true, createdAt: true, updatedAt: true },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        ownerId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
   }
 
   // ASSETS
-  static async attachAsset(templateId: string, assetId?: string, quantity: number = 1, matchData?: any, description?: string, matchedAt?: Date, agreedPrice?: number, isOptional?: boolean) {
+  static async attachAsset(
+    templateId: string,
+    assetId?: string,
+    quantity: number = 1,
+    matchData?: any,
+    description?: string,
+    matchedAt?: Date,
+    agreedPrice?: number,
+    isOptional?: boolean,
+  ) {
     return prisma.eventTemplateAsset.create({
       data: {
         templateId,
@@ -143,12 +179,18 @@ export default class EventTemplateRepo {
     });
   }
 
-  static async searchAssetsByLocation(filters: { state?: string; country?: string; category?: string }) {
+  static async searchAssetsByLocation(filters: {
+    state?: string;
+    country?: string;
+    category?: string;
+  }) {
     return prisma.asset.findMany({
       where: {
         ...(filters.state && { state: filters.state }),
         ...(filters.country && { country: filters.country }),
-        ...(filters.category && { category: filters.category as AssetCategory }),
+        ...(filters.category && {
+          category: filters.category as AssetCategory,
+        }),
         status: AssetStatus.available,
         deletedAt: null,
       },
@@ -164,7 +206,15 @@ export default class EventTemplateRepo {
   }
 
   // SERVICES
-  static async attachService(templateId: string, serviceId?: string, matchData?: any, description?: string, matchedAt?: Date, agreedPrice?: number, isOptional?: boolean) {
+  static async attachService(
+    templateId: string,
+    serviceId?: string,
+    matchData?: any,
+    description?: string,
+    matchedAt?: Date,
+    agreedPrice?: number,
+    isOptional?: boolean,
+  ) {
     return prisma.eventTemplateService.create({
       data: {
         templateId,
@@ -187,12 +237,18 @@ export default class EventTemplateRepo {
     });
   }
 
-  static async searchServicesByLocation(filters: { state?: string; country?: string; category?: string }) {
+  static async searchServicesByLocation(filters: {
+    state?: string;
+    country?: string;
+    category?: string;
+  }) {
     return prisma.service.findMany({
       where: {
         ...(filters.state && { state: filters.state }),
         ...(filters.country && { country: filters.country }),
-        ...(filters.category && { category: filters.category as ServiceCategory }),
+        ...(filters.category && {
+          category: filters.category as ServiceCategory,
+        }),
         status: ServiceStatus.available,
         deletedAt: null,
       },
@@ -208,7 +264,15 @@ export default class EventTemplateRepo {
   }
 
   // VENUES
-  static async attachVenue(templateId: string, venueId?: string, matchData?: any, description?: string, matchedAt?: Date, agreedPrice?: number, isOptional?: boolean) {
+  static async attachVenue(
+    templateId: string,
+    venueId?: string,
+    matchData?: any,
+    description?: string,
+    matchedAt?: Date,
+    agreedPrice?: number,
+    isOptional?: boolean,
+  ) {
     return prisma.eventTemplateVenue.create({
       data: {
         templateId,
@@ -231,12 +295,18 @@ export default class EventTemplateRepo {
     });
   }
 
-  static async searchVenuesByLocation(filters: { state?: string; country?: string; category?: string }) {
+  static async searchVenuesByLocation(filters: {
+    state?: string;
+    country?: string;
+    category?: string;
+  }) {
     return prisma.venue.findMany({
       where: {
         ...(filters.state && { state: filters.state }),
         ...(filters.country && { country: filters.country }),
-        ...(filters.category && { category: filters.category as VenueCategory }),
+        ...(filters.category && {
+          category: filters.category as VenueCategory,
+        }),
         status: VenueStatus.available,
       },
       include: { mayor: { select: { id: true, name: true } }, images: true },

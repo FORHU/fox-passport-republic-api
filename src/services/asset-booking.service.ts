@@ -25,8 +25,11 @@ export default class AssetBookingSvc {
     deliveryAddress?: string;
     notes?: string;
   }) {
-    const asset = await prisma.asset.findUnique({ where: { id: data.assetId } });
-    if (!asset || asset.deletedAt) throw new Error("Asset not found or unavailable");
+    const asset = await prisma.asset.findUnique({
+      where: { id: data.assetId },
+    });
+    if (!asset || asset.deletedAt)
+      throw new Error("Asset not found or unavailable");
 
     if (data.quantity > asset.quantity) {
       throw new Error(`Only ${asset.quantity} unit(s) available`);
@@ -59,7 +62,11 @@ export default class AssetBookingSvc {
     });
   }
 
-  static async getAll(filters?: { userId?: string; ownerId?: string; status?: string }) {
+  static async getAll(filters?: {
+    userId?: string;
+    ownerId?: string;
+    status?: string;
+  }) {
     return AssetBookingRepo.findAll({
       userId: filters?.userId,
       ownerId: filters?.ownerId,
@@ -73,11 +80,17 @@ export default class AssetBookingSvc {
     return booking;
   }
 
-  static async confirmPayment(id: string, transactionId: string, method: string, requesterId: string) {
+  static async confirmPayment(
+    id: string,
+    transactionId: string,
+    method: string,
+    requesterId: string,
+  ) {
     const booking = await AssetBookingRepo.findById(id);
     if (!booking) throw new Error("Asset booking not found");
     if (booking.userId !== requesterId) throw new Error("Unauthorized");
-    if (booking.status === ItemBookingStatus.cancelled) throw new Error("Booking is cancelled");
+    if (booking.status === ItemBookingStatus.cancelled)
+      throw new Error("Booking is cancelled");
 
     return AssetBookingRepo.confirmPayment(id, transactionId, method);
   }
@@ -90,7 +103,10 @@ export default class AssetBookingSvc {
     const isBooker = booking.userId === requesterId;
     if (!isOwner && !isBooker) throw new Error("Unauthorized");
 
-    const updated = await AssetBookingRepo.updateStatus(id, status as ItemBookingStatus);
+    const updated = await AssetBookingRepo.updateStatus(
+      id,
+      status as ItemBookingStatus,
+    );
 
     if (status === ItemBookingStatus.completed) {
       // Payout failures must never fail the status-update response — log and move on.
@@ -111,16 +127,20 @@ export default class AssetBookingSvc {
   static async confirmArrival(id: string, requesterId: string) {
     const booking = await AssetBookingRepo.findById(id);
     if (!booking) throw new Error("Asset booking not found");
-    if (booking.userId !== requesterId) throw new Error("Only the client can confirm arrival");
-    if (!["confirmed", "pending"].includes(booking.status)) throw new Error("Booking cannot be confirmed at this stage");
+    if (booking.userId !== requesterId)
+      throw new Error("Only the client can confirm arrival");
+    if (!["confirmed", "pending"].includes(booking.status))
+      throw new Error("Booking cannot be confirmed at this stage");
     return AssetBookingRepo.confirmArrival(id);
   }
 
   static async dispute(id: string, requesterId: string) {
     const booking = await AssetBookingRepo.findById(id);
     if (!booking) throw new Error("Asset booking not found");
-    if (booking.userId !== requesterId) throw new Error("Only the client can report a dispute");
-    if (["completed", "cancelled", "disputed"].includes(booking.status)) throw new Error("Booking cannot be disputed at this stage");
+    if (booking.userId !== requesterId)
+      throw new Error("Only the client can report a dispute");
+    if (["completed", "cancelled", "disputed"].includes(booking.status))
+      throw new Error("Booking cannot be disputed at this stage");
     return AssetBookingRepo.dispute(id);
   }
 }

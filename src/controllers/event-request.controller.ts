@@ -20,10 +20,11 @@ export default class EventRequestCtrl {
       totalPrice: Joi.number().min(0).optional(),
       totalAmount: Joi.number().min(0).optional(),
       currency: Joi.string().optional(),
-    }).or('templateId', 'venueId');
+    }).or("templateId", "venueId");
 
     const { error, value } = schema.validate(req.body);
-    if (error) return res.status(400).json({ success: false, message: error.message });
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
 
     try {
       const clientId = (req as any).user.userId;
@@ -64,7 +65,11 @@ export default class EventRequestCtrl {
     try {
       const { id } = req.params;
       const { userId, systemRole } = (req as any).user;
-      const updated = await EventRequestSvc.approveRequest(id, userId, systemRole);
+      const updated = await EventRequestSvc.approveRequest(
+        id,
+        userId,
+        systemRole,
+      );
       return res.status(200).json({ success: true, data: updated });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });

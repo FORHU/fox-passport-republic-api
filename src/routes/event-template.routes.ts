@@ -13,29 +13,99 @@ router.get("/", authenticate, EventTemplateCtrl.getTemplates);
 router.get("/:id", authenticate, EventTemplateCtrl.getTemplateById);
 
 // Organizer only actions
-router.post("/", authenticate, requireRole(["host"]), EventTemplateCtrl.createTemplate);
-router.post("/:id/submit", authenticate, requireRole(["host"]), EventTemplateCtrl.submitTemplate);
-router.put("/:id", authenticate, requireRole(["host"]), EventTemplateCtrl.updateTemplate);
-router.delete("/:id", authenticate, requireRole(["host"]), EventTemplateCtrl.deleteTemplate);
+router.post(
+  "/",
+  authenticate,
+  requireRole(["host"]),
+  EventTemplateCtrl.createTemplate,
+);
+router.post(
+  "/:id/submit",
+  authenticate,
+  requireRole(["host"]),
+  EventTemplateCtrl.submitTemplate,
+);
+router.put(
+  "/:id",
+  authenticate,
+  requireRole(["host"]),
+  EventTemplateCtrl.updateTemplate,
+);
+router.delete(
+  "/:id",
+  authenticate,
+  requireRole(["host"]),
+  EventTemplateCtrl.deleteTemplate,
+);
 
 // Asset associations
-router.post("/:id/assets", authenticate, requireRole(["host"]), EventTemplateCtrl.attachAsset);
-router.delete("/:id/assets/:assetId", authenticate, requireRole(["host"]), EventTemplateCtrl.removeAsset);
+router.post(
+  "/:id/assets",
+  authenticate,
+  requireRole(["host"]),
+  EventTemplateCtrl.attachAsset,
+);
+router.delete(
+  "/:id/assets/:assetId",
+  authenticate,
+  requireRole(["host"]),
+  EventTemplateCtrl.removeAsset,
+);
 
 // Service associations
-router.post("/:id/services", authenticate, requireRole(["host"]), EventTemplateCtrl.attachService);
-router.delete("/:id/services/:serviceId", authenticate, requireRole(["host"]), EventTemplateCtrl.removeService);
+router.post(
+  "/:id/services",
+  authenticate,
+  requireRole(["host"]),
+  EventTemplateCtrl.attachService,
+);
+router.delete(
+  "/:id/services/:serviceId",
+  authenticate,
+  requireRole(["host"]),
+  EventTemplateCtrl.removeService,
+);
 
 // Venue associations
-router.post("/:id/venues", authenticate, requireRole(["host"]), EventTemplateCtrl.attachVenue);
-router.delete("/:id/venues/:venueId", authenticate, requireRole(["host"]), EventTemplateCtrl.removeVenue);
+router.post(
+  "/:id/venues",
+  authenticate,
+  requireRole(["host"]),
+  EventTemplateCtrl.attachVenue,
+);
+router.delete(
+  "/:id/venues/:venueId",
+  authenticate,
+  requireRole(["host"]),
+  EventTemplateCtrl.removeVenue,
+);
 
 // Location Matching
-router.get("/matching/search", authenticate, requireRole(["host"]), EventTemplateCtrl.matchSearch);
-router.post("/:id/match", authenticate, requireRole(["host"]), EventTemplateCtrl.matchItem);
+router.get(
+  "/matching/search",
+  authenticate,
+  requireRole(["host"]),
+  EventTemplateCtrl.matchSearch,
+);
+router.post(
+  "/:id/match",
+  authenticate,
+  requireRole(["host"]),
+  EventTemplateCtrl.matchItem,
+);
 
 // Admin routes
-router.patch("/:id/approve", authenticate, requireRole(["admin", "super_admin"]), EventTemplateCtrl.approveEventTemplate);
-router.patch("/:id/reject", authenticate, requireRole(["admin", "super_admin"]), EventTemplateCtrl.rejectEventTemplate);
+router.patch(
+  "/:id/approve",
+  authenticate,
+  requireRole(["admin", "super_admin"]),
+  EventTemplateCtrl.approveEventTemplate,
+);
+router.patch(
+  "/:id/reject",
+  authenticate,
+  requireRole(["admin", "super_admin"]),
+  EventTemplateCtrl.rejectEventTemplate,
+);
 
 export default router;
