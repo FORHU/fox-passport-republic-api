@@ -3,7 +3,11 @@ import { prisma } from "../utils/prisma";
 export default class FavoriteRepo {
   // TOGGLE
   static async toggleFavorite(userId: string, targetId: string, type: string) {
-    const where = { userId: String(userId), entityId: String(targetId), entityType: String(type) };
+    const where = {
+      userId: String(userId),
+      entityId: String(targetId),
+      entityType: String(type),
+    };
 
     const existing = await prisma.favorite.findFirst({ where });
 
@@ -16,7 +20,7 @@ export default class FavoriteRepo {
           userId: String(userId),
           entityId: String(targetId),
           entityType: String(type),
-        }
+        },
       });
       return { added: true };
     }
@@ -26,13 +30,17 @@ export default class FavoriteRepo {
   static async getUserFavorites(userId: string) {
     return prisma.favorite.findMany({
       where: { userId: String(userId) },
-      include: {}
+      include: {},
     });
   }
 
   // CHECK
   static async isFavorite(userId: string, targetId: string, type: string) {
-    const where = { userId: String(userId), entityId: String(targetId), entityType: String(type) };
+    const where = {
+      userId: String(userId),
+      entityId: String(targetId),
+      entityType: String(type),
+    };
 
     const favorite = await prisma.favorite.findFirst({ where });
     return !!favorite;
@@ -41,13 +49,21 @@ export default class FavoriteRepo {
   // REMOVE BY ID
   static async removeFavorite(id: string) {
     return prisma.favorite.delete({
-      where: { id: String(id) }
+      where: { id: String(id) },
     });
   }
 
   // REMOVE BY LISTING
-  static async removeFavoriteByListing(userId: string, targetId: string, type: string) {
-    const where = { userId: String(userId), entityId: String(targetId), entityType: String(type) };
+  static async removeFavoriteByListing(
+    userId: string,
+    targetId: string,
+    type: string,
+  ) {
+    const where = {
+      userId: String(userId),
+      entityId: String(targetId),
+      entityType: String(type),
+    };
 
     return prisma.favorite.deleteMany({ where });
   }

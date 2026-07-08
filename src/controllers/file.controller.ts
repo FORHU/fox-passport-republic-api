@@ -35,7 +35,7 @@ export default class FileCtrl {
         success: true,
         message: "File uploaded and registered successfully",
         fileId: dbFile.id,
-        key: key
+        key: key,
       });
     } catch (error: any) {
       console.error("[FileCtrl] Upload error:", error);
@@ -67,9 +67,13 @@ export default class FileCtrl {
         ...value,
         uploadedBy: String(uploadedBy),
       });
-      return res.status(201).json({ message: "File created successfully", file });
+      return res
+        .status(201)
+        .json({ message: "File created successfully", file });
     } catch (err: any) {
-      return res.status(400).json({ message: err?.message || "Failed to create file" });
+      return res
+        .status(400)
+        .json({ message: err?.message || "Failed to create file" });
     }
   }
 }

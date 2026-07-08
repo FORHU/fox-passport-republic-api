@@ -39,7 +39,7 @@ export async function sendBookingConfirmationEmail({
         <td style="padding: 0 0 12px; font-size: ${mono ? "13px" : "15px"}; font-weight: ${mono ? "500" : "600"}; color: #111114; font-family: ${mono ? "'SFMono-Regular', Consolas, monospace" : "'Plus Jakarta Sans', Arial, sans-serif"}; word-break: break-all;">
           ${escapeHtml(value)}
         </td>
-      </tr>`
+      </tr>`,
     )
     .join("");
 

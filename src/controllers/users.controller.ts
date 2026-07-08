@@ -28,7 +28,9 @@ export default class UsersCtrl {
   // READ ALL
   static async getAllUsers(req: Request, res: Response) {
     const roleTypeParam = req.query.roleType as string | undefined;
-    const roleTypes = roleTypeParam ? roleTypeParam.split(',').map(r => r.trim()) : undefined;
+    const roleTypes = roleTypeParam
+      ? roleTypeParam.split(",").map((r) => r.trim())
+      : undefined;
     const users = await UsersSvc.getAllUsers(roleTypes);
     return res.json(users);
   }
@@ -93,9 +95,12 @@ export default class UsersCtrl {
   static async becomeHost(req: Request, res: Response) {
     try {
       const userId = req.user?.userId;
-      if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
 
-      const user = await UsersSvc.becomeHost(userId) as any;
+      const user = (await UsersSvc.becomeHost(userId)) as any;
       return res.status(200).json({
         success: true,
         message: "You are now a host!",
@@ -117,7 +122,10 @@ export default class UsersCtrl {
   static async getFoxerStats(req: Request, res: Response) {
     try {
       const userId = req.user?.userId;
-      if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
 
       const stats = await UsersSvc.getFoxerStats(userId);
       return res.status(200).json({ success: true, data: stats });

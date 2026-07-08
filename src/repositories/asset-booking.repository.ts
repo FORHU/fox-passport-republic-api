@@ -19,7 +19,7 @@ export default class AssetBookingRepo {
         assetId: data.assetId,
         userId: data.userId,
         startDate: data.startDate,
-        endDate: data.endDate, 
+        endDate: data.endDate,
         quantity: data.quantity,
         fulfillmentType: data.fulfillmentType,
         deliveryAddress: data.deliveryAddress,
@@ -34,7 +34,11 @@ export default class AssetBookingRepo {
     });
   }
 
-  static async findAll(filters?: { userId?: string; ownerId?: string; status?: ItemBookingStatus }) {
+  static async findAll(filters?: {
+    userId?: string;
+    ownerId?: string;
+    status?: ItemBookingStatus;
+  }) {
     return prisma.assetBooking.findMany({
       where: {
         ...(filters?.userId && { userId: filters.userId }),
@@ -53,7 +57,12 @@ export default class AssetBookingRepo {
     return prisma.assetBooking.findUnique({
       where: { id },
       include: {
-        asset: { include: { images: true, owner: { select: { id: true, name: true, email: true } } } },
+        asset: {
+          include: {
+            images: true,
+            owner: { select: { id: true, name: true, email: true } },
+          },
+        },
         user: { select: { id: true, name: true, email: true } },
       },
     });
@@ -70,7 +79,11 @@ export default class AssetBookingRepo {
     });
   }
 
-  static async confirmPayment(id: string, transactionId: string, method: string) {
+  static async confirmPayment(
+    id: string,
+    transactionId: string,
+    method: string,
+  ) {
     return prisma.assetBooking.update({
       where: { id },
       data: {
@@ -80,7 +93,12 @@ export default class AssetBookingRepo {
         paymentMethod: method,
       },
       include: {
-        asset: { include: { images: true, owner: { select: { id: true, name: true, email: true } } } },
+        asset: {
+          include: {
+            images: true,
+            owner: { select: { id: true, name: true, email: true } },
+          },
+        },
         user: { select: { id: true, name: true, email: true } },
       },
     });
@@ -96,7 +114,10 @@ export default class AssetBookingRepo {
         },
         select: { startDate: true, endDate: true, quantity: true },
       }),
-      prisma.asset.findUnique({ where: { id: assetId }, select: { quantity: true } }),
+      prisma.asset.findUnique({
+        where: { id: assetId },
+        select: { quantity: true },
+      }),
     ]);
     return {
       bookedRanges: bookings.map((b) => ({
@@ -113,7 +134,12 @@ export default class AssetBookingRepo {
       where: { id },
       data: { status: ItemBookingStatus.active },
       include: {
-        asset: { include: { images: true, owner: { select: { id: true, name: true, email: true } } } },
+        asset: {
+          include: {
+            images: true,
+            owner: { select: { id: true, name: true, email: true } },
+          },
+        },
         user: { select: { id: true, name: true, email: true } },
       },
     });
@@ -124,7 +150,12 @@ export default class AssetBookingRepo {
       where: { id },
       data: { status: ItemBookingStatus.disputed },
       include: {
-        asset: { include: { images: true, owner: { select: { id: true, name: true, email: true } } } },
+        asset: {
+          include: {
+            images: true,
+            owner: { select: { id: true, name: true, email: true } },
+          },
+        },
         user: { select: { id: true, name: true, email: true } },
       },
     });

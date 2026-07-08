@@ -26,7 +26,11 @@ router.patch("/:id/status", authenticate, ServiceBookingCtrl.updateStatus);
 router.delete("/:id", authenticate, ServiceBookingCtrl.cancel);
 
 // Protected — client confirms provider arrived (releases escrow)
-router.patch("/:id/confirm-arrival", authenticate, ServiceBookingCtrl.confirmArrival);
+router.patch(
+  "/:id/confirm-arrival",
+  authenticate,
+  ServiceBookingCtrl.confirmArrival,
+);
 
 // Protected — client reports no-show / problem (disputes escrow)
 router.patch("/:id/dispute", authenticate, ServiceBookingCtrl.dispute);

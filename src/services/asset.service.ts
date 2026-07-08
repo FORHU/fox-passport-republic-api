@@ -1,4 +1,9 @@
-import { AssetCondition, BillingRate, AssetCategory, AssetStatus } from "@prisma/client";
+import {
+  AssetCondition,
+  BillingRate,
+  AssetCategory,
+  AssetStatus,
+} from "@prisma/client";
 import AssetRepo from "../repositories/asset.repository";
 import { v4 as uuidv4 } from "uuid";
 
@@ -43,7 +48,10 @@ export default class AssetSvc {
     return asset;
   }
 
-  static async getAssets(filters?: { ownerId?: string; category?: AssetCategory }) {
+  static async getAssets(filters?: {
+    ownerId?: string;
+    category?: AssetCategory;
+  }) {
     return AssetRepo.findAllAssets(filters);
   }
 
@@ -68,7 +76,7 @@ export default class AssetSvc {
       currency?: string;
       billingRate?: BillingRate;
       status?: AssetStatus;
-    }>
+    }>,
   ) {
     const existing = await AssetRepo.findAssetById(id);
     if (!existing) {
@@ -81,7 +89,7 @@ export default class AssetSvc {
     return AssetRepo.updateAsset(id, data);
   }
 
-   static async deleteAsset(id: string, requesterId: string) {
+  static async deleteAsset(id: string, requesterId: string) {
     const asset = await AssetRepo.findAssetById(id);
 
     if (!asset) {

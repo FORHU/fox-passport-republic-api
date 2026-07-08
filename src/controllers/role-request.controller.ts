@@ -30,13 +30,20 @@ export default class RoleRequestController {
           ? JSON.parse(req.body.data)
           : req.body.data || {};
 
-      if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
       if (!roleType || !Object.values(RoleType).includes(roleType)) {
-        return res.status(400).json({ success: false, message: "Invalid role type" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid role type" });
       }
 
       // Process each uploaded file through the 4-step pipeline
-      const files = (req as any).files as Record<string, Express.Multer.File[]> | undefined;
+      const files = (req as any).files as
+        | Record<string, Express.Multer.File[]>
+        | undefined;
 
       if (files) {
         for (const [fieldName, fileArray] of Object.entries(files)) {
@@ -68,7 +75,11 @@ export default class RoleRequestController {
         }
       }
 
-      const application = await RoleRequestService.submitApplication(userId, roleType, data);
+      const application = await RoleRequestService.submitApplication(
+        userId,
+        roleType,
+        data,
+      );
 
       return res.status(201).json({
         success: true,
@@ -87,7 +98,9 @@ export default class RoleRequestController {
   static async list(req: Request, res: Response) {
     try {
       const { status } = req.query;
-      const requests = await RoleRequestService.getRequests(status as RequestStatus);
+      const requests = await RoleRequestService.getRequests(
+        status as RequestStatus,
+      );
 
       return res.status(200).json({
         success: true,
@@ -107,16 +120,21 @@ export default class RoleRequestController {
       const { id } = req.params;
       const { status, rejectionReason } = req.body;
 
-      if (!id) return res.status(400).json({ success: false, message: "Request ID required" });
+      if (!id)
+        return res
+          .status(400)
+          .json({ success: false, message: "Request ID required" });
       if (![RequestStatus.approved, RequestStatus.rejected].includes(status)) {
-        return res.status(400).json({ success: false, message: "Invalid status" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid status" });
       }
 
       const updatedRequest = await RoleRequestService.reviewApplication(
         id,
         adminId,
         status,
-        rejectionReason
+        rejectionReason,
       );
 
       return res.status(200).json({

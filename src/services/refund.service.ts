@@ -32,18 +32,26 @@ export default class RefundSvc {
   static computeRefund(
     startAt: Date,
     policy: CancellationPolicy | null | undefined,
-    now: Date = new Date()
-  ): { refundPercent: number; hoursUntilEvent: number; matchedRule: CancellationRule | null } {
-    const hoursUntilEvent = (startAt.getTime() - now.getTime()) / (1000 * 60 * 60);
+    now: Date = new Date(),
+  ): {
+    refundPercent: number;
+    hoursUntilEvent: number;
+    matchedRule: CancellationRule | null;
+  } {
+    const hoursUntilEvent =
+      (startAt.getTime() - now.getTime()) / (1000 * 60 * 60);
 
     if (!policy || !policy.rules || policy.rules.length === 0) {
       return { refundPercent: 0, hoursUntilEvent, matchedRule: null };
     }
 
-    const sortedRules = [...policy.rules].sort((a, b) => b.hoursBeforeEvent - a.hoursBeforeEvent);
+    const sortedRules = [...policy.rules].sort(
+      (a, b) => b.hoursBeforeEvent - a.hoursBeforeEvent,
+    );
 
     const matchedRule =
-      sortedRules.find((rule) => hoursUntilEvent >= rule.hoursBeforeEvent) ?? null;
+      sortedRules.find((rule) => hoursUntilEvent >= rule.hoursBeforeEvent) ??
+      null;
 
     return {
       refundPercent: matchedRule ? matchedRule.refundPercent : 0,
@@ -71,7 +79,9 @@ export default class RefundSvc {
                 venue: {
                   include: {
                     cancellationPolicy: {
-                      include: { rules: { orderBy: { hoursBeforeEvent: "desc" } } },
+                      include: {
+                        rules: { orderBy: { hoursBeforeEvent: "desc" } },
+                      },
                     },
                   },
                 },
@@ -82,7 +92,9 @@ export default class RefundSvc {
                 service: {
                   include: {
                     cancellationPolicy: {
-                      include: { rules: { orderBy: { hoursBeforeEvent: "desc" } } },
+                      include: {
+                        rules: { orderBy: { hoursBeforeEvent: "desc" } },
+                      },
                     },
                   },
                 },
@@ -94,21 +106,19 @@ export default class RefundSvc {
     });
     if (!booking) throw new Error("Booking not found");
     if (booking.userId !== userId) throw new Error("Unauthorized");
-    if (booking.status === "cancelled") throw new Error("Booking is already cancelled");
+    if (booking.status === "cancelled")
+      throw new Error("Booking is already cancelled");
 
     const now = new Date();
 
-    const policy = (
-      booking.event.template?.cancellationPolicy
-      ?? (booking.event as any).venueTransactions?.[0]?.venue?.cancellationPolicy
-      ?? (booking.event as any).serviceTransactions?.[0]?.service?.cancellationPolicy
-    ) as CancellationPolicy | undefined;
+    const policy = (booking.event.template?.cancellationPolicy ??
+      (booking.event as any).venueTransactions?.[0]?.venue
+        ?.cancellationPolicy ??
+      (booking.event as any).serviceTransactions?.[0]?.service
+        ?.cancellationPolicy) as CancellationPolicy | undefined;
 
-    const { refundPercent, hoursUntilEvent, matchedRule } = RefundSvc.computeRefund(
-      booking.startAt,
-      policy,
-      now
-    );
+    const { refundPercent, hoursUntilEvent, matchedRule } =
+      RefundSvc.computeRefund(booking.startAt, policy, now);
 
     let eligible = true;
     let message = "";
@@ -127,10 +137,13 @@ export default class RefundSvc {
     }
 
     const totalPaid = booking.payments
-      .filter((p) => p.status === "completed" || (p.status as string) === "succeeded")
+      .filter(
+        (p) => p.status === "completed" || (p.status as string) === "succeeded",
+      )
       .reduce((sum, p) => sum + p.amount, 0);
 
-    const estimatedRefund = Math.round(((totalPaid * refundPercent) / 100) * 100) / 100;
+    const estimatedRefund =
+      Math.round(((totalPaid * refundPercent) / 100) * 100) / 100;
 
     return {
       eligible,
@@ -163,7 +176,9 @@ export default class RefundSvc {
                 venue: {
                   include: {
                     cancellationPolicy: {
-                      include: { rules: { orderBy: { hoursBeforeEvent: "desc" } } },
+                      include: {
+                        rules: { orderBy: { hoursBeforeEvent: "desc" } },
+                      },
                     },
                   },
                 },
@@ -174,7 +189,9 @@ export default class RefundSvc {
                 service: {
                   include: {
                     cancellationPolicy: {
-                      include: { rules: { orderBy: { hoursBeforeEvent: "desc" } } },
+                      include: {
+                        rules: { orderBy: { hoursBeforeEvent: "desc" } },
+                      },
                     },
                   },
                 },
@@ -186,21 +203,31 @@ export default class RefundSvc {
     });
     if (!booking) throw new Error("Booking not found");
     if (booking.userId !== userId) throw new Error("Unauthorized");
-    if (booking.status === "cancelled") throw new Error("Booking is already cancelled");
+    if (booking.status === "cancelled")
+      throw new Error("Booking is already cancelled");
 
-    const policy = (
-      booking.event.template?.cancellationPolicy
-      ?? (booking.event as any).venueTransactions?.[0]?.venue?.cancellationPolicy
-      ?? (booking.event as any).serviceTransactions?.[0]?.service?.cancellationPolicy
-    ) as CancellationPolicy | undefined;
-    const { refundPercent, hoursUntilEvent } = RefundSvc.computeRefund(booking.startAt, policy);
+    const policy = (booking.event.template?.cancellationPolicy ??
+      (booking.event as any).venueTransactions?.[0]?.venue
+        ?.cancellationPolicy ??
+      (booking.event as any).serviceTransactions?.[0]?.service
+        ?.cancellationPolicy) as CancellationPolicy | undefined;
+    const { refundPercent, hoursUntilEvent } = RefundSvc.computeRefund(
+      booking.startAt,
+      policy,
+    );
 
     if (hoursUntilEvent <= 0) {
-      throw new Error("Event has already started — cancellation is no longer allowed");
+      throw new Error(
+        "Event has already started — cancellation is no longer allowed",
+      );
     }
 
-    const completedPayments = booking.payments.filter((p) => p.status === "completed");
-    const pendingPayments = booking.payments.filter((p) => p.status === "pending");
+    const completedPayments = booking.payments.filter(
+      (p) => p.status === "completed",
+    );
+    const pendingPayments = booking.payments.filter(
+      (p) => p.status === "pending",
+    );
 
     // Void any pending (not-yet-captured) transactions instead of refunding them.
     for (const payment of pendingPayments) {
@@ -264,7 +291,8 @@ export default class RefundSvc {
             amount: Math.round(estimatedRefund * 100),
           });
           stripeRefundId = refund.id;
-          refundStatus = refund.status === "succeeded" ? "succeeded" : "pending";
+          refundStatus =
+            refund.status === "succeeded" ? "succeeded" : "pending";
           if (refund.status === "failed") {
             failureReason = refund.failure_reason ?? "Unknown Stripe error";
             refundStatus = "failed";
@@ -307,7 +335,10 @@ export default class RefundSvc {
     const eventName = booking.event?.name ?? "Unknown Event";
     const userEmail = booking.user?.email;
     const totalPaid = completedPayments.reduce((s, p) => s + p.amount, 0);
-    const totalRefunded = refunds.reduce((s: number, r: any) => s + (r.amount ?? 0), 0);
+    const totalRefunded = refunds.reduce(
+      (s: number, r: any) => s + (r.amount ?? 0),
+      0,
+    );
 
     if (userEmail) {
       sendBookingCancelledEmail({
@@ -393,7 +424,8 @@ export default class RefundSvc {
       include: { payment: true },
     });
     if (!refund) throw new Error("Refund not found");
-    if (refund.status !== "failed") throw new Error("Only failed refunds can be retried");
+    if (refund.status !== "failed")
+      throw new Error("Only failed refunds can be retried");
 
     if (!refund.payment?.transactionId?.startsWith("pi_")) {
       throw new Error("No Stripe PaymentIntent to refund");
@@ -405,8 +437,10 @@ export default class RefundSvc {
         amount: Math.round(refund.amount * 100),
       });
 
-      const newRefundStatus = sr.status === "succeeded" ? "succeeded" : "pending";
-      const newFailureReason = sr.status === "failed" ? (sr.failure_reason ?? "Unknown") : null;
+      const newRefundStatus =
+        sr.status === "succeeded" ? "succeeded" : "pending";
+      const newFailureReason =
+        sr.status === "failed" ? (sr.failure_reason ?? "Unknown") : null;
 
       const updated = await prisma.refund.update({
         where: { id: refundId },
@@ -486,7 +520,12 @@ export default class RefundSvc {
     const existing = await prisma.refund.findFirst({
       where: { stripeRefundId: refund.id },
       include: {
-        booking: { include: { user: { select: { email: true } }, event: { select: { name: true } } } },
+        booking: {
+          include: {
+            user: { select: { email: true } },
+            event: { select: { name: true } },
+          },
+        },
         payment: true,
       },
     });
@@ -510,7 +549,12 @@ export default class RefundSvc {
     const existing = await prisma.refund.findFirst({
       where: { stripeRefundId: refund.id },
       include: {
-        booking: { include: { user: { select: { email: true } }, event: { select: { name: true } } } },
+        booking: {
+          include: {
+            user: { select: { email: true } },
+            event: { select: { name: true } },
+          },
+        },
         payment: true,
       },
     });

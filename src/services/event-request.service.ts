@@ -43,15 +43,21 @@ export default class EventRequestSvc {
     if (!template) throw new Error("Template not found");
 
     const templateTotals = EventTemplateSvc.calculateTotalsBreakdown(template);
-    const hasTemplateItems = 
+    const hasTemplateItems =
       (template.templateAssets?.length ?? 0) > 0 ||
       (template.templateServices?.length ?? 0) > 0 ||
       (template.templateVenues?.length ?? 0) > 0;
 
-    const totalAmount = hasTemplateItems ? templateTotals.totalAmount : (data.totalAmount ?? 0);
+    const totalAmount = hasTemplateItems
+      ? templateTotals.totalAmount
+      : (data.totalAmount ?? 0);
     const itemsTotal = hasTemplateItems ? templateTotals.itemsTotal : 0;
-    const hostMarkupAmount = hasTemplateItems ? templateTotals.hostMarkupAmount : 0;
-    const platformFeeAmount = hasTemplateItems ? templateTotals.platformFeeAmount : 0;
+    const hostMarkupAmount = hasTemplateItems
+      ? templateTotals.hostMarkupAmount
+      : 0;
+    const platformFeeAmount = hasTemplateItems
+      ? templateTotals.platformFeeAmount
+      : 0;
 
     // 2. Create Event without transactions (will be created after confirmation)
     return EventRequestRepo.create({
@@ -79,8 +85,10 @@ export default class EventRequestSvc {
     if (!request) throw new Error("Request not found");
 
     // Only assigned host or admin can approve
-    if (request.organizerId !== userId && systemRole !== 'admin') {
-      throw new Error("Unauthorized: Only the assigned host can approve this request");
+    if (request.organizerId !== userId && systemRole !== "admin") {
+      throw new Error(
+        "Unauthorized: Only the assigned host can approve this request",
+      );
     }
 
     return EventRequestRepo.updateRequestStatus(id, "approved");

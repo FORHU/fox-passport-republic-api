@@ -16,7 +16,8 @@ export default class ServiceBookingCtrl {
     });
 
     const { error, value } = schema.validate(req.body);
-    if (error) return res.status(400).json({ success: false, message: error.message });
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
 
     try {
       const userId = req.user!.userId;
@@ -30,7 +31,10 @@ export default class ServiceBookingCtrl {
   // GET /service/bookings/availability?serviceId=xxx
   static async getAvailability(req: Request, res: Response) {
     const { serviceId } = req.query as Record<string, string>;
-    if (!serviceId) return res.status(400).json({ success: false, message: "serviceId is required" });
+    if (!serviceId)
+      return res
+        .status(400)
+        .json({ success: false, message: "serviceId is required" });
     try {
       const data = await ServiceBookingSvc.getAvailability(serviceId);
       return res.status(200).json({ success: true, data });
@@ -43,7 +47,11 @@ export default class ServiceBookingCtrl {
   static async getAll(req: Request, res: Response) {
     try {
       const { userId, ownerId, status } = req.query as Record<string, string>;
-      const bookings = await ServiceBookingSvc.getAll({ userId, ownerId, status });
+      const bookings = await ServiceBookingSvc.getAll({
+        userId,
+        ownerId,
+        status,
+      });
       return res.status(200).json({ success: true, data: bookings });
     } catch (err: any) {
       return res.status(500).json({ success: false, message: err.message });
@@ -69,14 +77,15 @@ export default class ServiceBookingCtrl {
     });
 
     const { error, value } = schema.validate(req.body);
-    if (error) return res.status(400).json({ success: false, message: error.message });
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
 
     try {
       const booking = await ServiceBookingSvc.confirmPayment(
         req.params.id,
         value.transactionId,
         value.method,
-        req.user!.userId
+        req.user!.userId,
       );
       return res.status(200).json({ success: true, data: booking });
     } catch (err: any) {
@@ -87,14 +96,21 @@ export default class ServiceBookingCtrl {
   // PATCH /service/bookings/:id/status
   static async updateStatus(req: Request, res: Response) {
     const schema = Joi.object({
-      status: Joi.string().valid("pending", "confirmed", "active", "completed", "cancelled").required(),
+      status: Joi.string()
+        .valid("pending", "confirmed", "active", "completed", "cancelled")
+        .required(),
     });
 
     const { error, value } = schema.validate(req.body);
-    if (error) return res.status(400).json({ success: false, message: error.message });
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
 
     try {
-      const booking = await ServiceBookingSvc.updateStatus(req.params.id, value.status, req.user!.userId);
+      const booking = await ServiceBookingSvc.updateStatus(
+        req.params.id,
+        value.status,
+        req.user!.userId,
+      );
       return res.status(200).json({ success: true, data: booking });
     } catch (err: any) {
       return res.status(400).json({ success: false, message: err.message });
@@ -104,7 +120,10 @@ export default class ServiceBookingCtrl {
   // DELETE /service/bookings/:id
   static async cancel(req: Request, res: Response) {
     try {
-      const booking = await ServiceBookingSvc.cancel(req.params.id, req.user!.userId);
+      const booking = await ServiceBookingSvc.cancel(
+        req.params.id,
+        req.user!.userId,
+      );
       return res.status(200).json({ success: true, data: booking });
     } catch (err: any) {
       return res.status(400).json({ success: false, message: err.message });
@@ -114,7 +133,10 @@ export default class ServiceBookingCtrl {
   // PATCH /service/bookings/:id/confirm-arrival
   static async confirmArrival(req: Request, res: Response) {
     try {
-      const booking = await ServiceBookingSvc.confirmArrival(req.params.id, req.user!.userId);
+      const booking = await ServiceBookingSvc.confirmArrival(
+        req.params.id,
+        req.user!.userId,
+      );
       return res.status(200).json({ success: true, data: booking });
     } catch (err: any) {
       return res.status(400).json({ success: false, message: err.message });
@@ -124,7 +146,10 @@ export default class ServiceBookingCtrl {
   // PATCH /service/bookings/:id/dispute
   static async dispute(req: Request, res: Response) {
     try {
-      const booking = await ServiceBookingSvc.dispute(req.params.id, req.user!.userId);
+      const booking = await ServiceBookingSvc.dispute(
+        req.params.id,
+        req.user!.userId,
+      );
       return res.status(200).json({ success: true, data: booking });
     } catch (err: any) {
       return res.status(400).json({ success: false, message: err.message });

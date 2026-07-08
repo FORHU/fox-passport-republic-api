@@ -4,7 +4,13 @@ import { Resend } from "resend";
 import { RESEND_API_KEY, FRONTEND_URL } from "../../config";
 
 export const LOGO_DATA_URI = (() => {
-  const logoPath = path.join(process.cwd(), "..", "fox-passport-republic-app", "public", "logofox.png");
+  const logoPath = path.join(
+    process.cwd(),
+    "..",
+    "fox-passport-republic-app",
+    "public",
+    "logofox.png",
+  );
   try {
     if (fs.existsSync(logoPath)) {
       const ext = path.extname(logoPath).slice(1);
@@ -18,7 +24,8 @@ export const LOGO_DATA_URI = (() => {
 })();
 
 export const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
-export const FROM_ADDRESS = process.env.EMAIL_FROM || "FoxPassport <onboarding@foxpassport.com>";
+export const FROM_ADDRESS =
+  process.env.EMAIL_FROM || "FoxPassport <onboarding@foxpassport.com>";
 
 export interface EmailPayload {
   to: string;
@@ -49,7 +56,9 @@ export function escapeHtml(str: string): string {
 }
 
 export function wrapEmail(innerHtml: string, showLogo = true): string {
-  const logoSrc = showLogo ? `<img class="logo-img" src="${LOGO_DATA_URI}" alt="FoxPassport" />` : "";
+  const logoSrc = showLogo
+    ? `<img class="logo-img" src="${LOGO_DATA_URI}" alt="FoxPassport" />`
+    : "";
   const headerHtml = `<div class="header">
       <div class="logo">
         ${logoSrc}
@@ -101,7 +110,11 @@ export function wrapEmail(innerHtml: string, showLogo = true): string {
 </html>`;
 }
 
-export async function sendResendEmail({ to, subject, html }: EmailPayload): Promise<boolean> {
+export async function sendResendEmail({
+  to,
+  subject,
+  html,
+}: EmailPayload): Promise<boolean> {
   console.log(`\n========== EMAIL TO: ${to} ==========`);
   console.log(`Subject: ${subject}`);
   console.log(`Content:\n${html.replace(/<[^>]+>/g, "").substring(0, 500)}`);

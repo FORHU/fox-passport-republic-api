@@ -151,7 +151,7 @@ export default class CategoryController {
       });
 
       const { error: paramsError, value: params } = paramsSchema.validate(
-        req.params
+        req.params,
       );
       if (paramsError) {
         return res.status(400).json({ message: paramsError.message });

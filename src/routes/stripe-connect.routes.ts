@@ -10,7 +10,7 @@ router.post(
   "/onboard",
   authenticate,
   requireRole(["mayor", "host", "foxerAsset", "foxerService"]),
-  StripeConnectCtrl.createOnboardingLink
+  StripeConnectCtrl.createOnboardingLink,
 );
 router.get("/status", authenticate, StripeConnectCtrl.getStatus);
 

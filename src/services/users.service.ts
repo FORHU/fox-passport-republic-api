@@ -58,7 +58,7 @@ export default class UsersSvc {
       systemRole: SystemRole;
       name: string;
       isActive: boolean;
-    }>
+    }>,
   ) {
     const user = await UsersRepo.findUserById(id);
     if (!user) throw new Error("User not found");
@@ -86,4 +86,3 @@ export default class UsersSvc {
     return UsersRepo.deleteUser(id);
   }
 }
-
