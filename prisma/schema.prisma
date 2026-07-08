@@ -258,6 +258,8 @@ model Asset {
   bookings       AssetBooking[]
   owner          User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   templateAssets EventTemplateAsset[]
+  cancellationPolicyId      String?
+  cancellationPolicy  CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id])
 
   @@map("assets")
 }
@@ -284,7 +286,9 @@ model Service {
   images            File[]
   templateServices  EventTemplateService[]
   bookings          ServiceBooking[]
-  owner             User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner             User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade) 
+  cancellationPolicyId      String?
+  cancellationPolicy  CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id])
 
   @@map("services")
 }
@@ -314,6 +318,8 @@ model Venue {
   images         File[]
   templateVenues EventTemplateVenue[]
   mayor          User                    @relation(fields: [mayorId], references: [id], onDelete: Cascade)
+  cancellationPolicyId      String?
+  cancellationPolicy  CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id])
 
   @@map("venues")
 }
@@ -336,6 +342,8 @@ model EventTemplate {
   events           Event[]
   images           File[]
   owner            User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  cancellationPolicyId String?
+  cancellationPolicy  CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id])
   templateAssets   EventTemplateAsset[]
   templateServices EventTemplateService[]
   templateVenues   EventTemplateVenue[]
@@ -528,6 +536,7 @@ model Booking {
   serviceTransactions EventServiceTransaction[]
   venueTransactions   EventVenueTransaction[]
   reviews             Review[]
+  refunds             Refund[]
 }
 
 model BookingAttendee {
@@ -567,6 +576,7 @@ model Payment {
   hostMarkupAmount Float       @default(0)
   platformFeeAmount Float     @default(0)
   booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  refunds       Refund[]
 }
 
 model Favorite {
@@ -581,7 +591,7 @@ model Favorite {
 model Review {
   id         String   @id @default(uuid())
   userId     String
-  bookingId  String
+  bookingId  String?
   entityId   String
   entityType String
   rating     Int
@@ -589,7 +599,7 @@ model Review {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  booking    Booking?  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@unique([bookingId])
   @@index([userId, entityId, entityType])
@@ -691,6 +701,61 @@ model Payout {
   @@index([sourceType, sourceId])
   @@index([recipientId])
   @@map("payouts")
+}
+
+model Refund {
+  id             String       @id @default(uuid())
+  bookingId      String
+  paymentId      String?
+  amount         Float
+  currency       String       @default("PHP")
+  stripeRefundId String?      @unique
+  status         RefundStatus @default(pending)
+  failureReason  String?
+  failureCode    String?
+  initiatedBy    String?
+  resolved       Boolean      @default(false)
+  resolvedBy     String?
+  resolvedAt     DateTime?
+  adminNotes     String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  booking        Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  payment        Payment?     @relation(fields: [paymentId], references: [id])
+
+  @@index([bookingId])
+  @@index([status])
+  @@map("refunds")
+}
+
+model CancellationPolicy {
+  id          String   @id @default(uuid())
+  name        String   //"Flexible", "Moderate", "Strict"
+  asset       Asset[]
+  venue       Venue[]
+  service     Service[]
+  templates   EventTemplate[]
+  description String?
+  isActive    Boolean  @default(true)
+  rules       CancellationRule[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("cancellation_policies")
+}
+
+model CancellationRule {
+  id       String   @id @default(uuid())
+  policyId String
+  hoursBeforeEvent Int
+  refundPercent    Int
+  policy   CancellationPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+}
+
+enum RefundStatus {
+  pending
+  succeeded
+  failed
 }
 
 enum PayoutStatus {

@@ -38,4 +38,5 @@ export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET as string
 export const PLATFORM_FEE_PERCENT = Number(process.env.PLATFORM_FEE_PERCENT || 5);
 export const STRIPE_CONNECT_REFRESH_URL = process.env.STRIPE_CONNECT_REFRESH_URL as string;
 export const STRIPE_CONNECT_RETURN_URL = process.env.STRIPE_CONNECT_RETURN_URL as string;
+export const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
 
