@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import Joi from "joi";
+import { prisma } from "../utils/prisma";
 import AssetSvc from "../services/asset.service";
 import { AssetCondition, AssetStatus, BillingRate, AssetCategory } from "@prisma/client";
 
@@ -133,5 +134,40 @@ export default class AssetCtrl {
     }
   }
 
+  static async approveAsset(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      if (!user || user.systemRole !== "admin") {
+        return res.status(403).json({ message: "Forbidden: Admin access required" });
+      }
+      const asset = await prisma.asset.update({
+        where: { id: req.params.id },
+        data: { status: AssetStatus.available },
+      });
+      return res.status(200).json({ message: "Asset approved successfully", asset });
+    } catch (error: any) {
+      return res.status(404).json({ message: error.message || error });
+    }
+  }
+
+  static async rejectAsset(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      if (!user || user.systemRole !== "admin") {
+        return res.status(403).json({ message: "Forbidden: Admin access required" });
+      }
+      const { reason } = req.body;
+      if (!reason) {
+        return res.status(400).json({ message: "Rejection reason is required" });
+      }
+      const asset = await prisma.asset.update({
+        where: { id: req.params.id },
+        data: { status: AssetStatus.rejected, rejectionReason: reason },
+      });
+      return res.status(200).json({ message: "Asset rejected successfully", asset });
+    } catch (error: any) {
+      return res.status(404).json({ message: error.message || error });
+    }
+  }
 }
 

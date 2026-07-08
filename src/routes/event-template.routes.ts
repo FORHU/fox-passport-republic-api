@@ -34,4 +34,8 @@ router.delete("/:id/venues/:venueId", authenticate, requireRole(["host"]), Event
 router.get("/matching/search", authenticate, requireRole(["host"]), EventTemplateCtrl.matchSearch);
 router.post("/:id/match", authenticate, requireRole(["host"]), EventTemplateCtrl.matchItem);
 
+// Admin routes
+router.patch("/:id/approve", authenticate, requireRole(["admin", "super_admin"]), EventTemplateCtrl.approveEventTemplate);
+router.patch("/:id/reject", authenticate, requireRole(["admin", "super_admin"]), EventTemplateCtrl.rejectEventTemplate);
+
 export default router;

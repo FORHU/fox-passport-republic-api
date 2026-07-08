@@ -12,4 +12,8 @@ router.get("/:id", AssetCtrl.getAssetById);
 router.post("/create", authenticate, requireRole(["foxerAsset"]), AssetCtrl.createAsset);
 router.put("/:id", authenticate, requireRole(["foxerAsset"]), AssetCtrl.updateAsset);
 router.delete("/:id", authenticate, requireRole(["foxerAsset"]), AssetCtrl.deleteAsset);
+
+// Admin routes
+router.patch("/:id/approve", authenticate, requireRole(["admin", "super_admin"]), AssetCtrl.approveAsset);
+router.patch("/:id/reject", authenticate, requireRole(["admin", "super_admin"]), AssetCtrl.rejectAsset);
 export default router;
