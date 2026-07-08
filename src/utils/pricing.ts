@@ -11,7 +11,11 @@ const MS_PER_DAY = MS_PER_HOUR * 24;
  * `monthly`/`yearly` use a fixed 30/365-day approximation since there's no
  * calendar-aware billing elsewhere in this codebase to match.
  */
-export function calculateBillingPeriods(startDate: Date, endDate: Date, billingRate: BillingRate): number {
+export function calculateBillingPeriods(
+  startDate: Date,
+  endDate: Date,
+  billingRate: BillingRate,
+): number {
   if (billingRate === BillingRate.one_time) return 1;
 
   const spanMs = Math.max(0, endDate.getTime() - startDate.getTime());
@@ -40,6 +44,10 @@ export function calculateItemsTotal(params: {
   endDate: Date;
   billingRate: BillingRate;
 }): number {
-  const periods = calculateBillingPeriods(params.startDate, params.endDate, params.billingRate);
+  const periods = calculateBillingPeriods(
+    params.startDate,
+    params.endDate,
+    params.billingRate,
+  );
   return params.price * params.quantity * periods;
 }

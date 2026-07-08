@@ -74,4 +74,3 @@ router.use("/v1/admin", adminRoutes);
 router.use("/v1/s3", s3Routes);
 
 export default router;
-

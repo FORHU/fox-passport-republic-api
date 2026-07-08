@@ -38,7 +38,7 @@ export default class CancellationPolicyRepo {
       description?: string;
       isActive?: boolean;
       rules?: { hoursBeforeEvent: number; refundPercent: number }[];
-    }
+    },
   ) {
     const { rules, ...policyData } = data;
     if (rules) {

@@ -9,10 +9,32 @@ router.get("/", VenueCtrl.getVenues);
 router.get("/:id", VenueCtrl.getVenueById);
 
 // Protected routes
-router.post("/create", authenticate, requireRole(["mayor"]), VenueCtrl.createVenue);
+router.post(
+  "/create",
+  authenticate,
+  requireRole(["mayor"]),
+  VenueCtrl.createVenue,
+);
 router.put("/:id", authenticate, requireRole(["mayor"]), VenueCtrl.updateVenue);
-router.delete("/:id", authenticate, requireRole(["mayor"]), VenueCtrl.deleteVenue);
+router.delete(
+  "/:id",
+  authenticate,
+  requireRole(["mayor"]),
+  VenueCtrl.deleteVenue,
+);
 
-
+// Admin routes
+router.patch(
+  "/:id/approve",
+  authenticate,
+  requireRole(["admin", "super_admin"]),
+  VenueCtrl.approveVenue,
+);
+router.patch(
+  "/:id/reject",
+  authenticate,
+  requireRole(["admin", "super_admin"]),
+  VenueCtrl.rejectVenue,
+);
 
 export default router;

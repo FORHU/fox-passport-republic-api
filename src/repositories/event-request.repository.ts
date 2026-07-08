@@ -54,7 +54,9 @@ export default class EventRequestRepo {
   static async findAllAdmin(filters?: { requestStatus?: string }) {
     return prisma.event.findMany({
       where: {
-        ...(filters?.requestStatus && { requestStatus: filters.requestStatus as any }),
+        ...(filters?.requestStatus && {
+          requestStatus: filters.requestStatus as any,
+        }),
       },
       include: {
         template: EventRequestRepo.templateInclude,

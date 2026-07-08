@@ -19,7 +19,15 @@ export default class MatchController {
       const { error, value } = schema.validate(req.body);
       if (error) return res.status(400).json({ message: error.message });
 
-      const { style, date, guestCount, requestContent, totalAmount, venueId, foxerId } = value;
+      const {
+        style,
+        date,
+        guestCount,
+        requestContent,
+        totalAmount,
+        venueId,
+        foxerId,
+      } = value;
       const clientId = (req as any).user?.userId || (req as any).user?.id;
 
       if (!clientId) {
@@ -40,15 +48,15 @@ export default class MatchController {
       // Create Payment Intent immediately using server-computed totals
       const { clientSecret } = await PaymentSvc.createPaymentIntent({
         amount: eventRequest.totalAmount,
-        currency: 'php',
+        currency: "php",
         bookingId: booking.id,
-        description: `Match Request: ${style}`
+        description: `Match Request: ${style}`,
       });
 
       res.status(201).json({
         message: "Match request created",
         bookingId: booking.id,
-        clientSecret
+        clientSecret,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

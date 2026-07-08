@@ -28,7 +28,7 @@ export async function sendResendEmail({
   try {
     await resend.emails.send({
       from: FROM_ADDRESS,
-      to ,
+      to,
       subject,
       html,
     });
@@ -38,7 +38,10 @@ export async function sendResendEmail({
   }
 }
 
-function loadTemplate(templateName: string, data: Record<string, string>): string {
+function loadTemplate(
+  templateName: string,
+  data: Record<string, string>,
+): string {
   const filePath = path.join(process.cwd(), `email-template/${templateName}`);
   let html = fs.readFileSync(filePath, "utf8");
   for (const [key, value] of Object.entries(data)) {

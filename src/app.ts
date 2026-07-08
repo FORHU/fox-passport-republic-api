@@ -35,21 +35,20 @@ app.use(
       }
     },
     credentials: true,
-  })
+  }),
 );
 
 // Stripe webhook must receive raw body — register BEFORE express.json()
-app.use('/api/v1/payments/webhook', express.raw({ type: 'application/json' }));
+app.use("/api/v1/payments/webhook", express.raw({ type: "application/json" }));
 
 // allow larger payloads for base64 image uploads
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: "10mb" }));
 
 // Request Logger
 app.use((req, res, next) => {
   console.log(`📨 ${req.method} ${req.url} (Full: ${req.originalUrl})`);
   next();
 });
-
 
 // Rate Limiter
 const limiter = rateLimit({
@@ -75,18 +74,25 @@ app.use("/api", (req, res) => {
   console.warn(`🕵️ 404 NOT FOUND: ${req.method} ${req.originalUrl}`);
   res.status(404).json({
     success: false,
-    message: `Endpoint ${req.method} ${req.originalUrl} not found`
+    message: `Endpoint ${req.method} ${req.originalUrl} not found`,
   });
 });
 
 // Global error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error("❌ GLOBAL ERROR:", err.message);
-  res.status(err.status || 400).json({
-    success: false,
-    message: err.message || "An unexpected error occurred",
-    stack: isDev ? err.stack : undefined
-  });
-});
+app.use(
+  (
+    err: any,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    console.error("❌ GLOBAL ERROR:", err.message);
+    res.status(err.status || 400).json({
+      success: false,
+      message: err.message || "An unexpected error occurred",
+      stack: isDev ? err.stack : undefined,
+    });
+  },
+);
 
 export default app;

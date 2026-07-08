@@ -1,6 +1,11 @@
 import { Request, Response } from "express";
 import { prisma } from "../utils/prisma";
-import { RequestStatus, VenueStatus, AssetStatus, ServiceStatus } from "@prisma/client";
+import {
+  RequestStatus,
+  VenueStatus,
+  AssetStatus,
+  ServiceStatus,
+} from "@prisma/client";
 import EventRequestRepo from "../repositories/event-request.repository";
 import VenueRepo from "../repositories/venue.repository";
 import AssetRepo from "../repositories/asset.repository";
@@ -50,7 +55,16 @@ export default class AdminCtrl {
           event: r.booking.event ? { name: r.booking.event.name } : undefined,
         },
         refunds: r.payment
-          ? [{ id: r.id, bookingId: r.bookingId, amount: r.amount, status: r.status, method: "stripe", createdAt: r.createdAt.toISOString() }]
+          ? [
+              {
+                id: r.id,
+                bookingId: r.bookingId,
+                amount: r.amount,
+                status: r.status,
+                method: "stripe",
+                createdAt: r.createdAt.toISOString(),
+              },
+            ]
           : [],
       }));
 
@@ -98,7 +112,10 @@ export default class AdminCtrl {
       if (error) return res.status(400).json({ message: error.message });
 
       if (value.action === "approve") {
-        const updated = await RefundSvc.retryRefund(req.params.id, req.user!.userId);
+        const updated = await RefundSvc.retryRefund(
+          req.params.id,
+          req.user!.userId,
+        );
         return res.status(200).json({ success: true, data: updated });
       }
 
@@ -165,15 +182,22 @@ export default class AdminCtrl {
         prisma.eventTemplate.count(),
         prisma.roleRequest.count({ where: { status: RequestStatus.pending } }),
         prisma.booking.findMany({
-          where: { status: { not: 'cancelled' as any } },
-          select: { totalAmount: true, createdAt: true, event: { select: { eventCategory: true } } },
+          where: { status: { not: "cancelled" as any } },
+          select: {
+            totalAmount: true,
+            createdAt: true,
+            event: { select: { eventCategory: true } },
+          },
         }),
         prisma.serviceBooking.aggregate({ _sum: { totalAmount: true } }),
         prisma.assetBooking.aggregate({ _sum: { totalAmount: true } }),
-        prisma.event.groupBy({ by: ['eventCategory'], _count: { id: true } }),
+        prisma.event.groupBy({ by: ["eventCategory"], _count: { id: true } }),
       ]);
 
-      const eventRevenue = bookings.reduce((sum, b) => sum + (b.totalAmount ?? 0), 0);
+      const eventRevenue = bookings.reduce(
+        (sum, b) => sum + (b.totalAmount ?? 0),
+        0,
+      );
       const serviceRevenue = serviceBookings._sum.totalAmount ?? 0;
       const assetRevenue = assetBookings._sum.totalAmount ?? 0;
       const totalRevenue = eventRevenue + serviceRevenue + assetRevenue;
@@ -181,11 +205,15 @@ export default class AdminCtrl {
 
       // Bookings per day-of-week (0=Sun … 6=Sat), last 30 days
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const recentBookings = bookings.filter(b => new Date(b.createdAt) >= thirtyDaysAgo);
+      const recentBookings = bookings.filter(
+        (b) => new Date(b.createdAt) >= thirtyDaysAgo,
+      );
       const bookingsByDay = [0, 0, 0, 0, 0, 0, 0]; // Sun-Sat
-      recentBookings.forEach(b => { bookingsByDay[new Date(b.createdAt).getDay()]++; });
+      recentBookings.forEach((b) => {
+        bookingsByDay[new Date(b.createdAt).getDay()]++;
+      });
 
-      const categoryStats = categoryGroups.map(g => ({
+      const categoryStats = categoryGroups.map((g) => ({
         category: g.eventCategory,
         count: g._count.id,
       }));
@@ -221,7 +249,9 @@ export default class AdminCtrl {
 
   static async getPendingVenues(req: Request, res: Response) {
     try {
-      const venues = await VenueRepo.findAllVenuesAdmin({ status: VenueStatus.pending });
+      const venues = await VenueRepo.findAllVenuesAdmin({
+        status: VenueStatus.pending,
+      });
       return res.status(200).json({ success: true, data: venues });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message });
@@ -256,7 +286,9 @@ export default class AdminCtrl {
 
   static async getPendingAssets(req: Request, res: Response) {
     try {
-      const assets = await AssetRepo.findAllAssetsAdmin({ status: AssetStatus.pending });
+      const assets = await AssetRepo.findAllAssetsAdmin({
+        status: AssetStatus.pending,
+      });
       return res.status(200).json({ success: true, data: assets });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message });
@@ -300,7 +332,9 @@ export default class AdminCtrl {
 
   static async getPendingServices(req: Request, res: Response) {
     try {
-      const services = await ServiceRepo.getAllServicesAdmin({ status: ServiceStatus.pending });
+      const services = await ServiceRepo.getAllServicesAdmin({
+        status: ServiceStatus.pending,
+      });
       return res.status(200).json({ success: true, data: services });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message });
@@ -385,7 +419,9 @@ export default class AdminCtrl {
 
   static async getPendingEvents(req: Request, res: Response) {
     try {
-      const events = await EventRequestRepo.findAllAdmin({ requestStatus: "pending" });
+      const events = await EventRequestRepo.findAllAdmin({
+        requestStatus: "pending",
+      });
       return res.status(200).json({ success: true, data: events });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message });
@@ -406,7 +442,10 @@ export default class AdminCtrl {
 
   static async approveEvent(req: Request, res: Response) {
     try {
-      const event = await EventRequestRepo.updateRequestStatus(req.params.id, "approved");
+      const event = await EventRequestRepo.updateRequestStatus(
+        req.params.id,
+        "approved",
+      );
       // Make the parent template publicly discoverable (skip for template-less events)
       if (event.templateId) {
         await prisma.eventTemplate.update({
@@ -422,7 +461,10 @@ export default class AdminCtrl {
 
   static async rejectEvent(req: Request, res: Response) {
     try {
-      const event = await EventRequestRepo.updateRequestStatus(req.params.id, "rejected");
+      const event = await EventRequestRepo.updateRequestStatus(
+        req.params.id,
+        "rejected",
+      );
       // Hide the template if no other approved events remain for it (skip for template-less events)
       if (event.templateId) {
         const approvedCount = await prisma.event.count({
@@ -463,7 +505,10 @@ export default class AdminCtrl {
 
   static async retryRefund(req: Request, res: Response) {
     try {
-      const result = await RefundSvc.retryRefund(req.params.id, req.user!.userId);
+      const result = await RefundSvc.retryRefund(
+        req.params.id,
+        req.user!.userId,
+      );
       return res.status(200).json({ success: true, data: result });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });
@@ -478,7 +523,11 @@ export default class AdminCtrl {
       const { error, value } = schema.validate(req.body);
       if (error) return res.status(400).json({ message: error.message });
 
-      const result = await RefundSvc.resolveManual(req.params.id, req.user!.userId, value.notes);
+      const result = await RefundSvc.resolveManual(
+        req.params.id,
+        req.user!.userId,
+        value.notes,
+      );
       return res.status(200).json({ success: true, data: result });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });

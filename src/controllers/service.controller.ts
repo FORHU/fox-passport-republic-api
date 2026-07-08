@@ -1,12 +1,15 @@
 import { Request, Response } from "express";
 import Joi from "joi";
+import { prisma } from "../utils/prisma";
 import ServiceSvc from "../services/service.service";
 import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 
 export default class ServiceCtrl {
   static async createService(req: Request, res: Response) {
     const schema = Joi.object({
-      category: Joi.string().valid(...Object.values(ServiceCategory)).required(),
+      category: Joi.string()
+        .valid(...Object.values(ServiceCategory))
+        .required(),
       name: Joi.string().required(),
       description: Joi.string().required(),
       city: Joi.string().required(),
@@ -16,9 +19,13 @@ export default class ServiceCtrl {
       tags: Joi.array().items(Joi.string().trim().min(1)).optional(),
       price: Joi.number().required(),
       currency: Joi.string().trim().uppercase().length(3).optional(),
-      billingRate: Joi.string().valid(...Object.values(BillingRate)).optional(),
+      billingRate: Joi.string()
+        .valid(...Object.values(BillingRate))
+        .optional(),
       imgIds: Joi.array().items(Joi.string()).min(1).max(5).required(),
-      status: Joi.string().valid(...Object.values(ServiceStatus)).optional(),
+      status: Joi.string()
+        .valid(...Object.values(ServiceStatus))
+        .optional(),
       cancellationPolicyId: Joi.string().uuid().optional(),
     });
 
@@ -35,9 +42,11 @@ export default class ServiceCtrl {
 
       const service = await ServiceSvc.createService({
         ownerId: String(ownerId),
-        ...value as any,
+        ...(value as any),
       });
-      return res.status(201).json({ message: "Service created successfully", service });
+      return res
+        .status(201)
+        .json({ message: "Service created successfully", service });
     } catch (err: any) {
       return res.status(400).json({ message: err.message || err });
     }
@@ -75,7 +84,9 @@ export default class ServiceCtrl {
 
   static async updateService(req: Request, res: Response) {
     const schema = Joi.object({
-      category: Joi.string().valid(...Object.values(ServiceCategory)).optional(),
+      category: Joi.string()
+        .valid(...Object.values(ServiceCategory))
+        .optional(),
       name: Joi.string().optional(),
       description: Joi.string().optional(),
       city: Joi.string().optional(),
@@ -85,8 +96,12 @@ export default class ServiceCtrl {
       tags: Joi.array().items(Joi.string().trim().min(1)).optional(),
       price: Joi.number().min(0).optional(),
       currency: Joi.string().trim().uppercase().length(3).optional(),
-      billingRate: Joi.string().valid(...Object.values(BillingRate)).optional(),
-      status: Joi.string().valid(...Object.values(ServiceStatus)).optional(),
+      billingRate: Joi.string()
+        .valid(...Object.values(BillingRate))
+        .optional(),
+      status: Joi.string()
+        .valid(...Object.values(ServiceStatus))
+        .optional(),
       cancellationPolicyId: Joi.string().uuid().optional(),
     }).min(1);
 
@@ -106,8 +121,14 @@ export default class ServiceCtrl {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const service = await ServiceSvc.updateService(String(id), String(ownerId), value as any);
-      return res.status(200).json({ message: "Service updated successfully", service });
+      const service = await ServiceSvc.updateService(
+        String(id),
+        String(ownerId),
+        value as any,
+      );
+      return res
+        .status(200)
+        .json({ message: "Service updated successfully", service });
     } catch (err: any) {
       const status = err.message.includes("Unauthorized") ? 403 : 400;
       return res.status(status).json({ message: err.message || err });
@@ -123,11 +144,60 @@ export default class ServiceCtrl {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const result = await ServiceSvc.deleteService(String(id), String(requesterId));
+      const result = await ServiceSvc.deleteService(
+        String(id),
+        String(requesterId),
+      );
       return res.status(200).json(result);
     } catch (err: any) {
       const status = err.message.includes("authorized") ? 403 : 400;
       return res.status(status).json({ message: err.message || err });
+    }
+  }
+
+  static async approveService(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      if (!user || user.systemRole !== "admin") {
+        return res
+          .status(403)
+          .json({ message: "Forbidden: Admin access required" });
+      }
+      const service = await prisma.service.update({
+        where: { id: req.params.id },
+        data: { status: ServiceStatus.available },
+      });
+      return res
+        .status(200)
+        .json({ message: "Service approved successfully", service });
+    } catch (error: any) {
+      return res.status(404).json({ message: error.message || error });
+    }
+  }
+
+  static async rejectService(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      if (!user || user.systemRole !== "admin") {
+        return res
+          .status(403)
+          .json({ message: "Forbidden: Admin access required" });
+      }
+      const { reason } = req.body;
+      if (!reason) {
+        return res
+          .status(400)
+          .json({ message: "Rejection reason is required" });
+      }
+      const service = await prisma.service.update({
+        where: { id: req.params.id },
+        data: { status: ServiceStatus.rejected, rejectionReason: reason },
+      });
+      return res
+        .status(200)
+        .json({ message: "Service rejected successfully", service });
+    } catch (error: any) {
+      return res.status(404).json({ message: error.message || error });
     }
   }
 }

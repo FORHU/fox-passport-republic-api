@@ -1,6 +1,10 @@
 import express from "express";
 import EventRequestCtrl from "../controllers/event-request.controller";
-import { authenticate, requireAdmin, requireRole } from "../middleware/auth.middleware";
+import {
+  authenticate,
+  requireAdmin,
+  requireRole,
+} from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -15,7 +19,17 @@ router.get("/my", authenticate, EventRequestCtrl.listMyRequests);
 router.get("/:id", authenticate, EventRequestCtrl.getById);
 
 // Admin only
-router.patch("/:id/approve", authenticate, requireAdmin, EventRequestCtrl.approve);
-router.patch("/:id/complete", authenticate, requireAdmin, EventRequestCtrl.complete);
+router.patch(
+  "/:id/approve",
+  authenticate,
+  requireAdmin,
+  EventRequestCtrl.approve,
+);
+router.patch(
+  "/:id/complete",
+  authenticate,
+  requireAdmin,
+  EventRequestCtrl.complete,
+);
 
 export default router;

@@ -236,28 +236,29 @@ model Passport {
 }
 
 model Asset {
-  id             String                  @id @default(uuid())
-  ownerId        String
-  category       String
-  name           String
-  description    String
-  quantity       Int                     @default(1)
-  price          Float
-  currency       String                  @default("USD")
-  billingRate    BillingRate
-  condition      AssetCondition          @default(good)
-  status         AssetStatus             @default(available)
-  city           String?
-  state          String?
-  country        String?                 @default("Philippines")
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-  deletedAt      DateTime?
-  transactions   EventAssetTransaction[]
-  images         File[]
-  bookings       AssetBooking[]
-  owner          User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  templateAssets EventTemplateAsset[]
+  id               String                  @id @default(uuid())
+  ownerId          String
+  category         String
+  name             String
+  description      String
+  quantity         Int                     @default(1)
+  price            Float
+  currency         String                  @default("USD")
+  billingRate      BillingRate
+  condition        AssetCondition          @default(good)
+  status           AssetStatus             @default(available)
+  rejectionReason  String?
+  city             String?
+  state            String?
+  country          String?                 @default("Philippines")
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  deletedAt        DateTime?
+  transactions     EventAssetTransaction[]
+  images           File[]
+  bookings         AssetBooking[]
+  owner            User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  templateAssets   EventTemplateAsset[]
   cancellationPolicyId      String?
   cancellationPolicy  CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id])
 
@@ -279,6 +280,7 @@ model Service {
   currency          String                    @default("USD")
   billingRate       BillingRate
   status            ServiceStatus             @default(draft)
+  rejectionReason   String?
   createdAt         DateTime                  @default(now())
   updatedAt         DateTime                  @updatedAt
   deletedAt         DateTime?
@@ -307,6 +309,7 @@ model Venue {
   state          String?
   country        String
   status         VenueStatus             @default(draft)
+  rejectionReason String?
   spaceType      String[]
   amenities      String[]
   techAv         String[]
@@ -331,6 +334,7 @@ model EventTemplate {
   description      String
   category         EventCategory
   status           EventTemplateStatus    @default(draft)
+  rejectionReason  String?
   isPublic         Boolean                @default(false)
   targetCity       String?
   targetState      String?

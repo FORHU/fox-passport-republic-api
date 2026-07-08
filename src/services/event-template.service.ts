@@ -48,16 +48,23 @@ export default class EventTemplateSvc {
     return EventTemplateRepo.submitTemplate(id, ownerId);
   }
 
-  static async getTemplates(filters?: { ownerId?: string; isPublic?: boolean; category?: string }) {
+  static async getTemplates(filters?: {
+    ownerId?: string;
+    isPublic?: boolean;
+    category?: string;
+  }) {
     const templates = await EventTemplateRepo.findAllTemplates(filters);
-    return templates.map(t => ({
+    return templates.map((t) => ({
       ...t,
       ...this.calculateTotalsBreakdown(t),
     }));
   }
 
   // Lightweight browse for landing page — no price calculation, minimal joins
-  static async getPublicTemplatesLite(filters: { category?: string; limit?: number }) {
+  static async getPublicTemplatesLite(filters: {
+    category?: string;
+    limit?: number;
+  }) {
     return EventTemplateRepo.findPublicTemplatesLite({
       category: filters.category,
       limit: filters.limit ?? 8,
@@ -82,7 +89,11 @@ export default class EventTemplateSvc {
    */
   static calculateItemsTotal(
     template: any,
-    exclusions?: { excludedAssetIds?: string[]; excludedServiceIds?: string[]; excludedVenueIds?: string[] }
+    exclusions?: {
+      excludedAssetIds?: string[];
+      excludedServiceIds?: string[];
+      excludedVenueIds?: string[];
+    },
   ): number {
     const excludedAssetIds = exclusions?.excludedAssetIds ?? [];
     const excludedServiceIds = exclusions?.excludedServiceIds ?? [];
@@ -135,12 +146,23 @@ export default class EventTemplateSvc {
    */
   static calculateTotalsBreakdown(
     template: any,
-    exclusions?: { excludedAssetIds?: string[]; excludedServiceIds?: string[]; excludedVenueIds?: string[] },
-    platformFeePercent: number = PLATFORM_FEE_PERCENT
-  ): { itemsTotal: number; hostMarkupAmount: number; platformFeeAmount: number; totalAmount: number; estimatedTotal: number } {
+    exclusions?: {
+      excludedAssetIds?: string[];
+      excludedServiceIds?: string[];
+      excludedVenueIds?: string[];
+    },
+    platformFeePercent: number = PLATFORM_FEE_PERCENT,
+  ): {
+    itemsTotal: number;
+    hostMarkupAmount: number;
+    platformFeeAmount: number;
+    totalAmount: number;
+    estimatedTotal: number;
+  } {
     const itemsTotal = this.calculateItemsTotal(template, exclusions);
     const hostMarkupAmount = itemsTotal * ((template.hostMarkupPct ?? 0) / 100);
-    const platformFeeAmount = (itemsTotal + hostMarkupAmount) * (platformFeePercent / 100);
+    const platformFeeAmount =
+      (itemsTotal + hostMarkupAmount) * (platformFeePercent / 100);
     const totalAmount = itemsTotal + hostMarkupAmount + platformFeeAmount;
 
     return {
@@ -152,11 +174,30 @@ export default class EventTemplateSvc {
     };
   }
 
-  static async attachAsset(templateId: string, ownerId: string, assetId?: string, quantity: number = 1, description?: string, matchedAt?: Date, date?: Date, agreedPrice?: number, isOptional?: boolean) {
+  static async attachAsset(
+    templateId: string,
+    ownerId: string,
+    assetId?: string,
+    quantity: number = 1,
+    description?: string,
+    matchedAt?: Date,
+    date?: Date,
+    agreedPrice?: number,
+    isOptional?: boolean,
+  ) {
     await this.verifyOwnership(templateId, ownerId);
 
     if (!assetId) {
-      return EventTemplateRepo.attachAsset(templateId, undefined, quantity, undefined, description, matchedAt, agreedPrice, isOptional);
+      return EventTemplateRepo.attachAsset(
+        templateId,
+        undefined,
+        quantity,
+        undefined,
+        description,
+        matchedAt,
+        agreedPrice,
+        isOptional,
+      );
     }
 
     const template = await EventTemplateRepo.findTemplateById(templateId);
@@ -165,8 +206,13 @@ export default class EventTemplateSvc {
     const asset = await prisma.asset.findUnique({ where: { id: assetId } });
     if (!asset) throw new Error("Asset not found");
 
-    if (asset.state !== template.targetState || asset.country !== template.targetCountry) {
-      throw new Error("Asset location mismatch. Please use matching search or override.");
+    if (
+      asset.state !== template.targetState ||
+      asset.country !== template.targetCountry
+    ) {
+      throw new Error(
+        "Asset location mismatch. Please use matching search or override.",
+      );
     }
 
     this.validateMatchData(true, description, matchedAt);
@@ -178,33 +224,70 @@ export default class EventTemplateSvc {
     // was charged correctly but the provider would be paid $0).
     const finalAgreedPrice = agreedPrice ?? asset.price * quantity;
 
-    return EventTemplateRepo.attachAsset(templateId, assetId, quantity, {
-      matched: true,
-      matchConstraint: MatchConstraint.SAME_STATE
-    }, description, matchedAt, finalAgreedPrice, isOptional);
+    return EventTemplateRepo.attachAsset(
+      templateId,
+      assetId,
+      quantity,
+      {
+        matched: true,
+        matchConstraint: MatchConstraint.SAME_STATE,
+      },
+      description,
+      matchedAt,
+      finalAgreedPrice,
+      isOptional,
+    );
   }
 
-  static async removeAsset(templateId: string, ownerId: string, assetId: string) {
+  static async removeAsset(
+    templateId: string,
+    ownerId: string,
+    assetId: string,
+  ) {
     await this.verifyOwnership(templateId, ownerId);
     await EventTemplateRepo.removeAsset(templateId, assetId);
     return { message: "Asset removed from template" };
   }
 
-  static async attachService(templateId: string, ownerId: string, serviceId?: string, description?: string, matchedAt?: Date, date?: Date, agreedPrice?: number, isOptional?: boolean) {
+  static async attachService(
+    templateId: string,
+    ownerId: string,
+    serviceId?: string,
+    description?: string,
+    matchedAt?: Date,
+    date?: Date,
+    agreedPrice?: number,
+    isOptional?: boolean,
+  ) {
     await this.verifyOwnership(templateId, ownerId);
 
     if (!serviceId) {
-      return EventTemplateRepo.attachService(templateId, undefined, undefined, description, matchedAt, agreedPrice, isOptional);
+      return EventTemplateRepo.attachService(
+        templateId,
+        undefined,
+        undefined,
+        description,
+        matchedAt,
+        agreedPrice,
+        isOptional,
+      );
     }
 
     const template = await EventTemplateRepo.findTemplateById(templateId);
     if (!template) throw new Error("Template not found");
 
-    const service = await prisma.service.findUnique({ where: { id: serviceId } });
+    const service = await prisma.service.findUnique({
+      where: { id: serviceId },
+    });
     if (!service) throw new Error("Service not found");
 
-    if (service.state !== template.targetState || service.country !== template.targetCountry) {
-      throw new Error("Service location mismatch. Please use matching search or override.");
+    if (
+      service.state !== template.targetState ||
+      service.country !== template.targetCountry
+    ) {
+      throw new Error(
+        "Service location mismatch. Please use matching search or override.",
+      );
     }
 
     this.validateMatchData(true, description, matchedAt);
@@ -212,23 +295,52 @@ export default class EventTemplateSvc {
     // See attachAsset's comment — default to the service's own listed price.
     const finalAgreedPrice = agreedPrice ?? service.price;
 
-    return EventTemplateRepo.attachService(templateId, serviceId, {
-      matched: true,
-      matchConstraint: MatchConstraint.SAME_STATE
-    }, description, matchedAt, finalAgreedPrice, isOptional);
+    return EventTemplateRepo.attachService(
+      templateId,
+      serviceId,
+      {
+        matched: true,
+        matchConstraint: MatchConstraint.SAME_STATE,
+      },
+      description,
+      matchedAt,
+      finalAgreedPrice,
+      isOptional,
+    );
   }
 
-  static async removeService(templateId: string, ownerId: string, serviceId: string) {
+  static async removeService(
+    templateId: string,
+    ownerId: string,
+    serviceId: string,
+  ) {
     await this.verifyOwnership(templateId, ownerId);
     await EventTemplateRepo.removeService(templateId, serviceId);
     return { message: "Service removed from template" };
   }
 
-  static async attachVenue(templateId: string, ownerId: string, venueId?: string, description?: string, matchedAt?: Date, date?: Date, agreedPrice?: number, isOptional?: boolean) {
+  static async attachVenue(
+    templateId: string,
+    ownerId: string,
+    venueId?: string,
+    description?: string,
+    matchedAt?: Date,
+    date?: Date,
+    agreedPrice?: number,
+    isOptional?: boolean,
+  ) {
     await this.verifyOwnership(templateId, ownerId);
 
     if (!venueId) {
-      return EventTemplateRepo.attachVenue(templateId, undefined as any, undefined, description, matchedAt, agreedPrice, isOptional);
+      return EventTemplateRepo.attachVenue(
+        templateId,
+        undefined as any,
+        undefined,
+        description,
+        matchedAt,
+        agreedPrice,
+        isOptional,
+      );
     }
 
     const template = await EventTemplateRepo.findTemplateById(templateId);
@@ -237,8 +349,13 @@ export default class EventTemplateSvc {
     const venue = await prisma.venue.findUnique({ where: { id: venueId } });
     if (!venue) throw new Error("Venue not found");
 
-    if (venue.state !== template.targetState || venue.country !== template.targetCountry) {
-      throw new Error("Venue location mismatch. Please use the Matching Search to find compatible venues or override the constraint.");
+    if (
+      venue.state !== template.targetState ||
+      venue.country !== template.targetCountry
+    ) {
+      throw new Error(
+        "Venue location mismatch. Please use the Matching Search to find compatible venues or override the constraint.",
+      );
     }
 
     this.validateMatchData(true, description, matchedAt);
@@ -246,13 +363,25 @@ export default class EventTemplateSvc {
     // See attachAsset's comment — default to the venue's own listed price.
     const finalAgreedPrice = agreedPrice ?? venue.price;
 
-    return EventTemplateRepo.attachVenue(templateId, venueId, {
-      matched: true,
-      matchConstraint: MatchConstraint.SAME_STATE
-    }, description, matchedAt, finalAgreedPrice, isOptional);
+    return EventTemplateRepo.attachVenue(
+      templateId,
+      venueId,
+      {
+        matched: true,
+        matchConstraint: MatchConstraint.SAME_STATE,
+      },
+      description,
+      matchedAt,
+      finalAgreedPrice,
+      isOptional,
+    );
   }
 
-  static async removeVenue(templateId: string, ownerId: string, venueId: string) {
+  static async removeVenue(
+    templateId: string,
+    ownerId: string,
+    venueId: string,
+  ) {
     await this.verifyOwnership(templateId, ownerId);
     await EventTemplateRepo.removeVenue(templateId, venueId);
     return { message: "Venue removed from template" };
@@ -275,8 +404,15 @@ export default class EventTemplateSvc {
     return template;
   }
 
-  static async matchSearch(params: { templateId: string; type: string; scope: string; category?: string }) {
-    const template = await EventTemplateRepo.findTemplateById(params.templateId);
+  static async matchSearch(params: {
+    templateId: string;
+    type: string;
+    scope: string;
+    category?: string;
+  }) {
+    const template = await EventTemplateRepo.findTemplateById(
+      params.templateId,
+    );
     if (!template) throw new Error("Template not found");
 
     const filters: any = {};
@@ -289,46 +425,75 @@ export default class EventTemplateSvc {
     if (params.category) filters.category = params.category;
 
     let results: any[] = [];
-    if (params.type === "venue") results = await EventTemplateRepo.searchVenuesByLocation(filters);
-    else if (params.type === "service") results = await EventTemplateRepo.searchServicesByLocation(filters);
-    else if (params.type === "asset") results = await EventTemplateRepo.searchAssetsByLocation(filters);
+    if (params.type === "venue")
+      results = await EventTemplateRepo.searchVenuesByLocation(filters);
+    else if (params.type === "service")
+      results = await EventTemplateRepo.searchServicesByLocation(filters);
+    else if (params.type === "asset")
+      results = await EventTemplateRepo.searchAssetsByLocation(filters);
 
-    const scored = results.map(item => {
-      const sameState = item.state === template.targetState && item.country === template.targetCountry;
+    const scored = results.map((item) => {
+      const sameState =
+        item.state === template.targetState &&
+        item.country === template.targetCountry;
       const sameCountry = !sameState && item.country === template.targetCountry;
-      const matchScope = sameState ? "state" : sameCountry ? "country" : "manual";
+      const matchScope = sameState
+        ? "state"
+        : sameCountry
+          ? "country"
+          : "manual";
       // Lower sortOrder = higher priority (state match first, then country, then manual)
       const sortOrder = sameState ? 0 : sameCountry ? 1 : 2;
-      return { ...item, isMatched: sameState || sameCountry, matchScope, sortOrder };
+      return {
+        ...item,
+        isMatched: sameState || sameCountry,
+        matchScope,
+        sortOrder,
+      };
     });
 
     return scored.sort((a, b) => a.sortOrder - b.sortOrder);
   }
 
-  static async matchItem(params: { 
-    templateId: string; 
-    ownerId: string; 
-    itemId: string; 
-    type: string; 
-    providerId: string; 
+  static async matchItem(params: {
+    templateId: string;
+    ownerId: string;
+    itemId: string;
+    type: string;
+    providerId: string;
     forceMatch?: boolean;
     description?: string;
     matchedAt?: Date;
     date?: Date;
   }) {
-    const template = await this.verifyOwnership(params.templateId, params.ownerId);
-    
+    const template = await this.verifyOwnership(
+      params.templateId,
+      params.ownerId,
+    );
+
     // Fetch provider to validate location
     let provider: any;
-    if (params.type === "venue") provider = await prisma.venue.findUnique({ where: { id: params.providerId } });
-    else if (params.type === "service") provider = await prisma.service.findUnique({ where: { id: params.providerId } });
-    else if (params.type === "asset") provider = await prisma.asset.findUnique({ where: { id: params.providerId } });
+    if (params.type === "venue")
+      provider = await prisma.venue.findUnique({
+        where: { id: params.providerId },
+      });
+    else if (params.type === "service")
+      provider = await prisma.service.findUnique({
+        where: { id: params.providerId },
+      });
+    else if (params.type === "asset")
+      provider = await prisma.asset.findUnique({
+        where: { id: params.providerId },
+      });
 
     if (!provider) throw new Error("Provider not found");
 
     // Determine constraint
     let constraint: MatchConstraint = MatchConstraint.NONE;
-    if (provider.state === template.targetState && provider.country === template.targetCountry) {
+    if (
+      provider.state === template.targetState &&
+      provider.country === template.targetCountry
+    ) {
       constraint = MatchConstraint.SAME_STATE;
     } else if (provider.country === template.targetCountry) {
       constraint = MatchConstraint.BROADER;
@@ -348,18 +513,36 @@ export default class EventTemplateSvc {
       matchConstraint: constraint,
       description: params.description,
       matchedAt: params.matchedAt,
-      date: params.date
+      date: params.date,
     };
 
-    if (params.type === "venue") return EventTemplateRepo.updateVenueMatch(params.itemId, { ...matchData, venueId: params.providerId });
-    if (params.type === "service") return EventTemplateRepo.updateServiceMatch(params.itemId, { ...matchData, serviceId: params.providerId });
-    if (params.type === "asset") return EventTemplateRepo.updateAssetMatch(params.itemId, { ...matchData, assetId: params.providerId });
+    if (params.type === "venue")
+      return EventTemplateRepo.updateVenueMatch(params.itemId, {
+        ...matchData,
+        venueId: params.providerId,
+      });
+    if (params.type === "service")
+      return EventTemplateRepo.updateServiceMatch(params.itemId, {
+        ...matchData,
+        serviceId: params.providerId,
+      });
+    if (params.type === "asset")
+      return EventTemplateRepo.updateAssetMatch(params.itemId, {
+        ...matchData,
+        assetId: params.providerId,
+      });
   }
 
-  private static validateMatchData(matched: boolean, description?: string, matchedAt?: Date) {
+  private static validateMatchData(
+    matched: boolean,
+    description?: string,
+    matchedAt?: Date,
+  ) {
     if (matched) {
       if (!description || !matchedAt) {
-        throw new Error("Validation Error: 'description' and 'matchedAt' are required when item is matched.");
+        throw new Error(
+          "Validation Error: 'description' and 'matchedAt' are required when item is matched.",
+        );
       }
     }
   }

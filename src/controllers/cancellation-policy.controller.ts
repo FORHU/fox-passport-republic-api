@@ -36,7 +36,7 @@ export default class CancellationPolicyCtrl {
               fromHours: Joi.number().integer().min(0).required(),
               toHours: Joi.number().integer().min(0).allow(null).optional(),
               refundPercent: Joi.number().integer().min(0).max(100).required(),
-            })
+            }),
           )
           .min(1)
           .required(),
@@ -55,8 +55,11 @@ export default class CancellationPolicyCtrl {
   static async update(req: Request, res: Response) {
     try {
       const paramsSchema = Joi.object({ id: Joi.string().uuid().required() });
-      const { error: paramsError, value: params } = paramsSchema.validate(req.params);
-      if (paramsError) return res.status(400).json({ message: paramsError.message });
+      const { error: paramsError, value: params } = paramsSchema.validate(
+        req.params,
+      );
+      if (paramsError)
+        return res.status(400).json({ message: paramsError.message });
 
       const bodySchema = Joi.object({
         name: Joi.string().trim().optional(),
@@ -67,7 +70,7 @@ export default class CancellationPolicyCtrl {
               fromHours: Joi.number().integer().min(0).required(),
               toHours: Joi.number().integer().min(0).allow(null).optional(),
               refundPercent: Joi.number().integer().min(0).max(100).required(),
-            })
+            }),
           )
           .min(1)
           .optional(),
@@ -90,7 +93,9 @@ export default class CancellationPolicyCtrl {
       if (error) return res.status(400).json({ message: error.message });
 
       await CancellationPolicySvc.remove(value.id);
-      return res.status(200).json({ success: true, message: "Policy deactivated" });
+      return res
+        .status(200)
+        .json({ success: true, message: "Policy deactivated" });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });
     }
