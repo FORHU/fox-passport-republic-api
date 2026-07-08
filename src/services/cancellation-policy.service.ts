@@ -8,9 +8,16 @@ interface RuleInput {
 
 export default class CancellationPolicySvc {
   private static toApiRules(
-    rules: { id: string; hoursBeforeEvent: number; refundPercent: number }[]
-  ): { id: string; fromHours: number; toHours: number | null; refundPercent: number }[] {
-    const sorted = [...rules].sort((a, b) => b.hoursBeforeEvent - a.hoursBeforeEvent);
+    rules: { id: string; hoursBeforeEvent: number; refundPercent: number }[],
+  ): {
+    id: string;
+    fromHours: number;
+    toHours: number | null;
+    refundPercent: number;
+  }[] {
+    const sorted = [...rules].sort(
+      (a, b) => b.hoursBeforeEvent - a.hoursBeforeEvent,
+    );
     return sorted.map((rule, i) => ({
       id: rule.id,
       fromHours: rule.hoursBeforeEvent,
@@ -76,7 +83,7 @@ export default class CancellationPolicySvc {
       name?: string;
       description?: string;
       rules?: RuleInput[];
-    }
+    },
   ) {
     const existing = await CancellationPolicyRepo.findById(id);
     if (!existing) throw new Error("Cancellation policy not found");
@@ -84,12 +91,15 @@ export default class CancellationPolicySvc {
     if (data.name) {
       const nameConflict = await CancellationPolicyRepo.policyExists(
         data.name.trim(),
-        id
+        id,
       );
-      if (nameConflict) throw new Error("A policy with this name already exists");
+      if (nameConflict)
+        throw new Error("A policy with this name already exists");
     }
 
-    let dbRules: { hoursBeforeEvent: number; refundPercent: number }[] | undefined;
+    let dbRules:
+      | { hoursBeforeEvent: number; refundPercent: number }[]
+      | undefined;
     if (data.rules) {
       if (!data.rules.length) throw new Error("At least one rule is required");
       for (const rule of data.rules) {

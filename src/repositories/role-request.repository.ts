@@ -5,7 +5,12 @@ export default class RoleRequestRepo {
   /**
    * Create a base role request with associated application data
    */
-  static async createRequest(userId: string, roleType: RoleType, applicationData: any, applicationModel: string) {
+  static async createRequest(
+    userId: string,
+    roleType: RoleType,
+    applicationData: any,
+    applicationModel: string,
+  ) {
     return prisma.roleRequest.create({
       data: {
         userId,
@@ -48,16 +53,41 @@ export default class RoleRequestRepo {
           },
         },
         mayorApplication: {
-          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+          },
         },
         hostApplication: {
-          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true, portfolioFile: true }
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+            portfolioFile: true,
+          },
         },
         foxerAssetApplication: {
-          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+          },
         },
         foxerServiceApplication: {
-          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+          },
         },
         investorApplication: true,
       },
@@ -76,16 +106,41 @@ export default class RoleRequestRepo {
       include: {
         user: true,
         mayorApplication: {
-          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+          },
         },
         hostApplication: {
-          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true, portfolioFile: true }
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+            portfolioFile: true,
+          },
         },
         foxerAssetApplication: {
-          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+          },
         },
         foxerServiceApplication: {
-          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+          },
         },
         investorApplication: true,
       },
@@ -102,7 +157,7 @@ export default class RoleRequestRepo {
       reviewedBy: string;
       reviewedAt: Date;
       rejectionReason?: string;
-    }
+    },
   ) {
     return prisma.roleRequest.update({
       where: { id },

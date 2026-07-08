@@ -78,7 +78,7 @@ export default class ServiceSvc {
       billingRate: BillingRate;
       status: ServiceStatus;
       imgIds?: string[];
-    }>
+    }>,
   ) {
     const existing = await ServiceRepo.getServiceById(id);
     if (!existing || existing.deletedAt) {

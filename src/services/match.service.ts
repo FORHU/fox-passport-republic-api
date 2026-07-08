@@ -18,7 +18,9 @@ export default class MatchSvc {
     let templateId: string | null = null;
 
     if (data.venueId) {
-      const venue = await prisma.venue.findUnique({ where: { id: data.venueId } });
+      const venue = await prisma.venue.findUnique({
+        where: { id: data.venueId },
+      });
       if (!venue) throw new Error("Venue not found");
 
       const newTemplate = await prisma.eventTemplate.create({
@@ -46,7 +48,9 @@ export default class MatchSvc {
         false,
       );
     } else {
-      const templates = await EventTemplateRepo.findAllTemplates({ ownerId: data.foxerId });
+      const templates = await EventTemplateRepo.findAllTemplates({
+        ownerId: data.foxerId,
+      });
       templateId = templates.length > 0 ? templates[0].id : null;
 
       if (!templateId) {
@@ -91,7 +95,10 @@ export default class MatchSvc {
     });
 
     // 4. Build event-level supplier transactions from any matched template items.
-    await EventTransactionSvc.createTransactionsFromTemplate(eventRequest.id, booking.id);
+    await EventTransactionSvc.createTransactionsFromTemplate(
+      eventRequest.id,
+      booking.id,
+    );
 
     return { eventRequest, booking };
   }
@@ -114,7 +121,15 @@ export default class MatchSvc {
             host: { select: { id: true, name: true, imgId: true } },
           },
         },
-        payments: { select: { id: true, amount: true, status: true, method: true, createdAt: true } },
+        payments: {
+          select: {
+            id: true,
+            amount: true,
+            status: true,
+            method: true,
+            createdAt: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });

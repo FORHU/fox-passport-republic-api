@@ -11,7 +11,10 @@ export default class NotificationService {
     });
     emitToUser(io, input.userId, "new_notification", {
       ...notification,
-      metadata: notification.metadata as Record<string, unknown> | null | undefined,
+      metadata: notification.metadata as
+        | Record<string, unknown>
+        | null
+        | undefined,
     });
 
     return notification;

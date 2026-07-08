@@ -76,7 +76,7 @@ export default class AuthSvc {
       ACCESS_TOKEN_SECRET,
       {
         expiresIn: ACCESS_TOKEN_EXPIRY as any,
-      }
+      },
     );
 
     const refreshToken = jwt.sign(
@@ -87,7 +87,7 @@ export default class AuthSvc {
         email: user.email,
       },
       REFRESH_TOKEN_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
     return {
@@ -124,13 +124,7 @@ export default class AuthSvc {
     };
   }
 
-  static async login({
-    email,
-    password,
-  }: {
-    email: string;
-    password: string;
-  }) {
+  static async login({ email, password }: { email: string; password: string }) {
     const user = await AuthRepo.findUserByEmail(email);
     if (!user) {
       throw "Invalid credentials";
@@ -160,7 +154,7 @@ export default class AuthSvc {
       ACCESS_TOKEN_SECRET,
       {
         expiresIn: ACCESS_TOKEN_EXPIRY as any,
-      }
+      },
     );
 
     const refreshToken = jwt.sign(
@@ -171,7 +165,7 @@ export default class AuthSvc {
         email: user.email,
       },
       REFRESH_TOKEN_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
     return {
@@ -193,7 +187,7 @@ export default class AuthSvc {
       // Verify refresh token
       const decoded = jwt.verify(
         refreshToken,
-        process.env.REFRESH_TOKEN_SECRET!
+        process.env.REFRESH_TOKEN_SECRET!,
       ) as { userId: string };
 
       // Get user
@@ -211,7 +205,7 @@ export default class AuthSvc {
           email: user.email,
         },
         ACCESS_TOKEN_SECRET,
-        { expiresIn: ACCESS_TOKEN_EXPIRY as any }
+        { expiresIn: ACCESS_TOKEN_EXPIRY as any },
       );
 
       return {
@@ -227,7 +221,6 @@ export default class AuthSvc {
       throw "Invalid refresh token";
     }
   }
-
 
   // Send OTP to reset password
   static async forgotPassword(email: string) {
@@ -271,7 +264,7 @@ export default class AuthSvc {
   static async resetPassword(
     email: string,
     otpCode: string,
-    newPassword: string
+    newPassword: string,
   ) {
     // Find user by email
     const user = await AuthRepo.findUserByEmail(email);
@@ -315,7 +308,9 @@ export default class AuthSvc {
       await saveOTP(email, otp);
     } catch (error) {
       console.error("OTP save failed:", error);
-      throw new Error("Verification service temporarily unavailable. Please try again.");
+      throw new Error(
+        "Verification service temporarily unavailable. Please try again.",
+      );
     }
 
     try {
@@ -335,7 +330,6 @@ export default class AuthSvc {
       message: "New verification code sent to your email",
     };
   }
-
 
   static async getAuthUser(userId: string) {
     return AuthRepo.getAuthUser(String(userId));

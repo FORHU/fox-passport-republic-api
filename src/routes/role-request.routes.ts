@@ -21,10 +21,20 @@ const applicationFiles = upload.fields([
 const router = Router();
 
 // User routes
-router.post("/apply", authenticate, applicationFiles, RoleRequestController.apply);
+router.post(
+  "/apply",
+  authenticate,
+  applicationFiles,
+  RoleRequestController.apply,
+);
 
 // Admin routes
 router.get("/list", authenticate, requireAdmin, RoleRequestController.list);
-router.patch("/review/:id", authenticate, requireAdmin, RoleRequestController.review);
+router.patch(
+  "/review/:id",
+  authenticate,
+  requireAdmin,
+  RoleRequestController.review,
+);
 
 export default router;

@@ -1,8 +1,6 @@
 import { prisma } from "../utils/prisma";
 
 export default class AuthRepo {
-
-
   static async createUser(data: {
     email: string;
     password: string;

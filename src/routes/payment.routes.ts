@@ -9,7 +9,10 @@ router.post("/webhook", PaymentCtrl.handleWebhook);
 
 // Payment CRUD
 router.get("/", PaymentCtrl.getAllPayments);
-router.get("/transaction/:transactionId", PaymentCtrl.getPaymentByTransactionId);
+router.get(
+  "/transaction/:transactionId",
+  PaymentCtrl.getPaymentByTransactionId,
+);
 router.get("/booking/:bookingId", PaymentCtrl.getBookingPayments);
 router.get("/booking/:bookingId/balance", PaymentCtrl.getRemainingBalance);
 router.post("/create", PaymentCtrl.createPayment);

@@ -26,7 +26,11 @@ router.patch("/:id/status", authenticate, AssetBookingCtrl.updateStatus);
 router.delete("/:id", authenticate, AssetBookingCtrl.cancel);
 
 // Protected — client confirms equipment received (releases escrow)
-router.patch("/:id/confirm-arrival", authenticate, AssetBookingCtrl.confirmArrival);
+router.patch(
+  "/:id/confirm-arrival",
+  authenticate,
+  AssetBookingCtrl.confirmArrival,
+);
 
 // Protected — client reports no-show / problem (disputes escrow)
 router.patch("/:id/dispute", authenticate, AssetBookingCtrl.dispute);
