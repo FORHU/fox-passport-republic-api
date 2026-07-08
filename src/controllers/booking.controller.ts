@@ -5,6 +5,12 @@ import PaymentSvc from "../services/payment.service";
 import { prisma } from "../utils/prisma";
 import { PaymentStatus } from "@prisma/client";
 import EventTemplateSvc from "../services/event-template.service";
+import RefundSvc from "../services/refund.service";
+import { STRIPE_SECRET_KEY } from "../config";
+import Stripe from "stripe";
+import { sendBookingCancelledEmail } from "../utils/emails/cancellation";
+import { sendBookingConfirmationEmail } from "../utils/emails/confirmation";
+import { sendRefundUpdateEmail } from "../utils/emails/refund";
 
 export default class BookingCtrl {
     // BOOK FROM TEMPLATE — creates an Event + Booking in one shot for a logged-in client
@@ -213,6 +219,240 @@ export default class BookingCtrl {
         }
     }
 
+    // CANCEL CHECK — eligibility + refund estimate
+    static async cancelCheck(req: Request, res: Response) {
+        try {
+            const schema = Joi.object({
+                id: Joi.string().required(),
+            });
+            const { error, value } = schema.validate(req.params);
+            if (error) return res.status(400).json({ message: error.message });
+
+            const result = await RefundSvc.checkEligibility(value.id, req.user!.userId);
+            return res.status(200).json({ success: true, data: result });
+        } catch (error: any) {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+    }
+
+    // CANCEL — citizen cancels booking + initiates Stripe refund
+    static async cancelBooking(req: Request, res: Response) {
+        try {
+            const schema = Joi.object({
+                id: Joi.string().required(),
+            });
+            const { error, value } = schema.validate(req.params);
+            if (error) return res.status(400).json({ message: error.message });
+
+            const booking = await prisma.booking.findUnique({
+                where: { id: value.id },
+                include: {
+                    payments: true,
+                    user: { select: { id: true, name: true, email: true } },
+                    event: {
+                        include: {
+                            template: {
+                                include: {
+                                    cancellationPolicy: {
+                                        include: { rules: { orderBy: { hoursBeforeEvent: "desc" } } },
+                                    },
+                                },
+                            },
+                            venueTransactions: {
+                                include: {
+                                    venue: {
+                                        include: {
+                                            cancellationPolicy: {
+                                                include: { rules: { orderBy: { hoursBeforeEvent: "desc" } } },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                            serviceTransactions: {
+                                include: {
+                                    service: {
+                                        include: {
+                                            cancellationPolicy: {
+                                                include: { rules: { orderBy: { hoursBeforeEvent: "desc" } } },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+            if (!booking) throw new Error("Booking not found");
+            if (booking.userId !== req.user!.userId) throw new Error("Unauthorized");
+            if (booking.status === "cancelled") throw new Error("Booking is already cancelled");
+
+            const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
+                apiVersion: "2025-08-27.basil",
+            });
+
+            const cancellationPolicy = (
+                booking.event.template?.cancellationPolicy
+                ?? (booking.event as any).venueTransactions?.[0]?.venue?.cancellationPolicy
+                ?? (booking.event as any).serviceTransactions?.[0]?.service?.cancellationPolicy
+            ) as any;
+            const { refundPercent, hoursUntilEvent, matchedRule } = RefundSvc.computeRefund(booking.startAt, cancellationPolicy);
+
+            if (hoursUntilEvent <= 0) {
+                return res.status(400).json({ success: false, message: "Event has already started — cancellation is no longer allowed" });
+            }
+
+            const policyName = cancellationPolicy?.name ?? null;
+            const ruleDesc = matchedRule
+                ? `${matchedRule.hoursBeforeEvent}h before = ${matchedRule.refundPercent}% refund`
+                : null;
+            const matchedRuleInfo = policyName
+                ? `Policy: ${policyName} — ${ruleDesc ?? "no rule matched"}`
+                : ruleDesc;
+
+            const completedPayments = booking.payments.filter((p) => p.status === "completed");
+            const pendingPayments = booking.payments.filter((p) => p.status === "pending");
+
+            for (const payment of pendingPayments) {
+                if (payment.transactionId?.startsWith("pi_")) {
+                    try {
+                        await stripe.paymentIntents.cancel(payment.transactionId);
+                    } catch (err) {
+                        // fall through
+                    }
+                }
+
+                await prisma.payment.update({
+                    where: { id: payment.id },
+                    data: { status: "cancelled" as any },
+                });
+            }
+
+            if (completedPayments.length === 0) {
+                const updated = await prisma.booking.update({
+                    where: { id: value.id },
+                    data: { status: "cancelled" },
+                });
+
+                const eventName = booking.event?.name ?? "Unknown Event";
+                const userEmail = booking.user?.email;
+                if (userEmail) {
+                    sendBookingCancelledEmail({
+                        to: userEmail,
+                        eventName,
+                        bookingId: value.id,
+                        startDate: booking.startAt?.toISOString() ?? "N/A",
+                        totalPaid: "PHP 0.00",
+                        refundAmount: "PHP 0.00",
+                        refundStatus: "No payment was collected",
+                    });
+                }
+
+                return res.status(200).json({ success: true, data: { booking: updated, refunds: [] } });
+            }
+
+            const refunds: any[] = [];
+
+            for (const payment of completedPayments) {
+                let stripeRefundId: string | null = null;
+                let refundStatus: "pending" | "succeeded" | "failed" = "pending";
+                let failureReason: string | null = null;
+
+                const estimatedRefund =
+                    Math.round(((payment.amount * refundPercent) / 100) * 100) / 100;
+
+                if (refundPercent <= 0) {
+                    const refund = await prisma.refund.create({
+                        data: {
+                            bookingId: value.id,
+                            paymentId: payment.id,
+                            amount: 0,
+                            currency: payment.currency,
+                            stripeRefundId: null,
+                            status: "succeeded" as any,
+                            failureReason: null,
+                            initiatedBy: req.user!.userId,
+                            adminNotes: matchedRuleInfo,
+                        },
+                    });
+                    refunds.push(refund);
+                    continue;
+                }
+
+                if (payment.transactionId?.startsWith("pi_")) {
+                    try {
+                        const refund = await stripe.refunds.create({
+                            payment_intent: payment.transactionId,
+                            amount: Math.round(estimatedRefund * 100),
+                        });
+                        stripeRefundId = refund.id;
+                        refundStatus = refund.status === "succeeded" ? "succeeded" : "pending";
+                        if (refund.status === "failed") {
+                            failureReason = refund.failure_reason ?? "Unknown Stripe error";
+                            refundStatus = "failed";
+                        }
+                    } catch (err: any) {
+                        stripeRefundId = null;
+                        refundStatus = "failed";
+                        failureReason = err.message ?? "Stripe refund failed";
+                    }
+                }
+
+                const refund = await prisma.refund.create({
+                    data: {
+                        bookingId: value.id,
+                        paymentId: payment.id,
+                        amount: estimatedRefund,
+                        currency: payment.currency,
+                        stripeRefundId,
+                        status: refundStatus as any,
+                        failureReason,
+                        initiatedBy: req.user!.userId,
+                        adminNotes: matchedRuleInfo,
+                    },
+                });
+
+                if (refundStatus === "succeeded") {
+                    await prisma.payment.update({
+                        where: { id: payment.id },
+                        data: { status: "refunded" },
+                    });
+                }
+
+                refunds.push(refund);
+            }
+
+            const updated = await prisma.booking.update({
+                where: { id: value.id },
+                data: { status: "cancelled" },
+            });
+
+            const eventName = booking.event?.name ?? "Unknown Event";
+            const userEmail = booking.user?.email;
+            const totalPaid = completedPayments.reduce((s, p) => s + p.amount, 0);
+            const totalRefunded = refunds.reduce((s: number, r: any) => s + (r.amount ?? 0), 0);
+
+            if (userEmail) {
+                sendBookingCancelledEmail({
+                    to: userEmail,
+                    eventName,
+                    bookingId: value.id,
+                    startDate: booking.startAt?.toISOString() ?? "N/A",
+                    totalPaid: `PHP ${totalPaid.toFixed(2)}`,
+                    refundAmount: `PHP ${totalRefunded.toFixed(2)}`,
+                    refundStatus: refunds.some((r: any) => r.status === "failed")
+                        ? "Some refunds failed — contact support"
+                        : "Processed successfully",
+                });
+            }
+
+            return res.status(200).json({ success: true, data: { booking: updated, refunds } });
+        } catch (error: any) {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+    }
+
     static async getAllBookings(req: Request, res: Response) {
         try {
             const limit = Math.min(Number(req.query.limit) || 4, 20);
@@ -366,6 +606,25 @@ export default class BookingCtrl {
 
             const booking = await BookingSvc.getBookingById(bookingId, req.user);
 
+            // Send booking confirmation email (fire-and-forget)
+            try {
+                const userEmail = req.user?.email || (booking as any).user?.email;
+                const eventName = (booking as any).event?.name ?? "Your Booking";
+                const venueName = (booking as any).venueTransactions?.find((vt: any) => vt.included)?.venue?.name ?? (booking as any).venueTransactions?.[0]?.venue?.name ?? (booking as any).event?.name ?? "Venue";
+                if (userEmail) {
+                    sendBookingConfirmationEmail({
+                        to: userEmail,
+                        eventName,
+                        bookingId,
+                        startDate: (booking as any).startAt?.toISOString() ?? "N/A",
+                        totalPaid: `PHP ${value.amount.toFixed(2)}`,
+                        venueName,
+                    });
+                }
+            } catch (emailErr) {
+                console.error("Failed to send booking confirmation email:", emailErr);
+            }
+
             return res.status(200).json({ success: true, data: { booking, payment } });
         } catch (error: any) {
             return res.status(400).json({ success: false, message: error.message });
@@ -383,16 +642,6 @@ export default class BookingCtrl {
             if (error) return res.status(400).json({ success: false, message: error.message });
 
             const booking = await BookingSvc.updateStatus(req.params.id, value.status, req.user!.userId);
-            return res.status(200).json({ success: true, data: booking });
-        } catch (err: any) {
-            return res.status(400).json({ success: false, message: err.message });
-        }
-    }
-
-    // PATCH CANCEL — dedicated cancel endpoint
-    static async cancelBooking(req: Request, res: Response) {
-        try {
-            const booking = await BookingSvc.cancelBooking(req.params.id, req.user!.userId);
             return res.status(200).json({ success: true, data: booking });
         } catch (err: any) {
             return res.status(400).json({ success: false, message: err.message });
