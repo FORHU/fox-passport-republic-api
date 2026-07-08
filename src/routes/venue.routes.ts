@@ -13,6 +13,8 @@ router.post("/create", authenticate, requireRole(["mayor"]), VenueCtrl.createVen
 router.put("/:id", authenticate, requireRole(["mayor"]), VenueCtrl.updateVenue);
 router.delete("/:id", authenticate, requireRole(["mayor"]), VenueCtrl.deleteVenue);
 
-
+// Admin routes
+router.patch("/:id/approve", authenticate, requireRole(["admin", "super_admin"]), VenueCtrl.approveVenue);
+router.patch("/:id/reject", authenticate, requireRole(["admin", "super_admin"]), VenueCtrl.rejectVenue);
 
 export default router;

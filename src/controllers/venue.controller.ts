@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import Joi from "joi";
+import { prisma } from "../utils/prisma";
 import VenueSvc from "../services/venue.service";
 import { VenueStatus, VenueCategory } from "@prisma/client";
 
@@ -129,6 +130,42 @@ export default class VenueCtrl {
         } catch (err: any) {
             const status = err.message === "Unauthorized" ? 403 : err.message === "Venue not found" ? 404 : 400;
             return res.status(status).json({ message: err.message || err });
+        }
+    }
+
+    static async approveVenue(req: Request, res: Response) {
+        try {
+            const user = (req as any).user;
+            if (!user || user.systemRole !== "admin") {
+                return res.status(403).json({ message: "Forbidden: Admin access required" });
+            }
+            const venue = await prisma.venue.update({
+                where: { id: req.params.id },
+                data: { status: VenueStatus.available },
+            });
+            return res.status(200).json({ message: "Venue approved successfully", venue });
+        } catch (error: any) {
+            return res.status(404).json({ message: error.message || error });
+        }
+    }
+
+    static async rejectVenue(req: Request, res: Response) {
+        try {
+            const user = (req as any).user;
+            if (!user || user.systemRole !== "admin") {
+                return res.status(403).json({ message: "Forbidden: Admin access required" });
+            }
+            const { reason } = req.body;
+            if (!reason) {
+                return res.status(400).json({ message: "Rejection reason is required" });
+            }
+            const venue = await prisma.venue.update({
+                where: { id: req.params.id },
+                data: { status: VenueStatus.rejected, rejectionReason: reason },
+            });
+            return res.status(200).json({ message: "Venue rejected successfully", venue });
+        } catch (error: any) {
+            return res.status(404).json({ message: error.message || error });
         }
     }
 }

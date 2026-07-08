@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import Joi from "joi";
+import { prisma } from "../utils/prisma";
 import ServiceSvc from "../services/service.service";
 import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 
@@ -126,6 +127,42 @@ export default class ServiceCtrl {
     } catch (err: any) {
       const status = err.message.includes("authorized") ? 403 : 400;
       return res.status(status).json({ message: err.message || err });
+    }
+  }
+
+  static async approveService(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      if (!user || user.systemRole !== "admin") {
+        return res.status(403).json({ message: "Forbidden: Admin access required" });
+      }
+      const service = await prisma.service.update({
+        where: { id: req.params.id },
+        data: { status: ServiceStatus.available },
+      });
+      return res.status(200).json({ message: "Service approved successfully", service });
+    } catch (error: any) {
+      return res.status(404).json({ message: error.message || error });
+    }
+  }
+
+  static async rejectService(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      if (!user || user.systemRole !== "admin") {
+        return res.status(403).json({ message: "Forbidden: Admin access required" });
+      }
+      const { reason } = req.body;
+      if (!reason) {
+        return res.status(400).json({ message: "Rejection reason is required" });
+      }
+      const service = await prisma.service.update({
+        where: { id: req.params.id },
+        data: { status: ServiceStatus.rejected, rejectionReason: reason },
+      });
+      return res.status(200).json({ message: "Service rejected successfully", service });
+    } catch (error: any) {
+      return res.status(404).json({ message: error.message || error });
     }
   }
 }
