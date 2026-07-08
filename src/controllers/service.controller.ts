@@ -19,6 +19,7 @@ export default class ServiceCtrl {
       billingRate: Joi.string().valid(...Object.values(BillingRate)).optional(),
       imgIds: Joi.array().items(Joi.string()).min(1).max(5).required(),
       status: Joi.string().valid(...Object.values(ServiceStatus)).optional(),
+      cancellationPolicyId: Joi.string().uuid().optional(),
     });
 
     const { error, value } = schema.validate(req.body, { stripUnknown: true });
@@ -86,6 +87,7 @@ export default class ServiceCtrl {
       currency: Joi.string().trim().uppercase().length(3).optional(),
       billingRate: Joi.string().valid(...Object.values(BillingRate)).optional(),
       status: Joi.string().valid(...Object.values(ServiceStatus)).optional(),
+      cancellationPolicyId: Joi.string().uuid().optional(),
     }).min(1);
 
     const { error, value } = schema.validate(req.body, { stripUnknown: true });

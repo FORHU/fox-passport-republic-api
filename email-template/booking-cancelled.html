@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Verify Your Email</title>
+  <title>Booking Cancelled</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Space+Grotesk:wght@700;800&display=swap" rel="stylesheet" />
@@ -17,11 +17,14 @@
     .body { padding: 32px 40px 40px; }
     h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; color: #ffffff; font-family: 'Space Grotesk', sans-serif; }
     p { margin: 0 0 16px; font-size: 15px; color: rgba(255,255,255,0.6); line-height: 1.6; }
-    .otp-block { background: rgba(204,255,0,0.05); border: 1px solid rgba(204,255,0,0.2); border-radius: 14px; padding: 24px; text-align: center; margin: 24px 0; }
-    .otp-code { font-size: 42px; font-weight: 900; letter-spacing: 12px; color: #ccff00; font-family: 'Space Grotesk', 'Courier New', monospace; }
-    .otp-label { font-size: 12px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 2px; margin-top: 8px; }
-    .expiry { font-size: 13px; color: rgba(255,255,255,0.4); text-align: center; margin-top: 8px; }
-    .warning { background: rgba(255,80,80,0.07); border: 1px solid rgba(255,80,80,0.15); border-radius: 10px; padding: 14px 18px; font-size: 13px; color: rgba(255,180,180,0.8); margin-top: 24px; }
+    .detail-block { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 20px 24px; margin: 20px 0; }
+    .detail-row { padding: 10px 0; }
+    .detail-row + .detail-row { border-top: 1px solid rgba(255,255,255,0.05); }
+    .detail-label { color: rgba(255,255,255,0.4); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+    .detail-value { color: #ffffff; font-weight: 600; font-size: 15px; }
+    .refund-amount { color: #ccff00; font-size: 28px; font-weight: 900; text-align: center; padding: 16px 0; font-family: 'Space Grotesk', sans-serif; }
+    .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+    .status-cancelled { background: rgba(255,80,80,0.15); color: #ff6b6b; }
     .footer { border-top: 1px solid rgba(255,255,255,0.06); padding: 20px 40px; text-align: center; font-size: 12px; color: rgba(255,255,255,0.25); }
     @media only screen and (max-width: 480px) {
       .wrapper { margin: 16px auto; border-radius: 16px; }
@@ -29,8 +32,7 @@
       .logo-text { font-size: 18px; }
       .body { padding: 24px 20px 32px; }
       h1 { font-size: 22px; }
-      .otp-block { padding: 16px; margin: 16px 0; }
-      .otp-code { font-size: 32px; letter-spacing: 8px; }
+      .detail-block { padding: 16px; margin: 16px 0; }
       .footer { padding: 16px 20px; }
     }
   </style>
@@ -44,19 +46,36 @@
       </div>
     </div>
     <div class="body">
-      <h1>Verify your email</h1>
-      <p>Welcome to FoxPassport! Enter the code below to verify <strong style="color:#fff">email</strong> and activate your account.</p>
+      <span class="status-badge status-cancelled">Cancelled</span>
+      <h1>Booking cancelled</h1>
+      <p>Your booking has been cancelled as requested. Here is a summary:</p>
 
-      <div class="otp-block">
-        <div class="otp-code">OTP_CODE</div>
-        <div class="otp-label">Email Verification Code</div>
+      <div class="detail-block">
+        <div class="detail-row">
+          <span class="detail-label">Event</span>
+          <span class="detail-value">EVENT_NAME</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Booking ID</span>
+          <span class="detail-value">BOOKING_ID</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Start Date</span>
+          <span class="detail-value">START_DATE</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Total Paid</span>
+          <span class="detail-value">TOTAL_PAID</span>
+        </div>
       </div>
 
-      <p class="expiry">This code expires in <strong style="color:#fff">5 minutes</strong>.</p>
-
-      <div class="warning">
-        If you did not create a FoxPassport account, you can safely ignore this email.
+      <div class="detail-block">
+        <div style="color: rgba(255,255,255,0.4); font-size: 13px; text-align: center; margin-bottom: 4px;">Refund</div>
+        <div class="refund-amount">REFUND_AMOUNT</div>
+        <div style="color: rgba(255,255,255,0.3); font-size: 13px; text-align: center;">REFUND_STATUS</div>
       </div>
+
+      <p>If you have any questions, please contact our support team.</p>
     </div>
     <div class="footer">
       &copy; 2025 FoxPassport Inc. &bull; This is an automated message, please do not reply.

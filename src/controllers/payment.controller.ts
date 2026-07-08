@@ -5,6 +5,7 @@ import StripeConnectSvc from "../services/stripe-connect.service";
 import Stripe from "stripe";
 import { prisma } from "../utils/prisma";
 import { PaymentStatus } from "@prisma/client";
+import RefundSvc from "../services/refund.service";
 
 export default class PaymentController {
     // GET ALL PAYMENTS
@@ -329,6 +330,32 @@ export default class PaymentController {
             case 'payment_intent.payment_failed':
                 const failedIntent = event.data.object as Stripe.PaymentIntent;
                 console.log(`❌ PaymentIntent failed: ${failedIntent.id}`);
+                break;
+
+            case 'charge.refunded': {
+                const charge = event.data.object as Stripe.Charge;
+                if (charge.refunded && charge.payment_intent) {
+                    const piId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent.id;
+                    const payment = await prisma.payment.findFirst({
+                        where: { transactionId: piId },
+                    });
+                    if (payment) {
+                        await prisma.payment.update({
+                            where: { id: payment.id },
+                            data: { status: PaymentStatus.refunded },
+                        });
+                    }
+                }
+                break;
+            }
+
+            case 'refund.updated':
+                const refundUpdated = event.data.object as Stripe.Refund;
+                if (refundUpdated.status === 'failed') {
+                    await RefundSvc.handleWebhookRefundFailed(event);
+                } else if (refundUpdated.status === 'succeeded') {
+                    await RefundSvc.handleWebhookRefundSucceeded(event);
+                }
                 break;
 
             case 'account.updated':
