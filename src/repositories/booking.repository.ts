@@ -48,7 +48,11 @@ export default class BookingRepo {
                 payments: true,
                 assetTransactions: true,
                 serviceTransactions: true,
-                venueTransactions: true
+                venueTransactions: {
+                    include: {
+                        venue: true
+                    }
+                }
             }
         });
     }
