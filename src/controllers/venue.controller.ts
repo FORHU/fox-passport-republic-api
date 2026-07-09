@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import { prisma } from "../utils/prisma";
 import VenueSvc from "../services/venue.service";
+import { sendApprovedEmail } from "../utils/emails/approved";
+import { sendRejectedEmail } from "../utils/emails/rejected";
 import { VenueStatus, VenueCategory } from "@prisma/client";
 
 export default class VenueCtrl {
@@ -178,6 +180,23 @@ export default class VenueCtrl {
         where: { id: req.params.id },
         data: { status: VenueStatus.available },
       });
+
+      try {
+        const full = await prisma.venue.findUnique({
+          where: { id: venue.id },
+          include: { mayor: { select: { email: true, name: true } } },
+        });
+        if (full?.mayor?.email) {
+          sendApprovedEmail({
+            to: full.mayor.email,
+            entityName: full.name,
+            entityType: "Venue",
+          });
+        }
+      } catch (emailErr) {
+        console.error("Failed to send approval email:", emailErr);
+      }
+
       return res
         .status(200)
         .json({ message: "Venue approved successfully", venue });
@@ -204,6 +223,24 @@ export default class VenueCtrl {
         where: { id: req.params.id },
         data: { status: VenueStatus.rejected, rejectionReason: reason },
       });
+
+      try {
+        const full = await prisma.venue.findUnique({
+          where: { id: venue.id },
+          include: { mayor: { select: { email: true, name: true } } },
+        });
+        if (full?.mayor?.email) {
+          sendRejectedEmail({
+            to: full.mayor.email,
+            entityName: full.name,
+            entityType: "Venue",
+            reason,
+          });
+        }
+      } catch (emailErr) {
+        console.error("Failed to send rejection email:", emailErr);
+      }
+
       return res
         .status(200)
         .json({ message: "Venue rejected successfully", venue });

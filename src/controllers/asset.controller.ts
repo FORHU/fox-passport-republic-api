@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import { prisma } from "../utils/prisma";
 import AssetSvc from "../services/asset.service";
+import { sendApprovedEmail } from "../utils/emails/approved";
+import { sendRejectedEmail } from "../utils/emails/rejected";
 import {
   AssetCondition,
   AssetStatus,
@@ -179,6 +181,23 @@ export default class AssetCtrl {
         where: { id: req.params.id },
         data: { status: AssetStatus.available },
       });
+
+      try {
+        const full = await prisma.asset.findUnique({
+          where: { id: asset.id },
+          include: { owner: { select: { email: true, name: true } } },
+        });
+        if (full?.owner?.email) {
+          sendApprovedEmail({
+            to: full.owner.email,
+            entityName: full.name,
+            entityType: "Asset",
+          });
+        }
+      } catch (emailErr) {
+        console.error("Failed to send approval email:", emailErr);
+      }
+
       return res
         .status(200)
         .json({ message: "Asset approved successfully", asset });
@@ -205,6 +224,24 @@ export default class AssetCtrl {
         where: { id: req.params.id },
         data: { status: AssetStatus.rejected, rejectionReason: reason },
       });
+
+      try {
+        const full = await prisma.asset.findUnique({
+          where: { id: asset.id },
+          include: { owner: { select: { email: true, name: true } } },
+        });
+        if (full?.owner?.email) {
+          sendRejectedEmail({
+            to: full.owner.email,
+            entityName: full.name,
+            entityType: "Asset",
+            reason,
+          });
+        }
+      } catch (emailErr) {
+        console.error("Failed to send rejection email:", emailErr);
+      }
+
       return res
         .status(200)
         .json({ message: "Asset rejected successfully", asset });
