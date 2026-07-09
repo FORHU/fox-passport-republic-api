@@ -43,11 +43,7 @@ router.use("/v1/categories", categoryRoutes);
 
 // Feature Routes
 router.use("/v1/venues", venueRoutes);
-router.use("/v1/venues/", venueRoutes); // Trailing slash alias
-router.use("/v1/venue", venueRoutes); // Singular alias
-router.use("/v1/venue/", venueRoutes); // Singular alias with trailing slash
 router.use("/v1/payments", paymentRoutes);
-router.use("/v1/payments/", paymentRoutes); // Trailing slash alias
 router.use("/v1/notifications", notificationRoutes);
 // Booking sub-routes must be registered BEFORE the generic /:id routes
 router.use("/v1/service/bookings", serviceBookingRoutes);
@@ -55,7 +51,6 @@ router.use("/v1/asset/bookings", assetBookingRoutes);
 router.use("/v1/asset", assetRoutes);
 router.use("/v1/service", serviceRoutes);
 router.use("/v1/files", fileRoutes);
-router.use("/v1/file", fileRoutes);
 router.use("/v1/event-templates", eventTemplateRoutes);
 router.use("/v1/event-requests", eventRequestRoutes);
 router.use("/v1/event-transactions", eventTransactionRoutes);

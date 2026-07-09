@@ -76,6 +76,21 @@ export default class EventRequestCtrl {
     }
   }
 
+  static async reject(req: Request, res: Response) {
+    const schema = Joi.object({ reason: Joi.string().optional() });
+    const { error, value } = schema.validate(req.body);
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
+    try {
+      const { id } = req.params;
+      const { userId, systemRole } = (req as any).user;
+      const updated = await EventRequestSvc.rejectRequest(id, value.reason, userId, systemRole);
+      return res.status(200).json({ success: true, data: updated });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
   static async complete(req: Request, res: Response) {
     try {
       const { id } = req.params;

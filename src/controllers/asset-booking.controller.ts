@@ -150,10 +150,12 @@ export default class AssetBookingCtrl {
 
   // PATCH /asset/bookings/:id/dispute
   static async dispute(req: Request, res: Response) {
+    const { reason } = req.body;
     try {
       const booking = await AssetBookingSvc.dispute(
         req.params.id,
         req.user!.userId,
+        reason,
       );
       return res.status(200).json({ success: true, data: booking });
     } catch (err: any) {

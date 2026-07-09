@@ -134,13 +134,13 @@ export default class AssetBookingSvc {
     return AssetBookingRepo.confirmArrival(id);
   }
 
-  static async dispute(id: string, requesterId: string) {
+  static async dispute(id: string, requesterId: string, reason?: string) {
     const booking = await AssetBookingRepo.findById(id);
     if (!booking) throw new Error("Asset booking not found");
     if (booking.userId !== requesterId)
       throw new Error("Only the client can report a dispute");
     if (["completed", "cancelled", "disputed"].includes(booking.status))
       throw new Error("Booking cannot be disputed at this stage");
-    return AssetBookingRepo.dispute(id);
+    return AssetBookingRepo.dispute(id, reason);
   }
 }

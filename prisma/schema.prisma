@@ -431,6 +431,7 @@ model Event {
   platformFeeAmount   Float                     @default(0)
   eventStatus         EventStatus               @default(pending)
   requestStatus       RequestStatus             @default(pending)
+  rejectionReason     String?
   targetCity          String?
   targetState         String?
   targetCountry       String?                   @default("Philippines")
@@ -639,6 +640,8 @@ model ServiceBooking {
   paymentTransactionId String?
   stripePaymentId      String?           @unique
   paymentMethod        String?
+  disputeReason        String?
+  disputeAt            DateTime?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   service              Service           @relation(fields: [serviceId], references: [id])
@@ -665,6 +668,8 @@ model AssetBooking {
   paymentTransactionId String?
   stripePaymentId      String?           @unique
   paymentMethod        String?
+  disputeReason        String?
+  disputeAt            DateTime?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   asset                Asset             @relation(fields: [assetId], references: [id])

@@ -21,6 +21,7 @@ const applicationFiles = upload.fields([
 const router = Router();
 
 // User routes
+router.get("/my", authenticate, RoleRequestController.listMine);
 router.post(
   "/apply",
   authenticate,

@@ -110,4 +110,11 @@ export default class EventRequestRepo {
       data: { requestStatus: status },
     });
   }
+
+  static async rejectRequest(id: string, reason?: string) {
+    return prisma.event.update({
+      where: { id },
+      data: { requestStatus: "rejected", rejectionReason: reason ?? null },
+    });
+  }
 }
