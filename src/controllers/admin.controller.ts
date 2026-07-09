@@ -135,6 +135,76 @@ export default class AdminCtrl {
     }
   }
 
+  // ─── ASSET / SERVICE BOOKING DISPUTES ───────────────────────────────────
+
+  static async getAssetBookingDisputes(req: Request, res: Response) {
+    try {
+      const bookings = await prisma.assetBooking.findMany({
+        where: { status: "disputed" },
+        include: {
+          asset: { select: { id: true, name: true } },
+          user: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      return res.status(200).json({ success: true, data: bookings });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  static async resolveAssetBookingDispute(req: Request, res: Response) {
+    try {
+      const schema = Joi.object({
+        resolution: Joi.string().valid("completed", "cancelled").required(),
+      });
+      const { error, value } = schema.validate(req.body);
+      if (error) return res.status(400).json({ success: false, message: error.message });
+
+      const booking = await prisma.assetBooking.update({
+        where: { id: req.params.id },
+        data: { status: value.resolution },
+      });
+      return res.status(200).json({ success: true, data: booking });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  static async getServiceBookingDisputes(req: Request, res: Response) {
+    try {
+      const bookings = await prisma.serviceBooking.findMany({
+        where: { status: "disputed" },
+        include: {
+          service: { select: { id: true, name: true } },
+          user: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      return res.status(200).json({ success: true, data: bookings });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  static async resolveServiceBookingDispute(req: Request, res: Response) {
+    try {
+      const schema = Joi.object({
+        resolution: Joi.string().valid("completed", "cancelled").required(),
+      });
+      const { error, value } = schema.validate(req.body);
+      if (error) return res.status(400).json({ success: false, message: error.message });
+
+      const booking = await prisma.serviceBooking.update({
+        where: { id: req.params.id },
+        data: { status: value.resolution },
+      });
+      return res.status(200).json({ success: true, data: booking });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
   static async manualRefund(req: Request, res: Response) {
     try {
       const schema = Joi.object({
@@ -378,7 +448,25 @@ export default class AdminCtrl {
 
   static async getAllEventTemplates(req: Request, res: Response) {
     try {
+      const { status } = req.query as { status?: string };
       const templates = await prisma.eventTemplate.findMany({
+        where: status ? { status: status as any } : {},
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          images: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      return res.status(200).json({ success: true, data: templates });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  static async getPendingEventTemplates(req: Request, res: Response) {
+    try {
+      const templates = await prisma.eventTemplate.findMany({
+        where: { status: "pending" },
         include: {
           owner: { select: { id: true, name: true, email: true } },
           images: true,
@@ -461,10 +549,8 @@ export default class AdminCtrl {
 
   static async rejectEvent(req: Request, res: Response) {
     try {
-      const event = await EventRequestRepo.updateRequestStatus(
-        req.params.id,
-        "rejected",
-      );
+      const { reason } = req.body;
+      const event = await EventRequestRepo.rejectRequest(req.params.id, reason);
       // Hide the template if no other approved events remain for it (skip for template-less events)
       if (event.templateId) {
         const approvedCount = await prisma.event.count({

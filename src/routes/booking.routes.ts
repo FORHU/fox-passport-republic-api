@@ -35,7 +35,7 @@ router.post("/:id/confirm", authenticate, BookingCtrl.confirmBooking);
 
 // ========== LIFECYCLE ROUTES (mirrors asset-booking.routes.ts / service-booking.routes.ts) ==========
 router.patch("/:id/status", authenticate, BookingCtrl.updateStatus);
-router.patch("/:id/cancel", authenticate, BookingCtrl.cancelBooking);
+
 router.patch("/:id/confirm-arrival", authenticate, BookingCtrl.confirmArrival);
 router.patch("/:id/dispute", authenticate, BookingCtrl.dispute);
 

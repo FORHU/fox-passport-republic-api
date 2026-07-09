@@ -129,4 +129,8 @@ export default class RoleRequestService {
   static async getRequests(status?: RequestStatus) {
     return RoleRequestRepo.getAllRequests(status);
   }
+
+  static async getMyRequests(userId: string) {
+    return RoleRequestRepo.getMyRequests(userId);
+  }
 }

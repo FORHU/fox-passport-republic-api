@@ -129,10 +129,10 @@ export default class ServiceBookingRepo {
     });
   }
 
-  static async dispute(id: string) {
+  static async dispute(id: string, reason?: string) {
     return prisma.serviceBooking.update({
       where: { id },
-      data: { status: ItemBookingStatus.disputed },
+      data: { status: ItemBookingStatus.disputed, disputeReason: reason ?? null, disputeAt: new Date() },
       include: {
         service: {
           include: {

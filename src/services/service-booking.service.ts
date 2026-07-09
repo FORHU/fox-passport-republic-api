@@ -130,13 +130,13 @@ export default class ServiceBookingSvc {
     return ServiceBookingRepo.confirmArrival(id);
   }
 
-  static async dispute(id: string, requesterId: string) {
+  static async dispute(id: string, requesterId: string, reason?: string) {
     const booking = await ServiceBookingRepo.findById(id);
     if (!booking) throw new Error("Service booking not found");
     if (booking.userId !== requesterId)
       throw new Error("Only the client can report a dispute");
     if (["completed", "cancelled", "disputed"].includes(booking.status))
       throw new Error("Booking cannot be disputed at this stage");
-    return ServiceBookingRepo.dispute(id);
+    return ServiceBookingRepo.dispute(id, reason);
   }
 }

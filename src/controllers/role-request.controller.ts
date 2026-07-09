@@ -92,6 +92,16 @@ export default class RoleRequestController {
     }
   }
 
+  static async listMine(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user?.userId;
+      const requests = await RoleRequestService.getMyRequests(userId);
+      return res.status(200).json({ success: true, data: requests });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
   /**
    * Admin: List all applications
    */

@@ -97,6 +97,20 @@ export default class RoleRequestRepo {
     });
   }
 
+  static async getMyRequests(userId: string) {
+    return prisma.roleRequest.findMany({
+      where: { userId },
+      include: {
+        mayorApplication: true,
+        hostApplication: true,
+        foxerAssetApplication: true,
+        foxerServiceApplication: true,
+        investorApplication: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
   /**
    * Find request by ID
    */
