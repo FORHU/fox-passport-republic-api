@@ -44,6 +44,7 @@ model User {
   bookingAttendees    BookingAttendee[]
   invitedAttendees    BookingAttendee[]         @relation("Inviter")
   notifications       Notification[]
+  stamps               Stamp[]
   stripeCustomerId     String?                   @unique
   stripeChargesEnabled      Boolean             @default(false)
   stripePayoutsEnabled      Boolean             @default(false)
@@ -235,6 +236,20 @@ model Passport {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model Stamp {
+  id         String         @id @default(uuid())
+  userId     String
+  bookingId  String         @unique // Enforces AC #4 (No duplicates per booking)
+  templateId String?
+  imageUrl   String
+  eventName  String
+  earnedAt   DateTime       @default(now())
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking  Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  template EventTemplate? @relation(fields: [templateId], references: [id])
+}
+
 model Asset {
   id               String                  @id @default(uuid())
   ownerId          String
@@ -351,6 +366,7 @@ model EventTemplate {
   templateAssets   EventTemplateAsset[]
   templateServices EventTemplateService[]
   templateVenues   EventTemplateVenue[]
+  stamps          Stamp[]
 }
 
 model EventTemplateAsset {
@@ -542,6 +558,7 @@ model Booking {
   venueTransactions   EventVenueTransaction[]
   reviews             Review[]
   refunds             Refund[]
+  stamps              Stamp[]
 }
 
 model BookingAttendee {
