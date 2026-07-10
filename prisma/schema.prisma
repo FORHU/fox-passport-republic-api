@@ -44,6 +44,7 @@ model User {
   bookingAttendees    BookingAttendee[]
   invitedAttendees    BookingAttendee[]         @relation("Inviter")
   notifications       Notification[]
+  waitlistEntries    Waitlist[]
   stripeCustomerId     String?                   @unique
   stripeChargesEnabled      Boolean             @default(false)
   stripePayoutsEnabled      Boolean             @default(false)
@@ -341,6 +342,7 @@ model EventTemplate {
   targetCountry    String?                @default("Philippines")
   hostMarkupPct    Float                  @default(0)
   platformFeePct    Float                  @default(0.05) //might change later on
+  maxAttendees     Int?
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
   events           Event[]
@@ -351,6 +353,7 @@ model EventTemplate {
   templateAssets   EventTemplateAsset[]
   templateServices EventTemplateService[]
   templateVenues   EventTemplateVenue[]
+  waitlist         Waitlist[]
 }
 
 model EventTemplateAsset {
@@ -938,4 +941,17 @@ enum ItemBookingStatus {
   completed
   cancelled
   disputed
+}
+
+model Waitlist {
+  id         String   @id @default(uuid())
+  templateId String
+  userId     String
+  createdAt  DateTime @default(now())
+
+  template EventTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, userId])
+  @@map("waitlist")
 }
