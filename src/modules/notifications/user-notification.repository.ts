@@ -20,11 +20,16 @@ export default class NotificationRepository {
     });
   }
 
-  static async findByUserId(userId: string) {
+  static async findByUserId(userId: string, limit?: number) {
     return prisma.notification.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
+      ...(typeof limit === "number" ? { take: limit } : {}),
     });
+  }
+
+  static async countUnread(userId: string) {
+    return prisma.notification.count({ where: { userId, isRead: false } });
   }
 
   static async markAsRead(notificationId: string, userId: string) {

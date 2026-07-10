@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import { prisma } from "../utils/prisma";
 import ServiceSvc from "../services/service.service";
+import { sendApprovedEmail } from "../utils/emails/approved";
+import { sendRejectedEmail } from "../utils/emails/rejected";
 import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 
 export default class ServiceCtrl {
@@ -167,6 +169,23 @@ export default class ServiceCtrl {
         where: { id: req.params.id },
         data: { status: ServiceStatus.available },
       });
+
+      try {
+        const full = await prisma.service.findUnique({
+          where: { id: service.id },
+          include: { owner: { select: { email: true, name: true } } },
+        });
+        if (full?.owner?.email) {
+          sendApprovedEmail({
+            to: full.owner.email,
+            entityName: full.name,
+            entityType: "Service",
+          });
+        }
+      } catch (emailErr) {
+        console.error("Failed to send approval email:", emailErr);
+      }
+
       return res
         .status(200)
         .json({ message: "Service approved successfully", service });
@@ -193,6 +212,24 @@ export default class ServiceCtrl {
         where: { id: req.params.id },
         data: { status: ServiceStatus.rejected, rejectionReason: reason },
       });
+
+      try {
+        const full = await prisma.service.findUnique({
+          where: { id: service.id },
+          include: { owner: { select: { email: true, name: true } } },
+        });
+        if (full?.owner?.email) {
+          sendRejectedEmail({
+            to: full.owner.email,
+            entityName: full.name,
+            entityType: "Service",
+            reason,
+          });
+        }
+      } catch (emailErr) {
+        console.error("Failed to send rejection email:", emailErr);
+      }
+
       return res
         .status(200)
         .json({ message: "Service rejected successfully", service });

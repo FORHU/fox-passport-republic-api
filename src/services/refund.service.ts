@@ -3,6 +3,7 @@ import { prisma } from "../utils/prisma";
 import { STRIPE_SECRET_KEY } from "../config";
 import { sendBookingCancelledEmail } from "../utils/emails/cancellation";
 import { sendRefundUpdateEmail } from "../utils/emails/refund";
+import NotificationService from "../modules/notifications/user-notification.service";
 
 const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-08-27.basil",
@@ -354,6 +355,8 @@ export default class RefundSvc {
       });
     }
 
+    notifyBookingCancelled(booking, eventName, bookingId);
+
     return { booking: updated, refunds };
   }
 
@@ -522,7 +525,7 @@ export default class RefundSvc {
       include: {
         booking: {
           include: {
-            user: { select: { email: true } },
+            user: { select: { id: true, email: true } },
             event: { select: { name: true } },
           },
         },
@@ -540,6 +543,18 @@ export default class RefundSvc {
         failureReason: refund.failure_reason ?? undefined,
       });
     }
+
+    if (existing?.booking?.user?.id) {
+      NotificationService.create({
+        userId: existing.booking.user.id,
+        type: "PAYOUT",
+        title: "Refund failed",
+        message: `Your refund of PHP ${existing.amount.toFixed(2)} for ${
+          existing.booking.event?.name ?? "your booking"
+        } failed.`,
+        metadata: { link: `/bookings/${existing.bookingId}` },
+      }).catch((e) => console.error("Failed to create refund notification", e));
+    }
   }
 
   static async handleWebhookRefundSucceeded(event: Stripe.Event) {
@@ -551,7 +566,7 @@ export default class RefundSvc {
       include: {
         booking: {
           include: {
-            user: { select: { email: true } },
+            user: { select: { id: true, email: true } },
             event: { select: { name: true } },
           },
         },
@@ -581,5 +596,48 @@ export default class RefundSvc {
         status: "succeeded",
       });
     }
+
+    if (existing.booking?.user?.id) {
+      NotificationService.create({
+        userId: existing.booking.user.id,
+        type: "PAYOUT",
+        title: "Refund succeeded",
+        message: `Your refund of PHP ${existing.amount.toFixed(2)} for ${
+          existing.booking.event?.name ?? "your booking"
+        } has been processed.`,
+        metadata: { link: `/bookings/${existing.bookingId}` },
+      }).catch((e) => console.error("Failed to create refund notification", e));
+    }
+  }
+}
+
+// Fire-and-forget in-app notifications mirroring the booking-cancelled email
+// (guest who booked + the host/organizer).
+function notifyBookingCancelled(
+  booking: any,
+  eventName: string,
+  bookingId: string,
+) {
+  const guestId = booking?.user?.id as string | undefined;
+  const hostId = booking?.event?.organizerId as string | undefined;
+
+  if (guestId) {
+    NotificationService.create({
+      userId: guestId,
+      type: "BOOKING_CANCELLED",
+      title: "Booking cancelled",
+      message: `Your booking for ${eventName} has been cancelled.`,
+      metadata: { link: `/bookings/${bookingId}` },
+    }).catch((e) => console.error("Failed to create guest notification", e));
+  }
+
+  if (hostId && hostId !== guestId) {
+    NotificationService.create({
+      userId: hostId,
+      type: "BOOKING_CANCELLED",
+      title: "Booking cancelled",
+      message: `The booking for ${eventName} has been cancelled.`,
+      metadata: { link: `/host/bookings/${bookingId}` },
+    }).catch((e) => console.error("Failed to create host notification", e));
   }
 }

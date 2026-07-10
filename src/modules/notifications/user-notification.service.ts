@@ -20,8 +20,12 @@ export default class NotificationService {
     return notification;
   }
 
-  static async getForUser(userId: string) {
-    return NotificationRepository.findByUserId(userId);
+  static async getForUser(userId: string, limit?: number) {
+    const [notifications, unreadCount] = await Promise.all([
+      NotificationRepository.findByUserId(userId, limit),
+      NotificationRepository.countUnread(userId),
+    ]);
+    return { notifications, unreadCount };
   }
 
   static async markAsRead(notificationId: string, userId: string) {

@@ -9,11 +9,16 @@ interface AuthenticatedSocket extends Socket {
 export const registerSocketGateway = (io: Server) => {
   // Middleware: verify JWT before allowing connection
   io.use((socket: AuthenticatedSocket, next) => {
-    const token = socket.handshake.auth?.token;
+    const rawToken = socket.handshake.auth?.token;
 
-    if (!token) {
+    if (!rawToken) {
       return next(new Error("Authentication token missing"));
     }
+
+    // Mirror the HTTP auth middleware: strip "Bearer " prefix and any accidental quotes
+    const token = String(rawToken)
+      .replace(/^Bearer\s+/i, "")
+      .replace(/"/g, "");
 
     try {
       const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET) as {
