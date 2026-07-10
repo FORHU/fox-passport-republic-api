@@ -9,9 +9,17 @@ router.post("/webhook", PaymentCtrl.handleWebhook);
 
 // Authenticated
 router.post("/create-intent", authenticate, PaymentCtrl.createPaymentIntent);
-router.get("/transaction/:transactionId", authenticate, PaymentCtrl.getPaymentByTransactionId);
+router.get(
+  "/transaction/:transactionId",
+  authenticate,
+  PaymentCtrl.getPaymentByTransactionId,
+);
 router.get("/booking/:bookingId", authenticate, PaymentCtrl.getBookingPayments);
-router.get("/booking/:bookingId/balance", authenticate, PaymentCtrl.getRemainingBalance);
+router.get(
+  "/booking/:bookingId/balance",
+  authenticate,
+  PaymentCtrl.getRemainingBalance,
+);
 router.post("/create", authenticate, PaymentCtrl.createPayment);
 router.put("/:id", authenticate, PaymentCtrl.updatePayment);
 

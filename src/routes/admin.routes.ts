@@ -101,12 +101,32 @@ router.patch(
 router.get("/bookings", authenticate, requireAdmin, BookingCtrl.getAllBookings);
 
 // Asset Booking Disputes
-router.get("/asset-bookings/disputes", authenticate, requireAdmin, AdminCtrl.getAssetBookingDisputes);
-router.patch("/asset-bookings/:id/resolve", authenticate, requireAdmin, AdminCtrl.resolveAssetBookingDispute);
+router.get(
+  "/asset-bookings/disputes",
+  authenticate,
+  requireAdmin,
+  AdminCtrl.getAssetBookingDisputes,
+);
+router.patch(
+  "/asset-bookings/:id/resolve",
+  authenticate,
+  requireAdmin,
+  AdminCtrl.resolveAssetBookingDispute,
+);
 
 // Service Booking Disputes
-router.get("/service-bookings/disputes", authenticate, requireAdmin, AdminCtrl.getServiceBookingDisputes);
-router.patch("/service-bookings/:id/resolve", authenticate, requireAdmin, AdminCtrl.resolveServiceBookingDispute);
+router.get(
+  "/service-bookings/disputes",
+  authenticate,
+  requireAdmin,
+  AdminCtrl.getServiceBookingDisputes,
+);
+router.patch(
+  "/service-bookings/:id/resolve",
+  authenticate,
+  requireAdmin,
+  AdminCtrl.resolveServiceBookingDispute,
+);
 
 // Disputes & Refunds
 router.get("/disputes", authenticate, requireAdmin, AdminCtrl.getDisputes);
