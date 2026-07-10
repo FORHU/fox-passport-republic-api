@@ -5,10 +5,8 @@ export default class NotificationController {
   static async getNotifications(req: Request, res: Response) {
     try {
       const limit = Math.min(Number(req.query.limit) || 20, 100);
-      const { notifications, unreadCount } = await NotificationService.getForUser(
-        req.user!.userId,
-        limit,
-      );
+      const { notifications, unreadCount } =
+        await NotificationService.getForUser(req.user!.userId, limit);
       res.json({ success: true, notifications, unreadCount });
     } catch (err: any) {
       res.status(400).json({ success: false, message: err.message });
