@@ -11,6 +11,7 @@ import Stripe from "stripe";
 import { sendBookingCancelledEmail } from "../utils/emails/cancellation";
 import { sendBookingConfirmationEmail } from "../utils/emails/confirmation";
 import { sendRefundUpdateEmail } from "../utils/emails/refund";
+import NotificationService from "../modules/notifications/user-notification.service";
 
 export default class BookingCtrl {
   // BOOK FROM TEMPLATE — creates an Event + Booking in one shot for a logged-in client
@@ -399,6 +400,8 @@ export default class BookingCtrl {
           });
         }
 
+        notifyBookingCancelled(booking, eventName, value.id);
+
         return res
           .status(200)
           .json({ success: true, data: { booking: updated, refunds: [] } });
@@ -502,6 +505,8 @@ export default class BookingCtrl {
             : "Processed successfully",
         });
       }
+
+      notifyBookingCancelled(booking, eventName, value.id);
 
       return res
         .status(200)
@@ -726,6 +731,29 @@ export default class BookingCtrl {
             venueName,
           });
         }
+
+        // In-app notification (guest + host), mirroring the confirmation email
+        const guestId = req.user!.userId;
+        const hostId = (booking as any).event?.host?.id as string | undefined;
+        NotificationService.create({
+          userId: guestId,
+          type: "BOOKING_CONFIRMED",
+          title: "Booking confirmed",
+          message: `Your booking for ${eventName} is confirmed.`,
+          metadata: { link: `/bookings/${bookingId}` },
+        }).catch((e) => console.error("Failed to create guest notification", e));
+
+        if (hostId && hostId !== guestId) {
+          NotificationService.create({
+            userId: hostId,
+            type: "BOOKING_CONFIRMED",
+            title: "New booking",
+            message: `You have a new confirmed booking for ${eventName}.`,
+            metadata: { link: `/host/bookings/${bookingId}` },
+          }).catch((e) =>
+            console.error("Failed to create host notification", e),
+          );
+        }
       } catch (emailErr) {
         console.error("Failed to send booking confirmation email:", emailErr);
       }
@@ -827,5 +855,38 @@ export default class BookingCtrl {
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });
     }
+  }
+}
+
+// Fire-and-forget in-app notifications mirroring the booking-cancelled email
+// (guest who booked + the host/organizer).
+function notifyBookingCancelled(
+  booking: any,
+  eventName: string,
+  bookingId: string,
+) {
+  const guestId = booking?.user?.id as string | undefined;
+  const hostId =
+    (booking?.event?.host?.id as string | undefined) ??
+    (booking?.event?.organizerId as string | undefined);
+
+  if (guestId) {
+    NotificationService.create({
+      userId: guestId,
+      type: "BOOKING_CANCELLED",
+      title: "Booking cancelled",
+      message: `Your booking for ${eventName} has been cancelled.`,
+      metadata: { link: `/bookings/${bookingId}` },
+    }).catch((e) => console.error("Failed to create guest notification", e));
+  }
+
+  if (hostId && hostId !== guestId) {
+    NotificationService.create({
+      userId: hostId,
+      type: "BOOKING_CANCELLED",
+      title: "Booking cancelled",
+      message: `The booking for ${eventName} has been cancelled.`,
+      metadata: { link: `/host/bookings/${bookingId}` },
+    }).catch((e) => console.error("Failed to create host notification", e));
   }
 }
