@@ -18,6 +18,7 @@ export default class EventTemplateRepo {
     category: EventCategory;
     isPublic?: boolean;
     imgIds?: string[];
+    maxAttendees?: number;
   }) {
     const { imgIds, ...rest } = data;
     return prisma.eventTemplate.create({

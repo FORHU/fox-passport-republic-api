@@ -159,7 +159,8 @@ export default class AdminCtrl {
         resolution: Joi.string().valid("completed", "cancelled").required(),
       });
       const { error, value } = schema.validate(req.body);
-      if (error) return res.status(400).json({ success: false, message: error.message });
+      if (error)
+        return res.status(400).json({ success: false, message: error.message });
 
       const booking = await prisma.assetBooking.update({
         where: { id: req.params.id },
@@ -193,7 +194,8 @@ export default class AdminCtrl {
         resolution: Joi.string().valid("completed", "cancelled").required(),
       });
       const { error, value } = schema.validate(req.body);
-      if (error) return res.status(400).json({ success: false, message: error.message });
+      if (error)
+        return res.status(400).json({ success: false, message: error.message });
 
       const booking = await prisma.serviceBooking.update({
         where: { id: req.params.id },
