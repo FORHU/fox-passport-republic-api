@@ -104,7 +104,12 @@ export default class EventRequestCtrl {
     try {
       const { id } = req.params;
       const { userId, systemRole } = (req as any).user;
-      const updated = await EventRequestSvc.rejectRequest(id, value.reason, userId, systemRole);
+      const updated = await EventRequestSvc.rejectRequest(
+        id,
+        value.reason,
+        userId,
+        systemRole,
+      );
 
       try {
         const event = await prisma.event.findUnique({

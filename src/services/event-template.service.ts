@@ -15,6 +15,7 @@ export default class EventTemplateSvc {
     targetState?: string;
     targetCountry?: string;
     hostMarkupPct?: number;
+    maxAttendees?: number;
   }) {
     const template = await EventTemplateRepo.createTemplate(data);
     return {
@@ -33,6 +34,7 @@ export default class EventTemplateSvc {
       isPublic: boolean;
       imgIds: string[];
       hostMarkupPct: number;
+      maxAttendees: number | null;
     }>;
   }) {
     const { id, ownerId, data } = params;

@@ -6,7 +6,8 @@
     "scripts": {
         "dev": "npx kill-port 3002 && nodemon --watch src --ext ts --exec ts-node --files ./src/server.ts",
         "lint": "eslint src/**/*.ts --fix",
-        "test": "NODE_ENV=development mocha --require ts-node/register 'tests/**/*.spec.ts'",
+        "test": "vitest run",
+        "test:watch": "vitest",
         "build": "tsc",
         "start": "node ./dist/src/server.js",
         "db:setup": "npx prisma generate && npx prisma migrate dev",
@@ -72,6 +73,7 @@
         "@types/supertest": "^2.0.14",
         "@typescript-eslint/eslint-plugin": "^8.56.0",
         "@typescript-eslint/parser": "^8.56.0",
+        "@vitest/coverage-v8": "^4.1.10",
         "chai": "^4.3.10",
         "dotenv": "^17.3.1",
         "eslint": "^10.0.0",
@@ -83,6 +85,7 @@
         "prisma": "^7.4.2",
         "supertest": "^6.3.3",
         "ts-node": "^10.9.2",
-        "typescript": "^5.9.3"
+        "typescript": "^5.9.3",
+        "vitest": "^4.1.10"
     }
 }

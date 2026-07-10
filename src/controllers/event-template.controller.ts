@@ -20,6 +20,7 @@ export default class EventTemplateCtrl {
       targetState: Joi.string().optional(),
       targetCountry: Joi.string().optional(),
       hostMarkupPct: Joi.number().min(0).max(100).optional(),
+      maxAttendees: Joi.number().integer().min(1).optional(),
       cancellationPolicyId: Joi.string().uuid().optional(),
     });
 
@@ -50,6 +51,7 @@ export default class EventTemplateCtrl {
       isPublic: Joi.boolean().optional(),
       imgIds: Joi.array().items(Joi.string().uuid()).max(5).optional(),
       hostMarkupPct: Joi.number().min(0).max(100).optional(),
+      maxAttendees: Joi.number().integer().min(1).allow(null).optional(),
       cancellationPolicyId: Joi.string().uuid().optional(),
     });
 

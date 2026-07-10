@@ -11,6 +11,7 @@ import Stripe from "stripe";
 import { sendBookingCancelledEmail } from "../utils/emails/cancellation";
 import { sendBookingConfirmationEmail } from "../utils/emails/confirmation";
 import { sendRefundUpdateEmail } from "../utils/emails/refund";
+import WaitlistSvc from "../services/waitlist.service";
 import NotificationService from "../modules/notifications/user-notification.service";
 
 export default class BookingCtrl {
@@ -52,6 +53,20 @@ export default class BookingCtrl {
         return res
           .status(404)
           .json({ message: "Template not found or not approved" });
+
+      if (template.maxAttendees) {
+        const currentAttendees = await WaitlistSvc.getCurrentAttendees(
+          template.id,
+        );
+        if (currentAttendees >= template.maxAttendees) {
+          return res.status(409).json({
+            success: false,
+            message:
+              "This event is at capacity. You can join the waitlist instead.",
+            code: "AT_CAPACITY",
+          });
+        }
+      }
 
       const { itemsTotal, hostMarkupAmount, platformFeeAmount, totalAmount } =
         EventTemplateSvc.calculateTotalsBreakdown(template, {
@@ -402,6 +417,16 @@ export default class BookingCtrl {
 
         notifyBookingCancelled(booking, eventName, value.id);
 
+        // Notify first person on waitlist if template has capacity
+        try {
+          const templateId = booking.event?.templateId;
+          if (templateId) {
+            await WaitlistSvc.notifyFirstInLine(templateId);
+          }
+        } catch (err) {
+          console.error("Failed to notify waitlist after cancellation:", err);
+        }
+
         return res
           .status(200)
           .json({ success: true, data: { booking: updated, refunds: [] } });
@@ -507,6 +532,16 @@ export default class BookingCtrl {
       }
 
       notifyBookingCancelled(booking, eventName, value.id);
+
+      // Notify first person on waitlist if template has capacity
+      try {
+        const templateId = booking.event?.templateId;
+        if (templateId) {
+          await WaitlistSvc.notifyFirstInLine(templateId);
+        }
+      } catch (err) {
+        console.error("Failed to notify waitlist after cancellation:", err);
+      }
 
       return res
         .status(200)
@@ -741,7 +776,9 @@ export default class BookingCtrl {
           title: "Booking confirmed",
           message: `Your booking for ${eventName} is confirmed.`,
           metadata: { link: `/bookings/${bookingId}` },
-        }).catch((e) => console.error("Failed to create guest notification", e));
+        }).catch((e) =>
+          console.error("Failed to create guest notification", e),
+        );
 
         if (hostId && hostId !== guestId) {
           NotificationService.create({

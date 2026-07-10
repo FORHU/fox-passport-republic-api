@@ -94,7 +94,12 @@ export default class EventRequestSvc {
     return EventRequestRepo.updateRequestStatus(id, "approved");
   }
 
-  static async rejectRequest(id: string, reason: string | undefined, userId: string, systemRole: string) {
+  static async rejectRequest(
+    id: string,
+    reason: string | undefined,
+    userId: string,
+    systemRole: string,
+  ) {
     const request = await EventRequestRepo.findById(id);
     if (!request) throw new Error("Request not found");
     if (systemRole !== "admin")
