@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "Event" ADD COLUMN     "rejectionReason" TEXT;
+-- "rejectionReason" was already added to "Event" in a previous run; no-op to keep history consistent.

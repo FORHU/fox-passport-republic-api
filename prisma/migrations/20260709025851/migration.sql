@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "Event" ADD COLUMN     "rejectionReason" TEXT;
+-- "rejectionReason" was already added to "Event" by migration 20260709023648_add_dispute_fields_to_item_bookings
