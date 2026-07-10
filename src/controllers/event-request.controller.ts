@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import EventRequestSvc from "../services/event-request.service";
 import EventRequestRepo from "../repositories/event-request.repository";
+import { prisma } from "../utils/prisma";
+import { sendApprovedEmail } from "../utils/emails/approved";
+import { sendRejectedEmail } from "../utils/emails/rejected";
 import Joi from "joi";
 
 export default class EventRequestCtrl {
@@ -70,6 +73,23 @@ export default class EventRequestCtrl {
         userId,
         systemRole,
       );
+
+      try {
+        const event = await prisma.event.findUnique({
+          where: { id },
+          include: { host: { select: { email: true, name: true } } },
+        });
+        if (event?.host?.email) {
+          sendApprovedEmail({
+            to: event.host.email,
+            entityName: event.name,
+            entityType: "Event",
+          });
+        }
+      } catch (emailErr) {
+        console.error("Failed to send approval email:", emailErr);
+      }
+
       return res.status(200).json({ success: true, data: updated });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });
@@ -85,6 +105,24 @@ export default class EventRequestCtrl {
       const { id } = req.params;
       const { userId, systemRole } = (req as any).user;
       const updated = await EventRequestSvc.rejectRequest(id, value.reason, userId, systemRole);
+
+      try {
+        const event = await prisma.event.findUnique({
+          where: { id },
+          include: { host: { select: { email: true, name: true } } },
+        });
+        if (event?.host?.email && value.reason) {
+          sendRejectedEmail({
+            to: event.host.email,
+            entityName: event.name,
+            entityType: "Event",
+            reason: value.reason,
+          });
+        }
+      } catch (emailErr) {
+        console.error("Failed to send rejection email:", emailErr);
+      }
+
       return res.status(200).json({ success: true, data: updated });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });
