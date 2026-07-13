@@ -2,7 +2,7 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { seedUsers, seedVenues, seedAssets, seedServices, seedEvents, seedBookings, seedReviews, seedItemBookings } from "./seeder";
+import { seedUsers, seedVenues, seedAssets, seedServices, seedEvents, seedBookings, seedReviews, seedItemBookings, seedBadges } from "./seeder";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -34,6 +34,9 @@ async function main() {
 
   // 8. Seed Item Bookings (service + asset bookings for foxer flow testing)
   await seedItemBookings(prisma, users);
+
+  // 9. Seed Badges (platform-wide badge definitions)
+  await seedBadges(prisma);
 
   console.log("Seeding completed successfully!");
 }

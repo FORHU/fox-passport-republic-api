@@ -225,15 +225,67 @@ model File {
 }
 
 model Passport {
-  id           String   @id @default(uuid())
-  userId       String   @unique
-  totalStamps  Int      @default(0)
-  totalMileage Int      @default(0)
-  level        Int      @default(1)
-  achievements Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String          @id @default(uuid())
+  userId     String          @unique
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paths      PassportPath[]
+  stamps     PassportStamp[]
+  userBadges UserBadge[]
+}
+
+model PassportPath {
+  id         String   @id @default(uuid())
+  passportId String
+  path       UserPath
+  level      Int      @default(1)
+  currentXP  Int      @default(0)
+  totalXP    Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  passport   Passport @relation(fields: [passportId], references: [id], onDelete: Cascade)
+
+  @@unique([passportId, path])
+}
+
+model Badge {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  description String
+  icon        String
+  color       String?
+  rarity      BadgeRarity
+  path        UserPath?
+  criteria    String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  userBadges  UserBadge[]
+}
+
+model UserBadge {
+  id         String   @id @default(uuid())
+  passportId String
+  badgeId    String
+  earnedAt   DateTime @default(now())
+  passport   Passport @relation(fields: [passportId], references: [id], onDelete: Cascade)
+  badge      Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([passportId, badgeId])
+}
+
+model PassportStamp {
+  id         String   @id @default(uuid())
+  passportId String
+  bookingId  String   @unique
+  eventName  String
+  eventDate  DateTime
+  location   String?
+  xpEarned   Int
+  imageUrl   String?
+  createdAt  DateTime @default(now())
+  passport   Passport @relation(fields: [passportId], references: [id], onDelete: Cascade)
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }
 
 model Asset {
@@ -536,6 +588,8 @@ model Booking {
   updatedAt           DateTime                  @updatedAt
   isGuestListLocked   Boolean                   @default(false)
   hasReview           Boolean                   @default(false)
+  ticketCode          String?                   @unique
+  checkedIn           Boolean                   @default(false)
   event               Event                     @relation(fields: [eventId], references: [id])
   user                User                      @relation(fields: [userId], references: [id])
   attendees           BookingAttendee[]
@@ -545,6 +599,7 @@ model Booking {
   venueTransactions   EventVenueTransaction[]
   reviews             Review[]
   refunds             Refund[]
+  stamp               PassportStamp?
 }
 
 model BookingAttendee {
@@ -954,4 +1009,20 @@ model Waitlist {
 
   @@unique([templateId, userId])
   @@map("waitlist")
+}
+
+enum UserPath {
+  user
+  foxer
+  host
+  mayor
+  investor
+}
+
+enum BadgeRarity {
+  Common
+  Uncommon
+  Rare
+  Epic
+  Legendary
 }

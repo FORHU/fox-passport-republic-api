@@ -857,6 +857,88 @@ export default class BookingCtrl {
     }
   }
 
+  // CHECK IN BOOKING — host scans citizen's booking QR code at the event door
+  static async checkInBooking(req: Request, res: Response) {
+    try {
+      const schema = Joi.object({ ticketCode: Joi.string().required() });
+      const { error, value } = schema.validate(req.body);
+      if (error) return res.status(400).json({ message: error.message });
+
+      const booking = await prisma.booking.findUnique({
+        where: { ticketCode: value.ticketCode },
+        include: { event: { select: { organizerId: true, name: true } } },
+      });
+
+      if (!booking)
+        return res
+          .status(404)
+          .json({ success: false, message: "Invalid ticket code" });
+
+      if (booking.event?.organizerId !== req.user!.userId)
+        return res.status(403).json({
+          success: false,
+          message: "Unauthorized — you are not the host of this event",
+        });
+
+      if (booking.checkedIn)
+        return res
+          .status(409)
+          .json({ success: false, message: "Booking already checked in" });
+
+      const updated = await prisma.booking.update({
+        where: { id: booking.id },
+        data: { checkedIn: true },
+      });
+
+      return res.status(200).json({ success: true, data: updated });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // CHECK IN ATTENDEE — host scans QR code at the event
+  static async checkInAttendee(req: Request, res: Response) {
+    try {
+      const schema = Joi.object({ ticketCode: Joi.string().required() });
+      const { error, value } = schema.validate(req.body);
+      if (error) return res.status(400).json({ message: error.message });
+
+      const attendee = await prisma.bookingAttendee.findUnique({
+        where: { ticketCode: value.ticketCode },
+        include: {
+          booking: {
+            include: { event: { select: { organizerId: true, name: true } } },
+          },
+        },
+      });
+
+      if (!attendee)
+        return res
+          .status(404)
+          .json({ success: false, message: "Invalid ticket code" });
+
+      if (attendee.booking.event?.organizerId !== req.user!.userId)
+        return res.status(403).json({
+          success: false,
+          message: "Unauthorized — you are not the host of this event",
+        });
+
+      if (attendee.checkedIn)
+        return res
+          .status(409)
+          .json({ success: false, message: "Attendee already checked in" });
+
+      const updated = await prisma.bookingAttendee.update({
+        where: { id: attendee.id },
+        data: { checkedIn: true },
+      });
+
+      return res.status(200).json({ success: true, data: updated });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
   // APPEND ATTENDEES IN BULK (PUT)
   static async appendAttendees(req: Request, res: Response) {
     try {
