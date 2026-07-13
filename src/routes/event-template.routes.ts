@@ -1,12 +1,16 @@
 import express from "express";
 import EventTemplateCtrl from "../controllers/event-template.controller";
-import { authenticate, requireRole } from "../middleware/auth.middleware";
+import {
+  authenticate,
+  optionalAuth,
+  requireRole,
+} from "../middleware/auth.middleware";
 
 const router = express.Router();
 
 // Public browse — no auth, only isPublic templates, supports ?category=
 router.get("/browse", EventTemplateCtrl.browsePublic);
-router.get("/browse/:id", EventTemplateCtrl.browsePublicById);
+router.get("/browse/:id", optionalAuth, EventTemplateCtrl.browsePublicById);
 
 // Public/Authenticated list
 router.get("/", authenticate, EventTemplateCtrl.getTemplates);

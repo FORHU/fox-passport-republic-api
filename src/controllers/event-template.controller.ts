@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import { prisma } from "../utils/prisma";
 import EventTemplateSvc from "../services/event-template.service";
+import WaitlistSvc from "../services/waitlist.service";
 import { sendApprovedEmail } from "../utils/emails/approved";
 import { sendRejectedEmail } from "../utils/emails/rejected";
 import { EventCategory, EventTemplateStatus } from "@prisma/client";
@@ -104,13 +105,49 @@ export default class EventTemplateCtrl {
     }
   }
 
-  // Public single template by ID — no auth required
+  // Public single template by ID — optional auth for ?claimed=1 validation
   static async browsePublicById(req: Request, res: Response) {
     try {
       const template = await EventTemplateSvc.getTemplateById(req.params.id);
       if (!template.isPublic) {
         return res.status(404).json({ message: "Template not found" });
       }
+
+      const claimed = req.query.claimed === "1";
+
+      if (claimed) {
+        if (!req.user) {
+          return res.status(401).json({
+            success: false,
+            message: "Authentication required to access a held spot",
+          });
+        }
+
+        const hasValidHold = await WaitlistSvc.validateHold(
+          template.id,
+          req.user.userId,
+        );
+
+        if (!hasValidHold) {
+          return res.status(403).json({
+            success: false,
+            message: "No valid hold found for this template",
+          });
+        }
+
+        const currentAttendees = await WaitlistSvc.getCurrentAttendees(
+          template.id,
+        );
+
+        return res.status(200).json({
+          success: true,
+          data: {
+            ...template,
+            currentAttendees: currentAttendees - 1,
+          },
+        });
+      }
+
       return res.status(200).json({ success: true, data: template });
     } catch (error: any) {
       return res.status(404).json({ message: error.message });
