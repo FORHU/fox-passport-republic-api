@@ -44,6 +44,11 @@ export default class AuthSvc {
       mobileNumber: data.mobileNumber,
     });
 
+    // Fire-and-forget — badge failure must never block registration
+    import("./passport.service").then(({ default: PassportSvc }) =>
+      PassportSvc.awardBadgeByName(user.id, "Early Adopter")
+    ).catch(() => {});
+
     const otp = generateOTP();
     try {
       await saveOTP(data.email, otp);

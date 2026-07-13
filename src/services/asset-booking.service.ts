@@ -109,12 +109,15 @@ export default class AssetBookingSvc {
     );
 
     if (status === ItemBookingStatus.completed) {
-      // Payout failures must never fail the status-update response — log and move on.
       try {
         await PayoutSvc.createPayoutsForAssetBooking(id);
       } catch (err) {
         console.error(`Payout failed for asset booking ${id}`, err);
       }
+      import("./passport.service").then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
+        const ownerId = (booking.asset as any)?.ownerId ?? (booking.asset as any)?.owner?.id;
+        if (ownerId) return PassportSvc.awardXP(ownerId, UserPath.foxer, XP_REWARDS.listingBooked);
+      }).catch(() => {});
     }
 
     return updated;
