@@ -3,6 +3,8 @@ import { prisma } from "../utils/prisma";
 import NotificationService from "../modules/notifications/user-notification.service";
 import { sendWaitlistSpotAvailableEmail } from "../utils/emails/waitlist";
 
+const HOLD_DURATION_MINUTES = 15;
+
 export default class WaitlistSvc {
   static async getCurrentAttendees(templateId: string): Promise<number> {
     const events = await prisma.event.findMany({
@@ -83,9 +85,15 @@ export default class WaitlistSvc {
     return { isOnWaitlist: true, position, entryId: entry.id, totalWaiting };
   }
 
-  static async notifyFirstInLine(templateId: string) {
+  static async assignAndNotifyFirstInLine(templateId: string) {
     const entry = await WaitlistRepo.getFirstInLine(templateId);
     if (!entry) return null;
+
+    const holdExpiresAt = new Date(
+      Date.now() + HOLD_DURATION_MINUTES * 60 * 1000,
+    );
+
+    await WaitlistRepo.markAsAssigned(entry.id, holdExpiresAt);
 
     const template = await prisma.eventTemplate.findUnique({
       where: { id: templateId },
@@ -97,10 +105,12 @@ export default class WaitlistSvc {
     try {
       await NotificationService.create({
         userId: entry.userId,
-        type: "waitlist_spot_available",
-        title: "A spot opened up!",
-        message: `A spot just opened for "${eventName}". Book now before it fills up again.`,
-        metadata: { templateId },
+        type: "WAITLIST_SPOT_OPENED",
+        title: "Spot Available!",
+        message: `A spot has opened up for ${eventName}. Complete your booking to secure your spot.`,
+        metadata: {
+          link: `/booking/config?templateId=${templateId}&claimed=1`,
+        },
       });
     } catch (err) {
       console.error("Failed to create waitlist notification:", err);
@@ -119,5 +129,16 @@ export default class WaitlistSvc {
     }
 
     return entry;
+  }
+
+  static async validateHold(templateId: string, userId: string) {
+    const entry = await WaitlistRepo.findAssignedEntry(templateId, userId);
+    if (!entry) return false;
+    if (!entry.holdExpiresAt) return false;
+    return entry.holdExpiresAt.getTime() > Date.now();
+  }
+
+  static async markAsConverted(templateId: string, userId: string) {
+    await WaitlistRepo.markAsConverted(templateId, userId);
   }
 }

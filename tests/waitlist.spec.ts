@@ -31,7 +31,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Clean everything: bookings → events → waitlist → templates → all test users
   const events = await prisma.event.findMany({
     where: { templateId },
     select: { id: true },
@@ -99,7 +98,6 @@ describe("POST /api/v1/waitlist", () => {
   });
 
   it("should join the waitlist when at capacity", async () => {
-    // Fill the template: maxAttendees=2, create 2 bookings (guestCount=1 each)
     await seedTestBooking(eventId, userId, 1);
 
     const fillerEmail = `filler-${Date.now()}@test.com`;
@@ -107,7 +105,6 @@ describe("POST /api/v1/waitlist", () => {
     extraUserIds.push(filler.id);
     await seedTestBooking(eventId, filler.id, 1);
 
-    // Now the template is at capacity (2 guests >= maxAttendees 2)
     const waiterEmail = `waiter-${Date.now()}@test.com`;
     const waiter = await seedTestUser(waiterEmail);
     extraUserIds.push(waiter.id);
@@ -131,10 +128,8 @@ describe("GET /api/v1/waitlist (after joining)", () => {
   let entryId: string;
 
   beforeAll(async () => {
-    // Clean any leftover waitlist entries from previous tests
     await prisma.waitlist.deleteMany({ where: { templateId } });
 
-    // Fill the template
     await seedTestBooking(eventId, userId, 1);
     const filler = await seedTestUser(`fill2-${Date.now()}@test.com`);
     extraUserIds.push(filler.id);
@@ -144,7 +139,6 @@ describe("GET /api/v1/waitlist (after joining)", () => {
     extraUserIds.push(waiterId);
     waiterToken = createTestToken(waiterId, `wait2-${Date.now()}@test.com`);
 
-    // Join waitlist
     const joinRes = await request(app)
       .post("/api/v1/waitlist")
       .set("Authorization", `Bearer ${waiterToken}`)
@@ -186,7 +180,6 @@ describe("DELETE /api/v1/waitlist/:id", () => {
   let entryId: string;
 
   beforeAll(async () => {
-    // Fill the template
     await seedTestBooking(eventId, userId, 1);
     const filler = await seedTestUser(`delfiller-${Date.now()}@test.com`);
     extraUserIds.push(filler.id);
@@ -212,7 +205,6 @@ describe("DELETE /api/v1/waitlist/:id", () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
 
-    // Verify removed
     const statusRes = await request(app)
       .get(`/api/v1/waitlist?templateId=${templateId}`)
       .set("Authorization", `Bearer ${waiterToken}`);
@@ -247,7 +239,6 @@ describe("Duplicate join prevention", () => {
     extraUserIds.push(dupeUserId);
     dupeToken = createTestToken(dupeUserId, `dupe-${Date.now()}@test.com`);
 
-    // First join
     await request(app)
       .post("/api/v1/waitlist")
       .set("Authorization", `Bearer ${dupeToken}`)
@@ -262,5 +253,177 @@ describe("Duplicate join prevention", () => {
 
     expect(res.status).toBe(400);
     expect(res.body.message).toContain("already on the waitlist");
+  });
+});
+
+describe("Auto-assignment on cancellation", () => {
+  let waiterId: string;
+  let waiterToken: string;
+  let bookingId: string;
+
+  beforeAll(async () => {
+    await prisma.waitlist.deleteMany({ where: { templateId } });
+
+    await seedTestBooking(eventId, userId, 1);
+    const filler = await seedTestUser(`autofill-${Date.now()}@test.com`);
+    extraUserIds.push(filler.id);
+    await seedTestBooking(eventId, filler.id, 1);
+
+    waiterId = (await seedTestUser(`autowaiter-${Date.now()}@test.com`)).id;
+    extraUserIds.push(waiterId);
+    waiterToken = createTestToken(waiterId, `autowaiter-${Date.now()}@test.com`);
+
+    await request(app)
+      .post("/api/v1/waitlist")
+      .set("Authorization", `Bearer ${waiterToken}`)
+      .send({ templateId });
+
+    const booking = await seedTestBooking(eventId, userId, 1);
+    bookingId = booking.id;
+  });
+
+  it("should assign spot and create notification on cancellation", async () => {
+    const res = await request(app)
+      .post(`/api/v1/bookings/${bookingId}/cancel`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+
+    const entry = await prisma.waitlist.findFirst({
+      where: { templateId, userId: waiterId },
+    });
+    expect(entry).not.toBeNull();
+    expect(entry!.status).toBe("assigned");
+    expect(entry!.holdExpiresAt).not.toBeNull();
+    expect(entry!.holdExpiresAt!.getTime()).toBeGreaterThan(Date.now());
+
+    const notification = await prisma.notification.findFirst({
+      where: { userId: waiterId, type: "WAITLIST_SPOT_OPENED" },
+    });
+    expect(notification).not.toBeNull();
+    expect(notification!.metadata).toHaveProperty(
+      "link",
+      `/booking/config?templateId=${templateId}&claimed=1`,
+    );
+  });
+});
+
+describe("Hold expiry", () => {
+  it("should expire stale holds", async () => {
+    const expiringUser = await seedTestUser(`expiry-${Date.now()}@test.com`);
+    extraUserIds.push(expiringUser.id);
+
+    await prisma.waitlist.create({
+      data: {
+        templateId,
+        userId: expiringUser.id,
+        status: "assigned",
+        holdExpiresAt: new Date(Date.now() - 1000),
+      },
+    });
+
+    const result = await prisma.waitlist.updateMany({
+      where: {
+        status: "assigned",
+        holdExpiresAt: { lt: new Date() },
+      },
+      data: { status: "expired" },
+    });
+
+    expect(result.count).toBeGreaterThanOrEqual(1);
+
+    const entry = await prisma.waitlist.findFirst({
+      where: { templateId, userId: expiringUser.id },
+    });
+    expect(entry!.status).toBe("expired");
+  });
+});
+
+describe("GET /api/v1/event-templates/browse/:id with ?claimed=1", () => {
+  let claimedTemplateId: string;
+  let claimedUserId: string;
+  let claimedToken: string;
+
+  beforeAll(async () => {
+    const owner = await seedTestUser(`owner-claim-${Date.now()}@test.com`);
+    extraUserIds.push(owner.id);
+    const tmpl = await seedTestTemplate(owner.id, 2);
+    claimedTemplateId = tmpl.id;
+
+    const ev = await seedTestEvent(claimedTemplateId, owner.id);
+    await seedTestBooking(ev.id, owner.id, 1);
+    await seedTestBooking(ev.id, owner.id, 1);
+
+    claimedUserId = (await seedTestUser(`claimed-user-${Date.now()}@test.com`)).id;
+    extraUserIds.push(claimedUserId);
+    claimedToken = createTestToken(claimedUserId, `claimed-user-${Date.now()}@test.com`);
+
+    await prisma.waitlist.create({
+      data: {
+        templateId: claimedTemplateId,
+        userId: claimedUserId,
+        status: "assigned",
+        holdExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      },
+    });
+  });
+
+  it("should return 401 without auth when claimed=1", async () => {
+    const res = await request(app).get(
+      `/api/v1/event-templates/browse/${claimedTemplateId}?claimed=1`,
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("should return template with reduced currentAttendees for valid hold", async () => {
+    const res = await request(app)
+      .get(`/api/v1/event-templates/browse/${claimedTemplateId}?claimed=1`)
+      .set("Authorization", `Bearer ${claimedToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.currentAttendees).toBeDefined();
+    expect(res.body.data.currentAttendees).toBeLessThan(2);
+  });
+
+  it("should return 403 for expired hold", async () => {
+    const expiredUser = await seedTestUser(`expired-claim-${Date.now()}@test.com`);
+    extraUserIds.push(expiredUser.id);
+    const expiredToken = createTestToken(expiredUser.id, `expired-claim-${Date.now()}@test.com`);
+
+    await prisma.waitlist.create({
+      data: {
+        templateId: claimedTemplateId,
+        userId: expiredUser.id,
+        status: "assigned",
+        holdExpiresAt: new Date(Date.now() - 1000),
+      },
+    });
+
+    const res = await request(app)
+      .get(`/api/v1/event-templates/browse/${claimedTemplateId}?claimed=1`)
+      .set("Authorization", `Bearer ${expiredToken}`);
+
+    expect(res.status).toBe(403);
+  });
+
+  it("should return 403 for user not on waitlist", async () => {
+    const stranger = await seedTestUser(`stranger-${Date.now()}@test.com`);
+    extraUserIds.push(stranger.id);
+    const strangerToken = createTestToken(stranger.id, `stranger-${Date.now()}@test.com`);
+
+    const res = await request(app)
+      .get(`/api/v1/event-templates/browse/${claimedTemplateId}?claimed=1`)
+      .set("Authorization", `Bearer ${strangerToken}`);
+
+    expect(res.status).toBe(403);
+  });
+
+  it("should return template normally without claimed=1", async () => {
+    const res = await request(app).get(
+      `/api/v1/event-templates/browse/${claimedTemplateId}`,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
   });
 });

@@ -1,4 +1,7 @@
 -- AlterTable
+--ALTER TABLE "Event" ADD COLUMN     "rejectionReason" TEXT;
+
+-- AlterTable
 ALTER TABLE "EventTemplate" ADD COLUMN     "maxAttendees" INTEGER;
 
 -- CreateTable

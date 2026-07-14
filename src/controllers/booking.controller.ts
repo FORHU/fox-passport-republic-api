@@ -161,6 +161,16 @@ export default class BookingCtrl {
         ...venueTxPromises,
       ]);
 
+      // Mark any waitlist hold as converted for this user
+      try {
+        await WaitlistSvc.markAsConverted(
+          value.templateId,
+          req.user!.userId,
+        );
+      } catch (err) {
+        console.error("Failed to mark waitlist hold as converted:", err);
+      }
+
       return res
         .status(201)
         .json({ success: true, data: { booking, eventId: event.id } });
@@ -421,7 +431,7 @@ export default class BookingCtrl {
         try {
           const templateId = booking.event?.templateId;
           if (templateId) {
-            await WaitlistSvc.notifyFirstInLine(templateId);
+            await WaitlistSvc.assignAndNotifyFirstInLine(templateId);
           }
         } catch (err) {
           console.error("Failed to notify waitlist after cancellation:", err);
@@ -537,11 +547,11 @@ export default class BookingCtrl {
       try {
         const templateId = booking.event?.templateId;
         if (templateId) {
-          await WaitlistSvc.notifyFirstInLine(templateId);
+            await WaitlistSvc.assignAndNotifyFirstInLine(templateId);
+          }
+        } catch (err) {
+          console.error("Failed to notify waitlist after cancellation:", err);
         }
-      } catch (err) {
-        console.error("Failed to notify waitlist after cancellation:", err);
-      }
 
       return res
         .status(200)

@@ -51,11 +51,41 @@ export default class WaitlistRepo {
 
   static async getFirstInLine(templateId: string) {
     return prisma.waitlist.findFirst({
-      where: { templateId },
+      where: { templateId, status: "waiting" },
       orderBy: { createdAt: "asc" },
       include: {
         user: { select: { id: true, name: true, email: true } },
       },
+    });
+  }
+
+  static async findAssignedEntry(templateId: string, userId: string) {
+    return prisma.waitlist.findFirst({
+      where: { templateId, userId, status: "assigned" },
+    });
+  }
+
+  static async markAsAssigned(id: string, holdExpiresAt: Date) {
+    return prisma.waitlist.update({
+      where: { id },
+      data: { status: "assigned", holdExpiresAt },
+    });
+  }
+
+  static async markAsConverted(templateId: string, userId: string) {
+    return prisma.waitlist.updateMany({
+      where: { templateId, userId, status: "assigned" },
+      data: { status: "converted" },
+    });
+  }
+
+  static async expireStaleHolds() {
+    return prisma.waitlist.updateMany({
+      where: {
+        status: "assigned",
+        holdExpiresAt: { lt: new Date() },
+      },
+      data: { status: "expired" },
     });
   }
 
