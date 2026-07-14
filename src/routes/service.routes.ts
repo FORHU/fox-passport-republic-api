@@ -12,19 +12,19 @@ router.get("/:id", ServiceCtrl.getServiceById);
 router.post(
   "/create",
   authenticate,
-  requireRole(["foxerService"]),
+  requireRole(["serviceFoxer"]),
   ServiceCtrl.createService,
 );
 router.put(
   "/:id",
   authenticate,
-  requireRole(["foxerService"]),
+  requireRole(["serviceFoxer"]),
   ServiceCtrl.updateService,
 );
 router.delete(
   "/:id",
   authenticate,
-  requireRole(["foxerService"]),
+  requireRole(["serviceFoxer"]),
   ServiceCtrl.deleteService,
 );
 

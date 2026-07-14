@@ -116,7 +116,7 @@ export default class AssetBookingSvc {
       }
       import("./passport.service").then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
         const ownerId = (booking.asset as any)?.ownerId ?? (booking.asset as any)?.owner?.id;
-        if (ownerId) return PassportSvc.awardXP(ownerId, UserPath.foxer, XP_REWARDS.listingBooked);
+        if (ownerId) return PassportSvc.awardXP(ownerId, UserPath.gearFoxer, XP_REWARDS.listingBooked);
       }).catch(() => {});
     }
 

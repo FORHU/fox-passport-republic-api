@@ -9,7 +9,7 @@ const router = express.Router();
 router.post(
   "/onboard",
   authenticate,
-  requireRole(["mayor", "host", "foxerAsset", "foxerService"]),
+  requireRole(["venueFoxer", "eventFoxer", "gearFoxer", "serviceFoxer"]),
   StripeConnectCtrl.createOnboardingLink,
 );
 router.get("/status", authenticate, StripeConnectCtrl.getStatus);
