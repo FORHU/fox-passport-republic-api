@@ -16,7 +16,9 @@ export default class PassportCtrl {
     try {
       const passport = await PassportSvc.getByUserId(req.params.userId);
       if (!passport)
-        return res.status(404).json({ success: false, message: "Passport not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "Passport not found" });
       return res.status(200).json({ success: true, data: passport });
     } catch (err: any) {
       return res.status(500).json({ success: false, message: err.message });
@@ -25,7 +27,9 @@ export default class PassportCtrl {
 
   static async getAllBadges(req: Request, res: Response) {
     try {
-      const badges = await prisma.badge.findMany({ orderBy: [{ path: "asc" }, { rarity: "asc" }] });
+      const badges = await prisma.badge.findMany({
+        orderBy: [{ path: "asc" }, { rarity: "asc" }],
+      });
       return res.status(200).json({ success: true, data: badges });
     } catch (err: any) {
       return res.status(500).json({ success: false, message: err.message });

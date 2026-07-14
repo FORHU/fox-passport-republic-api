@@ -281,6 +281,34 @@ export default class BookingSvc {
     return updated;
   }
 
+  // Host scans the booking QR at the door: mark checked-in AND immediately
+  // settle the booking so the host (and all providers) receive their payout.
+  // Reuses the existing payout trigger in updateStatus (status -> completed).
+  static async checkInAndSettle(id: string, hostId: string) {
+    const booking = await BookingRepo.findById(id);
+    if (!booking) throw new Error("Booking not found");
+
+    const organizerId = (booking.event as any)?.organizerId;
+    if (organizerId !== hostId) {
+      throw new Error("Unauthorized — you are not the host of this event");
+    }
+
+    // Don't release a payout for an unpaid/cancelled booking.
+    if (["pending", "cancelled"].includes(booking.status)) {
+      throw new Error("Booking is not confirmed/paid yet");
+    }
+
+    // Already settled — idempotent, no re-payout.
+    if (booking.status === ItemBookingStatus.completed) {
+      return { booking, payoutTriggered: false, alreadySettled: true };
+    }
+
+    await BookingRepo.update(id, { checkedIn: true });
+    await this.updateStatus(id, ItemBookingStatus.completed, hostId);
+
+    return { booking: await BookingRepo.findById(id), payoutTriggered: true };
+  }
+
   static async confirmArrival(id: string, requesterId: string) {
     const booking = await BookingRepo.findById(id);
     if (!booking) throw new Error("Booking not found");

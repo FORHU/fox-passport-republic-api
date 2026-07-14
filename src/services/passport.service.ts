@@ -26,7 +26,11 @@ function xpRequiredForLevel(level: number): number {
   return total;
 }
 
-function calculateLevel(totalXP: number): { level: number; currentXP: number; requiredXP: number } {
+function calculateLevel(totalXP: number): {
+  level: number;
+  currentXP: number;
+  requiredXP: number;
+} {
   let level = 1;
   while (totalXP >= xpRequiredForLevel(level + 1)) {
     level++;
@@ -46,7 +50,11 @@ export default class PassportSvc {
       where: { userId },
       create: { userId },
       update: {},
-      include: { paths: true, stamps: { orderBy: { createdAt: "desc" } }, userBadges: { include: { badge: true } } },
+      include: {
+        paths: true,
+        stamps: { orderBy: { createdAt: "desc" } },
+        userBadges: { include: { badge: true } },
+      },
     });
   }
 
@@ -67,7 +75,9 @@ export default class PassportSvc {
     if (!badge) return;
     const passport = await PassportSvc.getOrCreate(userId);
     await prisma.userBadge.upsert({
-      where: { passportId_badgeId: { passportId: passport.id, badgeId: badge.id } },
+      where: {
+        passportId_badgeId: { passportId: passport.id, badgeId: badge.id },
+      },
       create: { passportId: passport.id, badgeId: badge.id },
       update: {},
     });
@@ -83,14 +93,24 @@ export default class PassportSvc {
 
     await prisma.passportPath.upsert({
       where: { passportId_path: { passportId: passport.id, path } },
-      create: { passportId: passport.id, path, level, currentXP, totalXP: newTotalXP },
+      create: {
+        passportId: passport.id,
+        path,
+        level,
+        currentXP,
+        totalXP: newTotalXP,
+      },
       update: { level, currentXP, totalXP: newTotalXP },
     });
 
     // Award level-based badges when crossing thresholds
     if (level !== prevLevel && path === UserPath.venueFoxer) {
-      if (prevLevel < 3 && level >= 3) PassportSvc.awardBadgeByName(userId, "District Champion").catch(() => {});
-      if (prevLevel < 18 && level >= 18) PassportSvc.awardBadgeByName(userId, "Grand Mayor").catch(() => {});
+      if (prevLevel < 3 && level >= 3)
+        PassportSvc.awardBadgeByName(userId, "District Champion").catch(
+          () => {},
+        );
+      if (prevLevel < 18 && level >= 18)
+        PassportSvc.awardBadgeByName(userId, "Grand Mayor").catch(() => {});
     }
 
     return { level, currentXP, requiredXP, totalXP: newTotalXP };
@@ -102,7 +122,14 @@ export default class PassportSvc {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
-        event: { select: { name: true, startAt: true, targetCity: true, targetCountry: true } },
+        event: {
+          select: {
+            name: true,
+            startAt: true,
+            targetCity: true,
+            targetCountry: true,
+          },
+        },
         user: { select: { id: true } },
       },
     });
@@ -111,12 +138,15 @@ export default class PassportSvc {
     const passport = await PassportSvc.getOrCreate(booking.userId);
 
     // Idempotent — if stamp already exists for this booking, skip
-    const existing = await prisma.passportStamp.findUnique({ where: { bookingId } });
+    const existing = await prisma.passportStamp.findUnique({
+      where: { bookingId },
+    });
     if (existing) return;
 
-    const location = [booking.event?.targetCity, booking.event?.targetCountry]
-      .filter(Boolean)
-      .join(", ") || null;
+    const location =
+      [booking.event?.targetCity, booking.event?.targetCountry]
+        .filter(Boolean)
+        .join(", ") || null;
 
     await prisma.passportStamp.create({
       data: {
@@ -129,7 +159,11 @@ export default class PassportSvc {
       },
     });
 
-    await PassportSvc.awardXP(booking.userId, UserPath.user, XP_REWARDS.attendEvent);
+    await PassportSvc.awardXP(
+      booking.userId,
+      UserPath.user,
+      XP_REWARDS.attendEvent,
+    );
   }
 
   static async getLeaderboard(limit = 20) {

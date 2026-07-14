@@ -111,10 +111,19 @@ export default class ServiceBookingSvc {
       } catch (err) {
         console.error(`Payout failed for service booking ${id}`, err);
       }
-      import("./passport.service").then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
-        const ownerId = (booking.service as any)?.ownerId ?? (booking.service as any)?.owner?.id;
-        if (ownerId) return PassportSvc.awardXP(ownerId, UserPath.serviceFoxer, XP_REWARDS.listingBooked);
-      }).catch(() => {});
+      import("./passport.service")
+        .then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
+          const ownerId =
+            (booking.service as any)?.ownerId ??
+            (booking.service as any)?.owner?.id;
+          if (ownerId)
+            return PassportSvc.awardXP(
+              ownerId,
+              UserPath.serviceFoxer,
+              XP_REWARDS.listingBooked,
+            );
+        })
+        .catch(() => {});
     }
 
     return updated;
