@@ -182,46 +182,46 @@ model EventFoxerApplication {
 }
 
 model File {
-  id                    String                    @id @default(uuid())
-  url                   String
-  name                  String
-  type                  String
-  uploadedBy            String?
-  venueId               String?
-  assetId               String?
-  serviceId             String?
-  templateId            String?
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
-  deletedAt             DateTime?
-  asset                 Asset?                    @relation(fields: [assetId], references: [id])
-  service               Service?                  @relation(fields: [serviceId], references: [id])
-  template              EventTemplate?            @relation(fields: [templateId], references: [id])
-  user                  User?                     @relation(fields: [uploadedBy], references: [id])
-  venue                 Venue?                    @relation(fields: [venueId], references: [id])
-  gearFoxerBirPermit        GearFoxerApplication[]    @relation("GearFoxerBirPermit")
-  gearFoxerNbi              GearFoxerApplication[]    @relation("GearFoxerNBI")
-  gearFoxerSelfie           GearFoxerApplication[]    @relation("GearFoxerSelfie")
-  gearFoxerTinId            GearFoxerApplication[]    @relation("GearFoxerTinId")
-  gearFoxerValidId1         GearFoxerApplication[]    @relation("GearFoxerValidId1")
-  serviceFoxerBirPermit     ServiceFoxerApplication[] @relation("ServiceFoxerBirPermit")
-  serviceFoxerNbi           ServiceFoxerApplication[] @relation("ServiceFoxerNBI")
-  serviceFoxerSelfie        ServiceFoxerApplication[] @relation("ServiceFoxerSelfie")
-  serviceFoxerTinId         ServiceFoxerApplication[] @relation("ServiceFoxerTinId")
-  serviceFoxerValidId1      ServiceFoxerApplication[] @relation("ServiceFoxerValidId1")
-  eventFoxerBirPermit       EventFoxerApplication[]   @relation("EventFoxerBirPermit")
-  eventFoxerNbi             EventFoxerApplication[]   @relation("EventFoxerNBI")
-  eventFoxerPortfolio       EventFoxerApplication[]   @relation("EventFoxerPortfolio")
-  eventFoxerSelfie          EventFoxerApplication[]   @relation("EventFoxerSelfie")
-  eventFoxerTinId           EventFoxerApplication[]   @relation("EventFoxerTinId")
-  eventFoxerValidId1        EventFoxerApplication[]   @relation("EventFoxerValidId1")
-  investorProof             InvestorApplication[]     @relation("InvestorProof")
-  venueFoxerBirPermit       VenueFoxerApplication[]   @relation("VenueFoxerBirPermit")
-  venueFoxerNbi             VenueFoxerApplication[]   @relation("VenueFoxerNBI")
-  venueFoxerSelfie          VenueFoxerApplication[]   @relation("VenueFoxerSelfie")
-  venueFoxerTinId           VenueFoxerApplication[]   @relation("VenueFoxerTinId")
-  venueFoxerValidId1        VenueFoxerApplication[]   @relation("VenueFoxerValidId1")
-  eventFoxerPortfolioMany   EventFoxerApplication[]   @relation("EventFoxerPortfolioMany")
+  id                      String                    @id @default(uuid())
+  url                     String
+  name                    String
+  type                    String
+  uploadedBy              String?
+  venueId                 String?
+  assetId                 String?
+  serviceId               String?
+  templateId              String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  deletedAt               DateTime?
+  asset                   Asset?                    @relation(fields: [assetId], references: [id])
+  service                 Service?                  @relation(fields: [serviceId], references: [id])
+  template                EventTemplate?            @relation(fields: [templateId], references: [id])
+  user                    User?                     @relation(fields: [uploadedBy], references: [id])
+  venue                   Venue?                    @relation(fields: [venueId], references: [id])
+  gearFoxerBirPermit      GearFoxerApplication[]    @relation("GearFoxerBirPermit")
+  gearFoxerNbi            GearFoxerApplication[]    @relation("GearFoxerNBI")
+  gearFoxerSelfie         GearFoxerApplication[]    @relation("GearFoxerSelfie")
+  gearFoxerTinId          GearFoxerApplication[]    @relation("GearFoxerTinId")
+  gearFoxerValidId1       GearFoxerApplication[]    @relation("GearFoxerValidId1")
+  serviceFoxerBirPermit   ServiceFoxerApplication[] @relation("ServiceFoxerBirPermit")
+  serviceFoxerNbi         ServiceFoxerApplication[] @relation("ServiceFoxerNBI")
+  serviceFoxerSelfie      ServiceFoxerApplication[] @relation("ServiceFoxerSelfie")
+  serviceFoxerTinId       ServiceFoxerApplication[] @relation("ServiceFoxerTinId")
+  serviceFoxerValidId1    ServiceFoxerApplication[] @relation("ServiceFoxerValidId1")
+  eventFoxerBirPermit     EventFoxerApplication[]   @relation("EventFoxerBirPermit")
+  eventFoxerNbi           EventFoxerApplication[]   @relation("EventFoxerNBI")
+  eventFoxerPortfolio     EventFoxerApplication[]   @relation("EventFoxerPortfolio")
+  eventFoxerSelfie        EventFoxerApplication[]   @relation("EventFoxerSelfie")
+  eventFoxerTinId         EventFoxerApplication[]   @relation("EventFoxerTinId")
+  eventFoxerValidId1      EventFoxerApplication[]   @relation("EventFoxerValidId1")
+  investorProof           InvestorApplication[]     @relation("InvestorProof")
+  venueFoxerBirPermit     VenueFoxerApplication[]   @relation("VenueFoxerBirPermit")
+  venueFoxerNbi           VenueFoxerApplication[]   @relation("VenueFoxerNBI")
+  venueFoxerSelfie        VenueFoxerApplication[]   @relation("VenueFoxerSelfie")
+  venueFoxerTinId         VenueFoxerApplication[]   @relation("VenueFoxerTinId")
+  venueFoxerValidId1      VenueFoxerApplication[]   @relation("VenueFoxerValidId1")
+  eventFoxerPortfolioMany EventFoxerApplication[]   @relation("EventFoxerPortfolioMany")
 }
 
 model Passport {
@@ -614,6 +614,8 @@ model Booking {
   venueTransactions   EventVenueTransaction[]
   reviews             Review[]
   refunds             Refund[]
+  passportStamp       PassportStamp?
+  stamp               Stamp?
 }
 
 model BookingAttendee {
