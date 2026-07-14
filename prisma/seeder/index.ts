@@ -7,3 +7,4 @@ export * from "./booking.seeder";
 export * from "./review.seeder";
 export * from "./item-booking.seeder";
 export * from "./badge.seeder";
+export * from "./passport.seeder";

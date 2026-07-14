@@ -31,4 +31,14 @@ export default class PassportCtrl {
       return res.status(500).json({ success: false, message: err.message });
     }
   }
+
+  static async getLeaderboard(req: Request, res: Response) {
+    try {
+      const limit = Math.min(Number(req.query.limit) || 20, 50);
+      const data = await PassportSvc.getLeaderboard(limit);
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
 }

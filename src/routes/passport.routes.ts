@@ -5,6 +5,7 @@ import { authenticate, optionalAuth } from "../middleware/auth.middleware";
 const router = express.Router();
 
 router.get("/badges", PassportCtrl.getAllBadges);
+router.get("/leaderboard", PassportCtrl.getLeaderboard);
 router.get("/me", authenticate, PassportCtrl.getMyPassport);
 router.get("/:userId", optionalAuth, PassportCtrl.getPassportByUserId);
 
