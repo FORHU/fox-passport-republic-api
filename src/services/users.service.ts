@@ -68,7 +68,7 @@ export default class UsersSvc {
 
   // BECOME HOST — adds "host" to roleType array
   static async becomeHost(userId: string) {
-    return UsersRepo.addRoleType(userId, "host");
+    return UsersRepo.addRoleType(userId, "eventFoxer");
   }
 
   // FOXER STATS
