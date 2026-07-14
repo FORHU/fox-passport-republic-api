@@ -113,7 +113,7 @@ export default class ServiceBookingSvc {
       }
       import("./passport.service").then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
         const ownerId = (booking.service as any)?.ownerId ?? (booking.service as any)?.owner?.id;
-        if (ownerId) return PassportSvc.awardXP(ownerId, UserPath.foxer, XP_REWARDS.listingBooked);
+        if (ownerId) return PassportSvc.awardXP(ownerId, UserPath.serviceFoxer, XP_REWARDS.listingBooked);
       }).catch(() => {});
     }
 

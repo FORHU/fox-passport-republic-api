@@ -88,7 +88,7 @@ export default class PassportSvc {
     });
 
     // Award level-based badges when crossing thresholds
-    if (level !== prevLevel && path === UserPath.mayor) {
+    if (level !== prevLevel && path === UserPath.venueFoxer) {
       if (prevLevel < 3 && level >= 3) PassportSvc.awardBadgeByName(userId, "District Champion").catch(() => {});
       if (prevLevel < 18 && level >= 18) PassportSvc.awardBadgeByName(userId, "Grand Mayor").catch(() => {});
     }

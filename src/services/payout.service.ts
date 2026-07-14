@@ -122,7 +122,7 @@ export default class PayoutSvc {
     const results = await Promise.allSettled([
       this.createAndFire({
         recipientId: booking.asset.ownerId,
-        role: RoleType.foxerAsset,
+        role: RoleType.gearFoxer,
         sourceType: "assetBooking",
         sourceId: booking.id,
         amount: booking.totalAmount - booking.platformFeeAmount,
@@ -142,7 +142,7 @@ export default class PayoutSvc {
     const results = await Promise.allSettled([
       this.createAndFire({
         recipientId: booking.service.ownerId,
-        role: RoleType.foxerService,
+        role: RoleType.serviceFoxer,
         sourceType: "serviceBooking",
         sourceId: booking.id,
         amount: booking.totalAmount - booking.platformFeeAmount,
@@ -180,7 +180,7 @@ export default class PayoutSvc {
       jobs.push(
         this.createAndFire({
           recipientId: tx.providerId,
-          role: RoleType.foxerAsset,
+          role: RoleType.gearFoxer,
           sourceType: "eventAssetTransaction",
           sourceId: tx.id,
           amount: tx.agreedPrice,
@@ -191,7 +191,7 @@ export default class PayoutSvc {
       jobs.push(
         this.createAndFire({
           recipientId: tx.providerId,
-          role: RoleType.foxerService,
+          role: RoleType.serviceFoxer,
           sourceType: "eventServiceTransaction",
           sourceId: tx.id,
           amount: tx.agreedPrice,
@@ -202,7 +202,7 @@ export default class PayoutSvc {
       jobs.push(
         this.createAndFire({
           recipientId: tx.providerId,
-          role: RoleType.mayor,
+          role: RoleType.venueFoxer,
           sourceType: "eventVenueTransaction",
           sourceId: tx.id,
           amount: tx.agreedPrice,
@@ -214,7 +214,7 @@ export default class PayoutSvc {
     jobs.push(
       this.createAndFire({
         recipientId: booking.event.organizerId,
-        role: RoleType.host,
+        role: RoleType.eventFoxer,
         sourceType: "eventHostMarkup",
         sourceId: booking.id,
         amount: booking.event.hostMarkupAmount,
