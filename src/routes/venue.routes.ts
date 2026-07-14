@@ -15,7 +15,12 @@ router.post(
   requireRole(["venueFoxer"]),
   VenueCtrl.createVenue,
 );
-router.put("/:id", authenticate, requireRole(["venueFoxer"]), VenueCtrl.updateVenue);
+router.put(
+  "/:id",
+  authenticate,
+  requireRole(["venueFoxer"]),
+  VenueCtrl.updateVenue,
+);
 router.delete(
   "/:id",
   authenticate,

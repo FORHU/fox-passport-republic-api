@@ -1,4 +1,8 @@
-import { EventCategory, MatchConstraint, MatchRequestStatus } from "@prisma/client";
+import {
+  EventCategory,
+  MatchConstraint,
+  MatchRequestStatus,
+} from "@prisma/client";
 import { prisma } from "../utils/prisma";
 import EventTemplateRepo from "../repositories/event-template.repository";
 import { PLATFORM_FEE_PERCENT } from "../config";
@@ -567,7 +571,13 @@ export default class EventTemplateSvc {
             matchedAt: true,
             description: true,
             date: true,
-            asset: { select: { id: true, name: true, owner: { select: { id: true, name: true, imgId: true } } } },
+            asset: {
+              select: {
+                id: true,
+                name: true,
+                owner: { select: { id: true, name: true, imgId: true } },
+              },
+            },
           },
         },
         templateServices: {
@@ -578,7 +588,13 @@ export default class EventTemplateSvc {
             matchedAt: true,
             description: true,
             date: true,
-            service: { select: { id: true, name: true, owner: { select: { id: true, name: true, imgId: true } } } },
+            service: {
+              select: {
+                id: true,
+                name: true,
+                owner: { select: { id: true, name: true, imgId: true } },
+              },
+            },
           },
         },
         templateVenues: {
@@ -589,7 +605,13 @@ export default class EventTemplateSvc {
             matchedAt: true,
             description: true,
             date: true,
-            venue: { select: { id: true, name: true, mayor: { select: { id: true, name: true, imgId: true } } } },
+            venue: {
+              select: {
+                id: true,
+                name: true,
+                mayor: { select: { id: true, name: true, imgId: true } },
+              },
+            },
           },
         },
       },
@@ -602,9 +624,24 @@ export default class EventTemplateSvc {
       targetCity: t.targetCity,
       targetState: t.targetState,
       requests: [
-        ...t.templateAssets.map((a) => ({ ...a, type: "asset" as const, provider: a.asset?.owner ?? null, item: a.asset })),
-        ...t.templateServices.map((s) => ({ ...s, type: "service" as const, provider: s.service?.owner ?? null, item: s.service })),
-        ...t.templateVenues.map((v) => ({ ...v, type: "venue" as const, provider: v.venue?.mayor ?? null, item: v.venue })),
+        ...t.templateAssets.map((a) => ({
+          ...a,
+          type: "asset" as const,
+          provider: a.asset?.owner ?? null,
+          item: a.asset,
+        })),
+        ...t.templateServices.map((s) => ({
+          ...s,
+          type: "service" as const,
+          provider: s.service?.owner ?? null,
+          item: s.service,
+        })),
+        ...t.templateVenues.map((v) => ({
+          ...v,
+          type: "venue" as const,
+          provider: v.venue?.mayor ?? null,
+          item: v.venue,
+        })),
       ],
     }));
   }
@@ -621,7 +658,16 @@ export default class EventTemplateSvc {
           description: true,
           date: true,
           asset: { select: { id: true, name: true } },
-          template: { select: { id: true, name: true, category: true, targetCity: true, targetState: true, owner: { select: { id: true, name: true, imgId: true } } } },
+          template: {
+            select: {
+              id: true,
+              name: true,
+              category: true,
+              targetCity: true,
+              targetState: true,
+              owner: { select: { id: true, name: true, imgId: true } },
+            },
+          },
         },
       }),
       prisma.eventTemplateService.findMany({
@@ -633,7 +679,16 @@ export default class EventTemplateSvc {
           description: true,
           date: true,
           service: { select: { id: true, name: true } },
-          template: { select: { id: true, name: true, category: true, targetCity: true, targetState: true, owner: { select: { id: true, name: true, imgId: true } } } },
+          template: {
+            select: {
+              id: true,
+              name: true,
+              category: true,
+              targetCity: true,
+              targetState: true,
+              owner: { select: { id: true, name: true, imgId: true } },
+            },
+          },
         },
       }),
       prisma.eventTemplateVenue.findMany({
@@ -645,16 +700,33 @@ export default class EventTemplateSvc {
           description: true,
           date: true,
           venue: { select: { id: true, name: true } },
-          template: { select: { id: true, name: true, category: true, targetCity: true, targetState: true, owner: { select: { id: true, name: true, imgId: true } } } },
+          template: {
+            select: {
+              id: true,
+              name: true,
+              category: true,
+              targetCity: true,
+              targetState: true,
+              owner: { select: { id: true, name: true, imgId: true } },
+            },
+          },
         },
       }),
     ]);
 
     return [
       ...assets.map((a) => ({ ...a, type: "asset" as const, item: a.asset })),
-      ...services.map((s) => ({ ...s, type: "service" as const, item: s.service })),
+      ...services.map((s) => ({
+        ...s,
+        type: "service" as const,
+        item: s.service,
+      })),
       ...venues.map((v) => ({ ...v, type: "venue" as const, item: v.venue })),
-    ].sort((a, b) => new Date(b.matchedAt ?? 0).getTime() - new Date(a.matchedAt ?? 0).getTime());
+    ].sort(
+      (a, b) =>
+        new Date(b.matchedAt ?? 0).getTime() -
+        new Date(a.matchedAt ?? 0).getTime(),
+    );
   }
 
   // Provider accepts or declines a match request.
@@ -664,24 +736,48 @@ export default class EventTemplateSvc {
     responderId: string;
     status: MatchRequestStatus;
   }) {
-    if (params.status !== MatchRequestStatus.accepted && params.status !== MatchRequestStatus.declined) {
+    if (
+      params.status !== MatchRequestStatus.accepted &&
+      params.status !== MatchRequestStatus.declined
+    ) {
       throw new Error("status must be 'accepted' or 'declined'");
     }
 
     if (params.type === "asset") {
-      const row = await prisma.eventTemplateAsset.findUnique({ where: { id: params.matchId }, include: { asset: true } });
-      if (!row || row.asset?.ownerId !== params.responderId) throw new Error("Not found or unauthorized");
-      return prisma.eventTemplateAsset.update({ where: { id: params.matchId }, data: { matchRequestStatus: params.status } });
+      const row = await prisma.eventTemplateAsset.findUnique({
+        where: { id: params.matchId },
+        include: { asset: true },
+      });
+      if (!row || row.asset?.ownerId !== params.responderId)
+        throw new Error("Not found or unauthorized");
+      return prisma.eventTemplateAsset.update({
+        where: { id: params.matchId },
+        data: { matchRequestStatus: params.status },
+      });
     }
     if (params.type === "service") {
-      const row = await prisma.eventTemplateService.findUnique({ where: { id: params.matchId }, include: { service: true } });
-      if (!row || row.service?.ownerId !== params.responderId) throw new Error("Not found or unauthorized");
-      return prisma.eventTemplateService.update({ where: { id: params.matchId }, data: { matchRequestStatus: params.status } });
+      const row = await prisma.eventTemplateService.findUnique({
+        where: { id: params.matchId },
+        include: { service: true },
+      });
+      if (!row || row.service?.ownerId !== params.responderId)
+        throw new Error("Not found or unauthorized");
+      return prisma.eventTemplateService.update({
+        where: { id: params.matchId },
+        data: { matchRequestStatus: params.status },
+      });
     }
     if (params.type === "venue") {
-      const row = await prisma.eventTemplateVenue.findUnique({ where: { id: params.matchId }, include: { venue: true } });
-      if (!row || row.venue?.mayorId !== params.responderId) throw new Error("Not found or unauthorized");
-      return prisma.eventTemplateVenue.update({ where: { id: params.matchId }, data: { matchRequestStatus: params.status } });
+      const row = await prisma.eventTemplateVenue.findUnique({
+        where: { id: params.matchId },
+        include: { venue: true },
+      });
+      if (!row || row.venue?.mayorId !== params.responderId)
+        throw new Error("Not found or unauthorized");
+      return prisma.eventTemplateVenue.update({
+        where: { id: params.matchId },
+        data: { matchRequestStatus: params.status },
+      });
     }
     throw new Error("Invalid type");
   }
