@@ -89,6 +89,7 @@ export default class BookingSvc {
         startAt,
         endAt,
         expiresAt,
+        ticketCode: `BKG-${crypto.randomBytes(5).toString("hex").toUpperCase()}`,
         event: { connect: { id: event.id } },
         user: { connect: { id: userId } },
       });
@@ -129,6 +130,7 @@ export default class BookingSvc {
       startAt: event.startAt,
       endAt: event.endAt,
       expiresAt,
+      ticketCode: `BKG-${crypto.randomBytes(5).toString("hex").toUpperCase()}`,
       event: { connect: { id: eventId } },
       user: { connect: { id: userId } },
       attendees: { create: attendeesWithTickets },
@@ -267,6 +269,12 @@ export default class BookingSvc {
         await PayoutSvc.createPayoutsForEventBooking(id);
       } catch (err) {
         console.error(`Payout failed for booking ${id}`, err);
+      }
+      try {
+        const PassportSvc = (await import("./passport.service")).default;
+        await PassportSvc.issueStamp(id);
+      } catch (err) {
+        console.error(`Passport stamp failed for booking ${id}`, err);
       }
     }
 

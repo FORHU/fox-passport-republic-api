@@ -1,7 +1,7 @@
 import express from "express";
 import BookingCtrl from "../controllers/booking.controller";
 import AttendeeCtrl from "../controllers/attendee.controller";
-import { authenticate, optionalAuth } from "../middleware/auth.middleware";
+import { authenticate, optionalAuth, requireHost } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -18,6 +18,9 @@ router.post("/:id/finalize", authenticate, BookingCtrl.finalizeGuests);
 router.post("/:bookingId/attendees", authenticate, AttendeeCtrl.addGuest);
 router.put("/:id/attendees", authenticate, BookingCtrl.appendAttendees);
 router.delete("/attendees/:id", authenticate, AttendeeCtrl.removeGuest);
+// static routes must come before /:id dynamic routes
+router.patch("/check-in", authenticate, requireHost, BookingCtrl.checkInBooking);
+router.patch("/attendees/check-in", authenticate, requireHost, BookingCtrl.checkInAttendee);
 router.patch(
   "/attendees/:id/respond",
   optionalAuth,
