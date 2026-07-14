@@ -4,8 +4,42 @@ import { prisma } from "../utils/prisma";
 const XP_PER_LEVEL = 1000;
 const XP_MULTIPLIER = 1.15;
 
+// Perk keys granted per path at specific level thresholds.
+// Order matters — lower levels first.
+const PERK_THRESHOLDS: Record<string, { level: number; perk: string }[]> = {
+  [UserPath.user]: [
+    { level: 1,  perk: "early_bird" },
+    { level: 5,  perk: "priority_access" },
+    { level: 10, perk: "vip_lounge" },
+    { level: 15, perk: "founding_citizen" },
+  ],
+  [UserPath.eventFoxer]: [
+    { level: 1,  perk: "host_support" },
+    { level: 5,  perk: "analytics_pro" },
+    { level: 10, perk: "featured_listing" },
+    { level: 15, perk: "event_boost" },
+  ],
+  [UserPath.venueFoxer]: [
+    { level: 1,  perk: "venue_authority" },
+    { level: 3,  perk: "city_badge" },
+    { level: 8,  perk: "venue_spotlight" },
+    { level: 15, perk: "mayor_verified" },
+  ],
+  [UserPath.gearFoxer]: [
+    { level: 1,  perk: "gear_verified" },
+    { level: 3,  perk: "lower_fees" },
+    { level: 8,  perk: "gear_featured" },
+  ],
+  [UserPath.serviceFoxer]: [
+    { level: 1,  perk: "service_verified" },
+    { level: 3,  perk: "service_lower_fees" },
+    { level: 8,  perk: "service_featured" },
+  ],
+};
+
 // XP earned per action (mirrors FE constants)
 const XP_REWARDS = {
+  bookEvent: 50,
   attendEvent: 100,
   leaveReview: 25,
   createListing: 100,
@@ -103,6 +137,38 @@ export default class PassportSvc {
       update: { level, currentXP, totalXP: newTotalXP },
     });
 
+    // Grant perks for every threshold crossed on this path
+    if (level !== prevLevel) {
+      const thresholds = PERK_THRESHOLDS[path] ?? [];
+      const newlyUnlocked = thresholds
+        .filter((t) => t.level > prevLevel && t.level <= level)
+        .map((t) => t.perk);
+
+      if (newlyUnlocked.length > 0) {
+        // Push only perks not already in the array (idempotent)
+        const current = await prisma.passport.findUnique({ where: { id: passport.id }, select: { perks: true } });
+        const existing = current?.perks ?? [];
+        const toAdd = newlyUnlocked.filter((p) => !existing.includes(p));
+        if (toAdd.length > 0) {
+          await prisma.passport.update({
+            where: { id: passport.id },
+            data: { perks: { push: toAdd } },
+          });
+        }
+      }
+    }
+
+    // Seed Lvl-1 perks on first XP award for a path (prevLevel stays 1 but existing=0 XP)
+    if (prevLevel === 1 && (existing?.totalXP ?? 0) === 0) {
+      const lvl1Perk = PERK_THRESHOLDS[path]?.find((t) => t.level === 1)?.perk;
+      if (lvl1Perk) {
+        const current = await prisma.passport.findUnique({ where: { id: passport.id }, select: { perks: true } });
+        if (!(current?.perks ?? []).includes(lvl1Perk)) {
+          await prisma.passport.update({ where: { id: passport.id }, data: { perks: { push: [lvl1Perk] } } });
+        }
+      }
+    }
+
     // Award level-based badges when crossing thresholds
     if (level !== prevLevel && path === UserPath.venueFoxer) {
       if (prevLevel < 3 && level >= 3)
@@ -164,6 +230,77 @@ export default class PassportSvc {
       UserPath.user,
       XP_REWARDS.attendEvent,
     );
+  }
+
+  // Sort a list of items so owners with the given perk appear first.
+  // perkPriority: ordered highest→lowest. Items are scored by their highest matching perk.
+  static async sortByFeaturedPerk<T extends Record<string, any>>(
+    items: T[],
+    perkPriority: string | string[],
+    ownerField = 'ownerId'
+  ): Promise<T[]> {
+    if (items.length === 0) return items;
+    const priority = Array.isArray(perkPriority) ? perkPriority : [perkPriority];
+    const ownerIds = [...new Set(items.map((i) => i[ownerField]).filter(Boolean) as string[])];
+    if (ownerIds.length === 0) return items;
+
+    const passports = await prisma.passport.findMany({
+      where: { userId: { in: ownerIds } },
+      select: { userId: true, perks: true },
+    });
+    const perkMap = new Map(passports.map((p) => [p.userId, p.perks]));
+
+    const score = (item: T) => {
+      const perks = perkMap.get(item[ownerField]) ?? [];
+      for (let i = 0; i < priority.length; i++) {
+        if (perks.includes(priority[i])) return priority.length - i;
+      }
+      return 0;
+    };
+
+    return [...items].sort((a, b) => score(b) - score(a));
+  }
+
+  // Check if a user has a specific perk key unlocked
+  static async hasPerk(userId: string, perkKey: string): Promise<boolean> {
+    const passport = await prisma.passport.findUnique({
+      where: { userId },
+      select: { perks: true },
+    });
+    return passport?.perks.includes(perkKey) ?? false;
+  }
+
+  // Enrich a list of items with the highest-priority badge each owner holds.
+  // Returns items with an added `ownerBadge: string | null` field.
+  static async enrichWithOwnerBadge<T extends Record<string, any>>(
+    items: T[],
+    badgePriority: string | string[],
+    ownerField = 'ownerId'
+  ): Promise<(T & { ownerBadge: string | null })[]> {
+    if (items.length === 0) return items.map((i) => ({ ...i, ownerBadge: null }));
+    const priority = Array.isArray(badgePriority) ? badgePriority : [badgePriority];
+    const ownerIds = [...new Set(items.map((i) => i[ownerField]).filter(Boolean) as string[])];
+
+    const passports = await prisma.passport.findMany({
+      where: { userId: { in: ownerIds } },
+      select: { userId: true, perks: true },
+    });
+    const perkMap = new Map(passports.map((p) => [p.userId, p.perks]));
+
+    return items.map((item) => {
+      const perks = perkMap.get(item[ownerField]) ?? [];
+      const badge = priority.find((b) => perks.includes(b)) ?? null;
+      return { ...item, ownerBadge: badge };
+    });
+  }
+
+  // Return all perk keys for a user
+  static async getPerks(userId: string): Promise<string[]> {
+    const passport = await prisma.passport.findUnique({
+      where: { userId },
+      select: { perks: true },
+    });
+    return passport?.perks ?? [];
   }
 
   static async getLeaderboard(limit = 20) {

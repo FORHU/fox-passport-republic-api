@@ -45,4 +45,46 @@ export default class PassportCtrl {
       return res.status(500).json({ success: false, message: err.message });
     }
   }
+
+  // host_support perk: returns priority support contact — 403 without perk
+  static async getPrioritySupportContact(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user?.userId as string;
+      const hasHostSupport = await PassportSvc.hasPerk(userId, "host_support");
+      if (!hasHostSupport) {
+        return res.status(403).json({
+          success: false,
+          message: "Host Support perk required — unlock at Event Foxer Level 1",
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        data: {
+          email: "priority@foxpassport.com",
+          whatsapp: "+63-900-FOX-HOST",
+          responseTime: "Within 1 hour, 24/7",
+          note: "Exclusive to Event Foxers with Host Support perk",
+        },
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  // founding_citizen perk: returns OG badge info for a user — for profile display
+  static async getMyBadges(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user?.userId as string;
+      const perks = await PassportSvc.getPerks(userId);
+      return res.status(200).json({
+        success: true,
+        data: {
+          isFoundingCitizen: perks.includes("founding_citizen"),
+          perks,
+        },
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
 }

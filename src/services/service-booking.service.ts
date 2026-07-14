@@ -43,7 +43,11 @@ export default class ServiceBookingSvc {
       endDate,
       billingRate: service.billingRate,
     });
-    const platformFeeAmount = itemsTotal * (PLATFORM_FEE_PERCENT / 100);
+    // service_lower_fees perk: service foxer owner pays 0% platform commission
+    const { default: PassportSvc } = await import("./passport.service");
+    const ownerHasLowerFees = await PassportSvc.hasPerk(service.ownerId, "service_lower_fees");
+    const effectiveFeePercent = ownerHasLowerFees ? 0 : PLATFORM_FEE_PERCENT;
+    const platformFeeAmount = itemsTotal * (effectiveFeePercent / 100);
     const totalAmount = itemsTotal + platformFeeAmount;
 
     return ServiceBookingRepo.create({
