@@ -52,15 +52,18 @@ export default class AssetSvc {
     ownerId?: string;
     category?: AssetCategory;
   }) {
-    return AssetRepo.findAllAssets(filters);
+    const assets = await AssetRepo.findAllAssets(filters);
+    const { default: PassportSvc } = await import("./passport.service");
+    const sorted = await PassportSvc.sortByFeaturedPerk(assets, 'gear_featured', 'ownerId');
+    return PassportSvc.enrichWithOwnerBadge(sorted, 'gear_verified', 'ownerId');
   }
 
   static async getAssetById(id: string) {
     const asset = await AssetRepo.findAssetById(id);
-    if (!asset) {
-      throw new Error("Asset not found");
-    }
-    return asset;
+    if (!asset) throw new Error("Asset not found");
+    const { default: PassportSvc } = await import("./passport.service");
+    const [enriched] = await PassportSvc.enrichWithOwnerBadge([asset], 'gear_verified', 'ownerId');
+    return enriched;
   }
 
   static async updateAsset(

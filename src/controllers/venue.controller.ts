@@ -78,7 +78,8 @@ export default class VenueCtrl {
   static async getVenueById(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const venue = await VenueSvc.getVenueById(id);
+      const requesterId = (req as any).user?.userId as string | undefined;
+      const venue = await VenueSvc.getVenueById(id, requesterId);
       return res.status(200).json({ venue });
     } catch (error: any) {
       return res.status(404).json({ message: error.message || error });

@@ -89,6 +89,34 @@ export default class ReviewSvc {
       if (reviewCount === 1) {
         await PassportSvc.awardBadgeByName(String(data.userId), "First Review");
       }
+
+      // Award receive5StarReview XP to the provider when rating is 5
+      if (data.rating >= 5) {
+        let providerId: string | null = null;
+        let providerPath: typeof UserPath[keyof typeof UserPath] = UserPath.user;
+
+        if (data.entityType === "venue") {
+          const venue = await prisma.venue.findUnique({ where: { id: data.entityId }, select: { mayorId: true } });
+          providerId = venue?.mayorId ?? null;
+          providerPath = UserPath.venueFoxer;
+        } else if (data.entityType === "asset") {
+          const asset = await prisma.asset.findUnique({ where: { id: data.entityId }, select: { ownerId: true } });
+          providerId = asset?.ownerId ?? null;
+          providerPath = UserPath.gearFoxer;
+        } else if (data.entityType === "service") {
+          const service = await prisma.service.findUnique({ where: { id: data.entityId }, select: { ownerId: true } });
+          providerId = service?.ownerId ?? null;
+          providerPath = UserPath.serviceFoxer;
+        } else if (data.entityType === "event") {
+          const event = await prisma.event.findUnique({ where: { id: data.entityId }, select: { organizerId: true } });
+          providerId = event?.organizerId ?? null;
+          providerPath = UserPath.eventFoxer;
+        }
+
+        if (providerId && providerId !== String(data.userId)) {
+          await PassportSvc.awardXP(providerId, providerPath, XP_REWARDS.receive5StarReview);
+        }
+      }
     }).catch(() => {});
 
     return review;

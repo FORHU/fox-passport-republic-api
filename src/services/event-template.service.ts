@@ -56,7 +56,14 @@ export default class EventTemplateSvc {
     category?: string;
   }) {
     const templates = await EventTemplateRepo.findAllTemplates(filters);
-    return templates.map((t) => ({
+    // event_boost (Lvl 15) > featured_listing (Lvl 10) > unranked
+    const { default: PassportSvc } = await import("./passport.service");
+    const sorted = await PassportSvc.sortByFeaturedPerk(
+      templates,
+      ['event_boost', 'featured_listing'],
+      'ownerId'
+    );
+    return sorted.map((t) => ({
       ...t,
       ...this.calculateTotalsBreakdown(t),
     }));
@@ -67,10 +74,16 @@ export default class EventTemplateSvc {
     category?: string;
     limit?: number;
   }) {
-    return EventTemplateRepo.findPublicTemplatesLite({
+    const templates = await EventTemplateRepo.findPublicTemplatesLite({
       category: filters.category,
       limit: filters.limit ?? 8,
     });
+    const { default: PassportSvc } = await import("./passport.service");
+    return PassportSvc.sortByFeaturedPerk(
+      templates,
+      ['event_boost', 'featured_listing'],
+      'ownerId'
+    );
   }
 
   static async getTemplateById(id: string) {
