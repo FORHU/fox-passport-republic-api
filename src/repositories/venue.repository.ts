@@ -1,7 +1,7 @@
 import { prisma } from "../utils/prisma";
 import { VenueStatus, BillingRate, VenueCategory } from "@prisma/client";
 
-const mayorSelect = { select: { id: true, name: true, email: true } } as const;
+const mayorSelect = { select: { id: true, name: true, email: true, imgId: true } } as const;
 
 export default class VenueRepo {
   static async createVenue(data: {
