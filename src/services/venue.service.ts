@@ -3,7 +3,7 @@ import { VenueStatus, BillingRate, VenueCategory } from "@prisma/client";
 
 export default class VenueSvc {
   private static isAdminRole(role?: string) {
-    return role ? ["admin", "super_admin", "mayor"].includes(role) : false;
+    return role ? ["admin", "super_admin", "venueFoxer"].includes(role) : false;
   }
 
   // ───────────────────────────────────────────────────────────

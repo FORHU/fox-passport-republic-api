@@ -52,7 +52,7 @@ export default class RoleRequestRepo {
             email: true,
           },
         },
-        mayorApplication: {
+        venueFoxerApplication: {
           include: {
             validId1: true,
             nbiFile: true,
@@ -61,7 +61,7 @@ export default class RoleRequestRepo {
             selfieFile: true,
           },
         },
-        hostApplication: {
+        eventFoxerApplication: {
           include: {
             validId1: true,
             nbiFile: true,
@@ -71,7 +71,7 @@ export default class RoleRequestRepo {
             portfolioFile: true,
           },
         },
-        foxerAssetApplication: {
+        gearFoxerApplication: {
           include: {
             validId1: true,
             nbiFile: true,
@@ -80,7 +80,7 @@ export default class RoleRequestRepo {
             selfieFile: true,
           },
         },
-        foxerServiceApplication: {
+        serviceFoxerApplication: {
           include: {
             validId1: true,
             nbiFile: true,
@@ -101,10 +101,10 @@ export default class RoleRequestRepo {
     return prisma.roleRequest.findMany({
       where: { userId },
       include: {
-        mayorApplication: true,
-        hostApplication: true,
-        foxerAssetApplication: true,
-        foxerServiceApplication: true,
+        venueFoxerApplication: true,
+        eventFoxerApplication: true,
+        gearFoxerApplication: true,
+        serviceFoxerApplication: true,
         investorApplication: true,
       },
       orderBy: { createdAt: "desc" },
@@ -119,7 +119,7 @@ export default class RoleRequestRepo {
       where: { id },
       include: {
         user: true,
-        mayorApplication: {
+        venueFoxerApplication: {
           include: {
             validId1: true,
             nbiFile: true,
@@ -128,7 +128,7 @@ export default class RoleRequestRepo {
             selfieFile: true,
           },
         },
-        hostApplication: {
+        eventFoxerApplication: {
           include: {
             validId1: true,
             nbiFile: true,
@@ -138,7 +138,7 @@ export default class RoleRequestRepo {
             portfolioFile: true,
           },
         },
-        foxerAssetApplication: {
+        gearFoxerApplication: {
           include: {
             validId1: true,
             nbiFile: true,
@@ -147,7 +147,7 @@ export default class RoleRequestRepo {
             selfieFile: true,
           },
         },
-        foxerServiceApplication: {
+        serviceFoxerApplication: {
           include: {
             validId1: true,
             nbiFile: true,
