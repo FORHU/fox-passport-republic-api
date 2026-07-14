@@ -110,7 +110,7 @@ export default class UsersCtrl {
           username: user.username,
           name: user.name,
           role: user.systemRole,
-          isHost: (user.roleType as string[]).includes("host"),
+          isHost: (user.roleType as string[]).includes("eventFoxer"),
         },
       });
     } catch (err: any) {

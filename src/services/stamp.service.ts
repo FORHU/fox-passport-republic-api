@@ -1,13 +1,9 @@
 import StampRepo from "../repositories/stamp.repository";
+import PassportSvc from "./passport.service";
 
 export default class StampSvc {
   static async createStamp(userId: string, bookingId: string) {
-    const existing = await StampRepo.findByBookingId(bookingId);
-    if (existing) {
-      throw new Error("DUPLICATE_STAMP");
-    }
-
-    const booking = await StampRepo.getBookingWithEvent(bookingId);
+    const booking = await StampRepo.getBookingForStamp(bookingId);
     if (!booking) {
       throw new Error("BOOKING_NOT_FOUND");
     }
@@ -16,18 +12,13 @@ export default class StampSvc {
       throw new Error("FORBIDDEN");
     }
 
-    const event = booking.event;
-    const imageUrl = event?.template?.images?.[0]?.url ?? "";
-    const eventName = event?.name ?? "";
-    const templateId = event?.templateId ?? null;
+    const existing = await StampRepo.findByBookingId(bookingId);
+    if (existing) {
+      throw new Error("DUPLICATE_STAMP");
+    }
 
-    return StampRepo.create({
-      userId,
-      bookingId,
-      templateId,
-      imageUrl,
-      eventName,
-    });
+    await PassportSvc.issueStamp(bookingId);
+    return StampRepo.findByBookingId(bookingId);
   }
 
   static async getStampsByUser(userId: string) {
