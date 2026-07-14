@@ -420,11 +420,12 @@ model EventTemplateAsset {
   date            DateTime?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
-  matched         Boolean         @default(false)
-  matchedAt       DateTime?
-  matchConstraint MatchConstraint @default(NONE)
-  asset           Asset?          @relation(fields: [assetId], references: [id])
-  template        EventTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  matched              Boolean              @default(false)
+  matchedAt            DateTime?
+  matchConstraint      MatchConstraint      @default(NONE)
+  matchRequestStatus   MatchRequestStatus   @default(pending)
+  asset                Asset?               @relation(fields: [assetId], references: [id])
+  template             EventTemplate        @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@map("event_template_assets")
 }
@@ -440,11 +441,12 @@ model EventTemplateService {
   date            DateTime?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
-  matched         Boolean         @default(false)
-  matchedAt       DateTime?
-  matchConstraint MatchConstraint @default(NONE)
-  service         Service?        @relation(fields: [serviceId], references: [id])
-  template        EventTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  matched              Boolean              @default(false)
+  matchedAt            DateTime?
+  matchConstraint      MatchConstraint      @default(NONE)
+  matchRequestStatus   MatchRequestStatus   @default(pending)
+  service              Service?             @relation(fields: [serviceId], references: [id])
+  template             EventTemplate        @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@map("event_template_services")
 }
@@ -460,11 +462,12 @@ model EventTemplateVenue {
   date            DateTime?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
-  matched         Boolean         @default(false)
-  matchedAt       DateTime?
-  matchConstraint MatchConstraint @default(NONE)
-  template        EventTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  venue           Venue?          @relation(fields: [venueId], references: [id])
+  matched              Boolean              @default(false)
+  matchedAt            DateTime?
+  matchConstraint      MatchConstraint      @default(NONE)
+  matchRequestStatus   MatchRequestStatus   @default(pending)
+  template             EventTemplate        @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  venue                Venue?               @relation(fields: [venueId], references: [id])
 
   @@map("event_template_venues")
 }
@@ -829,6 +832,13 @@ enum PayoutStatus {
   pending
   paid
   failed
+}
+
+enum MatchRequestStatus {
+  pending
+  accepted
+  declined
+  secured
 }
 
 enum MatchConstraint {

@@ -131,6 +131,25 @@ export default class PassportSvc {
 
     await PassportSvc.awardXP(booking.userId, UserPath.user, XP_REWARDS.attendEvent);
   }
+
+  static async getLeaderboard(limit = 20) {
+    const passports = await prisma.passport.findMany({
+      include: {
+        paths: true,
+        user: { select: { id: true, name: true, imgId: true, roleType: true } },
+      },
+    });
+
+    return passports
+      .map((p) => {
+        const totalXP = p.paths.reduce((sum, path) => sum + path.totalXP, 0);
+        const totalLevel = p.paths.reduce((sum, path) => sum + path.level, 0);
+        return { userId: p.userId, user: p.user, totalXP, totalLevel };
+      })
+      .sort((a, b) => b.totalXP - a.totalXP)
+      .slice(0, limit)
+      .map((entry, index) => ({ rank: index + 1, ...entry }));
+  }
 }
 
 export { XP_REWARDS, UserPath };

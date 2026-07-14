@@ -1,4 +1,4 @@
-import { PrismaClient, EventCategory, RequestStatus, EventStatus } from "@prisma/client";
+import { PrismaClient, EventCategory, RequestStatus, EventStatus, MatchRequestStatus } from "@prisma/client";
 
 // ── Deterministic IDs ────────────────────────────────────────────────────────
 const TEMPLATE_IDS = {
@@ -129,46 +129,48 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
     // ── 3. Attach assets / services / venues to templates ───────────────────
     type TemplateAttachment = {
       templateId: string;
-      assets: { id: string; assetId: string; quantity: number }[];
-      services: { id: string; serviceId: string }[];
-      venues: { id: string; venueId: string }[];
+      assets: { id: string; assetId: string; quantity: number; matched?: boolean; matchRequestStatus?: MatchRequestStatus; matchedAt?: Date }[];
+      services: { id: string; serviceId: string; matched?: boolean; matchRequestStatus?: MatchRequestStatus; matchedAt?: Date }[];
+      venues: { id: string; venueId: string; matched?: boolean; matchRequestStatus?: MatchRequestStatus; matchedAt?: Date }[];
     };
+
+    const matchedAt = new Date();
 
     const attachments: TemplateAttachment[] = [
       {
         templateId: TEMPLATE_IDS.birthday,
         assets:   [
-          { id: "seed-ta-birthday-floral",   assetId: ASSET_IDS.floral,   quantity: 1 },
-          { id: "seed-ta-birthday-speakers", assetId: ASSET_IDS.speakers, quantity: 2 },
+          { id: "seed-ta-birthday-floral",   assetId: ASSET_IDS.floral,   quantity: 1, matched: true, matchRequestStatus: MatchRequestStatus.accepted, matchedAt },
+          { id: "seed-ta-birthday-speakers", assetId: ASSET_IDS.speakers, quantity: 2, matched: true, matchRequestStatus: MatchRequestStatus.pending,  matchedAt },
         ],
         services: [
-          { id: "seed-ts-birthday-catering",  serviceId: SERVICE_IDS.catering },
-          { id: "seed-ts-birthday-waitstaff", serviceId: SERVICE_IDS.waitstaff },
+          { id: "seed-ts-birthday-catering",  serviceId: SERVICE_IDS.catering,  matched: true, matchRequestStatus: MatchRequestStatus.accepted, matchedAt },
+          { id: "seed-ts-birthday-waitstaff", serviceId: SERVICE_IDS.waitstaff, matched: true, matchRequestStatus: MatchRequestStatus.pending,  matchedAt },
         ],
-        venues: [{ id: "seed-tv-birthday-palace", venueId: VENUE_IDS.palace }],
+        venues: [{ id: "seed-tv-birthday-palace", venueId: VENUE_IDS.palace, matched: true, matchRequestStatus: MatchRequestStatus.accepted, matchedAt }],
       },
       {
         templateId: TEMPLATE_IDS.wedding,
         assets:   [
-          { id: "seed-ta-wedding-floral",   assetId: ASSET_IDS.floral,  quantity: 2 },
-          { id: "seed-ta-wedding-chairs",   assetId: ASSET_IDS.chairs,  quantity: 1 },
-          { id: "seed-ta-wedding-lights",   assetId: ASSET_IDS.lights,  quantity: 6 },
+          { id: "seed-ta-wedding-floral",   assetId: ASSET_IDS.floral,  quantity: 2, matched: true, matchRequestStatus: MatchRequestStatus.secured,  matchedAt },
+          { id: "seed-ta-wedding-chairs",   assetId: ASSET_IDS.chairs,  quantity: 1, matched: true, matchRequestStatus: MatchRequestStatus.secured,  matchedAt },
+          { id: "seed-ta-wedding-lights",   assetId: ASSET_IDS.lights,  quantity: 6, matched: true, matchRequestStatus: MatchRequestStatus.accepted, matchedAt },
         ],
         services: [
-          { id: "seed-ts-wedding-catering",  serviceId: SERVICE_IDS.catering },
-          { id: "seed-ts-wedding-photo",     serviceId: SERVICE_IDS.photo },
-          { id: "seed-ts-wedding-waitstaff", serviceId: SERVICE_IDS.waitstaff },
+          { id: "seed-ts-wedding-catering",  serviceId: SERVICE_IDS.catering,  matched: true, matchRequestStatus: MatchRequestStatus.secured,  matchedAt },
+          { id: "seed-ts-wedding-photo",     serviceId: SERVICE_IDS.photo,     matched: true, matchRequestStatus: MatchRequestStatus.accepted, matchedAt },
+          { id: "seed-ts-wedding-waitstaff", serviceId: SERVICE_IDS.waitstaff, matched: true, matchRequestStatus: MatchRequestStatus.declined, matchedAt },
         ],
-        venues: [{ id: "seed-tv-wedding-boracay", venueId: VENUE_IDS.boracay }],
+        venues: [{ id: "seed-tv-wedding-boracay", venueId: VENUE_IDS.boracay, matched: true, matchRequestStatus: MatchRequestStatus.secured, matchedAt }],
       },
       {
         templateId: TEMPLATE_IDS.corporate,
         assets:   [
-          { id: "seed-ta-corporate-speakers", assetId: ASSET_IDS.speakers, quantity: 2 },
+          { id: "seed-ta-corporate-speakers", assetId: ASSET_IDS.speakers, quantity: 2, matched: true, matchRequestStatus: MatchRequestStatus.pending, matchedAt },
           { id: "seed-ta-corporate-lights",   assetId: ASSET_IDS.lights,   quantity: 4 },
         ],
         services: [
-          { id: "seed-ts-corporate-photo",     serviceId: SERVICE_IDS.photo },
+          { id: "seed-ts-corporate-photo",     serviceId: SERVICE_IDS.photo,     matched: true, matchRequestStatus: MatchRequestStatus.accepted, matchedAt },
           { id: "seed-ts-corporate-catering",  serviceId: SERVICE_IDS.catering },
           { id: "seed-ts-corporate-waitstaff", serviceId: SERVICE_IDS.waitstaff },
         ],
@@ -199,26 +201,26 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
       for (const a of att.assets) {
         await prisma.eventTemplateAsset.upsert({
           where: { id: a.id },
-          update: { quantity: a.quantity },
-          create: { id: a.id, templateId: att.templateId, assetId: a.assetId, quantity: a.quantity },
+          update: { quantity: a.quantity, matched: a.matched ?? false, matchRequestStatus: a.matchRequestStatus ?? MatchRequestStatus.pending, matchedAt: a.matchedAt },
+          create: { id: a.id, templateId: att.templateId, assetId: a.assetId, quantity: a.quantity, matched: a.matched ?? false, matchRequestStatus: a.matchRequestStatus ?? MatchRequestStatus.pending, matchedAt: a.matchedAt },
         });
       }
       for (const s of att.services) {
         await prisma.eventTemplateService.upsert({
           where: { id: s.id },
-          update: {},
-          create: { id: s.id, templateId: att.templateId, serviceId: s.serviceId },
+          update: { matched: s.matched ?? false, matchRequestStatus: s.matchRequestStatus ?? MatchRequestStatus.pending, matchedAt: s.matchedAt },
+          create: { id: s.id, templateId: att.templateId, serviceId: s.serviceId, matched: s.matched ?? false, matchRequestStatus: s.matchRequestStatus ?? MatchRequestStatus.pending, matchedAt: s.matchedAt },
         });
       }
       for (const v of att.venues) {
         await prisma.eventTemplateVenue.upsert({
           where: { id: v.id },
-          update: {},
-          create: { id: v.id, templateId: att.templateId, venueId: v.venueId },
+          update: { matched: v.matched ?? false, matchRequestStatus: v.matchRequestStatus ?? MatchRequestStatus.pending, matchedAt: v.matchedAt },
+          create: { id: v.id, templateId: att.templateId, venueId: v.venueId, matched: v.matched ?? false, matchRequestStatus: v.matchRequestStatus ?? MatchRequestStatus.pending, matchedAt: v.matchedAt },
         });
       }
     }
-    console.log("✓ Template assets/services/venues attached");
+    console.log("✓ Template assets/services/venues attached with match statuses");
 
     // ── 4. Events (approved and pending) ────────────────────────────────────
     const now = new Date();

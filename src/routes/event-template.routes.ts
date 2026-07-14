@@ -94,6 +94,24 @@ router.post(
   EventTemplateCtrl.matchItem,
 );
 
+// Match request management
+router.get(
+  "/matches/outgoing",
+  authenticate,
+  requireRole(["eventFoxer"]),
+  EventTemplateCtrl.getOutgoingMatchRequests,
+);
+router.get(
+  "/matches/incoming",
+  authenticate,
+  EventTemplateCtrl.getIncomingMatchRequests,
+);
+router.patch(
+  "/matches/:matchId/respond",
+  authenticate,
+  EventTemplateCtrl.respondToMatch,
+);
+
 // Admin routes
 router.patch(
   "/:id/approve",

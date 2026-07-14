@@ -355,6 +355,47 @@ export default class EventTemplateCtrl {
     }
   }
 
+  static async getOutgoingMatchRequests(req: Request, res: Response) {
+    try {
+      const ownerId = (req as any).user?.userId;
+      const data = await EventTemplateSvc.getOutgoingMatchRequests(ownerId);
+      return res.status(200).json({ success: true, data });
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  }
+
+  static async getIncomingMatchRequests(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user?.userId;
+      const data = await EventTemplateSvc.getIncomingMatchRequests(userId);
+      return res.status(200).json({ success: true, data });
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  }
+
+  static async respondToMatch(req: Request, res: Response) {
+    const schema = Joi.object({
+      type: Joi.string().valid("asset", "service", "venue").required(),
+      status: Joi.string().valid("accepted", "declined").required(),
+    });
+    const { error, value } = schema.validate(req.body);
+    if (error) return res.status(400).json({ message: error.message });
+
+    try {
+      const responderId = (req as any).user?.userId;
+      const result = await EventTemplateSvc.respondToMatch({
+        matchId: req.params.matchId,
+        responderId,
+        ...value,
+      });
+      return res.status(200).json({ success: true, data: result });
+    } catch (error: any) {
+      return res.status(error.message.includes("unauthorized") ? 403 : 400).json({ message: error.message });
+    }
+  }
+
   static async approveEventTemplate(req: Request, res: Response) {
     try {
       const user = (req as any).user;

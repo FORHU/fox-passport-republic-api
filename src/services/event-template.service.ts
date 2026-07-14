@@ -1,4 +1,4 @@
-import { EventCategory, MatchConstraint } from "@prisma/client";
+import { EventCategory, MatchConstraint, MatchRequestStatus } from "@prisma/client";
 import { prisma } from "../utils/prisma";
 import EventTemplateRepo from "../repositories/event-template.repository";
 import { PLATFORM_FEE_PERCENT } from "../config";
@@ -547,5 +547,142 @@ export default class EventTemplateSvc {
         );
       }
     }
+  }
+
+  // Returns all match requests sent by an EventFoxer across all their templates.
+  static async getOutgoingMatchRequests(ownerId: string) {
+    const templates = await prisma.eventTemplate.findMany({
+      where: { ownerId },
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        targetCity: true,
+        targetState: true,
+        templateAssets: {
+          where: { matched: true },
+          select: {
+            id: true,
+            matchRequestStatus: true,
+            matchedAt: true,
+            description: true,
+            date: true,
+            asset: { select: { id: true, name: true, owner: { select: { id: true, name: true, imgId: true } } } },
+          },
+        },
+        templateServices: {
+          where: { matched: true },
+          select: {
+            id: true,
+            matchRequestStatus: true,
+            matchedAt: true,
+            description: true,
+            date: true,
+            service: { select: { id: true, name: true, owner: { select: { id: true, name: true, imgId: true } } } },
+          },
+        },
+        templateVenues: {
+          where: { matched: true },
+          select: {
+            id: true,
+            matchRequestStatus: true,
+            matchedAt: true,
+            description: true,
+            date: true,
+            venue: { select: { id: true, name: true, mayor: { select: { id: true, name: true, imgId: true } } } },
+          },
+        },
+      },
+    });
+
+    return templates.map((t) => ({
+      templateId: t.id,
+      templateName: t.name,
+      category: t.category,
+      targetCity: t.targetCity,
+      targetState: t.targetState,
+      requests: [
+        ...t.templateAssets.map((a) => ({ ...a, type: "asset" as const, provider: a.asset?.owner ?? null, item: a.asset })),
+        ...t.templateServices.map((s) => ({ ...s, type: "service" as const, provider: s.service?.owner ?? null, item: s.service })),
+        ...t.templateVenues.map((v) => ({ ...v, type: "venue" as const, provider: v.venue?.mayor ?? null, item: v.venue })),
+      ],
+    }));
+  }
+
+  // Returns all match requests received by a provider (asset/service/venue owner).
+  static async getIncomingMatchRequests(userId: string) {
+    const [assets, services, venues] = await Promise.all([
+      prisma.eventTemplateAsset.findMany({
+        where: { matched: true, asset: { ownerId: userId } },
+        select: {
+          id: true,
+          matchRequestStatus: true,
+          matchedAt: true,
+          description: true,
+          date: true,
+          asset: { select: { id: true, name: true } },
+          template: { select: { id: true, name: true, category: true, targetCity: true, targetState: true, owner: { select: { id: true, name: true, imgId: true } } } },
+        },
+      }),
+      prisma.eventTemplateService.findMany({
+        where: { matched: true, service: { ownerId: userId } },
+        select: {
+          id: true,
+          matchRequestStatus: true,
+          matchedAt: true,
+          description: true,
+          date: true,
+          service: { select: { id: true, name: true } },
+          template: { select: { id: true, name: true, category: true, targetCity: true, targetState: true, owner: { select: { id: true, name: true, imgId: true } } } },
+        },
+      }),
+      prisma.eventTemplateVenue.findMany({
+        where: { matched: true, venue: { mayorId: userId } },
+        select: {
+          id: true,
+          matchRequestStatus: true,
+          matchedAt: true,
+          description: true,
+          date: true,
+          venue: { select: { id: true, name: true } },
+          template: { select: { id: true, name: true, category: true, targetCity: true, targetState: true, owner: { select: { id: true, name: true, imgId: true } } } },
+        },
+      }),
+    ]);
+
+    return [
+      ...assets.map((a) => ({ ...a, type: "asset" as const, item: a.asset })),
+      ...services.map((s) => ({ ...s, type: "service" as const, item: s.service })),
+      ...venues.map((v) => ({ ...v, type: "venue" as const, item: v.venue })),
+    ].sort((a, b) => new Date(b.matchedAt ?? 0).getTime() - new Date(a.matchedAt ?? 0).getTime());
+  }
+
+  // Provider accepts or declines a match request.
+  static async respondToMatch(params: {
+    matchId: string;
+    type: "asset" | "service" | "venue";
+    responderId: string;
+    status: MatchRequestStatus;
+  }) {
+    if (params.status !== MatchRequestStatus.accepted && params.status !== MatchRequestStatus.declined) {
+      throw new Error("status must be 'accepted' or 'declined'");
+    }
+
+    if (params.type === "asset") {
+      const row = await prisma.eventTemplateAsset.findUnique({ where: { id: params.matchId }, include: { asset: true } });
+      if (!row || row.asset?.ownerId !== params.responderId) throw new Error("Not found or unauthorized");
+      return prisma.eventTemplateAsset.update({ where: { id: params.matchId }, data: { matchRequestStatus: params.status } });
+    }
+    if (params.type === "service") {
+      const row = await prisma.eventTemplateService.findUnique({ where: { id: params.matchId }, include: { service: true } });
+      if (!row || row.service?.ownerId !== params.responderId) throw new Error("Not found or unauthorized");
+      return prisma.eventTemplateService.update({ where: { id: params.matchId }, data: { matchRequestStatus: params.status } });
+    }
+    if (params.type === "venue") {
+      const row = await prisma.eventTemplateVenue.findUnique({ where: { id: params.matchId }, include: { venue: true } });
+      if (!row || row.venue?.mayorId !== params.responderId) throw new Error("Not found or unauthorized");
+      return prisma.eventTemplateVenue.update({ where: { id: params.matchId }, data: { matchRequestStatus: params.status } });
+    }
+    throw new Error("Invalid type");
   }
 }
