@@ -50,15 +50,18 @@ export default class ServiceSvc {
     category?: ServiceCategory;
     status?: ServiceStatus;
   }) {
-    return ServiceRepo.getAllServices(filters);
+    const services = await ServiceRepo.getAllServices(filters);
+    const { default: PassportSvc } = await import("./passport.service");
+    const sorted = await PassportSvc.sortByFeaturedPerk(services, 'service_featured', 'ownerId');
+    return PassportSvc.enrichWithOwnerBadge(sorted, 'service_verified', 'ownerId');
   }
 
   static async getServiceById(id: string) {
     const service = await ServiceRepo.getServiceById(id);
-    if (!service || service.deletedAt) {
-      throw new Error("Service not found");
-    }
-    return service;
+    if (!service || service.deletedAt) throw new Error("Service not found");
+    const { default: PassportSvc } = await import("./passport.service");
+    const [enriched] = await PassportSvc.enrichWithOwnerBadge([service], 'service_verified', 'ownerId');
+    return enriched;
   }
 
   static async updateService(

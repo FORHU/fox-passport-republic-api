@@ -103,12 +103,31 @@ export default class BookingSvc {
         expiresAt,
       });
 
+      // Award bookEvent XP to the citizen who made the booking
+      import("./passport.service").then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
+        return PassportSvc.awardXP(userId, UserPath.user, XP_REWARDS.bookEvent);
+      }).catch(() => {});
+
       return booking;
     }
 
     // ── Existing event-based booking path ────────────────────────────────
     const event = await EventRequestRepo.findById(data.eventId);
     if (!event) throw new Error("Event not found");
+
+    // early_bird: if template has publicOpenAt in the future, only early_bird holders can book
+    const { default: PassportSvc } = await import("./passport.service");
+    const template = (event as any).template;
+    if (template?.publicOpenAt && new Date() < new Date(template.publicOpenAt)) {
+      const hasEarlyBird = await PassportSvc.hasPerk(userId, "early_bird");
+      if (!hasEarlyBird) {
+        const opensAt = new Date(template.publicOpenAt);
+        throw new Error(`Bookings open on ${opensAt.toLocaleDateString()} — Early Bird members can book now`);
+      }
+    }
+
+    // priority_access: auto-confirm booking instead of leaving it pending
+    const hasPriorityAccess = await PassportSvc.hasPerk(userId, "priority_access");
 
     const attendeesWithTickets = (attendees || []).map((a: any) => ({
       ...a,
@@ -131,6 +150,7 @@ export default class BookingSvc {
       endAt: event.endAt,
       expiresAt,
       ticketCode: `BKG-${crypto.randomBytes(5).toString("hex").toUpperCase()}`,
+      ...(hasPriorityAccess ? { status: "confirmed" as any } : {}),
       event: { connect: { id: eventId } },
       user: { connect: { id: userId } },
       attendees: { create: attendeesWithTickets },
@@ -144,6 +164,11 @@ export default class BookingSvc {
       paymentType: "full",
       expiresAt,
     });
+
+    // Award bookEvent XP to the citizen who made the booking
+    import("./passport.service").then(({ default: P, XP_REWARDS, UserPath }) => {
+      return P.awardXP(userId, UserPath.user, XP_REWARDS.bookEvent);
+    }).catch(() => {});
 
     return booking;
   }
@@ -276,6 +301,16 @@ export default class BookingSvc {
       } catch (err) {
         console.error(`Passport stamp failed for booking ${id}`, err);
       }
+      // Award venueBooked XP to the venue owner (mayorId)
+      import("./passport.service").then(async ({ default: PassportSvc, XP_REWARDS, UserPath }) => {
+        const venueTx = await prisma.eventVenueTransaction.findFirst({
+          where: { eventId: (booking.event as any)?.id ?? (booking as any).eventId },
+          select: { providerId: true },
+        });
+        if (venueTx?.providerId) {
+          return PassportSvc.awardXP(venueTx.providerId, UserPath.venueFoxer, XP_REWARDS.venueBooked);
+        }
+      }).catch(() => {});
     }
 
     return updated;
