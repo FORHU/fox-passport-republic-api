@@ -20,25 +20,25 @@ router.get("/:id", authenticate, EventTemplateCtrl.getTemplateById);
 router.post(
   "/",
   authenticate,
-  requireRole(["host"]),
+  requireRole(["eventFoxer"]),
   EventTemplateCtrl.createTemplate,
 );
 router.post(
   "/:id/submit",
   authenticate,
-  requireRole(["host"]),
+  requireRole(["eventFoxer"]),
   EventTemplateCtrl.submitTemplate,
 );
 router.put(
   "/:id",
   authenticate,
-  requireRole(["host"]),
+  requireRole(["eventFoxer"]),
   EventTemplateCtrl.updateTemplate,
 );
 router.delete(
   "/:id",
   authenticate,
-  requireRole(["host"]),
+  requireRole(["eventFoxer"]),
   EventTemplateCtrl.deleteTemplate,
 );
 
@@ -46,13 +46,13 @@ router.delete(
 router.post(
   "/:id/assets",
   authenticate,
-  requireRole(["host"]),
+  requireRole(["eventFoxer"]),
   EventTemplateCtrl.attachAsset,
 );
 router.delete(
   "/:id/assets/:assetId",
   authenticate,
-  requireRole(["host"]),
+  requireRole(["eventFoxer"]),
   EventTemplateCtrl.removeAsset,
 );
 
@@ -60,13 +60,13 @@ router.delete(
 router.post(
   "/:id/services",
   authenticate,
-  requireRole(["host"]),
+  requireRole(["eventFoxer"]),
   EventTemplateCtrl.attachService,
 );
 router.delete(
   "/:id/services/:serviceId",
   authenticate,
-  requireRole(["host"]),
+  requireRole(["eventFoxer"]),
   EventTemplateCtrl.removeService,
 );
 
@@ -74,13 +74,13 @@ router.delete(
 router.post(
   "/:id/venues",
   authenticate,
-  requireRole(["host"]),
+  requireRole(["eventFoxer"]),
   EventTemplateCtrl.attachVenue,
 );
 router.delete(
   "/:id/venues/:venueId",
   authenticate,
-  requireRole(["host"]),
+  requireRole(["eventFoxer"]),
   EventTemplateCtrl.removeVenue,
 );
 
@@ -88,13 +88,13 @@ router.delete(
 router.get(
   "/matching/search",
   authenticate,
-  requireRole(["host"]),
+  requireRole(["eventFoxer"]),
   EventTemplateCtrl.matchSearch,
 );
 router.post(
   "/:id/match",
   authenticate,
-  requireRole(["host"]),
+  requireRole(["eventFoxer"]),
   EventTemplateCtrl.matchItem,
 );
 

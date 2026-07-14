@@ -31,10 +31,10 @@ export default class RoleRequestService {
 
     // 3. Map roleType to the correct application model name in Prisma
     const modelMapping: Record<RoleType, string> = {
-      [RoleType.mayor]: "mayorApplication",
-      [RoleType.host]: "hostApplication",
-      [RoleType.foxerAsset]: "foxerAssetApplication",
-      [RoleType.foxerService]: "foxerServiceApplication",
+      [RoleType.venueFoxer]: "venueFoxerApplication",
+      [RoleType.eventFoxer]: "eventFoxerApplication",
+      [RoleType.gearFoxer]: "gearFoxerApplication",
+      [RoleType.serviceFoxer]: "serviceFoxerApplication",
       [RoleType.investor]: "investorApplication",
     };
 

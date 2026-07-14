@@ -12,19 +12,19 @@ router.get("/:id", AssetCtrl.getAssetById);
 router.post(
   "/create",
   authenticate,
-  requireRole(["foxerAsset"]),
+  requireRole(["gearFoxer"]),
   AssetCtrl.createAsset,
 );
 router.put(
   "/:id",
   authenticate,
-  requireRole(["foxerAsset"]),
+  requireRole(["gearFoxer"]),
   AssetCtrl.updateAsset,
 );
 router.delete(
   "/:id",
   authenticate,
-  requireRole(["foxerAsset"]),
+  requireRole(["gearFoxer"]),
   AssetCtrl.deleteAsset,
 );
 

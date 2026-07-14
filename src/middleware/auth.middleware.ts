@@ -138,7 +138,7 @@ export const requireSuperAdmin = requireRole(["super_admin"]);
 /**
  * Check if user is host, admin, or super_admin
  */
-export const requireHost = requireRole(["host", "admin", "super_admin"]);
+export const requireHost = requireRole(["eventFoxer", "admin", "super_admin"]);
 
 /**
  * Resource Owner or Admin Middleware

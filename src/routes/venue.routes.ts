@@ -12,14 +12,14 @@ router.get("/:id", VenueCtrl.getVenueById);
 router.post(
   "/create",
   authenticate,
-  requireRole(["mayor"]),
+  requireRole(["venueFoxer"]),
   VenueCtrl.createVenue,
 );
-router.put("/:id", authenticate, requireRole(["mayor"]), VenueCtrl.updateVenue);
+router.put("/:id", authenticate, requireRole(["venueFoxer"]), VenueCtrl.updateVenue);
 router.delete(
   "/:id",
   authenticate,
-  requireRole(["mayor"]),
+  requireRole(["venueFoxer"]),
   VenueCtrl.deleteVenue,
 );
 
