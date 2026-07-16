@@ -3,6 +3,38 @@ import { PrismaClient, UserPath } from "@prisma/client";
 const XP_PER_LEVEL = 1000;
 const XP_MULTIPLIER = 1.15;
 
+// Must mirror PERK_THRESHOLDS in passport.service.ts
+const PERK_THRESHOLDS: Record<string, { level: number; perk: string }[]> = {
+  [UserPath.user]: [
+    { level: 1,  perk: "early_bird" },
+    { level: 5,  perk: "priority_access" },
+    { level: 10, perk: "vip_lounge" },
+    { level: 15, perk: "founding_citizen" },
+  ],
+  [UserPath.eventFoxer]: [
+    { level: 1,  perk: "host_support" },
+    { level: 5,  perk: "analytics_pro" },
+    { level: 10, perk: "featured_listing" },
+    { level: 15, perk: "event_boost" },
+  ],
+  [UserPath.venueFoxer]: [
+    { level: 1,  perk: "venue_authority" },
+    { level: 3,  perk: "city_badge" },
+    { level: 8,  perk: "venue_spotlight" },
+    { level: 15, perk: "mayor_verified" },
+  ],
+  [UserPath.gearFoxer]: [
+    { level: 1, perk: "gear_verified" },
+    { level: 3, perk: "lower_fees" },
+    { level: 8, perk: "gear_featured" },
+  ],
+  [UserPath.serviceFoxer]: [
+    { level: 1, perk: "service_verified" },
+    { level: 3, perk: "service_lower_fees" },
+    { level: 8, perk: "service_featured" },
+  ],
+};
+
 function xpRequiredForLevel(level: number): number {
   if (level <= 1) return 0;
   let total = 0;
@@ -102,14 +134,25 @@ export async function seedPassports(prisma: PrismaClient, users: any[]) {
         include: { paths: true },
       });
 
+      const allPerks: string[] = [];
       for (const { path, totalXP } of pathData) {
-        const { level, currentXP, requiredXP } = calculateLevel(totalXP);
+        const { level, currentXP } = calculateLevel(totalXP);
         await prisma.passportPath.upsert({
           where: { passportId_path: { passportId: passport.id, path } },
           create: { passportId: passport.id, path, level, currentXP, totalXP },
           update: { level, currentXP, totalXP },
         });
+        // Collect all perks earned up to this level on this path
+        const earned = (PERK_THRESHOLDS[path] ?? [])
+          .filter((t) => t.level <= level)
+          .map((t) => t.perk);
+        allPerks.push(...earned);
       }
+      // Write computed perks to the passport
+      await prisma.passport.update({
+        where: { id: passport.id },
+        data: { perks: allPerks },
+      });
 
       // Stamps
       const stamps = STAMP_DATA[user.email] ?? [];
