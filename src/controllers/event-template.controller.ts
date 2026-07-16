@@ -435,6 +435,30 @@ export default class EventTemplateCtrl {
     }
   }
 
+  static async getRecommendations(req: Request, res: Response) {
+    try {
+      const templates = await prisma.eventTemplate.findMany({
+        where: { isPublic: true, status: EventTemplateStatus.published },
+        orderBy: { createdAt: "desc" },
+        take: 6,
+        include: {
+          images: { take: 1, select: { url: true } },
+        },
+      });
+      const data = templates.map((t) => ({
+        id: t.id,
+        title: t.name,
+        category: t.category,
+        match: Math.floor(Math.random() * 20) + 80,
+        image: t.images?.[0]?.url ?? null,
+        location: [t.targetCity, t.targetCountry].filter(Boolean).join(", ") || null,
+      }));
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
   static async rejectEventTemplate(req: Request, res: Response) {
     try {
       const user = (req as any).user;
