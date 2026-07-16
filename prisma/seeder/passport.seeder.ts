@@ -100,14 +100,35 @@ const USER_PASSPORT_DATA: Record<string, PathXP[]> = {
 // bookingId is the unique key on PassportStamp — use real booking IDs from the booking seeder
 const STAMP_DATA: Record<string, { bookingId: string; eventName: string; eventDate: Date; location: string; xpEarned: number }[]> = {
   "user@example.com": [
-    { bookingId: "seed-booking-may-birthday-01", eventName: "Santos Birthday Bash",            eventDate: new Date("2026-05-07"), location: "Quezon City, Philippines", xpEarned: 100 },
-    { bookingId: "seed-booking-may-wedding-01",  eventName: "Garcia-Reyes Wedding Reception",  eventDate: new Date("2026-05-20"), location: "Boracay, Philippines",     xpEarned: 100 },
-    { bookingId: "seed-booking-birthday-01",     eventName: "Maria's 30th Birthday",           eventDate: new Date("2026-06-10"), location: "Manila, Philippines",       xpEarned: 100 },
+    { bookingId: "seed-booking-may-birthday-01", eventName: "Santos Birthday Bash",           eventDate: new Date("2026-05-07"), location: "Quezon City, Philippines", xpEarned: 100 },
+    { bookingId: "seed-booking-may-wedding-01",  eventName: "Garcia-Reyes Wedding Reception", eventDate: new Date("2026-05-20"), location: "Boracay, Philippines",     xpEarned: 100 },
+    { bookingId: "seed-booking-birthday-01",     eventName: "Maria's 30th Birthday",          eventDate: new Date("2026-06-10"), location: "Manila, Philippines",      xpEarned: 100 },
+    { bookingId: "seed-booking-corporate-01",    eventName: "Q3 Team Strategy Summit",        eventDate: new Date("2026-07-30"), location: "Taguig, Philippines",      xpEarned: 100 },
   ],
   "host@example.com": [
-    { bookingId: "seed-booking-may-birthday-02",  eventName: "Reyes Surprise Party",     eventDate: new Date("2026-05-14"), location: "Pasig City, Philippines", xpEarned: 100 },
-    { bookingId: "seed-booking-may-corporate-01", eventName: "Q3 Team Strategy Summit",  eventDate: new Date("2026-05-27"), location: "Taguig, Philippines",    xpEarned: 100 },
-    { bookingId: "seed-booking-corporate-01",     eventName: "Tech Startup Demo Day",    eventDate: new Date("2026-06-20"), location: "Taguig, Philippines",    xpEarned: 100 },
+    { bookingId: "seed-booking-may-birthday-02",  eventName: "Reyes Surprise Party",          eventDate: new Date("2026-05-14"), location: "Pasig City, Philippines",  xpEarned: 100 },
+    { bookingId: "seed-booking-may-corporate-01", eventName: "Acme Corp Q2 Summit",           eventDate: new Date("2026-05-27"), location: "Makati, Philippines",      xpEarned: 150 },
+    { bookingId: "seed-booking-host-wedding-01",  eventName: "Cruz-Dela Rosa Wedding",        eventDate: new Date("2026-05-20"), location: "Tagaytay, Philippines",    xpEarned: 200 },
+    { bookingId: "seed-booking-host-birthday-01", eventName: "Maria's 30th Birthday Bash",    eventDate: new Date("2026-06-10"), location: "Manila, Philippines",      xpEarned: 150 },
+    { bookingId: "seed-booking-host-social-01",   eventName: "Summer Rooftop Social",         eventDate: new Date("2026-07-19"), location: "Taguig, Philippines",      xpEarned: 100 },
+    { bookingId: "seed-booking-host-social2-01",  eventName: "Santos Birthday Bash",          eventDate: new Date("2026-05-07"), location: "Quezon City, Philippines", xpEarned: 100 },
+  ],
+  "jasmine.reyes@foxers.ph": [
+    { bookingId: "seed-booking-jasmine-01", eventName: "Maria's 30th Birthday Bash",     eventDate: new Date("2026-06-10"), location: "Manila, Philippines",      xpEarned: 100 },
+    { bookingId: "seed-booking-jasmine-02", eventName: "Q3 Team Strategy Summit",        eventDate: new Date("2026-07-30"), location: "Taguig, Philippines",      xpEarned: 100 },
+    { bookingId: "seed-booking-jasmine-03", eventName: "Santos Birthday Bash",           eventDate: new Date("2026-05-07"), location: "Quezon City, Philippines", xpEarned: 100 },
+  ],
+  "marco.santos@foxers.ph": [
+    { bookingId: "seed-booking-marco-01", eventName: "Summer Rooftop Social",           eventDate: new Date("2026-07-19"), location: "Taguig, Philippines",       xpEarned: 100 },
+    { bookingId: "seed-booking-marco-02", eventName: "Acme Corp Q2 Summit",             eventDate: new Date("2026-05-27"), location: "Makati, Philippines",       xpEarned: 100 },
+  ],
+  "sarah.lim@foxers.ph": [
+    { bookingId: "seed-booking-sarah-01", eventName: "Maria's 30th Birthday Bash",      eventDate: new Date("2026-06-10"), location: "Manila, Philippines",       xpEarned: 100 },
+    { bookingId: "seed-booking-sarah-02", eventName: "Cruz-Dela Rosa Wedding",          eventDate: new Date("2026-05-20"), location: "Tagaytay, Philippines",     xpEarned: 150 },
+  ],
+  "multirole@example.com": [
+    { bookingId: "seed-booking-multi-01", eventName: "Santos Birthday Bash",            eventDate: new Date("2026-05-07"), location: "Quezon City, Philippines",  xpEarned: 100 },
+    { bookingId: "seed-booking-multi-02", eventName: "Summer Rooftop Social",           eventDate: new Date("2026-07-19"), location: "Taguig, Philippines",       xpEarned: 100 },
   ],
 };
 
