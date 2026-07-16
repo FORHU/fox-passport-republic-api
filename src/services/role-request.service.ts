@@ -80,16 +80,27 @@ export default class RoleRequestService {
         },
       );
 
-      // 3. If approved, grant the role
+      // 3. If approved, grant the role and copy declared specializations
       if (status === RequestStatus.approved) {
         await tx.user.update({
           where: { id: request.userId },
-          data: {
-            roleType: {
-              push: request.roleType,
-            },
-          },
+          data: { roleType: { push: request.roleType } },
         });
+
+        const appKey = `${request.roleType}Application` as keyof typeof request;
+        const app = request[appKey] as any;
+        const declared: string[] = app?.specializations ?? [];
+        if (declared.length > 0) {
+          await tx.foxerSpecialization.createMany({
+            data: declared.map((category) => ({
+              userId: request.userId,
+              roleType: request.roleType,
+              category,
+              source: "declared",
+            })),
+            skipDuplicates: true,
+          });
+        }
       }
 
       return {

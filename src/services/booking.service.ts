@@ -301,14 +301,27 @@ export default class BookingSvc {
       } catch (err) {
         console.error(`Passport stamp failed for booking ${id}`, err);
       }
-      // Award venueBooked XP to the venue owner (mayorId)
+      // Award venueBooked XP to the venue owner + check VenueFoxer specialization
       import("./passport.service").then(async ({ default: PassportSvc, XP_REWARDS, UserPath }) => {
         const venueTx = await prisma.eventVenueTransaction.findFirst({
           where: { eventId: (booking.event as any)?.id ?? (booking as any).eventId },
-          select: { providerId: true },
+          select: { providerId: true, venueId: true },
         });
         if (venueTx?.providerId) {
-          return PassportSvc.awardXP(venueTx.providerId, UserPath.venueFoxer, XP_REWARDS.venueBooked);
+          await PassportSvc.awardXP(venueTx.providerId, UserPath.venueFoxer, XP_REWARDS.venueBooked);
+          if (venueTx.venueId) {
+            const { default: SpecializationSvc } = await import("./specialization.service");
+            SpecializationSvc.checkVenueFoxer(venueTx.venueId, venueTx.providerId).catch(() => {});
+          }
+        }
+      }).catch(() => {});
+
+      // Check EventFoxer specialization
+      import("./specialization.service").then(async ({ default: SpecializationSvc }) => {
+        const organizerId = (booking.event as any)?.organizerId;
+        const eventCategory = (booking.event as any)?.eventCategory;
+        if (organizerId && eventCategory) {
+          await SpecializationSvc.checkEventFoxer(organizerId, eventCategory);
         }
       }).catch(() => {});
     }

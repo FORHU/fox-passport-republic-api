@@ -8,9 +8,9 @@ export default class UsersSvc {
     return UsersRepo.getAllUsers(roleTypes as any);
   }
 
-  // GET FOXERS (public listing, optionally filtered by roleType)
-  static async getFoxers(limit = 9, page = 1, roleType?: string) {
-    return UsersRepo.findFoxers(limit, page, roleType as any);
+  // GET FOXERS (public listing, optionally filtered by roleType and/or specialization)
+  static async getFoxers(limit = 9, page = 1, roleType?: string, specialization?: string) {
+    return UsersRepo.findFoxers(limit, page, roleType as any, specialization);
   }
 
   // GET SINGLE FOXER BY ID (public profile with services)
