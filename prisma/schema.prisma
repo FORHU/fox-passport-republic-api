@@ -52,6 +52,7 @@ model User {
   payouts                   Payout[]
   stripeAccountId          String?   @unique
   stripeOnboardingComplete Boolean   @default(false)
+  foxerSpecializations     FoxerSpecialization[]
 }
 
 
@@ -77,6 +78,19 @@ model RoleRequest {
   @@map("role_requests")
 }
 
+model FoxerSpecialization {
+  id         String   @id @default(uuid())
+  userId     String
+  roleType   RoleType
+  category   String
+  source     String   // "declared" | "earned"
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleType, category])
+  @@index([roleType, category])
+}
+
 model VenueFoxerApplication {
   id              String      @id @default(uuid())
   requestId       String      @unique
@@ -85,6 +99,7 @@ model VenueFoxerApplication {
   address         String
   tinNumber       String
   description     String?
+  specializations String[]
   validId1FileId  String?
   nbiFileId       String?
   tinIdFileId     String?
@@ -105,6 +120,7 @@ model GearFoxerApplication {
   requestId       String      @unique
   businessName    String
   assetTypes      String[]
+  specializations String[]
   tinNumber       String
   validId1FileId  String?
   nbiFileId       String?
@@ -125,6 +141,7 @@ model ServiceFoxerApplication {
   id                   String      @id @default(uuid())
   requestId            String      @unique
   serviceTypes         String[]
+  specializations      String[]
   portfolioUrls        String[]
   experience           Int
   nbiClearanceIdNumber String
@@ -163,6 +180,7 @@ model EventFoxerApplication {
   bio             String?
   experience      String?
   location        String?
+  specializations String[]
   validId1FileId  String?
   nbiFileId       String?
   tinIdFileId     String?

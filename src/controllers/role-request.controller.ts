@@ -75,6 +75,11 @@ export default class RoleRequestController {
         }
       }
 
+      // Enforce max 3 declared specializations
+      if (Array.isArray(data.specializations) && data.specializations.length > 3) {
+        return res.status(400).json({ success: false, message: "Maximum 3 specializations allowed" });
+      }
+
       const application = await RoleRequestService.submitApplication(
         userId,
         roleType,

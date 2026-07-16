@@ -131,6 +131,14 @@ export default class AssetBookingSvc {
             );
         })
         .catch(() => {});
+      import("./specialization.service")
+        .then(({ default: SpecializationSvc }) => {
+          const assetId = (booking.asset as any)?.id ?? (booking as any).assetId;
+          const ownerId = (booking.asset as any)?.ownerId ?? (booking.asset as any)?.owner?.id;
+          if (assetId && ownerId)
+            return SpecializationSvc.checkGearFoxer(assetId, ownerId);
+        })
+        .catch(() => {});
     }
 
     return updated;

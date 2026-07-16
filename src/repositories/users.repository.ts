@@ -23,7 +23,7 @@ export default class UsersRepo {
   }
 
   // READ FOXERS — public listing for the landing page
-  static async findFoxers(limit = 9, page = 1, roleType?: RoleType) {
+  static async findFoxers(limit = 9, page = 1, roleType?: RoleType, specialization?: string) {
     const skip = (page - 1) * limit;
     const allFoxerRoles: RoleType[] = [
       "serviceFoxer",
@@ -33,6 +33,9 @@ export default class UsersRepo {
     return prisma.user.findMany({
       where: {
         roleType: roleType ? { has: roleType } : { hasSome: allFoxerRoles },
+        ...(specialization ? {
+          foxerSpecializations: { some: { category: specialization, ...(roleType ? { roleType } : {}) } },
+        } : {}),
       },
       select: {
         id: true,
@@ -42,6 +45,10 @@ export default class UsersRepo {
         state: true,
         roleType: true,
         createdAt: true,
+        foxerSpecializations: {
+          select: { roleType: true, category: true, source: true },
+          orderBy: { source: "asc" },
+        },
         services: {
           where: { status: "available", deletedAt: null },
           take: 3,
@@ -106,6 +113,10 @@ export default class UsersRepo {
             description: true,
             images: { take: 3, select: { url: true } },
           },
+        },
+        foxerSpecializations: {
+          select: { roleType: true, category: true, source: true },
+          orderBy: { source: "asc" },
         },
         eventTemplates: {
           where: { isPublic: true },

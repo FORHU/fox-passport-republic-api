@@ -41,7 +41,8 @@ export default class UsersCtrl {
       const limit = Math.min(Number(req.query.limit) || 9, 30);
       const page = Math.max(Number(req.query.page) || 1, 1);
       const roleType = req.query.roleType as string | undefined;
-      const foxers = await UsersSvc.getFoxers(limit, page, roleType);
+      const specialization = req.query.specialization as string | undefined;
+      const foxers = await UsersSvc.getFoxers(limit, page, roleType, specialization);
       return res.status(200).json({ success: true, data: foxers });
     } catch (err: any) {
       return res.status(500).json({ success: false, message: err.message });

@@ -40,3 +40,7 @@ _Avoid_: Host fee, commission (implies platform-set, not Host-set)
 
 **Platform Fee**:
 The percentage the business itself takes on every transaction, added on top of what the citizen already sees (itemsTotal + Host Markup) — it's an extra line item, not carved out of any role's earnings. Distinct from Host Markup, which is Host-set and goes to the Host, not the business.
+
+**Specialization**:
+A category tag on a foxer's profile and listings showing what type of work they focus on. Comes in two forms with distinct visual treatment: a *Claimed* tag (declared at role-application time, admin-backed, capped at 3 per role) and an *Earned* badge (auto-granted by the system after 3 completed bookings in that category with a 4.0+ average rating, unlimited count, never revoked). Each role type uses its own category vocabulary: EventFoxer → EventCategory, ServiceFoxer → ServiceCategory, GearFoxer → AssetCategory, VenueFoxer → VenueCategory. Visible on both the foxer's public profile and on their listing cards.
+_Avoid_: Specialty, skill tag, expertise

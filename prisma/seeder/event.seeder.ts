@@ -81,8 +81,8 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
     for (const t of templateDefs) {
       await prisma.eventTemplate.upsert({
         where: { id: t.id },
-        update: { name: t.name, description: t.description, isPublic: true },
-        create: { ...t, ownerId: host.id, isPublic: true },
+        update: { name: t.name, description: t.description, isPublic: true, status: "published" },
+        create: { ...t, ownerId: host.id, isPublic: true, status: "published" },
       });
     }
     console.log("✓ EventTemplates seeded");

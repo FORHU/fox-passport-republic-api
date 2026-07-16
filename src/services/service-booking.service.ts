@@ -128,6 +128,14 @@ export default class ServiceBookingSvc {
             );
         })
         .catch(() => {});
+      import("./specialization.service")
+        .then(({ default: SpecializationSvc }) => {
+          const serviceId = (booking.service as any)?.id ?? (booking as any).serviceId;
+          const ownerId = (booking.service as any)?.ownerId ?? (booking.service as any)?.owner?.id;
+          if (serviceId && ownerId)
+            return SpecializationSvc.checkServiceFoxer(serviceId, ownerId);
+        })
+        .catch(() => {});
     }
 
     return updated;
