@@ -36,6 +36,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
 
     const client = users.find(u => u.email === "user@example.com");
     const host   = users.find(u => u.email === "host@example.com");
+    const multi  = users.find(u => u.email === "multirole@example.com");
     if (!client) throw new Error("user@example.com not found for event seeding");
     if (!host)   throw new Error("host@example.com not found for event seeding");
 
@@ -85,6 +86,34 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         create: { ...t, ownerId: host.id, isPublic: true, status: "published" },
       });
     }
+
+    // Multi-role user also gets two event templates so their profile isn't empty
+    if (multi) {
+      const multiTemplates = [
+        {
+          id: "seed-template-multi-social",
+          name: "All-In-One Social Night",
+          description: "A full-production social event package — venue, sound, lighting, catering, and entertainment all coordinated by one foxer. Perfect for parties, reunions, and themed nights.",
+          category: EventCategory.social,
+          targetCity: "Pasig", targetState: "Metro Manila", targetCountry: "Philippines",
+        },
+        {
+          id: "seed-template-multi-corporate",
+          name: "Turnkey Corporate Function",
+          description: "End-to-end corporate event management. From venue scouting to AV setup, catering, and on-the-day coordination — one point of contact for everything.",
+          category: EventCategory.corporate,
+          targetCity: "Pasig", targetState: "Metro Manila", targetCountry: "Philippines",
+        },
+      ];
+      for (const t of multiTemplates) {
+        await prisma.eventTemplate.upsert({
+          where: { id: t.id },
+          update: { name: t.name, description: t.description, isPublic: true, status: "published" },
+          create: { ...t, ownerId: multi.id, isPublic: true, status: "published" },
+        });
+      }
+    }
+
     console.log("✓ EventTemplates seeded");
 
     // ── 2. File (images) for each template ──────────────────────────────────
@@ -112,6 +141,16 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
       [TEMPLATE_IDS.other]: [
         { id: "seed-file-other-1", url: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&auto=format&fit=crop", name: "Custom Event" },
         { id: "seed-file-other-2", url: "https://images.unsplash.com/photo-1533174072545-e8d4aa97edf9?w=800&auto=format&fit=crop", name: "Event Setup" },
+      ],
+      "seed-template-multi-social": [
+        { id: "seed-file-multi-social-1", url: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop", name: "Social Night Crowd" },
+        { id: "seed-file-multi-social-2", url: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&auto=format&fit=crop", name: "DJ Night" },
+        { id: "seed-file-multi-social-3", url: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&auto=format&fit=crop", name: "Live Entertainment" },
+      ],
+      "seed-template-multi-corporate": [
+        { id: "seed-file-multi-corp-1", url: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop", name: "Corporate Stage" },
+        { id: "seed-file-multi-corp-2", url: "https://images.unsplash.com/photo-1559223607-b4d0555ae227?w=800&auto=format&fit=crop", name: "Team Summit" },
+        { id: "seed-file-multi-corp-3", url: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=800&auto=format&fit=crop", name: "Conference Setup" },
       ],
     };
 

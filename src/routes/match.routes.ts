@@ -6,5 +6,6 @@ const router = Router();
 
 router.post("/", authenticate, MatchController.createMatch);
 router.get("/my", authenticate, MatchController.getMyMatches);
+router.get("/client-inbox", authenticate, MatchController.getFoxerClientInbox);
 
 export default router;

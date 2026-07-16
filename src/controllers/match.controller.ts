@@ -7,7 +7,7 @@ export default class MatchController {
   static async createMatch(req: Request, res: Response) {
     try {
       const schema = Joi.object({
-        style: Joi.string().required(),
+        style: Joi.string().allow("", null).default("Own idea"),
         foxerId: Joi.string().required(),
         date: Joi.date().iso().required(),
         guestCount: Joi.number().integer().min(1).required(),
@@ -45,18 +45,25 @@ export default class MatchController {
         venueId,
       });
 
-      // Create Payment Intent immediately using server-computed totals
-      const { clientSecret } = await PaymentSvc.createPaymentIntent({
-        amount: eventRequest.totalAmount,
-        currency: "php",
-        bookingId: booking.id,
-        description: `Match Request: ${style}`,
-      });
+      // Only create a Stripe payment intent when there's a known amount to charge
+      if (eventRequest.totalAmount > 0) {
+        const { clientSecret } = await PaymentSvc.createPaymentIntent({
+          amount: eventRequest.totalAmount,
+          currency: "php",
+          bookingId: booking.id,
+          description: `Match Request: ${style}`,
+        });
+        return res.status(201).json({
+          message: "Match request created",
+          bookingId: booking.id,
+          clientSecret,
+        });
+      }
 
       res.status(201).json({
         message: "Match request created",
         bookingId: booking.id,
-        clientSecret,
+        clientSecret: null,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -69,6 +76,19 @@ export default class MatchController {
       if (!clientId) return res.status(401).json({ message: "Unauthorized" });
       const matches = await MatchSvc.getMyMatches(clientId);
       res.status(200).json({ success: true, data: matches });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+
+  static async getFoxerClientInbox(req: Request, res: Response) {
+    try {
+      const foxerId = (req as any).user?.id || (req as any).user?.userId;
+      if (!foxerId) return res.status(401).json({ message: "Unauthorized" });
+      const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+      const offset = parseInt(req.query.offset as string) || 0;
+      const result = await MatchSvc.getFoxerClientInbox(foxerId, limit, offset);
+      res.status(200).json({ success: true, ...result });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
