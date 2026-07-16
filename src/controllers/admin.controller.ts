@@ -339,11 +339,20 @@ export default class AdminCtrl {
       });
 
       // Award mayor XP + City Builder badge (fire-and-forget)
-      import("../services/passport.service").then(async ({ default: PassportSvc, XP_REWARDS, UserPath }) => {
-        await PassportSvc.awardXP(venue.mayorId, UserPath.venueFoxer, XP_REWARDS.mayorVenueApproved);
-        const approvedCount = await prisma.venue.count({ where: { mayorId: venue.mayorId, status: VenueStatus.available } });
-        if (approvedCount >= 3) await PassportSvc.awardBadgeByName(venue.mayorId, "City Builder");
-      }).catch(() => {});
+      import("../services/passport.service")
+        .then(async ({ default: PassportSvc, XP_REWARDS, UserPath }) => {
+          await PassportSvc.awardXP(
+            venue.mayorId,
+            UserPath.venueFoxer,
+            XP_REWARDS.mayorVenueApproved,
+          );
+          const approvedCount = await prisma.venue.count({
+            where: { mayorId: venue.mayorId, status: VenueStatus.available },
+          });
+          if (approvedCount >= 3)
+            await PassportSvc.awardBadgeByName(venue.mayorId, "City Builder");
+        })
+        .catch(() => {});
 
       return res.status(200).json({ success: true, data: venue });
     } catch (error: any) {
@@ -384,9 +393,15 @@ export default class AdminCtrl {
         select: { id: true, ownerId: true },
       });
 
-      import("../services/passport.service").then(({ default: PassportSvc, XP_REWARDS, UserPath }) =>
-        PassportSvc.awardXP(asset.ownerId, UserPath.gearFoxer, XP_REWARDS.createListing)
-      ).catch(() => {});
+      import("../services/passport.service")
+        .then(({ default: PassportSvc, XP_REWARDS, UserPath }) =>
+          PassportSvc.awardXP(
+            asset.ownerId,
+            UserPath.gearFoxer,
+            XP_REWARDS.createListing,
+          ),
+        )
+        .catch(() => {});
 
       return res.status(200).json({ success: true, data: asset });
     } catch (error: any) {
@@ -436,9 +451,15 @@ export default class AdminCtrl {
         select: { id: true, ownerId: true },
       });
 
-      import("../services/passport.service").then(({ default: PassportSvc, XP_REWARDS, UserPath }) =>
-        PassportSvc.awardXP(service.ownerId, UserPath.serviceFoxer, XP_REWARDS.createListing)
-      ).catch(() => {});
+      import("../services/passport.service")
+        .then(({ default: PassportSvc, XP_REWARDS, UserPath }) =>
+          PassportSvc.awardXP(
+            service.ownerId,
+            UserPath.serviceFoxer,
+            XP_REWARDS.createListing,
+          ),
+        )
+        .catch(() => {});
 
       return res.status(200).json({ success: true, data: service });
     } catch (error: any) {

@@ -392,7 +392,9 @@ export default class EventTemplateCtrl {
       });
       return res.status(200).json({ success: true, data: result });
     } catch (error: any) {
-      return res.status(error.message.includes("unauthorized") ? 403 : 400).json({ message: error.message });
+      return res
+        .status(error.message.includes("unauthorized") ? 403 : 400)
+        .json({ message: error.message });
     }
   }
 

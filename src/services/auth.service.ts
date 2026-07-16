@@ -45,9 +45,11 @@ export default class AuthSvc {
     });
 
     // Fire-and-forget — badge failure must never block registration
-    import("./passport.service").then(({ default: PassportSvc }) =>
-      PassportSvc.awardBadgeByName(user.id, "Early Adopter")
-    ).catch(() => {});
+    import("./passport.service")
+      .then(({ default: PassportSvc }) =>
+        PassportSvc.awardBadgeByName(user.id, "Early Adopter"),
+      )
+      .catch(() => {});
 
     const otp = generateOTP();
     try {

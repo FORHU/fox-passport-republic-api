@@ -83,12 +83,22 @@ export default class ReviewSvc {
     }
 
     // Award leaveReview XP + First Review badge (fire-and-forget)
-    import("./passport.service").then(async ({ default: PassportSvc, XP_REWARDS, UserPath }) => {
-      await PassportSvc.awardXP(String(data.userId), UserPath.user, XP_REWARDS.leaveReview);
-      const reviewCount = await prisma.review.count({ where: { userId: String(data.userId) } });
-      if (reviewCount === 1) {
-        await PassportSvc.awardBadgeByName(String(data.userId), "First Review");
-      }
+    import("./passport.service")
+      .then(async ({ default: PassportSvc, XP_REWARDS, UserPath }) => {
+        await PassportSvc.awardXP(
+          String(data.userId),
+          UserPath.user,
+          XP_REWARDS.leaveReview,
+        );
+        const reviewCount = await prisma.review.count({
+          where: { userId: String(data.userId) },
+        });
+        if (reviewCount === 1) {
+          await PassportSvc.awardBadgeByName(
+            String(data.userId),
+            "First Review",
+          );
+        }
 
       // Award receive5StarReview XP to the provider when rating is 5
       if (data.rating >= 5) {
@@ -117,7 +127,8 @@ export default class ReviewSvc {
           await PassportSvc.awardXP(providerId, providerPath, XP_REWARDS.receive5StarReview);
         }
       }
-    }).catch(() => {});
+      })
+      .catch(() => {});
 
     return review;
   }
