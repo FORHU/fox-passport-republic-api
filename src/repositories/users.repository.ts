@@ -25,7 +25,11 @@ export default class UsersRepo {
   // READ FOXERS — public listing for the landing page
   static async findFoxers(limit = 9, page = 1, roleType?: RoleType) {
     const skip = (page - 1) * limit;
-    const allFoxerRoles: RoleType[] = ["serviceFoxer", "gearFoxer", "eventFoxer"];
+    const allFoxerRoles: RoleType[] = [
+      "serviceFoxer",
+      "gearFoxer",
+      "eventFoxer",
+    ];
     return prisma.user.findMany({
       where: {
         roleType: roleType ? { has: roleType } : { hasSome: allFoxerRoles },

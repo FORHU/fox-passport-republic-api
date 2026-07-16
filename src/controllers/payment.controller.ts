@@ -4,7 +4,7 @@ import PaymentSvc from "../services/payment.service";
 import StripeConnectSvc from "../services/stripe-connect.service";
 import Stripe from "stripe";
 import { prisma } from "../utils/prisma";
-import { PaymentStatus } from "@prisma/client";
+import { BookingStatus, PaymentStatus } from "@prisma/client";
 import RefundSvc from "../services/refund.service";
 
 export default class PaymentController {
@@ -296,6 +296,12 @@ export default class PaymentController {
         );
 
         try {
+          // Load the booking so we know its current state before mutating it.
+          const booking = await prisma.booking.findUnique({
+            where: { id: bookingId },
+            select: { id: true, status: true, stripePaymentId: true },
+          });
+
           // Find the pending payment for this booking
           const payments = await PaymentSvc.getBookingPayments(bookingId);
           const pendingPayment = payments.find(
@@ -312,18 +318,6 @@ export default class PaymentController {
               where: { id: pendingPayment.id },
               data: { transactionId: paymentIntent.id },
             });
-            // Also link the Stripe PaymentIntent id to the Booking
-            try {
-              await prisma.booking.update({
-                where: { id: bookingId },
-                data: { stripePaymentId: paymentIntent.id },
-              });
-            } catch (err) {
-              console.error(
-                "Failed to set booking.stripePaymentId in webhook:",
-                err,
-              );
-            }
           } else {
             // If no pending payment found, create a completed one
             await PaymentSvc.createPayment({
@@ -335,7 +329,10 @@ export default class PaymentController {
               paymentStatus: PaymentStatus.completed,
               transactionId: paymentIntent.id,
             });
-            // Ensure booking.stripePaymentId is set (createPayment will also attempt this)
+          }
+
+          // Link the Stripe PaymentIntent id to the Booking (idempotent).
+          if (booking && booking.stripePaymentId !== paymentIntent.id) {
             try {
               await prisma.booking.update({
                 where: { id: bookingId },
@@ -343,7 +340,23 @@ export default class PaymentController {
               });
             } catch (err) {
               console.error(
-                "Failed to set booking.stripePaymentId after createPayment in webhook:",
+                "Failed to set booking.stripePaymentId in webhook:",
+                err,
+              );
+            }
+          }
+
+          // Mark the booking confirmed so it can later be checked-in/settled.
+          // Only when it's still pending — never un-complete or un-cancel a booking.
+          if (booking && booking.status === BookingStatus.pending) {
+            try {
+              await prisma.booking.update({
+                where: { id: bookingId },
+                data: { status: BookingStatus.confirmed },
+              });
+            } catch (err) {
+              console.error(
+                "Failed to set booking.status to confirmed in webhook:",
                 err,
               );
             }

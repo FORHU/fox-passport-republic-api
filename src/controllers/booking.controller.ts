@@ -880,19 +880,25 @@ export default class BookingCtrl {
           message: "Unauthorized — you are not the host of this event",
         });
 
-      if (booking.checkedIn)
-        return res
-          .status(409)
-          .json({ success: false, message: "Booking already checked in" });
+      const result = await BookingSvc.checkInAndSettle(
+        booking.id,
+        req.user!.userId,
+      );
 
-      const updated = await prisma.booking.update({
-        where: { id: booking.id },
-        data: { checkedIn: true },
+      return res.status(200).json({
+        success: true,
+        data: result.booking,
+        payoutTriggered: result.payoutTriggered,
       });
-
-      return res.status(200).json({ success: true, data: updated });
     } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message });
+      const msg = error.message;
+      if (msg.includes("not the host"))
+        return res.status(403).json({ success: false, message: msg });
+      if (msg.includes("not confirmed/paid"))
+        return res.status(400).json({ success: false, message: msg });
+      if (msg.includes("not found"))
+        return res.status(404).json({ success: false, message: msg });
+      return res.status(500).json({ success: false, message: msg });
     }
   }
 
