@@ -213,7 +213,7 @@ export default class UsersRepo {
 
   // FOXER STATS — bookings + revenue + avg rating for owned services/assets
   static async getFoxerStats(userId: string) {
-    const [serviceAgg, assetAgg, userItems] = await Promise.all([
+    const [serviceAgg, assetAgg, eventBookingAgg, userItems] = await Promise.all([
       prisma.serviceBooking.aggregate({
         where: {
           service: { ownerId: userId },
@@ -226,6 +226,14 @@ export default class UsersRepo {
         where: {
           asset: { ownerId: userId },
           status: { in: ["confirmed", "active", "completed"] },
+        },
+        _count: { id: true },
+        _sum: { totalAmount: true },
+      }),
+      prisma.booking.aggregate({
+        where: {
+          event: { organizerId: userId },
+          status: { in: ["confirmed", "completed"] },
         },
         _count: { id: true },
         _sum: { totalAmount: true },
@@ -253,9 +261,14 @@ export default class UsersRepo {
         : { _avg: { rating: null } };
 
     return {
-      totalBookings: (serviceAgg._count.id ?? 0) + (assetAgg._count.id ?? 0),
+      totalBookings:
+        (serviceAgg._count.id ?? 0) +
+        (assetAgg._count.id ?? 0) +
+        (eventBookingAgg._count.id ?? 0),
       totalRevenue:
-        (serviceAgg._sum.totalAmount ?? 0) + (assetAgg._sum.totalAmount ?? 0),
+        (serviceAgg._sum.totalAmount ?? 0) +
+        (assetAgg._sum.totalAmount ?? 0) +
+        (eventBookingAgg._sum.totalAmount ?? 0),
       rating: reviewAgg._avg.rating ?? 5.0,
     };
   }
