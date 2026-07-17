@@ -29,6 +29,7 @@ export default class UsersRepo {
       "serviceFoxer",
       "gearFoxer",
       "eventFoxer",
+      "venueFoxer",
     ];
     return prisma.user.findMany({
       where: {
@@ -64,6 +65,36 @@ export default class UsersRepo {
             images: { take: 1, select: { url: true } },
           },
         },
+        assets: {
+          where: { status: "available", deletedAt: null },
+          take: 3,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            price: true,
+            billingRate: true,
+            description: true,
+            images: { take: 1, select: { url: true } },
+          },
+        },
+        venues: {
+          where: { status: "available" },
+          take: 3,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            price: true,
+            billingRate: true,
+            description: true,
+            city: true,
+            capacity: true,
+            images: { take: 1, select: { url: true } },
+          },
+        },
         eventTemplates: {
           where: { isPublic: true },
           take: 3,
@@ -89,7 +120,7 @@ export default class UsersRepo {
       where: {
         id,
         roleType: {
-          hasSome: ["serviceFoxer", "gearFoxer", "eventFoxer"] as RoleType[],
+          hasSome: ["serviceFoxer", "gearFoxer", "eventFoxer", "venueFoxer"] as RoleType[],
         },
       },
       select: {
@@ -111,6 +142,34 @@ export default class UsersRepo {
             billingRate: true,
             tags: true,
             description: true,
+            images: { take: 3, select: { url: true } },
+          },
+        },
+        assets: {
+          where: { status: "available", deletedAt: null },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            price: true,
+            billingRate: true,
+            description: true,
+            images: { take: 3, select: { url: true } },
+          },
+        },
+        venues: {
+          where: { status: "available" },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            price: true,
+            billingRate: true,
+            description: true,
+            city: true,
+            capacity: true,
             images: { take: 3, select: { url: true } },
           },
         },
