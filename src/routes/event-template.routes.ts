@@ -9,6 +9,9 @@ router.get("/browse", EventTemplateCtrl.browsePublic);
 router.get("/browse/:id", EventTemplateCtrl.browsePublicById);
 router.get("/recommendations", EventTemplateCtrl.getRecommendations);
 
+// Trending — public, no auth, returns top N templates by booking count for a category
+router.get("/trending", EventTemplateCtrl.getTrending);
+
 // Public/Authenticated list
 router.get("/", authenticate, EventTemplateCtrl.getTemplates);
 router.get("/:id", authenticate, EventTemplateCtrl.getTemplateById);

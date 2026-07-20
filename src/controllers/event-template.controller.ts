@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import { prisma } from "../utils/prisma";
 import EventTemplateSvc from "../services/event-template.service";
+import EventTemplateRepo from "../repositories/event-template.repository";
 import { sendApprovedEmail } from "../utils/emails/approved";
 import { sendRejectedEmail } from "../utils/emails/rejected";
 import { EventCategory, EventTemplateStatus } from "@prisma/client";
@@ -72,6 +73,20 @@ export default class EventTemplateCtrl {
       return res
         .status(error.message.includes("Unauthorized") ? 403 : 400)
         .json({ message: error.message });
+    }
+  }
+
+  static async getTrending(req: Request, res: Response) {
+    try {
+      const { category, limit } = req.query;
+      if (!category) return res.status(400).json({ message: "category is required" });
+      const templates = await EventTemplateRepo.findTrendingByCategory(
+        category as string,
+        limit ? parseInt(limit as string, 10) : 4,
+      );
+      return res.status(200).json({ templates });
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
   }
 
