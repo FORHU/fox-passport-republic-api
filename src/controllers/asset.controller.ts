@@ -66,11 +66,12 @@ export default class AssetCtrl {
   //READ Assets Controller with optional query parameters for filtering by ownerId and categoryId
   static async getAssets(req: Request, res: Response) {
     try {
-      const { ownerId, category } = req.query;
+      const { ownerId, category, city } = req.query;
 
       const assets = await AssetSvc.getAssets({
         ...(ownerId && { ownerId: String(ownerId) }),
         ...(category && { category: category as any }),
+        ...(city && { city: String(city) }),
       });
 
       return res.status(200).json({ assets });
