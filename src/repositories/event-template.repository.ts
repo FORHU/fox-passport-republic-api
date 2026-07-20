@@ -64,6 +64,7 @@ export default class EventTemplateRepo {
     return prisma.eventTemplate.findMany({
       where: {
         isPublic: true,
+        status: "published" as any,
         ...(filters.category && { category: filters.category as any }),
       },
       select: {
@@ -319,6 +320,46 @@ export default class EventTemplateRepo {
     return prisma.eventTemplateVenue.deleteMany({
       where: { templateId, venueId },
     });
+  }
+
+  // TRENDING — top N public templates in a category ranked by approved-Event count
+  static async findTrendingByCategory(category: string, limit = 4) {
+    // Count approved Events per templateId within this category
+    const counts = await prisma.event.groupBy({
+      by: ["templateId"],
+      where: {
+        templateId: { not: null },
+        eventCategory: category as EventCategory,
+        requestStatus: "approved",
+      },
+      _count: { templateId: true },
+      orderBy: { _count: { templateId: "desc" } },
+      take: limit,
+    });
+
+    if (counts.length === 0) return [];
+
+    const templateIds = counts
+      .map((c) => c.templateId)
+      .filter((id): id is string => id !== null);
+
+    const templates = await prisma.eventTemplate.findMany({
+      where: { id: { in: templateIds }, isPublic: true },
+      include: {
+        owner: { select: { id: true, name: true } },
+        images: { take: 1 },
+      },
+    });
+
+    // Re-order to match descending booking count
+    return templateIds
+      .map((id) => {
+        const t = templates.find((t) => t.id === id);
+        const bookingCount =
+          counts.find((c) => c.templateId === id)?._count.templateId ?? 0;
+        return t ? { ...t, bookingCount } : null;
+      })
+      .filter((t): t is NonNullable<typeof t> => t !== null);
   }
 
   // DELETE TEMPLATE
