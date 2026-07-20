@@ -81,6 +81,37 @@ export default class MatchController {
     }
   }
 
+  static async acceptMatch(req: Request, res: Response) {
+    try {
+      const foxerId = (req as any).user?.id || (req as any).user?.userId;
+      if (!foxerId) return res.status(401).json({ message: "Unauthorized" });
+      await MatchSvc.acceptMatch(req.params.id, foxerId);
+      res.status(200).json({ success: true, message: "Match accepted" });
+    } catch (error: any) {
+      const status =
+        error.message === "Unauthorized" ? 403
+        : error.message === "Match not found" ? 404
+        : 400;
+      res.status(status).json({ message: error.message });
+    }
+  }
+
+  static async declineMatch(req: Request, res: Response) {
+    try {
+      const foxerId = (req as any).user?.id || (req as any).user?.userId;
+      if (!foxerId) return res.status(401).json({ message: "Unauthorized" });
+      const { reason } = req.body;
+      await MatchSvc.declineMatch(req.params.id, foxerId, reason);
+      res.status(200).json({ success: true, message: "Match declined" });
+    } catch (error: any) {
+      const status =
+        error.message === "Unauthorized" ? 403
+        : error.message === "Match not found" ? 404
+        : 400;
+      res.status(status).json({ message: error.message });
+    }
+  }
+
   static async getFoxerClientInbox(req: Request, res: Response) {
     try {
       const foxerId = (req as any).user?.id || (req as any).user?.userId;

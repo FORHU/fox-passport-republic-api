@@ -21,6 +21,7 @@ export default class ProfileSvc {
       username?: string;
       phone?: string;
       profileImage?: string;
+      city?: string;
     },
   ) {
     // Check if username is already taken (if updating username)
@@ -39,7 +40,7 @@ export default class ProfileSvc {
     return ProfileRepo.updateProfile(userId, {
       ...rest,
       ...(profileImage !== undefined ? { imgId: profileImage } : {}),
-    });
+    } as Parameters<typeof ProfileRepo.updateProfile>[1]);
   }
 
   // Change password

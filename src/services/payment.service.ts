@@ -40,6 +40,11 @@ export default class PaymentSvc {
     };
   }
 
+  // REFUND a captured Stripe payment intent
+  static async refundPayment(paymentIntentId: string): Promise<void> {
+    await stripe.refunds.create({ payment_intent: paymentIntentId });
+  }
+
   // GET ALL PAYMENTS
   static async getAllPayments(filters?: {
     bookingId?: string;
