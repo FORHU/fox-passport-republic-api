@@ -51,6 +51,7 @@ export default class AssetSvc {
   static async getAssets(filters?: {
     ownerId?: string;
     category?: AssetCategory;
+    city?: string;
   }) {
     const assets = await AssetRepo.findAllAssets(filters);
     const { default: PassportSvc } = await import("./passport.service");

@@ -56,12 +56,13 @@ export default class ServiceCtrl {
 
   static async getServices(req: Request, res: Response) {
     try {
-      const { ownerId, category, status } = req.query;
+      const { ownerId, category, status, city } = req.query;
 
       const services = await ServiceSvc.getAllServices({
         ...(ownerId && { ownerId: String(ownerId) }),
         ...(category && { category: category as any }),
         ...(status && { status: status as ServiceStatus }),
+        ...(city && { city: String(city) }),
       });
 
       return res.status(200).json({ services });

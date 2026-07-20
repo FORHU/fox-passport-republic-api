@@ -77,28 +77,38 @@ export default class EventTemplateCtrl {
 
   static async getTemplates(req: Request, res: Response) {
     try {
-      const { ownerId, isPublic, category } = req.query;
+      const { ownerId, isPublic, category, city, targetCity } = req.query;
       const templates = await EventTemplateSvc.getTemplates({
         ownerId: ownerId as string,
         isPublic:
           isPublic === "true" ? true : isPublic === "false" ? false : undefined,
         category: category as string | undefined,
+        city: (city ?? targetCity) as string | undefined,
       });
-      return res.status(200).json({ templates });
+      return res.status(200).json({ success: true, data: { templates } });
     } catch (error: any) {
       return res.status(500).json({ message: error.message });
     }
   }
 
-  // Public — no auth required, lightweight query for landing page cards
+  // Public — no auth required, searchable browse for the public /search page
   static async browsePublic(req: Request, res: Response) {
     try {
-      const { category, limit } = req.query;
+      const { category, targetCity, city, maxPrice, isPublic, limit } = req.query;
       const templates = await EventTemplateSvc.getPublicTemplatesLite({
         category: category as string | undefined,
-        limit: limit ? Math.min(Number(limit), 20) : 8,
+        targetCity: targetCity as string | undefined,
+        city: city as string | undefined,
+        maxPrice: maxPrice ? Number(maxPrice) : undefined,
+        isPublic:
+          isPublic === "false"
+            ? false
+            : isPublic === "true"
+              ? true
+              : undefined,
+        limit: limit ? Math.min(Number(limit), 50) : 50,
       });
-      return res.status(200).json({ success: true, data: templates });
+      return res.status(200).json({ success: true, data: { templates } });
     } catch (error: any) {
       return res.status(500).json({ message: error.message });
     }

@@ -58,6 +58,7 @@ export default class EventTemplateSvc {
     ownerId?: string;
     isPublic?: boolean;
     category?: string;
+    city?: string;
   }) {
     const templates = await EventTemplateRepo.findAllTemplates(filters);
     // event_boost (Lvl 15) > featured_listing (Lvl 10) > unranked
@@ -67,27 +68,54 @@ export default class EventTemplateSvc {
       ['event_boost', 'featured_listing'],
       'ownerId'
     );
-    return sorted.map((t) => ({
-      ...t,
-      ...this.calculateTotalsBreakdown(t),
-    }));
+    return sorted.map((t) => {
+      const totals = this.calculateTotalsBreakdown(t);
+      return {
+        ...t,
+        ...totals,
+        // Frontend TemplateCard reads `item.price` and optional `item.rating`
+        price: totals.totalAmount,
+        rating: (t as any).rating ?? null,
+      };
+    });
   }
 
-  // Lightweight browse for landing page — no price calculation, minimal joins
+  // Public browse for the search page — supports category/targetCity/maxPrice,
+  // computes price + rating so the frontend cards have the fields they read.
   static async getPublicTemplatesLite(filters: {
     category?: string;
+    targetCity?: string;
+    city?: string;
+    maxPrice?: number;
+    isPublic?: boolean;
     limit?: number;
   }) {
     const templates = await EventTemplateRepo.findPublicTemplatesLite({
       category: filters.category,
-      limit: filters.limit ?? 8,
+      targetCity: filters.targetCity,
+      maxPrice: filters.maxPrice,
+      isPublic: filters.isPublic,
+      limit: filters.limit ?? 50,
     });
     const { default: PassportSvc } = await import("./passport.service");
-    return PassportSvc.sortByFeaturedPerk(
-      templates,
+    const withTotals = templates.map((t: any) => {
+      const totals = this.calculateTotalsBreakdown(t);
+      return {
+        ...t,
+        ...totals,
+        price: totals.totalAmount,
+        rating: (t as any).rating ?? null,
+      };
+    });
+    const sorted = await PassportSvc.sortByFeaturedPerk(
+      withTotals,
       ['event_boost', 'featured_listing'],
       'ownerId'
     );
+    // maxPrice is enforced after price computation (server-computed totalAmount)
+    return filters.maxPrice != null
+      ? sorted.filter((t: any) => (t.price ?? 0) <= filters.maxPrice!)
+      : sorted;
   }
 
   static async getTemplateById(id: string) {

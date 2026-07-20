@@ -49,6 +49,7 @@ export default class ServiceSvc {
     ownerId?: string;
     category?: ServiceCategory;
     status?: ServiceStatus;
+    city?: string;
   }) {
     const services = await ServiceRepo.getAllServices(filters);
     const { default: PassportSvc } = await import("./passport.service");

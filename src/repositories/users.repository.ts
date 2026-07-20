@@ -22,65 +22,76 @@ export default class UsersRepo {
     });
   }
 
-  // READ FOXERS — public listing for the landing page
-  static async findFoxers(limit = 9, page = 1, roleType?: RoleType, specialization?: string) {
-    const skip = (page - 1) * limit;
+  // Shared where-clause builder for foxer listing + count
+  static buildFoxerWhere(roleType?: RoleType, specialization?: string, city?: string) {
     const allFoxerRoles: RoleType[] = [
       "serviceFoxer",
       "gearFoxer",
       "eventFoxer",
     ];
-    return prisma.user.findMany({
-      where: {
-        roleType: roleType ? { has: roleType } : { hasSome: allFoxerRoles },
-        ...(specialization ? {
-          foxerSpecializations: { some: { category: specialization, ...(roleType ? { roleType } : {}) } },
-        } : {}),
-      },
-      select: {
-        id: true,
-        name: true,
-        imgId: true,
-        city: true,
-        state: true,
-        roleType: true,
-        createdAt: true,
-        foxerSpecializations: {
-          select: { roleType: true, category: true, source: true },
-          orderBy: { source: "asc" },
-        },
-        services: {
-          where: { status: "available", deletedAt: null },
-          take: 3,
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            name: true,
-            category: true,
-            price: true,
-            billingRate: true,
-            tags: true,
-            description: true,
-            images: { take: 1, select: { url: true } },
+    return {
+      roleType: roleType ? { has: roleType } : { hasSome: allFoxerRoles },
+      ...(specialization ? {
+        foxerSpecializations: { some: { category: specialization, ...(roleType ? { roleType } : {}) } },
+      } : {}),
+      ...(city ? { city: { contains: city, mode: "insensitive" as const } } : {}),
+    };
+  }
+
+  // READ FOXERS — public listing for the landing page (with total for pagination)
+  static async findFoxers(limit = 9, page = 1, roleType?: RoleType, specialization?: string, city?: string) {
+    const skip = (page - 1) * limit;
+    const where = this.buildFoxerWhere(roleType, specialization, city);
+    const [foxers, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          imgId: true,
+          city: true,
+          state: true,
+          roleType: true,
+          createdAt: true,
+          foxerSpecializations: {
+            select: { roleType: true, category: true, source: true },
+            orderBy: { source: "asc" },
+          },
+          services: {
+            where: { status: "available", deletedAt: null },
+            take: 3,
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              name: true,
+              category: true,
+              price: true,
+              billingRate: true,
+              tags: true,
+              description: true,
+              images: { take: 1, select: { url: true } },
+            },
+          },
+          eventTemplates: {
+            where: { isPublic: true },
+            take: 3,
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              name: true,
+              category: true,
+              description: true,
+              images: { take: 1, select: { url: true } },
+            },
           },
         },
-        eventTemplates: {
-          where: { isPublic: true },
-          take: 3,
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            name: true,
-            category: true,
-            description: true,
-            images: { take: 1, select: { url: true } },
-          },
-        },
-      },
-      take: limit,
-      skip,
-      orderBy: { createdAt: "desc" },
-    });
+        take: limit,
+        skip,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.user.count({ where }),
+    ]);
+    return { foxers, total, totalPages: Math.max(1, Math.ceil(total / limit)) };
   }
 
   // READ SINGLE FOXER with services + event templates (public profile)
