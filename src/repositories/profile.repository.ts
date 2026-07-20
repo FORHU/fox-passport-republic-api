@@ -49,6 +49,7 @@ export default class ProfileRepo {
       username?: string;
       phone?: string;
       imgId?: string;
+      city?: string;
     },
   ) {
     return prisma.user.update({
@@ -61,6 +62,7 @@ export default class ProfileRepo {
         name: true,
         phone: true,
         imgId: true,
+        city: true,
         systemRole: true,
         roleType: true,
         updatedAt: true,

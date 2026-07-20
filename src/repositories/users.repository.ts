@@ -22,14 +22,89 @@ export default class UsersRepo {
     });
   }
 
+  // Compute avgRating + reviewCount for a list of foxers in one DB round-trip
+  private static async attachRatings<T extends { id: string; services: { id: string }[]; assets?: { id: string }[]; venues?: { id: string }[] }>(
+    foxers: T[],
+  ): Promise<(T & { avgRating: number | null; reviewCount: number })[]> {
+    const allEntityIds = foxers.flatMap((f) => [
+      ...f.services.map((s) => s.id),
+      ...(f.assets ?? []).map((a) => a.id),
+      ...(f.venues ?? []).map((v) => v.id),
+    ]);
+
+    if (allEntityIds.length === 0) {
+      return foxers.map((f) => ({ ...f, avgRating: null, reviewCount: 0 }));
+    }
+
+    const groups = await prisma.review.groupBy({
+      by: ["entityId"],
+      where: { entityId: { in: allEntityIds } },
+      _avg: { rating: true },
+      _count: { id: true },
+    });
+
+    const byEntity = new Map(groups.map((g) => [g.entityId, g]));
+
+    return foxers.map((f) => {
+      const ids = [
+        ...f.services.map((s) => s.id),
+        ...(f.assets ?? []).map((a) => a.id),
+        ...(f.venues ?? []).map((v) => v.id),
+      ];
+      const hit = ids.map((id) => byEntity.get(id)).filter(Boolean) as typeof groups;
+      const reviewCount = hit.reduce((sum, g) => sum + g._count.id, 0);
+      const weightedSum = hit.reduce((sum, g) => sum + (g._avg.rating ?? 0) * g._count.id, 0);
+      const avgRating = reviewCount > 0 ? weightedSum / reviewCount : null;
+      return { ...f, avgRating, reviewCount };
+    });
+  }
+
+  // Compute avgRating + reviewCount for a list of foxers in one DB round-trip
+  private static async attachRatings<T extends { id: string; services: { id: string }[]; assets?: { id: string }[]; venues?: { id: string }[] }>(
+    foxers: T[],
+  ): Promise<(T & { avgRating: number | null; reviewCount: number })[]> {
+    const allEntityIds = foxers.flatMap((f) => [
+      ...f.services.map((s) => s.id),
+      ...(f.assets ?? []).map((a) => a.id),
+      ...(f.venues ?? []).map((v) => v.id),
+    ]);
+
+    if (allEntityIds.length === 0) {
+      return foxers.map((f) => ({ ...f, avgRating: null, reviewCount: 0 }));
+    }
+
+    const groups = await prisma.review.groupBy({
+      by: ["entityId"],
+      where: { entityId: { in: allEntityIds } },
+      _avg: { rating: true },
+      _count: { id: true },
+    });
+
+    const byEntity = new Map(groups.map((g) => [g.entityId, g]));
+
+    return foxers.map((f) => {
+      const ids = [
+        ...f.services.map((s) => s.id),
+        ...(f.assets ?? []).map((a) => a.id),
+        ...(f.venues ?? []).map((v) => v.id),
+      ];
+      const hit = ids.map((id) => byEntity.get(id)).filter(Boolean) as typeof groups;
+      const reviewCount = hit.reduce((sum, g) => sum + g._count.id, 0);
+      const weightedSum = hit.reduce((sum, g) => sum + (g._avg.rating ?? 0) * g._count.id, 0);
+      const avgRating = reviewCount > 0 ? weightedSum / reviewCount : null;
+      return { ...f, avgRating, reviewCount };
+    });
+  }
+
   // Shared where-clause builder for foxer listing + count
   static buildFoxerWhere(roleType?: RoleType, specialization?: string, city?: string) {
     const allFoxerRoles: RoleType[] = [
       "serviceFoxer",
       "gearFoxer",
       "eventFoxer",
+      "venueFoxer",
     ];
-    return {
+    const foxers = await {
       roleType: roleType ? { has: roleType } : { hasSome: allFoxerRoles },
       ...(specialization ? {
         foxerSpecializations: { some: { category: specialization, ...(roleType ? { roleType } : {}) } },
@@ -72,7 +147,37 @@ export default class UsersRepo {
               images: { take: 1, select: { url: true } },
             },
           },
-          eventTemplates: {
+          assets: {
+          where: { status: "available", deletedAt: null },
+          take: 3,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            price: true,
+            billingRate: true,
+            description: true,
+            images: { take: 1, select: { url: true } },
+          },
+        },
+        venues: {
+          where: { status: "available" },
+          take: 3,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            price: true,
+            billingRate: true,
+            description: true,
+            city: true,
+            capacity: true,
+            images: { take: 1, select: { url: true } },
+          },
+        },
+        eventTemplates: {
             where: { isPublic: true },
             take: 3,
             orderBy: { createdAt: "desc" },
@@ -92,15 +197,16 @@ export default class UsersRepo {
       prisma.user.count({ where }),
     ]);
     return { foxers, total, totalPages: Math.max(1, Math.ceil(total / limit)) };
+    return UsersRepo.attachRatings(foxers);
   }
 
   // READ SINGLE FOXER with services + event templates (public profile)
   static async findFoxerById(id: string) {
-    return prisma.user.findFirst({
+    const foxer = await prisma.user.findFirst({
       where: {
         id,
         roleType: {
-          hasSome: ["serviceFoxer", "gearFoxer", "eventFoxer"] as RoleType[],
+          hasSome: ["serviceFoxer", "gearFoxer", "eventFoxer", "venueFoxer"] as RoleType[],
         },
       },
       select: {
@@ -125,6 +231,34 @@ export default class UsersRepo {
             images: { take: 3, select: { url: true } },
           },
         },
+        assets: {
+          where: { status: "available", deletedAt: null },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            price: true,
+            billingRate: true,
+            description: true,
+            images: { take: 3, select: { url: true } },
+          },
+        },
+        venues: {
+          where: { status: "available" },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            price: true,
+            billingRate: true,
+            description: true,
+            city: true,
+            capacity: true,
+            images: { take: 3, select: { url: true } },
+          },
+        },
         foxerSpecializations: {
           select: { roleType: true, category: true, source: true },
           orderBy: { source: "asc" },
@@ -144,6 +278,9 @@ export default class UsersRepo {
         },
       },
     });
+    if (!foxer) return null;
+    const [enriched] = await UsersRepo.attachRatings([foxer]);
+    return enriched;
   }
 
   // READ ONE
