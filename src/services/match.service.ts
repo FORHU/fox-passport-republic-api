@@ -2,6 +2,9 @@ import { MatchConstraint } from "@prisma/client";
 import EventTransactionSvc from "./event-transaction.service";
 import EventRequestSvc from "./event-request.service";
 import EventTemplateRepo from "../repositories/event-template.repository";
+import EventRequestRepo from "../repositories/event-request.repository";
+import NotificationSvc from "../modules/notifications/user-notification.service";
+import PaymentSvc from "./payment.service";
 import { prisma } from "../utils/prisma";
 
 export default class MatchSvc {
@@ -127,6 +130,60 @@ export default class MatchSvc {
       prisma.event.count({ where: { organizerId: foxerId } }),
     ]);
     return { data, total, hasMore: offset + limit < total };
+  }
+
+  static async acceptMatch(eventId: string, foxerId: string) {
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      include: { bookings: { select: { id: true, stripePaymentId: true } } },
+    });
+    if (!event) throw new Error("Match not found");
+    if (event.organizerId !== foxerId) throw new Error("Unauthorized");
+    if (event.requestStatus !== "pending") throw new Error("Match already processed");
+
+    await EventRequestRepo.updateRequestStatus(eventId, "approved");
+
+    if (event.clientId) {
+      await NotificationSvc.create({
+        userId: event.clientId,
+        type: "MATCH_ACCEPTED",
+        title: "Match Accepted!",
+        message: `Your match request "${event.name}" has been accepted.`,
+        metadata: { link: "/user/passport" },
+      });
+    }
+  }
+
+  static async declineMatch(eventId: string, foxerId: string, reason?: string) {
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      include: { bookings: { select: { id: true, stripePaymentId: true } } },
+    });
+    if (!event) throw new Error("Match not found");
+    if (event.organizerId !== foxerId) throw new Error("Unauthorized");
+    if (event.requestStatus !== "pending") throw new Error("Match already processed");
+
+    await EventRequestRepo.rejectRequest(eventId, reason);
+
+    for (const booking of event.bookings) {
+      if (booking.stripePaymentId) {
+        await PaymentSvc.refundPayment(booking.stripePaymentId);
+      }
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: { status: "cancelled" },
+      });
+    }
+
+    if (event.clientId) {
+      await NotificationSvc.create({
+        userId: event.clientId,
+        type: "MATCH_DECLINED",
+        title: "Match Declined",
+        message: `Your match request "${event.name}" was not accepted.`,
+        metadata: { link: "/user/passport" },
+      });
+    }
   }
 
   static async getMyMatches(clientId: string) {
