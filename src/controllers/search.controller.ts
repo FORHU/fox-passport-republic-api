@@ -9,14 +9,21 @@ export default class SearchCtrl {
     try {
       const location = req.query.location as string | undefined;
       const category = req.query.category as string | undefined;
+      const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 30));
 
-      const result = await SearchSvc.searchByLocation(location, category);
+      const result = await SearchSvc.searchByLocation(location, category, page, limit);
 
       return res.status(200).json({
         success: true,
         data: {
           location: location ?? null,
           category: category ?? null,
+          page,
+          limit,
+          totalEventTemplates: result.totalEventTemplates,
+          totalGearFoxers: result.totalGearFoxers,
+          totalServiceFoxers: result.totalServiceFoxers,
           eventTemplates: result.eventTemplates,
           gearFoxers: result.gearFoxers,
           serviceFoxers: result.serviceFoxers,

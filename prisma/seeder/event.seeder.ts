@@ -114,6 +114,54 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
       }
     }
 
+    // ── Bulk event templates for pagination testing ──────────────────────────
+    const BULK_TEMPLATE_DEFS: { suffix: string; name: string; desc: string; category: EventCategory; city: string; state: string }[] = [
+      { suffix: "beach-wedding", name: "Beach Wedding Bliss", desc: "A stunning beachfront wedding experience with full coordination and decor.", category: EventCategory.wedding, city: "Boracay", state: "Aklan" },
+      { suffix: "garden-birthday", name: "Garden Birthday Fiesta", desc: "Outdoor birthday party in a lush garden venue with catering and entertainment.", category: EventCategory.birthday, city: "Tagaytay", state: "Cavite" },
+      { suffix: "rooftop-social", name: "Rooftop Social Night", desc: "An elevated social gathering on a city rooftop with live music and cocktails.", category: EventCategory.social, city: "Makati", state: "Metro Manila" },
+      { suffix: "corp-summit", name: "Leadership Summit Package", desc: "Professional conference setup with AV, staging, and catering for 100+ attendees.", category: EventCategory.corporate, city: "Taguig", state: "Metro Manila" },
+      { suffix: "debut-party", name: "Grand Debut Celebration", desc: "A fairytale 18th birthday debut with full production, sound, and styling.", category: EventCategory.birthday, city: "Quezon City", state: "Metro Manila" },
+      { suffix: "cebu-fiesta", name: "Cebu Island Fiesta", desc: "Traditional Filipino fiesta celebration with local cuisine, music, and dance.", category: EventCategory.social, city: "Cebu City", state: "Cebu" },
+      { suffix: "davao-corp", name: "Davao Business Convention", desc: "Full-scale business convention with exhibit booths, keynote staging, and networking.", category: EventCategory.corporate, city: "Davao City", state: "Davao del Sur" },
+      { suffix: "intimate-wedding", name: "Intimate Wedding Package", desc: "A cozy wedding celebration for 30 guests with curated decor and live acoustics.", category: EventCategory.wedding, city: "Antipolo", state: "Rizal" },
+      { suffix: "pool-party", name: "Pool Party Package", desc: "Fun-filled pool party with DJ, inflatables, and poolside bar service.", category: EventCategory.social, city: "Manila", state: "Metro Manila" },
+      { suffix: "art-exhibit", name: "Art & Culture Exhibit", desc: "Gallery-style event with lighting, curation, and cocktail reception.", category: EventCategory.other, city: "Pasig", state: "Metro Manila" },
+      { suffix: "holiday-gala", name: "Holiday Gala Night", desc: "Year-end gala dinner with formal setup, live band, and awards ceremony.", category: EventCategory.corporate, city: "Makati", state: "Metro Manila" },
+      { suffix: "outdoor-concert", name: "Outdoor Concert Package", desc: "Open-air concert setup with stage, sound system, lighting, and crowd management.", category: EventCategory.other, city: "Clark", state: "Pampanga" },
+      { suffix: "kiddie-party", name: "Kiddie Party Bundle", desc: "Colorful kids' party with games, face painting, balloon twisting, and buffet.", category: EventCategory.birthday, city: "Manila", state: "Metro Manila" },
+      { suffix: "reunion-package", name: "Family Reunion Package", desc: "Large family gathering with activities, catering, and photo coverage.", category: EventCategory.social, city: "Laguna", state: "Laguna" },
+      { suffix: "product-launch", name: "Product Launch Event", desc: "Sleek product unveiling with media setup, stage design, and press kits.", category: EventCategory.corporate, city: "Taguig", state: "Metro Manila" },
+      { suffix: "sunset-dinner", name: "Sunset Dinner Experience", desc: "Seaside dinner event with live acoustic music and curated Filipino cuisine.", category: EventCategory.other, city: "La Union", state: "La Union" },
+      { suffix: "music-festival", name: "Mini Music Festival", desc: "Multi-stage music event with food stalls, art installations, and VIP areas.", category: EventCategory.other, city: "Cebu City", state: "Cebu" },
+    ];
+
+    // Assign ownership across bulk event foxers (round-robin)
+    const bulkEventFoxers = users.filter((u: any) => (u.email as string).startsWith("ef-"));
+    for (let i = 0; i < BULK_TEMPLATE_DEFS.length; i++) {
+      const t = BULK_TEMPLATE_DEFS[i];
+      const owner = bulkEventFoxers.length > 0
+        ? bulkEventFoxers[i % bulkEventFoxers.length]
+        : host;
+      const templateId = `seed-template-bulk-${t.suffix}`;
+      await prisma.eventTemplate.upsert({
+        where: { id: templateId },
+        update: { name: t.name, description: t.desc, isPublic: true, status: "published" },
+        create: {
+          id: templateId,
+          name: t.name,
+          description: t.desc,
+          category: t.category,
+          targetCity: t.city,
+          targetState: t.state,
+          targetCountry: "Philippines",
+          ownerId: owner.id,
+          isPublic: true,
+          status: "published",
+        },
+      });
+    }
+    console.log(`✓ Seeded ${BULK_TEMPLATE_DEFS.length} bulk event templates`);
+
     console.log("✓ EventTemplates seeded");
 
     // ── 2. File (images) for each template ──────────────────────────────────
@@ -141,6 +189,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
       [TEMPLATE_IDS.other]: [
         { id: "seed-file-other-1", url: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&auto=format&fit=crop", name: "Custom Event" },
         { id: "seed-file-other-2", url: "https://images.unsplash.com/photo-1533174072545-e8d4aa97edf9?w=800&auto=format&fit=crop", name: "Event Setup" },
+        { id: "seed-file-other-3", url: "https://images.unsplash.com/photo-1511578314322-379afb476865?w=800&auto=format&fit=crop", name: "Flexible Venue Layout" },
       ],
       "seed-template-multi-social": [
         { id: "seed-file-multi-social-1", url: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop", name: "Social Night Crowd" },
@@ -153,6 +202,26 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         { id: "seed-file-multi-corp-3", url: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=800&auto=format&fit=crop", name: "Conference Setup" },
       ],
     };
+
+    // ── Bulk template images ────────────────────────────────────────────────
+    // Record<EventCategory, string> ensures every category has a cover image;
+    // TypeScript will error at compile time if a new EventCategory is added
+    // without a corresponding entry here.
+    const TEMPLATE_COVER_URLS: Record<EventCategory, string> = {
+      [EventCategory.wedding]:   "https://images.unsplash.com/photo-1519741497674-611481863552?w=800&auto=format&fit=crop",
+      [EventCategory.birthday]:  "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&auto=format&fit=crop",
+      [EventCategory.corporate]: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop",
+      [EventCategory.social]:    "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop",
+      [EventCategory.other]:     "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&auto=format&fit=crop",
+    };
+
+    for (const t of BULK_TEMPLATE_DEFS) {
+      const templateId = `seed-template-bulk-${t.suffix}`;
+      const coverUrl = TEMPLATE_COVER_URLS[t.category];
+      templateImages[templateId] = [
+        { id: `seed-file-bulk-${t.suffix}-1`, url: coverUrl, name: `${t.name} Cover` },
+      ];
+    }
 
     for (const [templateId, files] of Object.entries(templateImages)) {
       for (const f of files) {
