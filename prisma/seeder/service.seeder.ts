@@ -452,6 +452,177 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
       ] : []),
     ];
 
+    // ── Bulk services for pagination-testing foxers ──────────────────────────
+    const EF_SERVICE_NAMES = [
+      ["Full Event Coordination", "Day-Of Event Management"],
+      ["Wedding Planning Package", "Corporate Event Setup"],
+      ["Birthday Party Production", "Social Gathering Package"],
+      ["Debut Event Planning", "Festival Coordination"],
+      ["Anniversary Celebration", "Reunion Event Setup"],
+      ["Concert Event Planning", "Product Launch Package"],
+      ["Outdoor Event Coordination", "Virtual Event Production"],
+      ["Gala Night Planning", "Team Building Coordination"],
+    ];
+
+    const GF_SERVICE_NAMES = [
+      ["PA System Rental", "Wireless Mic Set"],
+      ["LED Wall Package", "Projector Rental"],
+      ["Stage Lighting Rig", "Haze Machine Setup"],
+      ["Portable Stage Setup", "Truss System Rental"],
+      ["Generator Rental (30kVA)", "Power Distribution Box"],
+      ["DJ Equipment Set", "Turntable Package"],
+      ["Photo Booth Kiosk", "360 Video Booth"],
+      ["Drone Camera Package", "GoPro Multi-Cam Kit"],
+      ["Confetti Cannon Set", "CO2 Jet Machine"],
+      ["Fog Machine Rental", "Laser Light Show Kit"],
+      ["Backdrop Frame Set", "Modular Booth Walls"],
+      ["Event Tent (10x10)", "Canopy Rental Package"],
+      ["Folding Chair Set (50)", "Round Table Set (10)"],
+      ["Cooler & Ice Chest", "Mobile Bar Counter"],
+      ["Barrier & Stanchion Set", "Crowd Control Package"],
+    ];
+
+    const SF_SERVICE_NAMES = [
+      ["Event Photography", "Portrait Session"],
+      ["Hair & Makeup", "Bridal Styling"],
+      ["Floral Arrangement", "Bouquet Design"],
+      ["Catering (Filipino)", "Dessert Buffet"],
+      ["Emcee & Hosting", "Stand-Up Comedy Set"],
+      ["Bartending Service", "Cocktail Mixology"],
+      ["Videography Coverage", "Highlight Reel Edit"],
+      ["Face Painting", "Balloon Twisting"],
+    ];
+
+    const SVC_CATEGORIES = [
+      ServiceCategory.entertainment,
+      ServiceCategory.catering,
+      ServiceCategory.design,
+      ServiceCategory.service_staff,
+      ServiceCategory.other,
+    ];
+
+    const BILLING_RATES = [BillingRate.one_time, BillingRate.daily, BillingRate.one_time, BillingRate.one_time, BillingRate.daily];
+
+    for (let i = 1; i <= 16; i++) {
+      const foxer = users.find((u: any) => u.email === `ef-${String(i).padStart(2, "0")}@foxers.ph`);
+      if (!foxer) continue;
+      const [svcA, svcB] = EF_SERVICE_NAMES[(i - 1) % EF_SERVICE_NAMES.length];
+      services.push(
+        {
+          id: `seed-service-ef-${i}-a`,
+          ownerId: foxer.id,
+          category: SVC_CATEGORIES[i % SVC_CATEGORIES.length],
+          name: svcA,
+          description: `${svcA} by ${foxer.name}`,
+          price: 10000 + i * 2000,
+          currency: "PHP",
+          billingRate: BILLING_RATES[i % BILLING_RATES.length],
+          status: ServiceStatus.available,
+          city: (foxer as any).city ?? "Manila",
+          state: (foxer as any).state ?? "Metro Manila",
+          country: "Philippines",
+          tags: [svcA.toLowerCase().split(" ")[0]],
+          isWillingToTravel: i % 2 === 0,
+        } as any,
+        {
+          id: `seed-service-ef-${i}-b`,
+          ownerId: foxer.id,
+          category: SVC_CATEGORIES[(i + 1) % SVC_CATEGORIES.length],
+          name: svcB,
+          description: `${svcB} by ${foxer.name}`,
+          price: 5000 + i * 1500,
+          currency: "PHP",
+          billingRate: BILLING_RATES[(i + 1) % BILLING_RATES.length],
+          status: ServiceStatus.available,
+          city: (foxer as any).city ?? "Manila",
+          state: (foxer as any).state ?? "Metro Manila",
+          country: "Philippines",
+          tags: [svcB.toLowerCase().split(" ")[0]],
+          isWillingToTravel: i % 3 === 0,
+        } as any
+      );
+    }
+
+    for (let i = 1; i <= 29; i++) {
+      const foxer = users.find((u: any) => u.email === `gf-${String(i).padStart(2, "0")}@foxers.ph`);
+      if (!foxer) continue;
+      const [svcA, svcB] = GF_SERVICE_NAMES[(i - 1) % GF_SERVICE_NAMES.length];
+      services.push(
+        {
+          id: `seed-service-gf-${i}-a`,
+          ownerId: foxer.id,
+          category: SVC_CATEGORIES[i % SVC_CATEGORIES.length],
+          name: svcA,
+          description: `${svcA} — provided by ${foxer.name}`,
+          price: 3000 + (i % 5) * 2000,
+          currency: "PHP",
+          billingRate: i % 2 === 0 ? BillingRate.one_time : BillingRate.daily,
+          status: ServiceStatus.available,
+          city: (foxer as any).city ?? "Manila",
+          state: (foxer as any).state ?? "Metro Manila",
+          country: "Philippines",
+          tags: [svcA.toLowerCase().split(" ")[0]],
+          isWillingToTravel: true,
+        } as any,
+        {
+          id: `seed-service-gf-${i}-b`,
+          ownerId: foxer.id,
+          category: SVC_CATEGORIES[(i + 2) % SVC_CATEGORIES.length],
+          name: svcB,
+          description: `${svcB} — provided by ${foxer.name}`,
+          price: 1500 + (i % 3) * 1000,
+          currency: "PHP",
+          billingRate: BillingRate.one_time,
+          status: ServiceStatus.available,
+          city: (foxer as any).city ?? "Manila",
+          state: (foxer as any).state ?? "Metro Manila",
+          country: "Philippines",
+          tags: [svcB.toLowerCase().split(" ")[0]],
+          isWillingToTravel: false,
+        } as any
+      );
+    }
+
+    for (let i = 1; i <= 16; i++) {
+      const foxer = users.find((u: any) => u.email === `sf-${String(i).padStart(2, "0")}@foxers.ph`);
+      if (!foxer) continue;
+      const [svcA, svcB] = SF_SERVICE_NAMES[(i - 1) % SF_SERVICE_NAMES.length];
+      services.push(
+        {
+          id: `seed-service-sf-${i}-a`,
+          ownerId: foxer.id,
+          category: SVC_CATEGORIES[i % SVC_CATEGORIES.length],
+          name: svcA,
+          description: `${svcA} by ${foxer.name}`,
+          price: 5000 + (i % 4) * 3000,
+          currency: "PHP",
+          billingRate: i % 2 === 0 ? BillingRate.one_time : BillingRate.daily,
+          status: ServiceStatus.available,
+          city: (foxer as any).city ?? "Manila",
+          state: (foxer as any).state ?? "Metro Manila",
+          country: "Philippines",
+          tags: [svcA.toLowerCase().split(" ")[0]],
+          isWillingToTravel: true,
+        } as any,
+        {
+          id: `seed-service-sf-${i}-b`,
+          ownerId: foxer.id,
+          category: SVC_CATEGORIES[(i + 1) % SVC_CATEGORIES.length],
+          name: svcB,
+          description: `${svcB} by ${foxer.name}`,
+          price: 8000 + (i % 3) * 4000,
+          currency: "PHP",
+          billingRate: BillingRate.one_time,
+          status: ServiceStatus.available,
+          city: (foxer as any).city ?? "Manila",
+          state: (foxer as any).state ?? "Metro Manila",
+          country: "Philippines",
+          tags: [svcB.toLowerCase().split(" ")[0]],
+          isWillingToTravel: false,
+        } as any
+      );
+    }
+
     for (const s of services) {
       const { id, ...rest } = s as any;
       const serviceId = id || `seed-service-${s.name.toLowerCase().replace(/\s+/g, '-')}`;
@@ -510,6 +681,64 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
       { id: "seed-img-sarah-sound-1", serviceId: "seed-service-sarah-soundcheck", url: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&auto=format&fit=crop", name: "foh-mixing.jpg", type: "image/jpeg" },
       { id: "seed-img-sarah-sound-2", serviceId: "seed-service-sarah-soundcheck", url: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&auto=format&fit=crop", name: "stage-monitors.jpg", type: "image/jpeg" },
     ];
+
+    // ── Bulk portfolio images for pagination-testing services ────────────────
+    const EVENT_PHOTO_URLS = [
+      "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1519741497674-611481863552?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&auto=format&fit=crop",
+    ];
+
+    const GEAR_PHOTO_URLS = [
+      "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1504805572947-34fad45aed93?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1516873240891-4bf014598ab4?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=800&auto=format&fit=crop",
+    ];
+
+    const SERVICE_PHOTO_URLS = [
+      "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1555244162-803834f70033?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1469371670807-013ccf25f16a?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1522163182402-834f871fd851?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1533142266415-ac591a4deae9?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1478146896981-b80fe463b330?w=800&auto=format&fit=crop",
+    ];
+
+    // Event foxer service images
+    for (let i = 1; i <= 16; i++) {
+      serviceImages.push(
+        { id: `seed-img-ef-${i}-a`, serviceId: `seed-service-ef-${i}-a`, url: EVENT_PHOTO_URLS[(i - 1) % EVENT_PHOTO_URLS.length], name: `ef-${i}-portfolio-a.jpg`, type: "image/jpeg" },
+        { id: `seed-img-ef-${i}-b`, serviceId: `seed-service-ef-${i}-b`, url: EVENT_PHOTO_URLS[i % EVENT_PHOTO_URLS.length], name: `ef-${i}-portfolio-b.jpg`, type: "image/jpeg" },
+      );
+    }
+
+    // Gear foxer service images
+    for (let i = 1; i <= 29; i++) {
+      serviceImages.push(
+        { id: `seed-img-gf-${i}-a`, serviceId: `seed-service-gf-${i}-a`, url: GEAR_PHOTO_URLS[(i - 1) % GEAR_PHOTO_URLS.length], name: `gf-${i}-portfolio-a.jpg`, type: "image/jpeg" },
+        { id: `seed-img-gf-${i}-b`, serviceId: `seed-service-gf-${i}-b`, url: GEAR_PHOTO_URLS[i % GEAR_PHOTO_URLS.length], name: `gf-${i}-portfolio-b.jpg`, type: "image/jpeg" },
+      );
+    }
+
+    // Service foxer service images
+    for (let i = 1; i <= 16; i++) {
+      serviceImages.push(
+        { id: `seed-img-sf-${i}-a`, serviceId: `seed-service-sf-${i}-a`, url: SERVICE_PHOTO_URLS[(i - 1) % SERVICE_PHOTO_URLS.length], name: `sf-${i}-portfolio-a.jpg`, type: "image/jpeg" },
+        { id: `seed-img-sf-${i}-b`, serviceId: `seed-service-sf-${i}-b`, url: SERVICE_PHOTO_URLS[i % SERVICE_PHOTO_URLS.length], name: `sf-${i}-portfolio-b.jpg`, type: "image/jpeg" },
+      );
+    }
 
     for (const img of serviceImages) {
       await prisma.file.upsert({

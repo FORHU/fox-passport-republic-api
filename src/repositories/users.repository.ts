@@ -59,43 +59,6 @@ export default class UsersRepo {
     });
   }
 
-  // Compute avgRating + reviewCount for a list of foxers in one DB round-trip
-  private static async attachRatings<T extends { id: string; services: { id: string }[]; assets?: { id: string }[]; venues?: { id: string }[] }>(
-    foxers: T[],
-  ): Promise<(T & { avgRating: number | null; reviewCount: number })[]> {
-    const allEntityIds = foxers.flatMap((f) => [
-      ...f.services.map((s) => s.id),
-      ...(f.assets ?? []).map((a) => a.id),
-      ...(f.venues ?? []).map((v) => v.id),
-    ]);
-
-    if (allEntityIds.length === 0) {
-      return foxers.map((f) => ({ ...f, avgRating: null, reviewCount: 0 }));
-    }
-
-    const groups = await prisma.review.groupBy({
-      by: ["entityId"],
-      where: { entityId: { in: allEntityIds } },
-      _avg: { rating: true },
-      _count: { id: true },
-    });
-
-    const byEntity = new Map(groups.map((g) => [g.entityId, g]));
-
-    return foxers.map((f) => {
-      const ids = [
-        ...f.services.map((s) => s.id),
-        ...(f.assets ?? []).map((a) => a.id),
-        ...(f.venues ?? []).map((v) => v.id),
-      ];
-      const hit = ids.map((id) => byEntity.get(id)).filter(Boolean) as typeof groups;
-      const reviewCount = hit.reduce((sum, g) => sum + g._count.id, 0);
-      const weightedSum = hit.reduce((sum, g) => sum + (g._avg.rating ?? 0) * g._count.id, 0);
-      const avgRating = reviewCount > 0 ? weightedSum / reviewCount : null;
-      return { ...f, avgRating, reviewCount };
-    });
-  }
-
   // Shared where-clause builder for foxer listing + count
   static buildFoxerWhere(roleType?: RoleType, specialization?: string, city?: string) {
     const allFoxerRoles: RoleType[] = [
@@ -104,7 +67,7 @@ export default class UsersRepo {
       "eventFoxer",
       "venueFoxer",
     ];
-    const foxers = await {
+    return {
       roleType: roleType ? { has: roleType } : { hasSome: allFoxerRoles },
       ...(specialization ? {
         foxerSpecializations: { some: { category: specialization, ...(roleType ? { roleType } : {}) } },
@@ -197,7 +160,6 @@ export default class UsersRepo {
       prisma.user.count({ where }),
     ]);
     return { foxers, total, totalPages: Math.max(1, Math.ceil(total / limit)) };
-    return UsersRepo.attachRatings(foxers);
   }
 
   // READ SINGLE FOXER with services + event templates (public profile)
