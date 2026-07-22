@@ -1,5 +1,18 @@
 import { PrismaClient, AssetStatus, BillingRate, AssetCondition, AssetCategory } from "@prisma/client";
 
+const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
+  "Manila":        { lat: 14.5995, lng: 120.9842 },
+  "Taguig":        { lat: 14.5176, lng: 121.0509 },
+  "Quezon City":   { lat: 14.6760, lng: 121.0437 },
+  "Makati":        { lat: 14.5547, lng: 121.0244 },
+  "Baguio City":   { lat: 16.4023, lng: 120.5960 },
+  "Pasig":         { lat: 14.5764, lng: 121.0851 },
+  "Cebu City":     { lat: 10.3157, lng: 123.8854 },
+  "Mandaluyong":   { lat: 14.5794, lng: 121.0359 },
+  "Pasay":         { lat: 14.5378, lng: 121.0014 },
+  "Davao City":    { lat: 7.1907,  lng: 125.4553 },
+};
+
 const BULK_ASSET_NAMES: Record<AssetCategory, { name: string; desc: string; price: number; billingRate: BillingRate; condition: AssetCondition }[]> = {
   [AssetCategory.sound_system]: [
     { name: "Portable PA Speaker", desc: "Compact 12-inch powered speaker for small to mid-size gatherings.", price: 15000, billingRate: BillingRate.daily, condition: AssetCondition.good },
@@ -725,51 +738,16 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
       }
     ];
 
-    // ── Bulk assets for pagination-testing foxers ────────────────────────────
-    const COVER_URLS: Record<AssetCategory, string> = {
-      [AssetCategory.sound_system]: "https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&auto=format&fit=crop",
-      [AssetCategory.decorations]:  "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=800&auto=format&fit=crop",
-      [AssetCategory.furnitures]:   "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&auto=format&fit=crop",
-      [AssetCategory.other]:        "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop",
-    };
-
-    const bulkAssets: any[] = [];
-    for (let i = 1; i <= 60; i++) {
-      const foxer = users.find((u: any) => u.email === `gf-${String(i).padStart(2, "0")}@foxers.ph`);
-      if (!foxer) continue;
-      const cat = ASSET_CATEGORIES[i % ASSET_CATEGORIES.length];
-      const templates = BULK_ASSET_NAMES[cat];
-      const t = templates[i % templates.length];
-      const loc = CITIES[i % CITIES.length];
-      const assetId = `seed-asset-gf-${i}-${cat}`;
-      bulkAssets.push({
-        id: assetId,
-        ownerId: foxer.id,
-        category: cat,
-        name: t.name,
-        description: `${t.name} — provided by ${foxer.name}. ${t.desc}`,
-        quantity: 1,
-        price: t.price,
-        currency: "PHP",
-        billingRate: t.billingRate,
-        condition: t.condition,
-        status: AssetStatus.available,
-        city: loc.city,
-        state: loc.state,
-        country: "Philippines",
-      });
-    }
-
-    const allAssets = [...assets, ...bulkAssets];
-
-    for (const a of allAssets) {
-      const assetId = a.id || `seed-asset-${a.name.trim().toLowerCase().replace(/\s+/g, '-')}`;
+    for (const a of assets) {
+      const assetId = `seed-asset-${a.name.trim().toLowerCase().replace(/\s+/g, '-')}`;
+      const coords = CITY_COORDS[(a as any).city] ?? {};
       await prisma.asset.upsert({
         where: { id: assetId },
-        update: { ...a },
+        update: { ...a, ...coords },
         create: {
           id: assetId,
           ...a,
+          ...coords,
         },
       });
       console.log(`✓ Seeded asset: ${a.name}`);

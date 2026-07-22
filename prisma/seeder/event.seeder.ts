@@ -53,6 +53,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         description: "Everything you need for an unforgettable birthday party — from a grand venue and floral setup to live catering and full waitstaff. Let us handle the details while you celebrate.",
         category: EventCategory.birthday,
         targetCity: "Manila", targetState: "Metro Manila", targetCountry: "Philippines",
+        lat: 14.5995, lng: 120.9842,
       },
       {
         id: TEMPLATE_IDS.wedding,
@@ -60,6 +61,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         description: "An elegant beachfront wedding experience crafted to perfection. Includes a stunning arch, premium catering, Tiffany seating, and professional photography on the shores of Boracay.",
         category: EventCategory.wedding,
         targetCity: "Boracay", targetState: "Aklan", targetCountry: "Philippines",
+        lat: 11.9674, lng: 121.9248,
       },
       {
         id: TEMPLATE_IDS.corporate,
@@ -67,6 +69,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         description: "Professional setup for corporate meetings, product launches, and conferences. Full AV, photography coverage, and a premium BGC loft venue included.",
         category: EventCategory.corporate,
         targetCity: "Taguig", targetState: "Metro Manila", targetCountry: "Philippines",
+        lat: 14.5176, lng: 121.0509,
       },
       {
         id: TEMPLATE_IDS.social,
@@ -74,6 +77,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         description: "A relaxed yet vibrant setup for social hangouts, reunions, and celebrations. Featuring live band entertainment, quality sound, and a beautiful outdoor garden venue.",
         category: EventCategory.social,
         targetCity: "Cebu City", targetState: "Cebu", targetCountry: "Philippines",
+        lat: 10.3157, lng: 123.8854,
       },
       {
         id: TEMPLATE_IDS.other,
@@ -126,6 +130,72 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         create: { ...t, ownerId: host.id, isPublic: true, status: "published" },
       });
     }
+
+    // ── Hero showcase templates — visually distinct packages for the landing page ──
+    const heroTemplates = [
+      {
+        id: "seed-template-hero-rooftop",
+        name: "Rooftop Glow Party",
+        description: "A premium rooftop social with DJ, neon lighting, and panoramic city views. Built for unforgettable nights.",
+        category: EventCategory.social,
+        targetCity: "Taguig", targetState: "Metro Manila", targetCountry: "Philippines",
+      },
+      {
+        id: "seed-template-hero-intimate-wedding",
+        name: "Intimate Garden Wedding",
+        description: "A beautifully curated garden ceremony for 40 guests. Floral arch, string lights, gourmet catering, and live acoustic music.",
+        category: EventCategory.wedding,
+        targetCity: "Tagaytay", targetState: "Cavite", targetCountry: "Philippines",
+      },
+      {
+        id: "seed-template-hero-kids-bday",
+        name: "Kids Wonderland Birthday",
+        description: "Magical birthday party experience for kids — themed decorations, face painting, party games, and a custom cake setup.",
+        category: EventCategory.birthday,
+        targetCity: "Quezon City", targetState: "Metro Manila", targetCountry: "Philippines",
+      },
+      {
+        id: "seed-template-hero-launch",
+        name: "Product Launch Event",
+        description: "High-impact product launch with press coverage, AV production, branded backdrop, and curated media kit service.",
+        category: EventCategory.corporate,
+        targetCity: "Makati", targetState: "Metro Manila", targetCountry: "Philippines",
+      },
+    ];
+
+    for (const t of heroTemplates) {
+      await prisma.eventTemplate.upsert({
+        where: { id: t.id },
+        update: { name: t.name, description: t.description, isPublic: true, status: "published" },
+        create: { ...t, ownerId: host.id, isPublic: true, status: "published" },
+      });
+    }
+
+    const heroImages: Record<string, { id: string; url: string; name: string }[]> = {
+      "seed-template-hero-rooftop": [
+        { id: "seed-file-hero-rooftop-1", url: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&auto=format&fit=crop", name: "Rooftop Party" },
+      ],
+      "seed-template-hero-intimate-wedding": [
+        { id: "seed-file-hero-wedding-1", url: "https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?w=800&auto=format&fit=crop", name: "Garden Wedding" },
+      ],
+      "seed-template-hero-kids-bday": [
+        { id: "seed-file-hero-bday-1", url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&auto=format&fit=crop", name: "Kids Birthday" },
+      ],
+      "seed-template-hero-launch": [
+        { id: "seed-file-hero-launch-1", url: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=800&auto=format&fit=crop", name: "Product Launch" },
+      ],
+    };
+
+    for (const [templateId, files] of Object.entries(heroImages)) {
+      for (const f of files) {
+        await prisma.file.upsert({
+          where: { id: f.id },
+          update: { url: f.url, name: f.name, templateId },
+          create: { id: f.id, url: f.url, name: f.name, type: "image/jpeg", templateId },
+        });
+      }
+    }
+    console.log("✓ Hero showcase templates seeded");
 
     // Multi-role user also gets two event templates so their profile isn't empty
     if (multi) {

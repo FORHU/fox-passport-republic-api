@@ -18,6 +18,8 @@ export default class EventTemplateSvc {
     targetCity?: string;
     targetState?: string;
     targetCountry?: string;
+    lat?: number;
+    lng?: number;
     hostMarkupPct?: number;
     maxAttendees?: number;
   }) {
@@ -37,6 +39,11 @@ export default class EventTemplateSvc {
       category: EventCategory;
       isPublic: boolean;
       imgIds: string[];
+      targetCity?: string;
+      targetState?: string;
+      targetCountry?: string;
+      lat?: number;
+      lng?: number;
       hostMarkupPct: number;
       maxAttendees: number | null;
     }>;
