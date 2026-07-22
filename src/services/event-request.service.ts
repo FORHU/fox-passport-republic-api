@@ -115,9 +115,15 @@ export default class EventRequestSvc {
     // Award completeEvent XP to the event organizer (eventFoxer path)
     const organizerId = (request as any).organizerId ?? (request as any).hostId;
     if (organizerId) {
-      import("./passport.service").then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
-        return PassportSvc.awardXP(organizerId, UserPath.eventFoxer, XP_REWARDS.completeEvent);
-      }).catch(() => {});
+      import("./passport.service")
+        .then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
+          return PassportSvc.awardXP(
+            organizerId,
+            UserPath.eventFoxer,
+            XP_REWARDS.completeEvent,
+          );
+        })
+        .catch(() => {});
     }
 
     return result;
