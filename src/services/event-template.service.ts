@@ -65,8 +65,8 @@ export default class EventTemplateSvc {
     const { default: PassportSvc } = await import("./passport.service");
     const sorted = await PassportSvc.sortByFeaturedPerk(
       templates,
-      ['event_boost', 'featured_listing'],
-      'ownerId'
+      ["event_boost", "featured_listing"],
+      "ownerId",
     );
     return sorted.map((t) => {
       const totals = this.calculateTotalsBreakdown(t);
@@ -88,15 +88,19 @@ export default class EventTemplateSvc {
     city?: string;
     maxPrice?: number;
     isPublic?: boolean;
+    page?: number;
     limit?: number;
   }) {
-    const templates = await EventTemplateRepo.findPublicTemplatesLite({
-      category: filters.category,
-      targetCity: filters.targetCity,
-      maxPrice: filters.maxPrice,
-      isPublic: filters.isPublic,
-      limit: filters.limit ?? 50,
-    });
+    const { templates, total } =
+      await EventTemplateRepo.findPublicTemplatesLite({
+        category: filters.category,
+        targetCity: filters.targetCity,
+        city: filters.city,
+        maxPrice: filters.maxPrice,
+        isPublic: filters.isPublic,
+        page: filters.page,
+        limit: filters.limit ?? 50,
+      });
     const { default: PassportSvc } = await import("./passport.service");
     const withTotals = templates.map((t: any) => {
       const totals = this.calculateTotalsBreakdown(t);
@@ -109,13 +113,15 @@ export default class EventTemplateSvc {
     });
     const sorted = await PassportSvc.sortByFeaturedPerk(
       withTotals,
-      ['event_boost', 'featured_listing'],
-      'ownerId'
+      ["event_boost", "featured_listing"],
+      "ownerId",
     );
     // maxPrice is enforced after price computation (server-computed totalAmount)
-    return filters.maxPrice != null
-      ? sorted.filter((t: any) => (t.price ?? 0) <= filters.maxPrice!)
-      : sorted;
+    const filtered =
+      filters.maxPrice != null
+        ? sorted.filter((t: any) => (t.price ?? 0) <= filters.maxPrice!)
+        : sorted;
+    return { templates: filtered, total };
   }
 
   static async getTemplateById(id: string) {

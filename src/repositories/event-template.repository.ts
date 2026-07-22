@@ -72,31 +72,43 @@ export default class EventTemplateRepo {
     city?: string;
     isPublic?: boolean;
     maxPrice?: number;
+    page?: number;
     limit: number;
   }) {
-    return prisma.eventTemplate.findMany({
-      where: {
-        ...(filters.isPublic !== undefined
-          ? { isPublic: filters.isPublic }
-          : { isPublic: true }),
-        ...(filters.category && { category: filters.category as any }),
-        ...((filters.targetCity || filters.city) && {
-          targetCity: {
-            contains: (filters.targetCity ?? filters.city) as string,
-            mode: "insensitive",
-          },
-        }),
-      },
-      include: {
-        owner: { select: { id: true, name: true, email: true } },
-        templateAssets: { include: { asset: true } },
-        templateServices: { include: { service: true } },
-        templateVenues: { include: { venue: true } },
-        images: true,
-      },
-      take: filters.limit,
-      orderBy: { createdAt: "desc" },
-    });
+    const page = filters.page ?? 1;
+    const skip = (page - 1) * filters.limit;
+
+    const where = {
+      ...(filters.isPublic !== undefined
+        ? { isPublic: filters.isPublic }
+        : { isPublic: true }),
+      ...(filters.category && { category: filters.category as any }),
+      ...((filters.targetCity || filters.city) && {
+        targetCity: {
+          contains: (filters.targetCity ?? filters.city) as string,
+          mode: "insensitive" as const,
+        },
+      }),
+    };
+
+    const [templates, total] = await Promise.all([
+      prisma.eventTemplate.findMany({
+        where,
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          templateAssets: { include: { asset: true } },
+          templateServices: { include: { service: true } },
+          templateVenues: { include: { venue: true } },
+          images: true,
+        },
+        take: filters.limit,
+        skip,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.eventTemplate.count({ where }),
+    ]);
+
+    return { templates, total };
   }
 
   // FIND BY ID

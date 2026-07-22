@@ -32,11 +32,13 @@ export default class AnalyticsSvc {
     return templates.map((t) => {
       const allBookings = t.events.flatMap((e) => e.bookings);
       const confirmedBookings = allBookings.filter((b) =>
-        ["confirmed", "completed"].includes(b.status)
+        ["confirmed", "completed"].includes(b.status),
       );
       const revenue = confirmedBookings.reduce((s, b) => s + b.totalAmount, 0);
       const totalGuests = t.events.reduce((s, e) => s + (e.guestCount ?? 0), 0);
-      const completedEvents = t.events.filter((e) => e.eventStatus === "completed").length;
+      const completedEvents = t.events.filter(
+        (e) => e.eventStatus === "completed",
+      ).length;
 
       // Bookings bucketed by month (last 6 months)
       const now = new Date();
@@ -61,7 +63,9 @@ export default class AnalyticsSvc {
         confirmedBookings: confirmedBookings.length,
         revenue: Math.round(revenue * 100) / 100,
         totalGuests,
-        monthlyBookings: Object.entries(monthlyBuckets).map(([month, count]) => ({ month, count })),
+        monthlyBookings: Object.entries(monthlyBuckets).map(
+          ([month, count]) => ({ month, count }),
+        ),
       };
     });
   }

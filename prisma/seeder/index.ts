@@ -9,3 +9,4 @@ export * from "./item-booking.seeder";
 export * from "./badge.seeder";
 export * from "./passport.seeder";
 export * from "./specialization.seeder";
+export * from "./search-filter.seeder";

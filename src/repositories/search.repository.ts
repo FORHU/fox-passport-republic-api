@@ -4,7 +4,12 @@ import { RoleType } from "@prisma/client";
 export default class SearchRepo {
   // Aggregate discovery search: given a location (city) and optional category,
   // return event templates + gear foxers + service foxers (with their top items).
-  static async searchByLocation(location?: string, category?: string, page = 1, limit = 30) {
+  static async searchByLocation(
+    location?: string,
+    category?: string,
+    page = 1,
+    limit = 30,
+  ) {
     const skip = (page - 1) * limit;
     const cityFilter = location
       ? { contains: location, mode: "insensitive" as const }
@@ -24,7 +29,14 @@ export default class SearchRepo {
       ...(cityFilter && { city: cityFilter }),
     };
 
-    const [eventTemplates, gearFoxers, serviceFoxers, totalEventTemplates, totalGearFoxers, totalServiceFoxers] = await Promise.all([
+    const [
+      eventTemplates,
+      gearFoxers,
+      serviceFoxers,
+      totalEventTemplates,
+      totalGearFoxers,
+      totalServiceFoxers,
+    ] = await Promise.all([
       prisma.eventTemplate.findMany({
         where: templateWhere,
         include: {
@@ -49,7 +61,11 @@ export default class SearchRepo {
             orderBy: { source: "asc" },
           },
           assets: {
-            where: { status: "available", deletedAt: null, ...(category ? { category: category as any } : {}) },
+            where: {
+              status: "available",
+              deletedAt: null,
+              ...(category ? { category: category as any } : {}),
+            },
             take: 3,
             orderBy: { createdAt: "desc" },
             select: {
@@ -80,7 +96,11 @@ export default class SearchRepo {
             orderBy: { source: "asc" },
           },
           services: {
-            where: { status: "available", deletedAt: null, ...(category ? { category: category as any } : {}) },
+            where: {
+              status: "available",
+              deletedAt: null,
+              ...(category ? { category: category as any } : {}),
+            },
             take: 3,
             orderBy: { createdAt: "desc" },
             select: {

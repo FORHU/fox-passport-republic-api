@@ -7,44 +7,49 @@ export default class LocationsSvc {
     const query = q.trim();
     if (query.length < 2) return [];
 
-    const [userCities, venueCities, templateCities, serviceCities, assetCities] =
-      await Promise.all([
-        prisma.user.findMany({
-          where: {
-            city: { not: null, contains: query, mode: "insensitive" },
-          },
-          distinct: ["city"],
-          select: { city: true },
-        }),
-        prisma.venue.findMany({
-          where: {
-            city: { contains: query, mode: "insensitive" },
-          },
-          distinct: ["city"],
-          select: { city: true },
-        }),
-        prisma.eventTemplate.findMany({
-          where: {
-            targetCity: { not: null, contains: query, mode: "insensitive" },
-          },
-          distinct: ["targetCity"],
-          select: { targetCity: true },
-        }),
-        prisma.service.findMany({
-          where: {
-            city: { contains: query, mode: "insensitive" },
-          },
-          distinct: ["city"],
-          select: { city: true },
-        }),
-        prisma.asset.findMany({
-          where: {
-            city: { contains: query, mode: "insensitive" },
-          },
-          distinct: ["city"],
-          select: { city: true },
-        }),
-      ]);
+    const [
+      userCities,
+      venueCities,
+      templateCities,
+      serviceCities,
+      assetCities,
+    ] = await Promise.all([
+      prisma.user.findMany({
+        where: {
+          city: { not: null, contains: query, mode: "insensitive" },
+        },
+        distinct: ["city"],
+        select: { city: true },
+      }),
+      prisma.venue.findMany({
+        where: {
+          city: { contains: query, mode: "insensitive" },
+        },
+        distinct: ["city"],
+        select: { city: true },
+      }),
+      prisma.eventTemplate.findMany({
+        where: {
+          targetCity: { not: null, contains: query, mode: "insensitive" },
+        },
+        distinct: ["targetCity"],
+        select: { targetCity: true },
+      }),
+      prisma.service.findMany({
+        where: {
+          city: { contains: query, mode: "insensitive" },
+        },
+        distinct: ["city"],
+        select: { city: true },
+      }),
+      prisma.asset.findMany({
+        where: {
+          city: { contains: query, mode: "insensitive" },
+        },
+        distinct: ["city"],
+        select: { city: true },
+      }),
+    ]);
 
     const seen = new Set<string>();
     const merged: string[] = [];

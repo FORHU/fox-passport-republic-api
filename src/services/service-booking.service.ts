@@ -45,7 +45,10 @@ export default class ServiceBookingSvc {
     });
     // service_lower_fees perk: service foxer owner pays 0% platform commission
     const { default: PassportSvc } = await import("./passport.service");
-    const ownerHasLowerFees = await PassportSvc.hasPerk(service.ownerId, "service_lower_fees");
+    const ownerHasLowerFees = await PassportSvc.hasPerk(
+      service.ownerId,
+      "service_lower_fees",
+    );
     const effectiveFeePercent = ownerHasLowerFees ? 0 : PLATFORM_FEE_PERCENT;
     const platformFeeAmount = itemsTotal * (effectiveFeePercent / 100);
     const totalAmount = itemsTotal + platformFeeAmount;
@@ -130,8 +133,11 @@ export default class ServiceBookingSvc {
         .catch(() => {});
       import("./specialization.service")
         .then(({ default: SpecializationSvc }) => {
-          const serviceId = (booking.service as any)?.id ?? (booking as any).serviceId;
-          const ownerId = (booking.service as any)?.ownerId ?? (booking.service as any)?.owner?.id;
+          const serviceId =
+            (booking.service as any)?.id ?? (booking as any).serviceId;
+          const ownerId =
+            (booking.service as any)?.ownerId ??
+            (booking.service as any)?.owner?.id;
           if (serviceId && ownerId)
             return SpecializationSvc.checkServiceFoxer(serviceId, ownerId);
         })

@@ -75,7 +75,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         name: "Custom Event Package",
         description: "A fully flexible package for any kind of event. Comes with professional photography and a choice of venue. Add your own flair and build from here.",
         category: EventCategory.other,
-        targetCountry: "Philippines",
+        targetCity: "Manila", targetState: "Metro Manila", targetCountry: "Philippines",
       },
     ];
 

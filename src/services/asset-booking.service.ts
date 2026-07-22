@@ -47,7 +47,10 @@ export default class AssetBookingSvc {
     });
     // lower_fees perk: gear foxer owner pays 0% platform commission
     const { default: PassportSvc } = await import("./passport.service");
-    const ownerHasLowerFees = await PassportSvc.hasPerk(asset.ownerId, "lower_fees");
+    const ownerHasLowerFees = await PassportSvc.hasPerk(
+      asset.ownerId,
+      "lower_fees",
+    );
     const effectiveFeePercent = ownerHasLowerFees ? 0 : PLATFORM_FEE_PERCENT;
     const platformFeeAmount = itemsTotal * (effectiveFeePercent / 100);
     const totalAmount = itemsTotal + platformFeeAmount;
@@ -133,8 +136,11 @@ export default class AssetBookingSvc {
         .catch(() => {});
       import("./specialization.service")
         .then(({ default: SpecializationSvc }) => {
-          const assetId = (booking.asset as any)?.id ?? (booking as any).assetId;
-          const ownerId = (booking.asset as any)?.ownerId ?? (booking.asset as any)?.owner?.id;
+          const assetId =
+            (booking.asset as any)?.id ?? (booking as any).assetId;
+          const ownerId =
+            (booking.asset as any)?.ownerId ??
+            (booking.asset as any)?.owner?.id;
           if (assetId && ownerId)
             return SpecializationSvc.checkGearFoxer(assetId, ownerId);
         })

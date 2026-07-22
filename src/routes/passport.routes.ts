@@ -8,7 +8,11 @@ router.get("/badges", PassportCtrl.getAllBadges);
 router.get("/leaderboard", PassportCtrl.getLeaderboard);
 router.get("/me", authenticate, PassportCtrl.getMyPassport);
 router.get("/me/badges", authenticate, PassportCtrl.getMyBadges);
-router.get("/support/priority-contact", authenticate, PassportCtrl.getPrioritySupportContact);
+router.get(
+  "/support/priority-contact",
+  authenticate,
+  PassportCtrl.getPrioritySupportContact,
+);
 router.get("/:userId", optionalAuth, PassportCtrl.getPassportByUserId);
 
 export default router;

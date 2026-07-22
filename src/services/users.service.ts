@@ -16,7 +16,13 @@ export default class UsersSvc {
     specialization?: string,
     city?: string,
   ) {
-    return UsersRepo.findFoxers(limit, page, roleType as any, specialization, city);
+    return UsersRepo.findFoxers(
+      limit,
+      page,
+      roleType as any,
+      specialization,
+      city,
+    );
   }
 
   // GET SINGLE FOXER BY ID (public profile with services)
