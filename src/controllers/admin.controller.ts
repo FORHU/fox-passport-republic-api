@@ -533,8 +533,13 @@ export default class AdminCtrl {
       });
       return res.status(200).json({ success: true, data: template });
     } catch (error: any) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-        return res.status(404).json({ success: false, message: "Event template not found" });
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Event template not found" });
       }
       return res.status(500).json({ success: false, message: error.message });
     }
@@ -544,16 +549,27 @@ export default class AdminCtrl {
     try {
       const { reason } = req.body;
       if (!reason) {
-        return res.status(400).json({ success: false, message: "Rejection reason is required" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Rejection reason is required" });
       }
       const template = await prisma.eventTemplate.update({
         where: { id: req.params.id },
-        data: { status: EventTemplateStatus.rejected, isPublic: false, rejectionReason: reason },
+        data: {
+          status: EventTemplateStatus.rejected,
+          isPublic: false,
+          rejectionReason: reason,
+        },
       });
       return res.status(200).json({ success: true, data: template });
     } catch (error: any) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-        return res.status(404).json({ success: false, message: "Event template not found" });
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Event template not found" });
       }
       return res.status(500).json({ success: false, message: error.message });
     }

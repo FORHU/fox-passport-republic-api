@@ -46,7 +46,10 @@ export default class VenueSvc {
 
     // venue_authority perk: skip the review queue and auto-approve
     const { default: PassportSvc } = await import("./passport.service");
-    const hasVenueAuthority = await PassportSvc.hasPerk(data.mayorId, "venue_authority");
+    const hasVenueAuthority = await PassportSvc.hasPerk(
+      data.mayorId,
+      "venue_authority",
+    );
 
     const venue = await VenueRepo.createVenue({
       ...data,
@@ -57,15 +60,23 @@ export default class VenueSvc {
       techAv: data.techAv ?? [],
       staffing: data.staffing ?? [],
       policies: data.policies ?? [],
-      status: hasVenueAuthority ? VenueStatus.available : (data.status ?? VenueStatus.pending),
+      status: hasVenueAuthority
+        ? VenueStatus.available
+        : (data.status ?? VenueStatus.pending),
       price: data.price ?? 0,
       billingRate: (data.billingRate as BillingRate) ?? BillingRate.daily,
     });
 
     // Award uploadVenue XP to the venueFoxer who created the listing
-    import("./passport.service").then(({ default: P, XP_REWARDS, UserPath }) => {
-      return P.awardXP(data.mayorId, UserPath.venueFoxer, XP_REWARDS.uploadVenue);
-    }).catch(() => {});
+    import("./passport.service")
+      .then(({ default: P, XP_REWARDS, UserPath }) => {
+        return P.awardXP(
+          data.mayorId,
+          UserPath.venueFoxer,
+          XP_REWARDS.uploadVenue,
+        );
+      })
+      .catch(() => {});
 
     return venue;
   }
@@ -77,22 +88,37 @@ export default class VenueSvc {
   static async getVenues(filters?: { mayorId?: string; hostId?: string }) {
     const venues = await VenueRepo.findAllVenues(filters);
     const { default: PassportSvc } = await import("./passport.service");
-    const sorted = await PassportSvc.sortByFeaturedPerk(venues, 'venue_spotlight', 'mayorId');
+    const sorted = await PassportSvc.sortByFeaturedPerk(
+      venues,
+      "venue_spotlight",
+      "mayorId",
+    );
     // Add city_badge / mayor_verified badge for each venue owner
-    return PassportSvc.enrichWithOwnerBadge(sorted, ['mayor_verified', 'city_badge'], 'mayorId');
+    return PassportSvc.enrichWithOwnerBadge(
+      sorted,
+      ["mayor_verified", "city_badge"],
+      "mayorId",
+    );
   }
 
   static async getVenueById(id: string, requesterId?: string) {
     const venue = await VenueRepo.findVenueById(id);
 
     if (!venue) throw new Error("Venue not found");
-    if (venue.status === VenueStatus.archived) throw new Error("Venue has been removed");
+    if (venue.status === VenueStatus.archived)
+      throw new Error("Venue has been removed");
 
     const { default: PassportSvc } = await import("./passport.service");
     const [inclusions, [enriched], viewerHasVipAccess] = await Promise.all([
       Promise.resolve(VenueSvc.computeInclusions(venue)),
-      PassportSvc.enrichWithOwnerBadge([venue], ['mayor_verified', 'city_badge'], 'mayorId'),
-      requesterId ? PassportSvc.hasPerk(requesterId, 'vip_lounge') : Promise.resolve(false),
+      PassportSvc.enrichWithOwnerBadge(
+        [venue],
+        ["mayor_verified", "city_badge"],
+        "mayorId",
+      ),
+      requesterId
+        ? PassportSvc.hasPerk(requesterId, "vip_lounge")
+        : Promise.resolve(false),
     ]);
 
     return { ...enriched, inclusions, viewerHasVipAccess };

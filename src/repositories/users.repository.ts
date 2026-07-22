@@ -23,7 +23,14 @@ export default class UsersRepo {
   }
 
   // Compute avgRating + reviewCount for a list of foxers in one DB round-trip
-  private static async attachRatings<T extends { id: string; services: { id: string }[]; assets?: { id: string }[]; venues?: { id: string }[] }>(
+  private static async attachRatings<
+    T extends {
+      id: string;
+      services: { id: string }[];
+      assets?: { id: string }[];
+      venues?: { id: string }[];
+    },
+  >(
     foxers: T[],
   ): Promise<(T & { avgRating: number | null; reviewCount: number })[]> {
     const allEntityIds = foxers.flatMap((f) => [
@@ -51,16 +58,25 @@ export default class UsersRepo {
         ...(f.assets ?? []).map((a) => a.id),
         ...(f.venues ?? []).map((v) => v.id),
       ];
-      const hit = ids.map((id) => byEntity.get(id)).filter(Boolean) as typeof groups;
+      const hit = ids
+        .map((id) => byEntity.get(id))
+        .filter(Boolean) as typeof groups;
       const reviewCount = hit.reduce((sum, g) => sum + g._count.id, 0);
-      const weightedSum = hit.reduce((sum, g) => sum + (g._avg.rating ?? 0) * g._count.id, 0);
+      const weightedSum = hit.reduce(
+        (sum, g) => sum + (g._avg.rating ?? 0) * g._count.id,
+        0,
+      );
       const avgRating = reviewCount > 0 ? weightedSum / reviewCount : null;
       return { ...f, avgRating, reviewCount };
     });
   }
 
   // Shared where-clause builder for foxer listing + count
-  static buildFoxerWhere(roleType?: RoleType, specialization?: string, city?: string) {
+  static buildFoxerWhere(
+    roleType?: RoleType,
+    specialization?: string,
+    city?: string,
+  ) {
     const allFoxerRoles: RoleType[] = [
       "serviceFoxer",
       "gearFoxer",
@@ -69,15 +85,30 @@ export default class UsersRepo {
     ];
     return {
       roleType: roleType ? { has: roleType } : { hasSome: allFoxerRoles },
-      ...(specialization ? {
-        foxerSpecializations: { some: { category: specialization, ...(roleType ? { roleType } : {}) } },
-      } : {}),
-      ...(city ? { city: { contains: city, mode: "insensitive" as const } } : {}),
+      ...(specialization
+        ? {
+            foxerSpecializations: {
+              some: {
+                category: specialization,
+                ...(roleType ? { roleType } : {}),
+              },
+            },
+          }
+        : {}),
+      ...(city
+        ? { city: { contains: city, mode: "insensitive" as const } }
+        : {}),
     };
   }
 
   // READ FOXERS — public listing for the landing page (with total for pagination)
-  static async findFoxers(limit = 9, page = 1, roleType?: RoleType, specialization?: string, city?: string) {
+  static async findFoxers(
+    limit = 9,
+    page = 1,
+    roleType?: RoleType,
+    specialization?: string,
+    city?: string,
+  ) {
     const skip = (page - 1) * limit;
     const where = this.buildFoxerWhere(roleType, specialization, city);
     const [foxers, total] = await Promise.all([
@@ -111,36 +142,36 @@ export default class UsersRepo {
             },
           },
           assets: {
-          where: { status: "available", deletedAt: null },
-          take: 3,
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            name: true,
-            category: true,
-            price: true,
-            billingRate: true,
-            description: true,
-            images: { take: 1, select: { url: true } },
+            where: { status: "available", deletedAt: null },
+            take: 3,
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              name: true,
+              category: true,
+              price: true,
+              billingRate: true,
+              description: true,
+              images: { take: 1, select: { url: true } },
+            },
           },
-        },
-        venues: {
-          where: { status: "available" },
-          take: 3,
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            name: true,
-            category: true,
-            price: true,
-            billingRate: true,
-            description: true,
-            city: true,
-            capacity: true,
-            images: { take: 1, select: { url: true } },
+          venues: {
+            where: { status: "available" },
+            take: 3,
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              name: true,
+              category: true,
+              price: true,
+              billingRate: true,
+              description: true,
+              city: true,
+              capacity: true,
+              images: { take: 1, select: { url: true } },
+            },
           },
-        },
-        eventTemplates: {
+          eventTemplates: {
             where: { isPublic: true },
             take: 3,
             orderBy: { createdAt: "desc" },
@@ -168,7 +199,12 @@ export default class UsersRepo {
       where: {
         id,
         roleType: {
-          hasSome: ["serviceFoxer", "gearFoxer", "eventFoxer", "venueFoxer"] as RoleType[],
+          hasSome: [
+            "serviceFoxer",
+            "gearFoxer",
+            "eventFoxer",
+            "venueFoxer",
+          ] as RoleType[],
         },
       },
       select: {
@@ -334,39 +370,40 @@ export default class UsersRepo {
 
   // FOXER STATS — bookings + revenue + avg rating for owned services/assets
   static async getFoxerStats(userId: string) {
-    const [serviceAgg, assetAgg, eventBookingAgg, userItems] = await Promise.all([
-      prisma.serviceBooking.aggregate({
-        where: {
-          service: { ownerId: userId },
-          status: { in: ["confirmed", "active", "completed"] },
-        },
-        _count: { id: true },
-        _sum: { totalAmount: true },
-      }),
-      prisma.assetBooking.aggregate({
-        where: {
-          asset: { ownerId: userId },
-          status: { in: ["confirmed", "active", "completed"] },
-        },
-        _count: { id: true },
-        _sum: { totalAmount: true },
-      }),
-      prisma.booking.aggregate({
-        where: {
-          event: { organizerId: userId },
-          status: { in: ["confirmed", "completed"] },
-        },
-        _count: { id: true },
-        _sum: { totalAmount: true },
-      }),
-      prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          services: { select: { id: true } },
-          assets: { select: { id: true } },
-        },
-      }),
-    ]);
+    const [serviceAgg, assetAgg, eventBookingAgg, userItems] =
+      await Promise.all([
+        prisma.serviceBooking.aggregate({
+          where: {
+            service: { ownerId: userId },
+            status: { in: ["confirmed", "active", "completed"] },
+          },
+          _count: { id: true },
+          _sum: { totalAmount: true },
+        }),
+        prisma.assetBooking.aggregate({
+          where: {
+            asset: { ownerId: userId },
+            status: { in: ["confirmed", "active", "completed"] },
+          },
+          _count: { id: true },
+          _sum: { totalAmount: true },
+        }),
+        prisma.booking.aggregate({
+          where: {
+            event: { organizerId: userId },
+            status: { in: ["confirmed", "completed"] },
+          },
+          _count: { id: true },
+          _sum: { totalAmount: true },
+        }),
+        prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            services: { select: { id: true } },
+            assets: { select: { id: true } },
+          },
+        }),
+      ]);
 
     const entityIds = [
       ...(userItems?.services.map((s) => s.id) ?? []),
