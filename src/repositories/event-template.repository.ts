@@ -75,40 +75,28 @@ export default class EventTemplateRepo {
     page?: number;
     limit: number;
   }) {
-    const page = filters.page ?? 1;
-    const skip = (page - 1) * filters.limit;
-
-    const where = {
-      ...(filters.isPublic !== undefined
-        ? { isPublic: filters.isPublic }
-        : { isPublic: true }),
-      ...(filters.category && { category: filters.category as any }),
-      ...((filters.targetCity || filters.city) && {
-        targetCity: {
-          contains: (filters.targetCity ?? filters.city) as string,
-          mode: "insensitive" as const,
+    return prisma.eventTemplate.findMany({
+      where: {
+        isPublic: true,
+        status: "published" as any,
+        ...(filters.category && { category: filters.category as any }),
+      },
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        targetCity: true,
+        targetState: true,
+        images: { take: 1, select: { url: true } },
+        templateVenues: {
+          take: 1,
+          select: { venue: { select: { city: true, price: true } } },
         },
-      }),
-    };
-
-    const [templates, total] = await Promise.all([
-      prisma.eventTemplate.findMany({
-        where,
-        include: {
-          owner: { select: { id: true, name: true, email: true } },
-          templateAssets: { include: { asset: true } },
-          templateServices: { include: { service: true } },
-          templateVenues: { include: { venue: true } },
-          images: true,
-        },
-        take: filters.limit,
-        skip,
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.eventTemplate.count({ where }),
-    ]);
-
-    return { templates, total };
+        owner: { select: { id: true, name: true } },
+      },
+      take: filters.limit,
+      orderBy: { createdAt: "desc" },
+    });
   }
 
   // FIND BY ID
@@ -346,6 +334,46 @@ export default class EventTemplateRepo {
     return prisma.eventTemplateVenue.deleteMany({
       where: { templateId, venueId },
     });
+  }
+
+  // TRENDING — top N public templates in a category ranked by approved-Event count
+  static async findTrendingByCategory(category: string, limit = 4) {
+    // Count approved Events per templateId within this category
+    const counts = await prisma.event.groupBy({
+      by: ["templateId"],
+      where: {
+        templateId: { not: null },
+        eventCategory: category as EventCategory,
+        requestStatus: "approved",
+      },
+      _count: { templateId: true },
+      orderBy: { _count: { templateId: "desc" } },
+      take: limit,
+    });
+
+    if (counts.length === 0) return [];
+
+    const templateIds = counts
+      .map((c) => c.templateId)
+      .filter((id): id is string => id !== null);
+
+    const templates = await prisma.eventTemplate.findMany({
+      where: { id: { in: templateIds }, isPublic: true },
+      include: {
+        owner: { select: { id: true, name: true } },
+        images: { take: 1 },
+      },
+    });
+
+    // Re-order to match descending booking count
+    return templateIds
+      .map((id) => {
+        const t = templates.find((t) => t.id === id);
+        const bookingCount =
+          counts.find((c) => c.templateId === id)?._count.templateId ?? 0;
+        return t ? { ...t, bookingCount } : null;
+      })
+      .filter((t): t is NonNullable<typeof t> => t !== null);
   }
 
   // DELETE TEMPLATE
