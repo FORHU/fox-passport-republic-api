@@ -48,6 +48,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         description: "Everything you need for an unforgettable birthday party — from a grand venue and floral setup to live catering and full waitstaff. Let us handle the details while you celebrate.",
         category: EventCategory.birthday,
         targetCity: "Manila", targetState: "Metro Manila", targetCountry: "Philippines",
+        lat: 14.5995, lng: 120.9842,
       },
       {
         id: TEMPLATE_IDS.wedding,
@@ -55,6 +56,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         description: "An elegant beachfront wedding experience crafted to perfection. Includes a stunning arch, premium catering, Tiffany seating, and professional photography on the shores of Boracay.",
         category: EventCategory.wedding,
         targetCity: "Boracay", targetState: "Aklan", targetCountry: "Philippines",
+        lat: 11.9674, lng: 121.9248,
       },
       {
         id: TEMPLATE_IDS.corporate,
@@ -62,6 +64,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         description: "Professional setup for corporate meetings, product launches, and conferences. Full AV, photography coverage, and a premium BGC loft venue included.",
         category: EventCategory.corporate,
         targetCity: "Taguig", targetState: "Metro Manila", targetCountry: "Philippines",
+        lat: 14.5176, lng: 121.0509,
       },
       {
         id: TEMPLATE_IDS.social,
@@ -69,6 +72,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         description: "A relaxed yet vibrant setup for social hangouts, reunions, and celebrations. Featuring live band entertainment, quality sound, and a beautiful outdoor garden venue.",
         category: EventCategory.social,
         targetCity: "Cebu City", targetState: "Cebu", targetCountry: "Philippines",
+        lat: 10.3157, lng: 123.8854,
       },
       {
         id: TEMPLATE_IDS.other,
