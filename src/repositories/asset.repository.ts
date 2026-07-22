@@ -11,11 +11,15 @@ export default class AssetRepo {
   static async findAllAssets(filters?: {
     ownerId?: string;
     category?: string;
+    city?: string;
   }) {
     return prisma.asset.findMany({
       where: {
         ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
         ...(filters?.category && { category: filters.category as any }),
+        ...(filters?.city && {
+          city: { contains: filters.city, mode: "insensitive" },
+        }),
         ...(filters?.ownerId ? {} : { status: AssetStatus.available }),
         deletedAt: null,
       },

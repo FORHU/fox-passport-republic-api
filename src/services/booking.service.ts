@@ -104,9 +104,15 @@ export default class BookingSvc {
       });
 
       // Award bookEvent XP to the citizen who made the booking
-      import("./passport.service").then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
-        return PassportSvc.awardXP(userId, UserPath.user, XP_REWARDS.bookEvent);
-      }).catch(() => {});
+      import("./passport.service")
+        .then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
+          return PassportSvc.awardXP(
+            userId,
+            UserPath.user,
+            XP_REWARDS.bookEvent,
+          );
+        })
+        .catch(() => {});
 
       return booking;
     }
@@ -118,16 +124,24 @@ export default class BookingSvc {
     // early_bird: if template has publicOpenAt in the future, only early_bird holders can book
     const { default: PassportSvc } = await import("./passport.service");
     const template = (event as any).template;
-    if (template?.publicOpenAt && new Date() < new Date(template.publicOpenAt)) {
+    if (
+      template?.publicOpenAt &&
+      new Date() < new Date(template.publicOpenAt)
+    ) {
       const hasEarlyBird = await PassportSvc.hasPerk(userId, "early_bird");
       if (!hasEarlyBird) {
         const opensAt = new Date(template.publicOpenAt);
-        throw new Error(`Bookings open on ${opensAt.toLocaleDateString()} — Early Bird members can book now`);
+        throw new Error(
+          `Bookings open on ${opensAt.toLocaleDateString()} — Early Bird members can book now`,
+        );
       }
     }
 
     // priority_access: auto-confirm booking instead of leaving it pending
-    const hasPriorityAccess = await PassportSvc.hasPerk(userId, "priority_access");
+    const hasPriorityAccess = await PassportSvc.hasPerk(
+      userId,
+      "priority_access",
+    );
 
     const attendeesWithTickets = (attendees || []).map((a: any) => ({
       ...a,
@@ -166,9 +180,11 @@ export default class BookingSvc {
     });
 
     // Award bookEvent XP to the citizen who made the booking
-    import("./passport.service").then(({ default: P, XP_REWARDS, UserPath }) => {
-      return P.awardXP(userId, UserPath.user, XP_REWARDS.bookEvent);
-    }).catch(() => {});
+    import("./passport.service")
+      .then(({ default: P, XP_REWARDS, UserPath }) => {
+        return P.awardXP(userId, UserPath.user, XP_REWARDS.bookEvent);
+      })
+      .catch(() => {});
 
     return booking;
   }
@@ -302,28 +318,42 @@ export default class BookingSvc {
         console.error(`Passport stamp failed for booking ${id}`, err);
       }
       // Award venueBooked XP to the venue owner + check VenueFoxer specialization
-      import("./passport.service").then(async ({ default: PassportSvc, XP_REWARDS, UserPath }) => {
-        const venueTx = await prisma.eventVenueTransaction.findFirst({
-          where: { eventId: (booking.event as any)?.id ?? (booking as any).eventId },
-          select: { providerId: true, venueId: true },
-        });
-        if (venueTx?.providerId) {
-          await PassportSvc.awardXP(venueTx.providerId, UserPath.venueFoxer, XP_REWARDS.venueBooked);
-          if (venueTx.venueId) {
-            const { default: SpecializationSvc } = await import("./specialization.service");
-            SpecializationSvc.checkVenueFoxer(venueTx.venueId, venueTx.providerId).catch(() => {});
+      import("./passport.service")
+        .then(async ({ default: PassportSvc, XP_REWARDS, UserPath }) => {
+          const venueTx = await prisma.eventVenueTransaction.findFirst({
+            where: {
+              eventId: (booking.event as any)?.id ?? (booking as any).eventId,
+            },
+            select: { providerId: true, venueId: true },
+          });
+          if (venueTx?.providerId) {
+            await PassportSvc.awardXP(
+              venueTx.providerId,
+              UserPath.venueFoxer,
+              XP_REWARDS.venueBooked,
+            );
+            if (venueTx.venueId) {
+              const { default: SpecializationSvc } =
+                await import("./specialization.service");
+              SpecializationSvc.checkVenueFoxer(
+                venueTx.venueId,
+                venueTx.providerId,
+              ).catch(() => {});
+            }
           }
-        }
-      }).catch(() => {});
+        })
+        .catch(() => {});
 
       // Check EventFoxer specialization
-      import("./specialization.service").then(async ({ default: SpecializationSvc }) => {
-        const organizerId = (booking.event as any)?.organizerId;
-        const eventCategory = (booking.event as any)?.eventCategory;
-        if (organizerId && eventCategory) {
-          await SpecializationSvc.checkEventFoxer(organizerId, eventCategory);
-        }
-      }).catch(() => {});
+      import("./specialization.service")
+        .then(async ({ default: SpecializationSvc }) => {
+          const organizerId = (booking.event as any)?.organizerId;
+          const eventCategory = (booking.event as any)?.eventCategory;
+          if (organizerId && eventCategory) {
+            await SpecializationSvc.checkEventFoxer(organizerId, eventCategory);
+          }
+        })
+        .catch(() => {});
     }
 
     return updated;

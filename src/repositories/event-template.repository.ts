@@ -38,12 +38,20 @@ export default class EventTemplateRepo {
     ownerId?: string;
     isPublic?: boolean;
     category?: string;
+    city?: string;
+    targetCity?: string;
   }) {
     return prisma.eventTemplate.findMany({
       where: {
         ...(filters?.ownerId && { ownerId: filters.ownerId }),
         ...(filters?.isPublic !== undefined && { isPublic: filters.isPublic }),
         ...(filters?.category && { category: filters.category as any }),
+        ...((filters?.city || filters?.targetCity) && {
+          targetCity: {
+            contains: (filters.city ?? filters.targetCity) as string,
+            mode: "insensitive",
+          },
+        }),
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
@@ -56,9 +64,15 @@ export default class EventTemplateRepo {
     });
   }
 
-  // Lightweight browse for the public landing page — only fetches what cards need
+  // Public browse for the search page — supports category / targetCity / isPublic.
+  // maxPrice is applied post-query in the service (needs server-computed totalAmount).
   static async findPublicTemplatesLite(filters: {
     category?: string;
+    targetCity?: string;
+    city?: string;
+    isPublic?: boolean;
+    maxPrice?: number;
+    page?: number;
     limit: number;
   }) {
     return prisma.eventTemplate.findMany({

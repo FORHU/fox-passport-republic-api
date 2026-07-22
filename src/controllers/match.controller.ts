@@ -89,9 +89,11 @@ export default class MatchController {
       res.status(200).json({ success: true, message: "Match accepted" });
     } catch (error: any) {
       const status =
-        error.message === "Unauthorized" ? 403
-        : error.message === "Match not found" ? 404
-        : 400;
+        error.message === "Unauthorized"
+          ? 403
+          : error.message === "Match not found"
+            ? 404
+            : 400;
       res.status(status).json({ message: error.message });
     }
   }
@@ -105,9 +107,11 @@ export default class MatchController {
       res.status(200).json({ success: true, message: "Match declined" });
     } catch (error: any) {
       const status =
-        error.message === "Unauthorized" ? 403
-        : error.message === "Match not found" ? 404
-        : 400;
+        error.message === "Unauthorized"
+          ? 403
+          : error.message === "Match not found"
+            ? 404
+            : 400;
       res.status(status).json({ message: error.message });
     }
   }

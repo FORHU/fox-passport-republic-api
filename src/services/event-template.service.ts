@@ -65,36 +65,70 @@ export default class EventTemplateSvc {
     ownerId?: string;
     isPublic?: boolean;
     category?: string;
+    city?: string;
   }) {
     const templates = await EventTemplateRepo.findAllTemplates(filters);
     // event_boost (Lvl 15) > featured_listing (Lvl 10) > unranked
     const { default: PassportSvc } = await import("./passport.service");
     const sorted = await PassportSvc.sortByFeaturedPerk(
       templates,
-      ['event_boost', 'featured_listing'],
-      'ownerId'
+      ["event_boost", "featured_listing"],
+      "ownerId",
     );
-    return sorted.map((t) => ({
-      ...t,
-      ...this.calculateTotalsBreakdown(t),
-    }));
+    return sorted.map((t) => {
+      const totals = this.calculateTotalsBreakdown(t);
+      return {
+        ...t,
+        ...totals,
+        // Frontend TemplateCard reads `item.price` and optional `item.rating`
+        price: totals.totalAmount,
+        rating: (t as any).rating ?? null,
+      };
+    });
   }
 
-  // Lightweight browse for landing page — no price calculation, minimal joins
+  // Public browse for the search page — supports category/targetCity/maxPrice,
+  // computes price + rating so the frontend cards have the fields they read.
   static async getPublicTemplatesLite(filters: {
     category?: string;
+    targetCity?: string;
+    city?: string;
+    maxPrice?: number;
+    isPublic?: boolean;
+    page?: number;
     limit?: number;
   }) {
-    const templates = await EventTemplateRepo.findPublicTemplatesLite({
-      category: filters.category,
-      limit: filters.limit ?? 8,
-    });
+    const { templates, total } =
+      await EventTemplateRepo.findPublicTemplatesLite({
+        category: filters.category,
+        targetCity: filters.targetCity,
+        city: filters.city,
+        maxPrice: filters.maxPrice,
+        isPublic: filters.isPublic,
+        page: filters.page,
+        limit: filters.limit ?? 50,
+      });
     const { default: PassportSvc } = await import("./passport.service");
-    return PassportSvc.sortByFeaturedPerk(
-      templates,
-      ['event_boost', 'featured_listing'],
-      'ownerId'
+    const withTotals = templates.map((t: any) => {
+      const totals = this.calculateTotalsBreakdown(t);
+      return {
+        ...t,
+        ...totals,
+        price: totals.totalAmount,
+        rating: (t as any).rating ?? null,
+      };
+    });
+    const sorted = await PassportSvc.sortByFeaturedPerk(
+      withTotals,
+      ["event_boost", "featured_listing"],
+      "ownerId",
     );
+    // maxPrice is enforced after price computation (server-computed totalAmount)
+    const filtered =
+      filters.maxPrice != null
+        ? sorted.filter((t: any) => (t.price ?? 0) <= filters.maxPrice!)
+        : sorted;
+    return { templates: filtered, total };
   }
 
   static async getTemplateById(id: string) {

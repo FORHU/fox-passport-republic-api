@@ -6,11 +6,15 @@ export default class AnalyticsCtrl {
   static async getEventStats(req: Request, res: Response) {
     try {
       const userId = (req as any).user?.userId as string;
-      const hasAnalyticsPro = await PassportSvc.hasPerk(userId, "analytics_pro");
+      const hasAnalyticsPro = await PassportSvc.hasPerk(
+        userId,
+        "analytics_pro",
+      );
       if (!hasAnalyticsPro) {
         return res.status(403).json({
           success: false,
-          message: "Analytics Pro perk required — unlock at Event Foxer Level 5",
+          message:
+            "Analytics Pro perk required — unlock at Event Foxer Level 5",
         });
       }
       const stats = await AnalyticsSvc.getEventStats(userId);
