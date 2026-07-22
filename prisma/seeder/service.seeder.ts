@@ -503,7 +503,7 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
 
     const BILLING_RATES = [BillingRate.one_time, BillingRate.daily, BillingRate.one_time, BillingRate.one_time, BillingRate.daily];
 
-    for (let i = 1; i <= 16; i++) {
+    for (let i = 1; i <= 60; i++) {
       const foxer = users.find((u: any) => u.email === `ef-${String(i).padStart(2, "0")}@foxers.ph`);
       if (!foxer) continue;
       const [svcA, svcB] = EF_SERVICE_NAMES[(i - 1) % EF_SERVICE_NAMES.length];
@@ -543,7 +543,7 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
       );
     }
 
-    for (let i = 1; i <= 29; i++) {
+    for (let i = 1; i <= 60; i++) {
       const foxer = users.find((u: any) => u.email === `gf-${String(i).padStart(2, "0")}@foxers.ph`);
       if (!foxer) continue;
       const [svcA, svcB] = GF_SERVICE_NAMES[(i - 1) % GF_SERVICE_NAMES.length];
@@ -583,7 +583,7 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
       );
     }
 
-    for (let i = 1; i <= 16; i++) {
+    for (let i = 1; i <= 60; i++) {
       const foxer = users.find((u: any) => u.email === `sf-${String(i).padStart(2, "0")}@foxers.ph`);
       if (!foxer) continue;
       const [svcA, svcB] = SF_SERVICE_NAMES[(i - 1) % SF_SERVICE_NAMES.length];
@@ -717,7 +717,9 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
     ];
 
     // Event foxer service images
-    for (let i = 1; i <= 16; i++) {
+    for (let i = 1; i <= 60; i++) {
+      const foxer = users.find((u: any) => u.email === `ef-${String(i).padStart(2, "0")}@foxers.ph`);
+      if (!foxer) continue;
       serviceImages.push(
         { id: `seed-img-ef-${i}-a`, serviceId: `seed-service-ef-${i}-a`, url: EVENT_PHOTO_URLS[(i - 1) % EVENT_PHOTO_URLS.length], name: `ef-${i}-portfolio-a.jpg`, type: "image/jpeg" },
         { id: `seed-img-ef-${i}-b`, serviceId: `seed-service-ef-${i}-b`, url: EVENT_PHOTO_URLS[i % EVENT_PHOTO_URLS.length], name: `ef-${i}-portfolio-b.jpg`, type: "image/jpeg" },
@@ -725,7 +727,9 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
     }
 
     // Gear foxer service images
-    for (let i = 1; i <= 29; i++) {
+    for (let i = 1; i <= 60; i++) {
+      const foxer = users.find((u: any) => u.email === `gf-${String(i).padStart(2, "0")}@foxers.ph`);
+      if (!foxer) continue;
       serviceImages.push(
         { id: `seed-img-gf-${i}-a`, serviceId: `seed-service-gf-${i}-a`, url: GEAR_PHOTO_URLS[(i - 1) % GEAR_PHOTO_URLS.length], name: `gf-${i}-portfolio-a.jpg`, type: "image/jpeg" },
         { id: `seed-img-gf-${i}-b`, serviceId: `seed-service-gf-${i}-b`, url: GEAR_PHOTO_URLS[i % GEAR_PHOTO_URLS.length], name: `gf-${i}-portfolio-b.jpg`, type: "image/jpeg" },
@@ -733,7 +737,9 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
     }
 
     // Service foxer service images
-    for (let i = 1; i <= 16; i++) {
+    for (let i = 1; i <= 60; i++) {
+      const foxer = users.find((u: any) => u.email === `sf-${String(i).padStart(2, "0")}@foxers.ph`);
+      if (!foxer) continue;
       serviceImages.push(
         { id: `seed-img-sf-${i}-a`, serviceId: `seed-service-sf-${i}-a`, url: SERVICE_PHOTO_URLS[(i - 1) % SERVICE_PHOTO_URLS.length], name: `sf-${i}-portfolio-a.jpg`, type: "image/jpeg" },
         { id: `seed-img-sf-${i}-b`, serviceId: `seed-service-sf-${i}-b`, url: SERVICE_PHOTO_URLS[i % SERVICE_PHOTO_URLS.length], name: `sf-${i}-portfolio-b.jpg`, type: "image/jpeg" },

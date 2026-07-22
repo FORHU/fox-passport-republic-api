@@ -1,5 +1,61 @@
 import { PrismaClient, AssetStatus, BillingRate, AssetCondition, AssetCategory } from "@prisma/client";
 
+const BULK_ASSET_NAMES: Record<AssetCategory, { name: string; desc: string; price: number; billingRate: BillingRate; condition: AssetCondition }[]> = {
+  [AssetCategory.sound_system]: [
+    { name: "Portable PA Speaker", desc: "Compact 12-inch powered speaker for small to mid-size gatherings.", price: 15000, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    { name: "Wireless Microphone Duo", desc: "Dual-channel UHF wireless mic set with clear range up to 80m.", price: 9500, billingRate: BillingRate.daily, condition: AssetCondition.new },
+    { name: "Subwoofer 15-Inch", desc: "High-output active subwoofer for deep bass reinforcement.", price: 22000, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    { name: "Mixing Console 12-Channel", desc: "Analogue mixer with EQ and reverb for live sound.", price: 13000, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    { name: "Stage Monitor Pair", desc: "Active floor monitors for on-stage foldback.", price: 18000, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    { name: "Speaker Stand Set", desc: "Pair of steel tripod speaker stands with safety pins.", price: 5500, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    { name: "CDJ Player Set", desc: "Professional twin CDJ player setup with mixer.", price: 40000, billingRate: BillingRate.daily, condition: AssetCondition.new },
+    { name: "Portable Sound Bar", desc: "All-in-one Bluetooth soundbar for cocktail events.", price: 8000, billingRate: BillingRate.daily, condition: AssetCondition.good },
+  ],
+  [AssetCategory.decorations]: [
+    { name: "Backdrop Pipe and Drape", desc: "Adjustable pipe-and-drape system for stage or entrance backdrops.", price: 12000, billingRate: BillingRate.one_time, condition: AssetCondition.good },
+    { name: "Centrepiece Candle Holders", desc: "Set of 20 mixed-height glass candle holders.", price: 6500, billingRate: BillingRate.one_time, condition: AssetCondition.good },
+    { name: "Organza Table Overlay", desc: "Sheer organza runners for banquet table styling.", price: 4500, billingRate: BillingRate.one_time, condition: AssetCondition.new },
+    { name: "Balloon Garland Kit", desc: "DIY balloon arch kit with 120 latex balloons and strip.", price: 3500, billingRate: BillingRate.one_time, condition: AssetCondition.new },
+    { name: "Fabric Draping Panels", desc: "Set of 6 ceiling-to-floor tulle draping panels.", price: 8000, billingRate: BillingRate.one_time, condition: AssetCondition.good },
+    { name: "Garden Arch Trellis", desc: "White metal arch for outdoor ceremony or photo area.", price: 10000, billingRate: BillingRate.one_time, condition: AssetCondition.good },
+    { name: "Acrylic Welcome Sign", desc: "Customizable frosted acrylic welcome easel sign.", price: 4000, billingRate: BillingRate.one_time, condition: AssetCondition.new },
+    { name: "Gold Charger Plates (Set of 50)", desc: "Gold-rimmed charger plates for elegant table settings.", price: 7500, billingRate: BillingRate.one_time, condition: AssetCondition.good },
+  ],
+  [AssetCategory.furnitures]: [
+    { name: "Cocktail Hi-Top Table", desc: "32-inch round cocktail table for standing receptions.", price: 1500, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    { name: "Chiavari Chair Gold", desc: "Gold-finish chiavari chairs for upscale events.", price: 200, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    { name: "Banquet Table 6-Foot", desc: "Heavy-duty 6-foot folding banquet table.", price: 1200, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    { name: "Outdoor Folding Canopy", desc: "10x10 ft pop-up canopy tent for outdoor setups.", price: 6000, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    { name: "Bar Counter Portable", desc: "Foldable 6-foot portable bar counter with shelf.", price: 8000, billingRate: BillingRate.daily, condition: AssetCondition.new },
+    { name: "Bench Seating Set", desc: "Set of 4 wooden garden benches for outdoor seating.", price: 9000, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    { name: "Linen Chair Covers (Set of 20)", desc: "Stretchable polyester chair covers for banquet seating.", price: 5000, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    { name: "Rectangular Trestle Table", desc: "8-foot trestle table for buffets and displays.", price: 2500, billingRate: BillingRate.daily, condition: AssetCondition.good },
+  ],
+  [AssetCategory.other]: [
+    { name: "LED Uplight Set (8 units)", desc: "Wireless battery-powered LED uplights with remote.", price: 12000, billingRate: BillingRate.daily, condition: AssetCondition.new },
+    { name: "Portable Projector and Screen", desc: "HD projector with 100-inch retractable screen.", price: 15000, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    { name: "Power Extension Reel (50m)", desc: "Heavy-duty 50m extension cable on a reel for outdoor events.", price: 4000, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    { name: "Chafing Dish Set (Full-Size)", desc: "Set of 4 full-size stainless steel chafing dishes.", price: 8000, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    { name: "Instant Photo Camera", desc: "Polaroid-style instant camera with 20 film packs.", price: 7000, billingRate: BillingRate.one_time, condition: AssetCondition.new },
+    { name: "Crowd Control Barrier Set", desc: "Set of 6 interlocking metal crowd barriers.", price: 9000, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    { name: "Signage Stand (A-Frame)", desc: "Lightweight A-frame sidewalk sign for event directions.", price: 3000, billingRate: BillingRate.one_time, condition: AssetCondition.good },
+    { name: "Ice Chest Cooler (Large)", desc: "100-quart insulated cooler for outdoor beverage stations.", price: 2500, billingRate: BillingRate.daily, condition: AssetCondition.good },
+  ],
+};
+
+const ASSET_CATEGORIES = [AssetCategory.sound_system, AssetCategory.decorations, AssetCategory.furnitures, AssetCategory.other] as const;
+
+const CITIES: { city: string; state: string }[] = [
+  { city: "Manila", state: "Metro Manila" },
+  { city: "Makati", state: "Metro Manila" },
+  { city: "Taguig", state: "Metro Manila" },
+  { city: "Quezon City", state: "Metro Manila" },
+  { city: "Cebu City", state: "Cebu" },
+  { city: "Davao City", state: "Davao del Sur" },
+  { city: "Baguio", state: "Benguet" },
+  { city: "Clark", state: "Pampanga" },
+];
+
 export async function seedAssets(prisma: PrismaClient, users: any[]) {
   try {
     console.log("Starting asset seed...");
@@ -669,8 +725,45 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
       }
     ];
 
-    for (const a of assets) {
-      const assetId = `seed-asset-${a.name.trim().toLowerCase().replace(/\s+/g, '-')}`;
+    // ── Bulk assets for pagination-testing foxers ────────────────────────────
+    const COVER_URLS: Record<AssetCategory, string> = {
+      [AssetCategory.sound_system]: "https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&auto=format&fit=crop",
+      [AssetCategory.decorations]:  "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=800&auto=format&fit=crop",
+      [AssetCategory.furnitures]:   "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&auto=format&fit=crop",
+      [AssetCategory.other]:        "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop",
+    };
+
+    const bulkAssets: any[] = [];
+    for (let i = 1; i <= 60; i++) {
+      const foxer = users.find((u: any) => u.email === `gf-${String(i).padStart(2, "0")}@foxers.ph`);
+      if (!foxer) continue;
+      const cat = ASSET_CATEGORIES[i % ASSET_CATEGORIES.length];
+      const templates = BULK_ASSET_NAMES[cat];
+      const t = templates[i % templates.length];
+      const loc = CITIES[i % CITIES.length];
+      const assetId = `seed-asset-gf-${i}-${cat}`;
+      bulkAssets.push({
+        id: assetId,
+        ownerId: foxer.id,
+        category: cat,
+        name: t.name,
+        description: `${t.name} — provided by ${foxer.name}. ${t.desc}`,
+        quantity: 1,
+        price: t.price,
+        currency: "PHP",
+        billingRate: t.billingRate,
+        condition: t.condition,
+        status: AssetStatus.available,
+        city: loc.city,
+        state: loc.state,
+        country: "Philippines",
+      });
+    }
+
+    const allAssets = [...assets, ...bulkAssets];
+
+    for (const a of allAssets) {
+      const assetId = a.id || `seed-asset-${a.name.trim().toLowerCase().replace(/\s+/g, '-')}`;
       await prisma.asset.upsert({
         where: { id: assetId },
         update: { ...a },
@@ -730,8 +823,25 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
       { id: "img-asset-walkietalkie", name: "radio.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1615811361523-6bd03d7748e7?w=800&auto=format&fit=crop", assetName: "Walkie-Talkie Communication Set" }
     ];
 
+    // ── Bulk asset images for pagination-testing foxers ──────────────────────
+    for (let i = 1; i <= 60; i++) {
+      const foxer = users.find((u: any) => u.email === `gf-${String(i).padStart(2, "0")}@foxers.ph`);
+      if (!foxer) continue;
+      const cat = ASSET_CATEGORIES[i % ASSET_CATEGORIES.length];
+      const assetId = `seed-asset-gf-${i}-${cat}`;
+      assetImages.push({
+        id: `seed-img-asset-gf-${i}`,
+        name: `gf-${i}-asset.jpg`,
+        type: "image/jpeg",
+        url: COVER_URLS[cat],
+        assetName: `__bulk__${assetId}`,
+      });
+    }
+
     for (const img of assetImages) {
-      const associatedAssetId = `seed-asset-${img.assetName.trim().toLowerCase().replace(/\s+/g, '-')}`;
+      const associatedAssetId = img.assetName.startsWith("__bulk__")
+        ? img.assetName.replace("__bulk__", "")
+        : `seed-asset-${img.assetName.trim().toLowerCase().replace(/\s+/g, '-')}`;
 
       await prisma.file.upsert({
         where: { id: img.id },
@@ -741,7 +851,7 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
           name: img.name,
           type: img.type,
           url: img.url,
-          assetId: associatedAssetId, // Attaches the file directly to the correct asset record
+          assetId: associatedAssetId,
         },
       });
     }

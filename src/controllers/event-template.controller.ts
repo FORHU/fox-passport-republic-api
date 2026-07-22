@@ -111,12 +111,12 @@ export default class EventTemplateCtrl {
       });
       return res.status(200).json({
         success: true,
-        data: {
+        data: result.templates,
+        pagination: {
           page: pageNum,
           limit: limitNum,
           total: result.total,
           totalPages: Math.ceil(result.total / limitNum),
-          templates: result.templates,
         },
       });
     } catch (error: any) {

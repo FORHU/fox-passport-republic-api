@@ -53,8 +53,12 @@ export default class UsersCtrl {
       return res.status(200).json({
         success: true,
         data: result.foxers,
-        total: result.total,
-        totalPages: result.totalPages,
+        pagination: {
+          page,
+          limit,
+          total: result.total,
+          totalPages: result.totalPages,
+        },
       });
     } catch (err: any) {
       return res.status(500).json({ success: false, message: err.message });
