@@ -165,8 +165,8 @@ export async function seedUsers(prisma: PrismaClient) {
       },
       // ── Bulk foxers for search/pagination testing ─────────────────────────
       ...generateBulkFoxers("ef", ["eventFoxer"], 16),
-      ...generateBulkFoxers("gf", ["gearFoxer"], 29),
-      ...generateBulkFoxers("sf", ["serviceFoxer"], 16),
+      ...generateBulkFoxers("gf", ["gearFoxer"], 60),
+      ...generateBulkFoxers("sf", ["serviceFoxer"], 60),
     ];
 
 
