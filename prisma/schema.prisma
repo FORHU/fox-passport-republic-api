@@ -323,6 +323,8 @@ model Asset {
   city             String?
   state            String?
   country          String?                 @default("Philippines")
+  lat              Float?
+  lng              Float?
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
   deletedAt        DateTime?
@@ -346,6 +348,8 @@ model Service {
   city              String                    @default("Unknown City")
   state             String?
   country           String                    @default("Unknown Country")
+  lat               Float?
+  lng               Float?
   isWillingToTravel Boolean                   @default(false)
   tags              String[]
   price             Float
@@ -380,6 +384,8 @@ model Venue {
   city           String
   state          String?
   country        String
+  lat            Float?
+  lng            Float?
   status         VenueStatus             @default(draft)
   rejectionReason String?
   spaceType      String[]
@@ -411,6 +417,8 @@ model EventTemplate {
   targetCity       String?
   targetState      String?
   targetCountry    String?                @default("Philippines")
+  lat              Float?
+  lng              Float?
   hostMarkupPct    Float                  @default(0)
   platformFeePct    Float                  @default(0.05) //might change later on
   maxAttendees     Int?

@@ -1,5 +1,18 @@
 import { PrismaClient, ServiceStatus, BillingRate, ServiceCategory } from "@prisma/client";
 
+const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
+  "Manila":        { lat: 14.5995, lng: 120.9842 },
+  "Taguig":        { lat: 14.5176, lng: 121.0509 },
+  "Quezon City":   { lat: 14.6760, lng: 121.0437 },
+  "Makati":        { lat: 14.5547, lng: 121.0244 },
+  "Baguio City":   { lat: 16.4023, lng: 120.5960 },
+  "Pasig":         { lat: 14.5764, lng: 121.0851 },
+  "Cebu City":     { lat: 10.3157, lng: 123.8854 },
+  "Mandaluyong":   { lat: 14.5794, lng: 121.0359 },
+  "Pasay":         { lat: 14.5378, lng: 121.0014 },
+  "Davao City":    { lat: 7.1907,  lng: 125.4553 },
+};
+
 export async function seedServices(prisma: PrismaClient, users: any[]) {
   try {
     console.log("Starting service seed...");
@@ -455,10 +468,11 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
     for (const s of services) {
       const { id, ...rest } = s as any;
       const serviceId = id || `seed-service-${s.name.toLowerCase().replace(/\s+/g, '-')}`;
+      const coords = CITY_COORDS[rest.city] ?? {};
       await prisma.service.upsert({
         where: { id: serviceId },
-        update: { ...rest },
-        create: { id: serviceId, ...rest },
+        update: { ...rest, ...coords },
+        create: { id: serviceId, ...rest, ...coords },
       });
       console.log(`✓ Seeded service: ${s.name}`);
     }

@@ -29,6 +29,11 @@ export default class AssetCtrl {
       billingRate: Joi.string()
         .valid(...Object.values(BillingRate))
         .optional(),
+      city: Joi.string().optional(),
+      state: Joi.string().optional(),
+      country: Joi.string().optional(),
+      lat: Joi.number().optional(),
+      lng: Joi.number().optional(),
       imgIds: Joi.array().items(Joi.string()).min(1).max(5).required(),
       status: Joi.string()
         .valid(...Object.values(AssetStatus))
@@ -113,6 +118,11 @@ export default class AssetCtrl {
       condition: Joi.string()
         .valid(...Object.values(AssetCondition))
         .optional(),
+      city: Joi.string().optional(),
+      state: Joi.string().optional(),
+      country: Joi.string().optional(),
+      lat: Joi.number().optional(),
+      lng: Joi.number().optional(),
       status: Joi.string()
         .valid(...Object.values(AssetStatus))
         .optional(),
