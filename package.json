@@ -8,7 +8,7 @@
         "lint": "eslint src/**/*.ts --fix",
         "test": "vitest run",
         "test:watch": "vitest",
-        "build": "tsc",
+        "build": "prisma generate && tsc",
         "start": "node ./dist/src/server.js",
         "db:setup": "npx prisma generate && npx prisma migrate dev",
         "kill": "npx kill-port 3002"
