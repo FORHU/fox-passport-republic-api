@@ -74,12 +74,13 @@ export default class VenueSvc {
   // READ — Delegate all queries to repository
   // ───────────────────────────────────────────────────────────
 
-  static async getVenues(filters?: { mayorId?: string; hostId?: string }) {
-    const venues = await VenueRepo.findAllVenues(filters);
+  static async getVenues(filters?: { mayorId?: string; hostId?: string; page?: number; limit?: number }) {
+    const { venues, total } = await VenueRepo.findAllVenues(filters);
     const { default: PassportSvc } = await import("./passport.service");
     const sorted = await PassportSvc.sortByFeaturedPerk(venues, 'venue_spotlight', 'mayorId');
     // Add city_badge / mayor_verified badge for each venue owner
-    return PassportSvc.enrichWithOwnerBadge(sorted, ['mayor_verified', 'city_badge'], 'mayorId');
+    const enriched = await PassportSvc.enrichWithOwnerBadge(sorted, ['mayor_verified', 'city_badge'], 'mayorId');
+    return { venues: enriched, total };
   }
 
   static async getVenueById(id: string, requesterId?: string) {

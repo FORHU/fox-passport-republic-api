@@ -71,14 +71,16 @@ export default class AssetCtrl {
   //READ Assets Controller with optional query parameters for filtering by ownerId and categoryId
   static async getAssets(req: Request, res: Response) {
     try {
-      const { ownerId, category } = req.query;
+      const { ownerId, category, page, limit } = req.query;
 
-      const assets = await AssetSvc.getAssets({
+      const { assets, total } = await AssetSvc.getAssets({
         ...(ownerId && { ownerId: String(ownerId) }),
         ...(category && { category: category as any }),
+        page: page ? Number(page) : undefined,
+        limit: limit ? Math.min(Number(limit), 50) : undefined,
       });
 
-      return res.status(200).json({ assets });
+      return res.status(200).json({ assets, total });
     } catch (error: any) {
       return res.status(500).json({ message: error.message || error });
     }

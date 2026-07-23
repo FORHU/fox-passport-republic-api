@@ -11,7 +11,7 @@ export default class EventTemplateCtrl {
   static async createTemplate(req: Request, res: Response) {
     const schema = Joi.object({
       name: Joi.string().required(),
-      description: Joi.string().required(),
+      description: Joi.string().optional(),
       category: Joi.string()
         .valid(...Object.values(EventCategory))
         .required(),
@@ -77,9 +77,10 @@ export default class EventTemplateCtrl {
         .status(200)
         .json({ message: "Template updated successfully", template });
     } catch (error: any) {
-      return res
-        .status(error.message.includes("Unauthorized") ? 403 : 400)
-        .json({ message: error.message });
+      const status = error.message.includes("Unauthorized") ? 403
+        : error.message.includes("not found") ? 404
+        : 400;
+      return res.status(status).json({ message: error.message });
     }
   }
 
@@ -99,14 +100,16 @@ export default class EventTemplateCtrl {
 
   static async getTemplates(req: Request, res: Response) {
     try {
-      const { ownerId, isPublic, category } = req.query;
-      const templates = await EventTemplateSvc.getTemplates({
+      const { ownerId, isPublic, category, page, limit } = req.query;
+      const { templates, total } = await EventTemplateSvc.getTemplates({
         ownerId: ownerId as string,
         isPublic:
           isPublic === "true" ? true : isPublic === "false" ? false : undefined,
         category: category as string | undefined,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Math.min(Number(limit), 50) : undefined,
       });
-      return res.status(200).json({ templates });
+      return res.status(200).json({ templates, total });
     } catch (error: any) {
       return res.status(500).json({ message: error.message });
     }

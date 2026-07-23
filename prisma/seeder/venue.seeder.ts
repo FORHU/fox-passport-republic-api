@@ -1406,6 +1406,81 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
       console.log(`✓ Seeded venue: ${v.name}`);
     }
 
+    // ── Host Reyes Test Venues ─────────────────────────────────────────────
+    const hostReyes = await prisma.user.findFirst({ where: { email: "host@example.com" } });
+    if (hostReyes) {
+      const reyesVenues = [
+        {
+          id: "seed-venue-reyes-bgc-studio",
+          name: "Reyes BGC Studio",
+          description: "Sleek minimalist event studio in the heart of BGC, owned by Host Reyes.",
+          category: VenueCategory.indoor,
+          capacity: 80,
+          price: 18000,
+          billingRate: BillingRate.daily,
+          address: "9th Ave, BGC",
+          city: "Taguig",
+          state: "Metro Manila",
+          country: "Philippines",
+          status: VenueStatus.available,
+          spaceType: ["studio", "indoor"],
+          amenities: ["air conditioning", "restrooms", "prep kitchen"],
+          techAv: ["sound system", "projector"],
+          staffing: ["security"],
+          policies: ["no smoking", "venue hours 8am-11pm"],
+          ...CITY_COORDS["Taguig"],
+        },
+        {
+          id: "seed-venue-reyes-manila-hall",
+          name: "Reyes Manila Hall",
+          description: "Classic function hall in Manila perfect for corporate dinners and social events.",
+          category: VenueCategory.indoor,
+          capacity: 150,
+          price: 25000,
+          billingRate: BillingRate.daily,
+          address: "Taft Avenue, Manila",
+          city: "Manila",
+          state: "Metro Manila",
+          country: "Philippines",
+          status: VenueStatus.available,
+          spaceType: ["function hall", "indoor"],
+          amenities: ["air conditioning", "parking", "restrooms"],
+          techAv: ["full AV system", "wireless mics"],
+          staffing: ["security", "janitor"],
+          policies: ["no outside alcohol", "venue hours 9am-12am"],
+          ...CITY_COORDS["Manila"],
+        },
+        {
+          id: "seed-venue-reyes-rooftop-pasig",
+          name: "Reyes Rooftop Pasig",
+          description: "Open-air rooftop lounge with stunning Ortigas skyline views.",
+          category: VenueCategory.mix,
+          capacity: 100,
+          price: 22000,
+          billingRate: BillingRate.daily,
+          address: "Ortigas Avenue, Pasig",
+          city: "Pasig",
+          state: "Metro Manila",
+          country: "Philippines",
+          status: VenueStatus.available,
+          spaceType: ["rooftop", "outdoor"],
+          amenities: ["bar counter", "restrooms", "bistro seating"],
+          techAv: ["weatherproof sound system", "ambient lighting"],
+          staffing: ["security"],
+          policies: ["no outside liquor", "event hours 4pm-1am"],
+          ...CITY_COORDS["Pasig"],
+        },
+      ];
+      for (const rv of reyesVenues) {
+        await prisma.venue.upsert({
+          where: { id: rv.id },
+          update: { ...rv, mayorId: hostReyes.id },
+          create: { ...rv, mayorId: hostReyes.id },
+        });
+        console.log(`✓ Seeded Host Reyes venue: ${rv.name}`);
+      }
+    }
+
     // ── Venue Images Mapping Array ──────────────────────────────────────────
     const venueImages = [
       { id: "img-venue-grand-palace", name: "grand-palace.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=800&auto=format&fit=crop", venueName: "Grand Palace Hall" },

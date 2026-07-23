@@ -58,15 +58,17 @@ export default class ServiceCtrl {
 
   static async getServices(req: Request, res: Response) {
     try {
-      const { ownerId, category, status } = req.query;
+      const { ownerId, category, status, page, limit } = req.query;
 
-      const services = await ServiceSvc.getAllServices({
+      const { services, total } = await ServiceSvc.getAllServices({
         ...(ownerId && { ownerId: String(ownerId) }),
         ...(category && { category: category as any }),
         ...(status && { status: status as ServiceStatus }),
+        page: page ? Number(page) : undefined,
+        limit: limit ? Math.min(Number(limit), 50) : undefined,
       });
 
-      return res.status(200).json({ services });
+      return res.status(200).json({ services, total });
     } catch (err: any) {
       return res.status(500).json({ message: err.message || err });
     }

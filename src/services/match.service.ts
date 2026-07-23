@@ -51,10 +51,10 @@ export default class MatchSvc {
         false,
       );
     } else {
-      const templates = await EventTemplateRepo.findAllTemplates({
+      const { templates: foxerTemplates } = await EventTemplateRepo.findAllTemplates({
         ownerId: data.foxerId,
       });
-      templateId = templates.length > 0 ? templates[0].id : null;
+      templateId = foxerTemplates.length > 0 ? foxerTemplates[0].id : null;
 
       if (!templateId) {
         const newTemplate = await prisma.eventTemplate.create({
