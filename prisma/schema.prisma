@@ -898,6 +898,7 @@ enum VenueCategory {
   hotel
   beach_resort
   garden
+  mix
   other
 }
 
