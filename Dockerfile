@@ -1,27 +1,37 @@
-FROM node:22-alpine
+FROM node:22-alpine AS builder
 
-# Install pnpm globally
-RUN npm install -g pnpm
+RUN apk add --no-cache python3 make g++ && \
+    npm install -g pnpm@10.32.1
 
 WORKDIR /app
 
-# Copy package files and prisma schema first for better caching
-COPY package*.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma/
 
-# Install dependencies using pnpm
 RUN pnpm install --frozen-lockfile
 
-# Generate Prisma client
-RUN pnpm prisma generate
-
-# Copy project files
 COPY . .
 
-# Build the application
 RUN pnpm build
 
-# Optional: expose port for readability
+# ---- Production image ----
+FROM node:22-alpine AS production
+
+RUN apk add --no-cache python3 make g++ dumb-init && \
+    npm install -g pnpm@latest
+
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml ./
+COPY prisma ./prisma/
+
+RUN pnpm install --frozen-lockfile --prod
+
+# Pull generated Prisma client and compiled output from builder
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/dist ./dist
+
 EXPOSE 3002
 
-CMD ["sh", "-c", "pnpm prisma migrate deploy && pnpm start"]
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["sh", "-c", "pnpm prisma migrate deploy && node ./dist/src/server.js"]
