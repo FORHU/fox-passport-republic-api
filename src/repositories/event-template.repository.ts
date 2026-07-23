@@ -38,6 +38,8 @@ export default class EventTemplateRepo {
     ownerId?: string;
     isPublic?: boolean;
     category?: string;
+    city?: string;
+    targetCity?: string;
     page?: number;
     limit?: number;
   }) {
@@ -49,6 +51,12 @@ export default class EventTemplateRepo {
       ...(filters?.ownerId && { ownerId: filters.ownerId }),
       ...(filters?.isPublic !== undefined && { isPublic: filters.isPublic }),
       ...(filters?.category && { category: filters.category as any }),
+      ...((filters?.city || filters?.targetCity) && {
+        targetCity: {
+          contains: (filters.city ?? filters.targetCity) as string,
+          mode: "insensitive" as const,
+        },
+      }),
     };
 
     const [templates, total] = await prisma.$transaction([
@@ -71,33 +79,51 @@ export default class EventTemplateRepo {
     return { templates, total };
   }
 
-  // Lightweight browse for the public landing page — only fetches what cards need
+  // Public browse for the search page — supports category / targetCity / isPublic.
+  // maxPrice is applied post-query in the service (needs server-computed totalAmount).
   static async findPublicTemplatesLite(filters: {
     category?: string;
+    targetCity?: string;
+    city?: string;
+    isPublic?: boolean;
+    maxPrice?: number;
+    page?: number;
     limit: number;
   }) {
-    return prisma.eventTemplate.findMany({
-      where: {
-        isPublic: true,
-        status: "published" as any,
-        ...(filters.category && { category: filters.category as any }),
-      },
-      select: {
-        id: true,
-        name: true,
-        category: true,
-        targetCity: true,
-        targetState: true,
-        images: { take: 1, select: { url: true } },
-        templateVenues: {
-          take: 1,
-          select: { venue: { select: { city: true, price: true } } },
+    const page = filters.page ?? 1;
+    const limit = filters.limit;
+    const skip = (page - 1) * limit;
+
+    const where = {
+      isPublic: true,
+      status: "published" as any,
+      ...(filters.category && { category: filters.category as any }),
+    };
+
+    const [templates, total] = await prisma.$transaction([
+      prisma.eventTemplate.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          category: true,
+          targetCity: true,
+          targetState: true,
+          images: { take: 1, select: { url: true } },
+          templateVenues: {
+            take: 1,
+            select: { venue: { select: { city: true, price: true } } },
+          },
+          owner: { select: { id: true, name: true } },
         },
-        owner: { select: { id: true, name: true } },
-      },
-      take: filters.limit,
-      orderBy: { createdAt: "desc" },
-    });
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.eventTemplate.count({ where }),
+    ]);
+
+    return { templates, total };
   }
 
   // FIND BY ID

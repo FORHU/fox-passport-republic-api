@@ -58,12 +58,13 @@ export default class ServiceCtrl {
 
   static async getServices(req: Request, res: Response) {
     try {
-      const { ownerId, category, status, page, limit } = req.query;
+      const { ownerId, category, status, city, page, limit } = req.query;
 
       const { services, total } = await ServiceSvc.getAllServices({
         ...(ownerId && { ownerId: String(ownerId) }),
         ...(category && { category: category as any }),
         ...(status && { status: status as ServiceStatus }),
+        ...(city && { city: String(city) }),
         page: page ? Number(page) : undefined,
         limit: limit ? Math.min(Number(limit), 50) : undefined,
       });

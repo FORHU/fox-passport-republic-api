@@ -8,32 +8,32 @@ const XP_MULTIPLIER = 1.15;
 // Order matters — lower levels first.
 const PERK_THRESHOLDS: Record<string, { level: number; perk: string }[]> = {
   [UserPath.user]: [
-    { level: 1,  perk: "early_bird" },
-    { level: 5,  perk: "priority_access" },
+    { level: 1, perk: "early_bird" },
+    { level: 5, perk: "priority_access" },
     { level: 10, perk: "vip_lounge" },
     { level: 15, perk: "founding_citizen" },
   ],
   [UserPath.eventFoxer]: [
-    { level: 1,  perk: "host_support" },
-    { level: 5,  perk: "analytics_pro" },
+    { level: 1, perk: "host_support" },
+    { level: 5, perk: "analytics_pro" },
     { level: 10, perk: "featured_listing" },
     { level: 15, perk: "event_boost" },
   ],
   [UserPath.venueFoxer]: [
-    { level: 1,  perk: "venue_authority" },
-    { level: 3,  perk: "city_badge" },
-    { level: 8,  perk: "venue_spotlight" },
+    { level: 1, perk: "venue_authority" },
+    { level: 3, perk: "city_badge" },
+    { level: 8, perk: "venue_spotlight" },
     { level: 15, perk: "mayor_verified" },
   ],
   [UserPath.gearFoxer]: [
-    { level: 1,  perk: "gear_verified" },
-    { level: 3,  perk: "lower_fees" },
-    { level: 8,  perk: "gear_featured" },
+    { level: 1, perk: "gear_verified" },
+    { level: 3, perk: "lower_fees" },
+    { level: 8, perk: "gear_featured" },
   ],
   [UserPath.serviceFoxer]: [
-    { level: 1,  perk: "service_verified" },
-    { level: 3,  perk: "service_lower_fees" },
-    { level: 8,  perk: "service_featured" },
+    { level: 1, perk: "service_verified" },
+    { level: 3, perk: "service_lower_fees" },
+    { level: 8, perk: "service_featured" },
   ],
 };
 
@@ -146,7 +146,10 @@ export default class PassportSvc {
 
       if (newlyUnlocked.length > 0) {
         // Push only perks not already in the array (idempotent)
-        const current = await prisma.passport.findUnique({ where: { id: passport.id }, select: { perks: true } });
+        const current = await prisma.passport.findUnique({
+          where: { id: passport.id },
+          select: { perks: true },
+        });
         const existing = current?.perks ?? [];
         const toAdd = newlyUnlocked.filter((p) => !existing.includes(p));
         if (toAdd.length > 0) {
@@ -162,9 +165,15 @@ export default class PassportSvc {
     if (prevLevel === 1 && (existing?.totalXP ?? 0) === 0) {
       const lvl1Perk = PERK_THRESHOLDS[path]?.find((t) => t.level === 1)?.perk;
       if (lvl1Perk) {
-        const current = await prisma.passport.findUnique({ where: { id: passport.id }, select: { perks: true } });
+        const current = await prisma.passport.findUnique({
+          where: { id: passport.id },
+          select: { perks: true },
+        });
         if (!(current?.perks ?? []).includes(lvl1Perk)) {
-          await prisma.passport.update({ where: { id: passport.id }, data: { perks: { push: [lvl1Perk] } } });
+          await prisma.passport.update({
+            where: { id: passport.id },
+            data: { perks: { push: [lvl1Perk] } },
+          });
         }
       }
     }
@@ -237,11 +246,15 @@ export default class PassportSvc {
   static async sortByFeaturedPerk<T extends Record<string, any>>(
     items: T[],
     perkPriority: string | string[],
-    ownerField = 'ownerId'
+    ownerField = "ownerId",
   ): Promise<T[]> {
     if (items.length === 0) return items;
-    const priority = Array.isArray(perkPriority) ? perkPriority : [perkPriority];
-    const ownerIds = [...new Set(items.map((i) => i[ownerField]).filter(Boolean) as string[])];
+    const priority = Array.isArray(perkPriority)
+      ? perkPriority
+      : [perkPriority];
+    const ownerIds = [
+      ...new Set(items.map((i) => i[ownerField]).filter(Boolean) as string[]),
+    ];
     if (ownerIds.length === 0) return items;
 
     const passports = await prisma.passport.findMany({
@@ -275,11 +288,16 @@ export default class PassportSvc {
   static async enrichWithOwnerBadge<T extends Record<string, any>>(
     items: T[],
     badgePriority: string | string[],
-    ownerField = 'ownerId'
+    ownerField = "ownerId",
   ): Promise<(T & { ownerBadge: string | null })[]> {
-    if (items.length === 0) return items.map((i) => ({ ...i, ownerBadge: null }));
-    const priority = Array.isArray(badgePriority) ? badgePriority : [badgePriority];
-    const ownerIds = [...new Set(items.map((i) => i[ownerField]).filter(Boolean) as string[])];
+    if (items.length === 0)
+      return items.map((i) => ({ ...i, ownerBadge: null }));
+    const priority = Array.isArray(badgePriority)
+      ? badgePriority
+      : [badgePriority];
+    const ownerIds = [
+      ...new Set(items.map((i) => i[ownerField]).filter(Boolean) as string[]),
+    ];
 
     const passports = await prisma.passport.findMany({
       where: { userId: { in: ownerIds } },

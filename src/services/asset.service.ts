@@ -51,13 +51,14 @@ export default class AssetSvc {
   static async getAssets(filters?: {
     ownerId?: string;
     category?: AssetCategory;
+    city?: string;
     page?: number;
     limit?: number;
   }) {
     const { assets, total } = await AssetRepo.findAllAssets(filters);
     const { default: PassportSvc } = await import("./passport.service");
-    const sorted = await PassportSvc.sortByFeaturedPerk(assets, 'gear_featured', 'ownerId');
-    const enriched = await PassportSvc.enrichWithOwnerBadge(sorted, 'gear_verified', 'ownerId');
+    const sorted = await PassportSvc.sortByFeaturedPerk(assets, "gear_featured", "ownerId");
+    const enriched = await PassportSvc.enrichWithOwnerBadge(sorted, "gear_verified", "ownerId");
     return { assets: enriched, total };
   }
 
@@ -65,7 +66,11 @@ export default class AssetSvc {
     const asset = await AssetRepo.findAssetById(id);
     if (!asset) throw new Error("Asset not found");
     const { default: PassportSvc } = await import("./passport.service");
-    const [enriched] = await PassportSvc.enrichWithOwnerBadge([asset], 'gear_verified', 'ownerId');
+    const [enriched] = await PassportSvc.enrichWithOwnerBadge(
+      [asset],
+      "gear_verified",
+      "ownerId",
+    );
     return enriched;
   }
 

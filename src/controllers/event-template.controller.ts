@@ -100,12 +100,13 @@ export default class EventTemplateCtrl {
 
   static async getTemplates(req: Request, res: Response) {
     try {
-      const { ownerId, isPublic, category, page, limit } = req.query;
+      const { ownerId, isPublic, category, city, targetCity, page, limit } = req.query;
       const { templates, total } = await EventTemplateSvc.getTemplates({
         ownerId: ownerId as string,
         isPublic:
           isPublic === "true" ? true : isPublic === "false" ? false : undefined,
         category: category as string | undefined,
+        city: (city ?? targetCity) as string | undefined,
         page: page ? Number(page) : undefined,
         limit: limit ? Math.min(Number(limit), 50) : undefined,
       });
@@ -115,15 +116,34 @@ export default class EventTemplateCtrl {
     }
   }
 
-  // Public — no auth required, lightweight query for landing page cards
+  // Public — no auth required, searchable browse for the public /search page
   static async browsePublic(req: Request, res: Response) {
     try {
-      const { category, limit } = req.query;
-      const templates = await EventTemplateSvc.getPublicTemplatesLite({
+      const { category, targetCity, city, maxPrice, isPublic, page, limit } =
+        req.query;
+      const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
+      const limitNum = limit ? Math.min(Number(limit), 50) : 50;
+
+      const result = await EventTemplateSvc.getPublicTemplatesLite({
         category: category as string | undefined,
-        limit: limit ? Math.min(Number(limit), 20) : 8,
+        targetCity: targetCity as string | undefined,
+        city: city as string | undefined,
+        maxPrice: maxPrice ? Number(maxPrice) : undefined,
+        isPublic:
+          isPublic === "false" ? false : isPublic === "true" ? true : undefined,
+        page: pageNum,
+        limit: limitNum,
       });
-      return res.status(200).json({ success: true, data: templates });
+      return res.status(200).json({
+        success: true,
+        data: result.templates,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: result.total,
+          totalPages: Math.ceil(result.total / limitNum),
+        },
+      });
     } catch (error: any) {
       return res.status(500).json({ message: error.message });
     }
@@ -476,7 +496,8 @@ export default class EventTemplateCtrl {
         category: t.category,
         match: Math.floor(Math.random() * 20) + 80,
         image: t.images?.[0]?.url ?? null,
-        location: [t.targetCity, t.targetCountry].filter(Boolean).join(", ") || null,
+        location:
+          [t.targetCity, t.targetCountry].filter(Boolean).join(", ") || null,
       }));
       return res.status(200).json({ success: true, data });
     } catch (err: any) {

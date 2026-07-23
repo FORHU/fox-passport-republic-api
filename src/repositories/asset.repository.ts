@@ -11,6 +11,7 @@ export default class AssetRepo {
   static async findAllAssets(filters?: {
     ownerId?: string;
     category?: string;
+    city?: string;
     page?: number;
     limit?: number;
   }) {
@@ -21,6 +22,7 @@ export default class AssetRepo {
     const where = {
       ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
       ...(filters?.category && { category: filters.category as any }),
+      ...(filters?.city && { city: { contains: filters.city, mode: "insensitive" as const } }),
       ...(filters?.ownerId ? {} : { status: AssetStatus.available }),
       deletedAt: null,
     };
