@@ -49,11 +49,14 @@ export default class ServiceSvc {
     ownerId?: string;
     category?: ServiceCategory;
     status?: ServiceStatus;
+    page?: number;
+    limit?: number;
   }) {
-    const services = await ServiceRepo.getAllServices(filters);
+    const { services, total } = await ServiceRepo.getAllServices(filters);
     const { default: PassportSvc } = await import("./passport.service");
     const sorted = await PassportSvc.sortByFeaturedPerk(services, 'service_featured', 'ownerId');
-    return PassportSvc.enrichWithOwnerBadge(sorted, 'service_verified', 'ownerId');
+    const enriched = await PassportSvc.enrichWithOwnerBadge(sorted, 'service_verified', 'ownerId');
+    return { services: enriched, total };
   }
 
   static async getServiceById(id: string) {

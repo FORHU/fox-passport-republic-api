@@ -38,22 +38,37 @@ export default class EventTemplateRepo {
     ownerId?: string;
     isPublic?: boolean;
     category?: string;
+    page?: number;
+    limit?: number;
   }) {
-    return prisma.eventTemplate.findMany({
-      where: {
-        ...(filters?.ownerId && { ownerId: filters.ownerId }),
-        ...(filters?.isPublic !== undefined && { isPublic: filters.isPublic }),
-        ...(filters?.category && { category: filters.category as any }),
-      },
-      include: {
-        owner: { select: { id: true, name: true, email: true } },
-        templateAssets: { include: { asset: true } },
-        templateServices: { include: { service: true } },
-        templateVenues: { include: { venue: true } },
-        images: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const page = filters?.page ?? 1;
+    const limit = filters?.limit ?? 50;
+    const skip = (page - 1) * limit;
+
+    const where = {
+      ...(filters?.ownerId && { ownerId: filters.ownerId }),
+      ...(filters?.isPublic !== undefined && { isPublic: filters.isPublic }),
+      ...(filters?.category && { category: filters.category as any }),
+    };
+
+    const [templates, total] = await prisma.$transaction([
+      prisma.eventTemplate.findMany({
+        where,
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          templateAssets: { include: { asset: { include: { images: { take: 1 } } } } },
+          templateServices: { include: { service: { include: { images: { take: 1 } } } } },
+          templateVenues: { include: { venue: { include: { images: { take: 1 } } } } },
+          images: true,
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.eventTemplate.count({ where }),
+    ]);
+
+    return { templates, total };
   }
 
   // Lightweight browse for the public landing page — only fetches what cards need

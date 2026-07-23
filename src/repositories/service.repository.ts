@@ -6,20 +6,35 @@ export default class ServiceRepo {
   static async getAllServices(filters?: {
     ownerId?: string;
     category?: ServiceCategory;
+    page?: number;
+    limit?: number;
   }) {
-    return prisma.service.findMany({
-      where: {
-        ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
-        ...(filters?.category && { category: filters.category }),
-        ...(filters?.ownerId ? {} : { status: ServiceStatus.available }),
-        deletedAt: null,
-      },
-      include: {
-        owner: { select: { id: true, name: true, email: true } },
-        images: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const page = filters?.page ?? 1;
+    const limit = filters?.limit ?? 50;
+    const skip = (page - 1) * limit;
+
+    const where = {
+      ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
+      ...(filters?.category && { category: filters.category }),
+      ...(filters?.ownerId ? {} : { status: ServiceStatus.available }),
+      deletedAt: null,
+    };
+
+    const [services, total] = await prisma.$transaction([
+      prisma.service.findMany({
+        where,
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          images: true,
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.service.count({ where }),
+    ]);
+
+    return { services, total };
   }
 
   // READ ALL (admin — no status filter)

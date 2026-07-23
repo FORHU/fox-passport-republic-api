@@ -888,13 +888,13 @@ enum AssetCategory {
   furnitures
   sound_system
   decorations
+  equipment
   other
 }
 
 enum VenueCategory {
   indoor
   outdoor
-  mix
   hotel
   beach_resort
   garden

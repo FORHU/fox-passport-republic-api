@@ -65,8 +65,10 @@ export default class EventTemplateSvc {
     ownerId?: string;
     isPublic?: boolean;
     category?: string;
+    page?: number;
+    limit?: number;
   }) {
-    const templates = await EventTemplateRepo.findAllTemplates(filters);
+    const { templates, total } = await EventTemplateRepo.findAllTemplates(filters);
     // event_boost (Lvl 15) > featured_listing (Lvl 10) > unranked
     const { default: PassportSvc } = await import("./passport.service");
     const sorted = await PassportSvc.sortByFeaturedPerk(
@@ -74,10 +76,13 @@ export default class EventTemplateSvc {
       ['event_boost', 'featured_listing'],
       'ownerId'
     );
-    return sorted.map((t) => ({
-      ...t,
-      ...this.calculateTotalsBreakdown(t),
-    }));
+    return {
+      templates: sorted.map((t) => ({
+        ...t,
+        ...this.calculateTotalsBreakdown(t),
+      })),
+      total,
+    };
   }
 
   // Lightweight browse for landing page — no price calculation, minimal joins
@@ -232,16 +237,22 @@ export default class EventTemplateSvc {
     const asset = await prisma.asset.findUnique({ where: { id: assetId } });
     if (!asset) throw new Error("Asset not found");
 
+    // Only enforce location mismatch when both sides have explicit state/country data.
+    // If either the template or the resource has no location set, allow the attachment.
     if (
-      asset.state !== template.targetState ||
-      asset.country !== template.targetCountry
+      asset.state && template.targetState &&
+      (asset.state !== template.targetState || asset.country !== template.targetCountry)
     ) {
       throw new Error(
         "Asset location mismatch. Please use matching search or override.",
       );
     }
 
-    this.validateMatchData(true, description, matchedAt);
+    // Only enforce match data when matchedAt is provided (i.e., match-search flow).
+    // Direct attachment from the builder does not require description/matchedAt.
+    if (matchedAt) {
+      this.validateMatchData(true, description, matchedAt);
+    }
 
     // Default agreedPrice to the asset's own listed price (* quantity) when the Host
     // doesn't negotiate a different one — without this, agreedPrice silently defaults
@@ -254,10 +265,7 @@ export default class EventTemplateSvc {
       templateId,
       assetId,
       quantity,
-      {
-        matched: true,
-        matchConstraint: MatchConstraint.SAME_STATE,
-      },
+      matchedAt ? { matched: true, matchConstraint: MatchConstraint.SAME_STATE } : undefined,
       description,
       matchedAt,
       finalAgreedPrice,
@@ -308,15 +316,17 @@ export default class EventTemplateSvc {
     if (!service) throw new Error("Service not found");
 
     if (
-      service.state !== template.targetState ||
-      service.country !== template.targetCountry
+      service.state && template.targetState &&
+      (service.state !== template.targetState || service.country !== template.targetCountry)
     ) {
       throw new Error(
         "Service location mismatch. Please use matching search or override.",
       );
     }
 
-    this.validateMatchData(true, description, matchedAt);
+    if (matchedAt) {
+      this.validateMatchData(true, description, matchedAt);
+    }
 
     // See attachAsset's comment — default to the service's own listed price.
     const finalAgreedPrice = agreedPrice ?? service.price;
@@ -324,10 +334,7 @@ export default class EventTemplateSvc {
     return EventTemplateRepo.attachService(
       templateId,
       serviceId,
-      {
-        matched: true,
-        matchConstraint: MatchConstraint.SAME_STATE,
-      },
+      matchedAt ? { matched: true, matchConstraint: MatchConstraint.SAME_STATE } : undefined,
       description,
       matchedAt,
       finalAgreedPrice,
@@ -376,15 +383,17 @@ export default class EventTemplateSvc {
     if (!venue) throw new Error("Venue not found");
 
     if (
-      venue.state !== template.targetState ||
-      venue.country !== template.targetCountry
+      venue.state && template.targetState &&
+      (venue.state !== template.targetState || venue.country !== template.targetCountry)
     ) {
       throw new Error(
         "Venue location mismatch. Please use the Matching Search to find compatible venues or override the constraint.",
       );
     }
 
-    this.validateMatchData(true, description, matchedAt);
+    if (matchedAt) {
+      this.validateMatchData(true, description, matchedAt);
+    }
 
     // See attachAsset's comment — default to the venue's own listed price.
     const finalAgreedPrice = agreedPrice ?? venue.price;
@@ -392,10 +401,7 @@ export default class EventTemplateSvc {
     return EventTemplateRepo.attachVenue(
       templateId,
       venueId,
-      {
-        matched: true,
-        matchConstraint: MatchConstraint.SAME_STATE,
-      },
+      matchedAt ? { matched: true, matchConstraint: MatchConstraint.SAME_STATE } : undefined,
       description,
       matchedAt,
       finalAgreedPrice,

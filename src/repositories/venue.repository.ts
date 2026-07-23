@@ -65,22 +65,35 @@ export default class VenueRepo {
     mayorId?: string;
     hostId?: string;
     status?: VenueStatus;
+    page?: number;
+    limit?: number;
   }) {
     const mayorId = filters?.mayorId ?? filters?.hostId;
-    return prisma.venue.findMany({
-      where: {
-        ...(mayorId ? { mayorId } : {}),
-        // Public browse (no mayorId) → only available venues by default
-        // Mayor viewing own venues (with mayorId) → all statuses unless a specific status is passed
-        ...(mayorId
-          ? filters?.status
-            ? { status: filters.status }
-            : {}
-          : { status: filters?.status ?? VenueStatus.available }),
-      },
-      orderBy: { createdAt: "desc" },
-      include: { mayor: mayorSelect, images: true },
-    });
+    const page = filters?.page ?? 1;
+    const limit = filters?.limit ?? 50;
+    const skip = (page - 1) * limit;
+
+    const where = {
+      ...(mayorId ? { mayorId } : {}),
+      // Public browse (no mayorId) → only available venues by default
+      // Mayor viewing own venues (with mayorId) → all statuses unless a specific status is passed
+      ...(mayorId
+        ? filters?.status ? { status: filters.status } : {}
+        : { status: filters?.status ?? VenueStatus.available }),
+    };
+
+    const [venues, total] = await prisma.$transaction([
+      prisma.venue.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: { mayor: mayorSelect, images: true },
+        skip,
+        take: limit,
+      }),
+      prisma.venue.count({ where }),
+    ]);
+
+    return { venues, total };
   }
 
   static async findAllVenuesAdmin(filters?: {

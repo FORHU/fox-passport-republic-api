@@ -64,13 +64,14 @@ export default class VenueCtrl {
   // `hostId` accepted as a deprecated alias for `mayorId` (see venue.repository.ts)
   static async getVenues(req: Request, res: Response) {
     try {
-      const mayorId = (req.query.mayorId ?? req.query.hostId) as
-        | string
-        | undefined;
-      const venues = await VenueSvc.getVenues(
-        mayorId ? { mayorId } : undefined,
-      );
-      return res.status(200).json({ venues });
+      const { mayorId: _mayorId, hostId, page, limit } = req.query;
+      const mayorId = (_mayorId ?? hostId) as string | undefined;
+      const { venues, total } = await VenueSvc.getVenues({
+        ...(mayorId && { mayorId }),
+        page: page ? Number(page) : undefined,
+        limit: limit ? Math.min(Number(limit), 50) : undefined,
+      });
+      return res.status(200).json({ venues, total });
     } catch (error: any) {
       return res.status(500).json({ message: error.message || error });
     }
