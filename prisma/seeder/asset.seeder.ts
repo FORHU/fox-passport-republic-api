@@ -66,6 +66,13 @@ const COVER_URLS: Partial<Record<AssetCategory, string>> = {
   [AssetCategory.other]:         "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop",
 };
 
+const COVER_URLS: Record<AssetCategory, string> = {
+  [AssetCategory.sound_system]: "https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&auto=format&fit=crop",
+  [AssetCategory.decorations]:  "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=800&auto=format&fit=crop",
+  [AssetCategory.furnitures]:   "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&auto=format&fit=crop",
+  [AssetCategory.other]:         "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop",
+};
+
 const CITIES: { city: string; state: string }[] = [
   { city: "Manila", state: "Metro Manila" },
   { city: "Makati", state: "Metro Manila" },
@@ -910,6 +917,50 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         },
       });
       console.log(`✓ Seeded asset: ${a.name}`);
+    }
+
+    // ── Bulk assets for pagination-testing foxers ──────────────────────
+    const bulkAssets = [];
+    for (let i = 1; i <= 60; i++) {
+      const foxer = users.find((u: any) => u.email === `gf-${String(i).padStart(2, "0")}@foxers.ph`);
+      if (!foxer) continue;
+      const cat = ASSET_CATEGORIES[i % ASSET_CATEGORIES.length];
+      const assetId = `seed-asset-gf-${i}-${cat}`;
+      
+      const bulkDefs = BULK_ASSET_NAMES[cat] || [{ name: "Generic Asset", desc: "Generic asset description", price: 1000, billingRate: BillingRate.daily, condition: AssetCondition.good }];
+      const def = bulkDefs[i % bulkDefs.length];
+      
+      bulkAssets.push({
+        id: assetId,
+        ownerId: foxer.id,
+        category: cat,
+        name: def.name,
+        description: `${def.name} — provided by ${foxer.name}. ${def.desc}`,
+        quantity: 1 + (i % 5),
+        price: def.price,
+        currency: "PHP",
+        billingRate: def.billingRate,
+        condition: def.condition,
+        status: AssetStatus.available,
+        city: (foxer as any).city ?? "Manila",
+        state: (foxer as any).state ?? "Metro Manila",
+        country: "Philippines",
+      });
+    }
+
+    for (const a of bulkAssets) {
+      const { id, ...data } = a;
+      const coords = CITY_COORDS[(a as any).city] ?? {};
+      await prisma.asset.upsert({
+        where: { id },
+        update: { ...data, ...coords },
+        create: {
+          id,
+          ...data,
+          ...coords,
+        },
+      });
+      console.log(`✓ Seeded bulk asset: ${a.name} (${id})`);
     }
 
     // ── Asset Images Mapping ──────────────────────────────────────────────────
