@@ -6,6 +6,7 @@ const router = express.Router();
 
 // Public routes
 router.get("/", VenueCtrl.getVenues);
+router.get("/catalog", VenueCtrl.getCatalog);
 router.get("/:id", VenueCtrl.getVenueById);
 
 // Protected routes
