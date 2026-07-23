@@ -75,6 +75,41 @@ export async function seedSpecializations(prisma: PrismaClient, users: any[]) {
     );
   }
 
+  // ── Bulk foxer specializations for pagination testing ────────────────────
+  const EF_CATEGORIES = ["birthday", "wedding", "corporate", "social", "other"];
+  const GF_CATEGORIES = ["sound_system", "decorations", "furnitures", "other"];
+  const SF_CATEGORIES = ["entertainment", "catering", "design", "service_staff", "other"];
+
+  for (let i = 1; i <= 16; i++) {
+    const foxer = users.find((u: any) => u.email === `ef-${String(i).padStart(2, "0")}@foxers.ph`);
+    if (foxer) {
+      rows.push(
+        { userId: foxer.id, roleType: "eventFoxer", category: EF_CATEGORIES[i % EF_CATEGORIES.length], source: i % 2 === 0 ? "earned" : "declared" },
+        { userId: foxer.id, roleType: "eventFoxer", category: EF_CATEGORIES[(i + 2) % EF_CATEGORIES.length], source: "declared" },
+      );
+    }
+  }
+
+  for (let i = 1; i <= 29; i++) {
+    const foxer = users.find((u: any) => u.email === `gf-${String(i).padStart(2, "0")}@foxers.ph`);
+    if (foxer) {
+      rows.push(
+        { userId: foxer.id, roleType: "gearFoxer", category: GF_CATEGORIES[i % GF_CATEGORIES.length], source: i % 3 === 0 ? "earned" : "declared" },
+        { userId: foxer.id, roleType: "gearFoxer", category: GF_CATEGORIES[(i + 1) % GF_CATEGORIES.length], source: "earned" },
+      );
+    }
+  }
+
+  for (let i = 1; i <= 16; i++) {
+    const foxer = users.find((u: any) => u.email === `sf-${String(i).padStart(2, "0")}@foxers.ph`);
+    if (foxer) {
+      rows.push(
+        { userId: foxer.id, roleType: "serviceFoxer", category: SF_CATEGORIES[i % SF_CATEGORIES.length], source: i % 2 === 0 ? "earned" : "declared" },
+        { userId: foxer.id, roleType: "serviceFoxer", category: SF_CATEGORIES[(i + 1) % SF_CATEGORIES.length], source: "declared" },
+      );
+    }
+  }
+
   for (const row of rows) {
     await prisma.foxerSpecialization.upsert({
       where: { userId_roleType_category: { userId: row.userId, roleType: row.roleType, category: row.category } },

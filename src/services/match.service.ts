@@ -139,7 +139,8 @@ export default class MatchSvc {
     });
     if (!event) throw new Error("Match not found");
     if (event.organizerId !== foxerId) throw new Error("Unauthorized");
-    if (event.requestStatus !== "pending") throw new Error("Match already processed");
+    if (event.requestStatus !== "pending")
+      throw new Error("Match already processed");
 
     await EventRequestRepo.updateRequestStatus(eventId, "approved");
 
@@ -161,7 +162,8 @@ export default class MatchSvc {
     });
     if (!event) throw new Error("Match not found");
     if (event.organizerId !== foxerId) throw new Error("Unauthorized");
-    if (event.requestStatus !== "pending") throw new Error("Match already processed");
+    if (event.requestStatus !== "pending")
+      throw new Error("Match already processed");
 
     await EventRequestRepo.rejectRequest(eventId, reason);
 

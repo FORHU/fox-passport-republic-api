@@ -49,13 +49,14 @@ export default class ServiceSvc {
     ownerId?: string;
     category?: ServiceCategory;
     status?: ServiceStatus;
+    city?: string;
     page?: number;
     limit?: number;
   }) {
     const { services, total } = await ServiceRepo.getAllServices(filters);
     const { default: PassportSvc } = await import("./passport.service");
-    const sorted = await PassportSvc.sortByFeaturedPerk(services, 'service_featured', 'ownerId');
-    const enriched = await PassportSvc.enrichWithOwnerBadge(sorted, 'service_verified', 'ownerId');
+    const sorted = await PassportSvc.sortByFeaturedPerk(services, "service_featured", "ownerId");
+    const enriched = await PassportSvc.enrichWithOwnerBadge(sorted, "service_verified", "ownerId");
     return { services: enriched, total };
   }
 
@@ -63,7 +64,11 @@ export default class ServiceSvc {
     const service = await ServiceRepo.getServiceById(id);
     if (!service || service.deletedAt) throw new Error("Service not found");
     const { default: PassportSvc } = await import("./passport.service");
-    const [enriched] = await PassportSvc.enrichWithOwnerBadge([service], 'service_verified', 'ownerId');
+    const [enriched] = await PassportSvc.enrichWithOwnerBadge(
+      [service],
+      "service_verified",
+      "ownerId",
+    );
     return enriched;
   }
 

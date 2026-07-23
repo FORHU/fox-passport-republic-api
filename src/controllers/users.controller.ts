@@ -42,8 +42,24 @@ export default class UsersCtrl {
       const page = Math.max(Number(req.query.page) || 1, 1);
       const roleType = req.query.roleType as string | undefined;
       const specialization = req.query.specialization as string | undefined;
-      const foxers = await UsersSvc.getFoxers(limit, page, roleType, specialization);
-      return res.status(200).json({ success: true, data: foxers });
+      const city = req.query.city as string | undefined;
+      const result = await UsersSvc.getFoxers(
+        limit,
+        page,
+        roleType,
+        specialization,
+        city,
+      );
+      return res.status(200).json({
+        success: true,
+        data: result.foxers,
+        pagination: {
+          page,
+          limit,
+          total: result.total,
+          totalPages: result.totalPages,
+        },
+      });
     } catch (err: any) {
       return res.status(500).json({ success: false, message: err.message });
     }
