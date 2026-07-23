@@ -85,7 +85,12 @@ export default class VenueSvc {
   // READ — Delegate all queries to repository
   // ───────────────────────────────────────────────────────────
 
-  static async getVenues(filters?: { mayorId?: string; hostId?: string; page?: number; limit?: number }) {
+  static async getVenues(filters?: {
+    mayorId?: string;
+    hostId?: string;
+    page?: number;
+    limit?: number;
+  }) {
     const { venues, total } = await VenueRepo.findAllVenues(filters);
     const { default: PassportSvc } = await import("./passport.service");
     const sorted = await PassportSvc.sortByFeaturedPerk(

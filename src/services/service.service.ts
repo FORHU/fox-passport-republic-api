@@ -55,8 +55,16 @@ export default class ServiceSvc {
   }) {
     const { services, total } = await ServiceRepo.getAllServices(filters);
     const { default: PassportSvc } = await import("./passport.service");
-    const sorted = await PassportSvc.sortByFeaturedPerk(services, "service_featured", "ownerId");
-    const enriched = await PassportSvc.enrichWithOwnerBadge(sorted, "service_verified", "ownerId");
+    const sorted = await PassportSvc.sortByFeaturedPerk(
+      services,
+      "service_featured",
+      "ownerId",
+    );
+    const enriched = await PassportSvc.enrichWithOwnerBadge(
+      sorted,
+      "service_verified",
+      "ownerId",
+    );
     return { services: enriched, total };
   }
 

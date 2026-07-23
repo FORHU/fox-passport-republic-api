@@ -64,9 +64,15 @@ export default class EventTemplateRepo {
         where,
         include: {
           owner: { select: { id: true, name: true, email: true } },
-          templateAssets: { include: { asset: { include: { images: { take: 1 } } } } },
-          templateServices: { include: { service: { include: { images: { take: 1 } } } } },
-          templateVenues: { include: { venue: { include: { images: { take: 1 } } } } },
+          templateAssets: {
+            include: { asset: { include: { images: { take: 1 } } } },
+          },
+          templateServices: {
+            include: { service: { include: { images: { take: 1 } } } },
+          },
+          templateVenues: {
+            include: { venue: { include: { images: { take: 1 } } } },
+          },
           images: true,
         },
         orderBy: { createdAt: "desc" },
