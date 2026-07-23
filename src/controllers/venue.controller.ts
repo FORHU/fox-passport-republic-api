@@ -254,4 +254,54 @@ export default class VenueCtrl {
       return res.status(404).json({ message: error.message || error });
     }
   }
+
+  static getCatalog(_req: Request, res: Response) {
+    return res.status(200).json({
+      tech: [
+        "4K Projector",
+        "PA Sound System",
+        "LED Screen",
+        "Wireless Microphones",
+        "Live Streaming Setup",
+        "Video Conferencing System",
+        "Stage Lighting",
+        "Moving Head Lights",
+        "DJ Equipment",
+        "LED Video Wall",
+        "Interactive Touchscreen",
+        "Photo Booth",
+        "Bluetooth Speaker",
+        "Podium with Mic",
+      ],
+      amenities: [
+        "Air Conditioning",
+        "Parking",
+        "High-Speed WiFi",
+        "Restrooms",
+        "Catering Kitchen",
+        "Bar Area",
+        "Elevator Access",
+        "Wheelchair Access",
+        "Bridal Suite",
+        "Dressing Room",
+        "Security System",
+        "Backup Generator",
+        "First Aid Kit",
+        "CCTV",
+        "Smoking Area",
+      ],
+      staff: [
+        "Security Guard",
+        "Janitor",
+        "Event Coordinator",
+        "Concierge",
+        "Bartender",
+        "Parking Attendant",
+        "Sound Technician",
+        "Lighting Technician",
+        "Stage Manager",
+        "Emcee",
+      ],
+    });
+  }
 }
