@@ -69,7 +69,8 @@ export default class EventTemplateSvc {
     page?: number;
     limit?: number;
   }) {
-    const { templates, total } = await EventTemplateRepo.findAllTemplates(filters);
+    const { templates, total } =
+      await EventTemplateRepo.findAllTemplates(filters);
     // event_boost (Lvl 15) > featured_listing (Lvl 10) > unranked
     const { default: PassportSvc } = await import("./passport.service");
     const sorted = await PassportSvc.sortByFeaturedPerk(
@@ -273,8 +274,10 @@ export default class EventTemplateSvc {
     // Only enforce location mismatch when both sides have explicit state/country data.
     // If either the template or the resource has no location set, allow the attachment.
     if (
-      asset.state && template.targetState &&
-      (asset.state !== template.targetState || asset.country !== template.targetCountry)
+      asset.state &&
+      template.targetState &&
+      (asset.state !== template.targetState ||
+        asset.country !== template.targetCountry)
     ) {
       throw new Error(
         "Asset location mismatch. Please use matching search or override.",
@@ -298,7 +301,9 @@ export default class EventTemplateSvc {
       templateId,
       assetId,
       quantity,
-      matchedAt ? { matched: true, matchConstraint: MatchConstraint.SAME_STATE } : undefined,
+      matchedAt
+        ? { matched: true, matchConstraint: MatchConstraint.SAME_STATE }
+        : undefined,
       description,
       matchedAt,
       finalAgreedPrice,
@@ -349,8 +354,10 @@ export default class EventTemplateSvc {
     if (!service) throw new Error("Service not found");
 
     if (
-      service.state && template.targetState &&
-      (service.state !== template.targetState || service.country !== template.targetCountry)
+      service.state &&
+      template.targetState &&
+      (service.state !== template.targetState ||
+        service.country !== template.targetCountry)
     ) {
       throw new Error(
         "Service location mismatch. Please use matching search or override.",
@@ -367,7 +374,9 @@ export default class EventTemplateSvc {
     return EventTemplateRepo.attachService(
       templateId,
       serviceId,
-      matchedAt ? { matched: true, matchConstraint: MatchConstraint.SAME_STATE } : undefined,
+      matchedAt
+        ? { matched: true, matchConstraint: MatchConstraint.SAME_STATE }
+        : undefined,
       description,
       matchedAt,
       finalAgreedPrice,
@@ -416,8 +425,10 @@ export default class EventTemplateSvc {
     if (!venue) throw new Error("Venue not found");
 
     if (
-      venue.state && template.targetState &&
-      (venue.state !== template.targetState || venue.country !== template.targetCountry)
+      venue.state &&
+      template.targetState &&
+      (venue.state !== template.targetState ||
+        venue.country !== template.targetCountry)
     ) {
       throw new Error(
         "Venue location mismatch. Please use the Matching Search to find compatible venues or override the constraint.",
@@ -434,7 +445,9 @@ export default class EventTemplateSvc {
     return EventTemplateRepo.attachVenue(
       templateId,
       venueId,
-      matchedAt ? { matched: true, matchConstraint: MatchConstraint.SAME_STATE } : undefined,
+      matchedAt
+        ? { matched: true, matchConstraint: MatchConstraint.SAME_STATE }
+        : undefined,
       description,
       matchedAt,
       finalAgreedPrice,

@@ -22,7 +22,9 @@ export default class AssetRepo {
     const where = {
       ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
       ...(filters?.category && { category: filters.category as any }),
-      ...(filters?.city && { city: { contains: filters.city, mode: "insensitive" as const } }),
+      ...(filters?.city && {
+        city: { contains: filters.city, mode: "insensitive" as const },
+      }),
       ...(filters?.ownerId ? {} : { status: AssetStatus.available }),
       deletedAt: null,
     };

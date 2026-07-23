@@ -77,9 +77,11 @@ export default class EventTemplateCtrl {
         .status(200)
         .json({ message: "Template updated successfully", template });
     } catch (error: any) {
-      const status = error.message.includes("Unauthorized") ? 403
-        : error.message.includes("not found") ? 404
-        : 400;
+      const status = error.message.includes("Unauthorized")
+        ? 403
+        : error.message.includes("not found")
+          ? 404
+          : 400;
       return res.status(status).json({ message: error.message });
     }
   }
@@ -87,7 +89,8 @@ export default class EventTemplateCtrl {
   static async getTrending(req: Request, res: Response) {
     try {
       const { category, limit } = req.query;
-      if (!category) return res.status(400).json({ message: "category is required" });
+      if (!category)
+        return res.status(400).json({ message: "category is required" });
       const templates = await EventTemplateRepo.findTrendingByCategory(
         category as string,
         limit ? parseInt(limit as string, 10) : 4,
@@ -100,7 +103,8 @@ export default class EventTemplateCtrl {
 
   static async getTemplates(req: Request, res: Response) {
     try {
-      const { ownerId, isPublic, category, city, targetCity, page, limit } = req.query;
+      const { ownerId, isPublic, category, city, targetCity, page, limit } =
+        req.query;
       const { templates, total } = await EventTemplateSvc.getTemplates({
         ownerId: ownerId as string,
         isPublic:

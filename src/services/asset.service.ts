@@ -57,8 +57,16 @@ export default class AssetSvc {
   }) {
     const { assets, total } = await AssetRepo.findAllAssets(filters);
     const { default: PassportSvc } = await import("./passport.service");
-    const sorted = await PassportSvc.sortByFeaturedPerk(assets, "gear_featured", "ownerId");
-    const enriched = await PassportSvc.enrichWithOwnerBadge(sorted, "gear_verified", "ownerId");
+    const sorted = await PassportSvc.sortByFeaturedPerk(
+      assets,
+      "gear_featured",
+      "ownerId",
+    );
+    const enriched = await PassportSvc.enrichWithOwnerBadge(
+      sorted,
+      "gear_verified",
+      "ownerId",
+    );
     return { assets: enriched, total };
   }
 

@@ -78,7 +78,9 @@ export default class VenueRepo {
       // Public browse (no mayorId) → only available venues by default
       // Mayor viewing own venues (with mayorId) → all statuses unless a specific status is passed
       ...(mayorId
-        ? filters?.status ? { status: filters.status } : {}
+        ? filters?.status
+          ? { status: filters.status }
+          : {}
         : { status: filters?.status ?? VenueStatus.available }),
     };
 

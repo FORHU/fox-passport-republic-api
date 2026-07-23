@@ -51,9 +51,10 @@ export default class MatchSvc {
         false,
       );
     } else {
-      const { templates: foxerTemplates } = await EventTemplateRepo.findAllTemplates({
-        ownerId: data.foxerId,
-      });
+      const { templates: foxerTemplates } =
+        await EventTemplateRepo.findAllTemplates({
+          ownerId: data.foxerId,
+        });
       templateId = foxerTemplates.length > 0 ? foxerTemplates[0].id : null;
 
       if (!templateId) {

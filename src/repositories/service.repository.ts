@@ -19,7 +19,9 @@ export default class ServiceRepo {
       ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
       ...(filters?.category && { category: filters.category }),
       ...(filters?.status && { status: filters.status }),
-      ...(filters?.city && { city: { contains: filters.city, mode: "insensitive" as const } }),
+      ...(filters?.city && {
+        city: { contains: filters.city, mode: "insensitive" as const },
+      }),
       ...(filters?.ownerId ? {} : { status: ServiceStatus.available }),
       deletedAt: null,
     };
