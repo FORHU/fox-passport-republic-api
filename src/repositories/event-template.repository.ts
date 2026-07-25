@@ -95,12 +95,18 @@ export default class EventTemplateRepo {
     const skip = (page - 1) * limit;
 
     const where = {
-      isPublic: true,
+      isPublic: filters.isPublic !== undefined ? filters.isPublic : true,
       status: "published" as any,
       ...(filters.category && { category: filters.category as any }),
+      ...((filters.city || filters.targetCity) && {
+        targetCity: {
+          contains: (filters.city ?? filters.targetCity) as string,
+          mode: "insensitive" as const,
+        },
+      }),
     };
 
-    const [templates, total] = await prisma.$transaction([
+    const [templates, total] = await Promise.all([
       prisma.eventTemplate.findMany({
         where,
         select: {
@@ -116,9 +122,9 @@ export default class EventTemplateRepo {
           },
           owner: { select: { id: true, name: true } },
         },
-        skip,
         take: limit,
-        orderBy: { createdAt: "desc" },
+        skip,
+        orderBy: { createdAt: "desc" as const },
       }),
       prisma.eventTemplate.count({ where }),
     ]);
