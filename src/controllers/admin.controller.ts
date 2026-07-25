@@ -13,6 +13,7 @@ import VenueRepo from "../repositories/venue.repository";
 import AssetRepo from "../repositories/asset.repository";
 import ServiceRepo from "../repositories/service.repository";
 import RefundSvc from "../services/refund.service";
+import NotificationService from "../modules/notifications/user-notification.service";
 import Joi from "joi";
 
 export default class AdminCtrl {
@@ -337,7 +338,7 @@ export default class AdminCtrl {
       const venue = await prisma.venue.update({
         where: { id: req.params.id },
         data: { status: VenueStatus.available },
-        select: { id: true, venueFoxerId: true },
+        select: { id: true, name: true, venueFoxerId: true },
       });
 
       // Award venueFoxer XP + City Builder badge (fire-and-forget)
@@ -356,6 +357,14 @@ export default class AdminCtrl {
         })
         .catch(() => {});
 
+      NotificationService.create({
+        userId: venue.venueFoxerId,
+        type: "listing_approved",
+        title: "Venue approved",
+        message: `Your venue "${venue.name}" has been approved and is now live.`,
+        metadata: { entityId: venue.id, entityType: "venue" },
+      }).catch(() => {});
+
       return res.status(200).json({ success: true, data: venue });
     } catch (error: any) {
       return res.status(404).json({ success: false, message: error.message });
@@ -364,10 +373,24 @@ export default class AdminCtrl {
 
   static async rejectVenue(req: Request, res: Response) {
     try {
+      const { reason } = req.body;
       const venue = await prisma.venue.update({
         where: { id: req.params.id },
-        data: { status: VenueStatus.archived },
+        data: {
+          status: VenueStatus.rejected,
+          rejectionReason: reason ?? null,
+        },
+        select: { id: true, name: true, venueFoxerId: true },
       });
+
+      NotificationService.create({
+        userId: venue.venueFoxerId,
+        type: "listing_rejected",
+        title: "Venue not approved",
+        message: `Your venue "${venue.name}" was not approved.${reason ? ` Reason: ${reason}` : ""}`,
+        metadata: { entityId: venue.id, entityType: "venue" },
+      }).catch(() => {});
+
       return res.status(200).json({ success: true, data: venue });
     } catch (error: any) {
       return res.status(404).json({ success: false, message: error.message });
@@ -392,7 +415,7 @@ export default class AdminCtrl {
       const asset = await prisma.asset.update({
         where: { id: req.params.id },
         data: { status: AssetStatus.available },
-        select: { id: true, ownerId: true },
+        select: { id: true, name: true, ownerId: true },
       });
 
       import("../services/passport.service")
@@ -405,6 +428,14 @@ export default class AdminCtrl {
         )
         .catch(() => {});
 
+      NotificationService.create({
+        userId: asset.ownerId,
+        type: "listing_approved",
+        title: "Gear listing approved",
+        message: `Your gear listing "${asset.name}" has been approved and is now live.`,
+        metadata: { entityId: asset.id, entityType: "asset" },
+      }).catch(() => {});
+
       return res.status(200).json({ success: true, data: asset });
     } catch (error: any) {
       return res.status(404).json({ success: false, message: error.message });
@@ -413,10 +444,21 @@ export default class AdminCtrl {
 
   static async rejectAsset(req: Request, res: Response) {
     try {
+      const { reason } = req.body;
       const asset = await prisma.asset.update({
         where: { id: req.params.id },
         data: { status: AssetStatus.rejected },
+        select: { id: true, name: true, ownerId: true },
       });
+
+      NotificationService.create({
+        userId: asset.ownerId,
+        type: "listing_rejected",
+        title: "Gear listing not approved",
+        message: `Your gear listing "${asset.name}" was not approved.${reason ? ` Reason: ${reason}` : ""}`,
+        metadata: { entityId: asset.id, entityType: "asset" },
+      }).catch(() => {});
+
       return res.status(200).json({ success: true, data: asset });
     } catch (error: any) {
       return res.status(404).json({ success: false, message: error.message });
@@ -450,7 +492,7 @@ export default class AdminCtrl {
       const service = await prisma.service.update({
         where: { id: req.params.id },
         data: { status: ServiceStatus.available },
-        select: { id: true, ownerId: true },
+        select: { id: true, name: true, ownerId: true },
       });
 
       import("../services/passport.service")
@@ -463,6 +505,14 @@ export default class AdminCtrl {
         )
         .catch(() => {});
 
+      NotificationService.create({
+        userId: service.ownerId,
+        type: "listing_approved",
+        title: "Service listing approved",
+        message: `Your service "${service.name}" has been approved and is now live.`,
+        metadata: { entityId: service.id, entityType: "service" },
+      }).catch(() => {});
+
       return res.status(200).json({ success: true, data: service });
     } catch (error: any) {
       return res.status(404).json({ success: false, message: error.message });
@@ -471,10 +521,21 @@ export default class AdminCtrl {
 
   static async rejectService(req: Request, res: Response) {
     try {
+      const { reason } = req.body;
       const service = await prisma.service.update({
         where: { id: req.params.id },
         data: { status: ServiceStatus.rejected },
+        select: { id: true, name: true, ownerId: true },
       });
+
+      NotificationService.create({
+        userId: service.ownerId,
+        type: "listing_rejected",
+        title: "Service listing not approved",
+        message: `Your service "${service.name}" was not approved.${reason ? ` Reason: ${reason}` : ""}`,
+        metadata: { entityId: service.id, entityType: "service" },
+      }).catch(() => {});
+
       return res.status(200).json({ success: true, data: service });
     } catch (error: any) {
       return res.status(404).json({ success: false, message: error.message });
@@ -530,7 +591,17 @@ export default class AdminCtrl {
       const template = await prisma.eventTemplate.update({
         where: { id: req.params.id },
         data: { status: EventTemplateStatus.published, isPublic: true },
+        select: { id: true, name: true, ownerId: true },
       });
+
+      NotificationService.create({
+        userId: template.ownerId,
+        type: "listing_approved",
+        title: "Event template approved",
+        message: `Your event template "${template.name}" has been approved and is now public.`,
+        metadata: { entityId: template.id, entityType: "event_template" },
+      }).catch(() => {});
+
       return res.status(200).json({ success: true, data: template });
     } catch (error: any) {
       if (
@@ -560,7 +631,17 @@ export default class AdminCtrl {
           isPublic: false,
           rejectionReason: reason,
         },
+        select: { id: true, name: true, ownerId: true },
       });
+
+      NotificationService.create({
+        userId: template.ownerId,
+        type: "listing_rejected",
+        title: "Event template not approved",
+        message: `Your event template "${template.name}" was not approved. Reason: ${reason}`,
+        metadata: { entityId: template.id, entityType: "event_template" },
+      }).catch(() => {});
+
       return res.status(200).json({ success: true, data: template });
     } catch (error: any) {
       if (
