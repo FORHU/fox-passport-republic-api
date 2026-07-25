@@ -255,6 +255,17 @@ export default class VenueCtrl {
     }
   }
 
+  static async getOwnerStats(req: Request, res: Response) {
+    try {
+      const mayorId = (req as any).user?.userId;
+      if (!mayorId) return res.status(401).json({ message: "Unauthorized" });
+      const stats = await VenueSvc.getOwnerStats(String(mayorId));
+      return res.status(200).json(stats);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message || error });
+    }
+  }
+
   static getCatalog(_req: Request, res: Response) {
     return res.status(200).json({
       tech: [

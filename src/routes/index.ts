@@ -24,6 +24,7 @@ import notificationRoutes from "../modules/notifications/user-notification.route
 import stripeConnectRoutes from "./stripe-connect.routes";
 import cancellationPolicyRoutes from "./cancellation-policy.routes";
 import waitlistRoutes from "./waitlist.routes";
+import newsletterRoutes from "./newsletter.routes";
 import locationsRoutes from "./locations.routes";
 import passportRoutes from "./passport.routes";
 import analyticsRoutes from "./analytics.routes";
@@ -66,6 +67,7 @@ router.use("/v1/matches", matchRoutes);
 router.use("/v1/bookings", bookingRoutes);
 router.use("/v1/cancellation-policies", cancellationPolicyRoutes);
 router.use("/v1/waitlist", waitlistRoutes);
+router.use("/v1/newsletter", newsletterRoutes);
 router.use("/v1/locations", locationsRoutes);
 router.use("/v1/passport", passportRoutes);
 router.use("/v1/analytics", analyticsRoutes);

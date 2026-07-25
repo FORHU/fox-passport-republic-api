@@ -786,7 +786,7 @@ export default class BookingCtrl {
             type: "BOOKING_CONFIRMED",
             title: "New booking",
             message: `You have a new confirmed booking for ${eventName}.`,
-            metadata: { link: `/host/bookings/${bookingId}` },
+            metadata: { link: `/booking/${bookingId}` },
           }).catch((e) =>
             console.error("Failed to create host notification", e),
           );
@@ -877,7 +877,7 @@ export default class BookingCtrl {
       if (booking.event?.organizerId !== req.user!.userId)
         return res.status(403).json({
           success: false,
-          message: "Unauthorized — you are not the host of this event",
+          message: "Unauthorized — you are not the organizer of this event",
         });
 
       const result = await BookingSvc.checkInAndSettle(
@@ -926,7 +926,7 @@ export default class BookingCtrl {
       if (attendee.booking.event?.organizerId !== req.user!.userId)
         return res.status(403).json({
           success: false,
-          message: "Unauthorized — you are not the host of this event",
+          message: "Unauthorized — you are not the organizer of this event",
         });
 
       if (attendee.checkedIn)
@@ -1011,7 +1011,7 @@ function notifyBookingCancelled(
       type: "BOOKING_CANCELLED",
       title: "Booking cancelled",
       message: `The booking for ${eventName} has been cancelled.`,
-      metadata: { link: `/host/bookings/${bookingId}` },
+      metadata: { link: `/booking/${bookingId}` },
     }).catch((e) => console.error("Failed to create host notification", e));
   }
 }

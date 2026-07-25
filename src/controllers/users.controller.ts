@@ -120,14 +120,14 @@ export default class UsersCtrl {
       const user = (await UsersSvc.becomeHost(userId)) as any;
       return res.status(200).json({
         success: true,
-        message: "You are now a host!",
+        message: "You are now an Event Foxer!",
         data: {
           id: user.id,
           email: user.email,
           username: user.username,
           name: user.name,
           role: user.systemRole,
-          isHost: (user.roleType as string[]).includes("host"),
+          isEventFoxer: (user.roleType as string[]).includes("eventFoxer"),
         },
       });
     } catch (err: any) {

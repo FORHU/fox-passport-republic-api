@@ -109,20 +109,31 @@ export default class VenueSvc {
     if (venue.status === VenueStatus.archived)
       throw new Error("Venue has been removed");
 
+    const { prisma } = await import("../utils/prisma");
     const { default: PassportSvc } = await import("./passport.service");
-    const [inclusions, [enriched], viewerHasVipAccess] = await Promise.all([
-      Promise.resolve(VenueSvc.computeInclusions(venue)),
-      PassportSvc.enrichWithOwnerBadge(
-        [venue],
-        ["mayor_verified", "city_badge"],
-        "mayorId",
-      ),
-      requesterId
-        ? PassportSvc.hasPerk(requesterId, "vip_lounge")
-        : Promise.resolve(false),
-    ]);
+    const [inclusions, [enriched], viewerHasVipAccess, ratingAgg] =
+      await Promise.all([
+        Promise.resolve(VenueSvc.computeInclusions(venue)),
+        PassportSvc.enrichWithOwnerBadge(
+          [venue],
+          ["mayor_verified", "city_badge"],
+          "mayorId",
+        ),
+        requesterId
+          ? PassportSvc.hasPerk(requesterId, "vip_lounge")
+          : Promise.resolve(false),
+        prisma.review.aggregate({
+          where: { entityId: id },
+          _avg: { rating: true },
+          _count: { id: true },
+        }),
+      ]);
 
-    return { ...enriched, inclusions, viewerHasVipAccess };
+    const averageRating =
+      Math.round((ratingAgg._avg.rating ?? 0) * 10) / 10;
+    const reviewCount = ratingAgg._count.id;
+
+    return { ...enriched, inclusions, viewerHasVipAccess, averageRating, reviewCount };
   }
 
   // Derives a displayable inclusions list from venue's structured arrays
@@ -254,5 +265,31 @@ export default class VenueSvc {
     }
 
     return VenueRepo.archiveVenue(id);
+  }
+
+  static async getOwnerStats(mayorId: string) {
+    const { prisma } = await import("../utils/prisma");
+
+    const venues = await prisma.venue.findMany({
+      where: { mayorId },
+      select: { id: true, status: true },
+    });
+
+    const venueIds = venues.map((v) => v.id);
+    const totalVenues = venues.length;
+    const activeListings = venues.filter(
+      (v) => v.status === VenueStatus.available
+    ).length;
+
+    let averageRating = 0;
+    if (venueIds.length > 0) {
+      const agg = await prisma.review.aggregate({
+        where: { entityId: { in: venueIds } },
+        _avg: { rating: true },
+      });
+      averageRating = Math.round((agg._avg.rating ?? 0) * 10) / 10;
+    }
+
+    return { totalVenues, activeListings, averageRating, totalRevenue: 0 };
   }
 }

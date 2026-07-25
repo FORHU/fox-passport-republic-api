@@ -54,7 +54,7 @@ export default class PassportCtrl {
       if (!hasHostSupport) {
         return res.status(403).json({
           success: false,
-          message: "Host Support perk required — unlock at Event Foxer Level 1",
+          message: "Creator Support perk required — unlock at Event Foxer Level 1",
         });
       }
       return res.status(200).json({
@@ -63,7 +63,7 @@ export default class PassportCtrl {
           email: "priority@foxpassport.com",
           whatsapp: "+63-900-FOX-HOST",
           responseTime: "Within 1 hour, 24/7",
-          note: "Exclusive to Event Foxers with Host Support perk",
+          note: "Exclusive to Event Foxers with Creator Support perk",
         },
       });
     } catch (err: any) {

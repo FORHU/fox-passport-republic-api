@@ -7,6 +7,10 @@ const router = express.Router();
 // Public routes
 router.get("/", VenueCtrl.getVenues);
 router.get("/catalog", VenueCtrl.getCatalog);
+
+// Authenticated owner routes (before /:id to avoid param collision)
+router.get("/owner-stats", authenticate, requireRole(["venueFoxer"]), VenueCtrl.getOwnerStats);
+
 router.get("/:id", VenueCtrl.getVenueById);
 
 // Protected routes
