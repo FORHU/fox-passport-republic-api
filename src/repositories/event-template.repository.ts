@@ -358,7 +358,7 @@ export default class EventTemplateRepo {
         }),
         status: VenueStatus.available,
       },
-      include: { mayor: { select: { id: true, name: true } }, images: true },
+      include: { venueFoxer: { select: { id: true, name: true } }, images: true },
       orderBy: { createdAt: "desc" },
     });
   }

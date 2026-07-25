@@ -1,4 +1,4 @@
-import {
+﻿import {
   PrismaClient,
   VenueStatus,
   BillingRate,
@@ -108,7 +108,7 @@ export async function seedPartners(prisma: PrismaClient) {
         id: "seed-venue-partner-rooftop-pasig",
         name: "Partner Sky Lounge",
         description: "Semi-enclosed rooftop lounge in Ortigas that opens to an observation deck with panoramic city views.",
-        category: VenueCategory.mix,
+        category: VenueCategory.other,
         capacity: 100,
         price: 28000,
         billingRate: BillingRate.daily,
@@ -148,7 +148,7 @@ export async function seedPartners(prisma: PrismaClient) {
         id: "seed-venue-partner-villa-tagaytay",
         name: "Partner Tagaytay Villa",
         description: "Scenic hillside villa overlooking Taal Lake, combining a cozy indoor sala with a wide garden lawn area.",
-        category: VenueCategory.mix,
+        category: VenueCategory.other,
         capacity: 150,
         price: 40000,
         billingRate: BillingRate.daily,
@@ -169,8 +169,8 @@ export async function seedPartners(prisma: PrismaClient) {
     for (const v of venues) {
       await prisma.venue.upsert({
         where: { id: v.id },
-        update: { ...v, mayorId: partner.id },
-        create: { ...v, mayorId: partner.id },
+        update: { ...v, venueFoxerId: partner.id },
+        create: { ...v, venueFoxerId: partner.id },
       });
       console.log(`✓ Seeded partner venue: ${v.name}`);
     }

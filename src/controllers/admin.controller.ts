@@ -337,22 +337,22 @@ export default class AdminCtrl {
       const venue = await prisma.venue.update({
         where: { id: req.params.id },
         data: { status: VenueStatus.available },
-        select: { id: true, mayorId: true },
+        select: { id: true, venueFoxerId: true },
       });
 
-      // Award mayor XP + City Builder badge (fire-and-forget)
+      // Award venueFoxer XP + City Builder badge (fire-and-forget)
       import("../services/passport.service")
         .then(async ({ default: PassportSvc, XP_REWARDS, UserPath }) => {
           await PassportSvc.awardXP(
-            venue.mayorId,
+            venue.venueFoxerId,
             UserPath.venueFoxer,
             XP_REWARDS.mayorVenueApproved,
           );
           const approvedCount = await prisma.venue.count({
-            where: { mayorId: venue.mayorId, status: VenueStatus.available },
+            where: { venueFoxerId: venue.venueFoxerId, status: VenueStatus.available },
           });
           if (approvedCount >= 3)
-            await PassportSvc.awardBadgeByName(venue.mayorId, "City Builder");
+            await PassportSvc.awardBadgeByName(venue.venueFoxerId, "City Builder");
         })
         .catch(() => {});
 

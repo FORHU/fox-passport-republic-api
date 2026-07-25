@@ -87,7 +87,7 @@ export default class EventTransactionSvc {
             eventId,
             bookingId,
             venueId: item.venueId!,
-            providerId: item.venue.mayorId,
+            providerId: item.venue.venueFoxerId,
             agreedPrice: item.venue.price,
             currency: item.currency,
             status: item.matched

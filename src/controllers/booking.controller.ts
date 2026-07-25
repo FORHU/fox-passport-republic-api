@@ -46,7 +46,7 @@ export default class BookingCtrl {
           templateServices: {
             include: { service: { include: { owner: true } } },
           },
-          templateVenues: { include: { venue: { include: { mayor: true } } } },
+          templateVenues: { include: { venue: { include: { venueFoxer: true } } } },
         },
       });
       if (!template)
@@ -140,14 +140,14 @@ export default class BookingCtrl {
         );
 
       const venueTxPromises = template.templateVenues
-        .filter((tv) => tv.venueId && tv.venue?.mayorId)
+        .filter((tv) => tv.venueId && tv.venue?.venueFoxerId)
         .map((tv) =>
           prisma.eventVenueTransaction.create({
             data: {
               eventId: event.id,
               bookingId: booking.id,
               venueId: tv.venueId!,
-              providerId: tv.venue!.mayorId,
+              providerId: tv.venue!.venueFoxerId,
               agreedPrice: tv.agreedPrice,
               included: !excludedVenueIds.includes(tv.id),
               status: tv.matched ? "approved" : "pending",
@@ -892,7 +892,7 @@ export default class BookingCtrl {
       });
     } catch (error: any) {
       const msg = error.message;
-      if (msg.includes("not the host"))
+      if (msg.includes("not the organizer"))
         return res.status(403).json({ success: false, message: msg });
       if (msg.includes("not confirmed/paid"))
         return res.status(400).json({ success: false, message: msg });

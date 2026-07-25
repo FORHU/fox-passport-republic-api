@@ -4,6 +4,14 @@ import { RoleType, RequestStatus } from "@prisma/client";
 import { prisma } from "../utils/prisma";
 import NotificationService from "../modules/notifications/user-notification.service";
 
+const ROLE_DISPLAY_NAMES: Record<string, string> = {
+  venueFoxer: 'Venue Foxer',
+  eventFoxer: 'Event Foxer',
+  gearFoxer: 'Gear Foxer',
+  serviceFoxer: 'Service Foxer',
+  investor: 'Investor',
+};
+
 export default class RoleRequestService {
   /**
    * Submit an application for a specific role
@@ -18,14 +26,14 @@ export default class RoleRequestService {
     if (!user) throw new Error("User not found");
 
     if (user.roleType.includes(roleType)) {
-      throw new Error(`User already has the ${roleType} role`);
+      throw new Error(`User already has the ${ROLE_DISPLAY_NAMES[roleType] ?? roleType} role`);
     }
 
     // 2. Check for existing pending application for this role
     const pending = await RoleRequestRepo.findPendingRequest(userId, roleType);
     if (pending) {
       throw new Error(
-        `An application for the ${roleType} role is already pending`,
+        `An application for the ${ROLE_DISPLAY_NAMES[roleType] ?? roleType} role is already pending`,
       );
     }
 
@@ -124,8 +132,8 @@ export default class RoleRequestService {
           : "Application rejected",
       message:
         status === RequestStatus.approved
-          ? `Your ${result.roleType} application has been approved!`
-          : `Your ${result.roleType} application was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`,
+          ? `Your ${ROLE_DISPLAY_NAMES[result.roleType] ?? result.roleType} application has been approved!`
+          : `Your ${ROLE_DISPLAY_NAMES[result.roleType] ?? result.roleType} application was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`,
       metadata: { requestId, roleType: result.roleType, status },
     });
 

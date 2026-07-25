@@ -668,7 +668,7 @@ export default class EventTemplateSvc {
               select: {
                 id: true,
                 name: true,
-                mayor: { select: { id: true, name: true, imgId: true } },
+                venueFoxer: { select: { id: true, name: true, imgId: true } },
               },
             },
           },
@@ -698,7 +698,7 @@ export default class EventTemplateSvc {
         ...t.templateVenues.map((v) => ({
           ...v,
           type: "venue" as const,
-          provider: v.venue?.mayor ?? null,
+          provider: v.venue?.venueFoxer ?? null,
           item: v.venue,
         })),
       ],
@@ -751,7 +751,7 @@ export default class EventTemplateSvc {
         },
       }),
       prisma.eventTemplateVenue.findMany({
-        where: { matched: true, venue: { mayorId: userId } },
+        where: { matched: true, venue: { venueFoxerId: userId } },
         select: {
           id: true,
           matchRequestStatus: true,
@@ -831,7 +831,7 @@ export default class EventTemplateSvc {
         where: { id: params.matchId },
         include: { venue: true },
       });
-      if (!row || row.venue?.mayorId !== params.responderId)
+      if (!row || row.venue?.venueFoxerId !== params.responderId)
         throw new Error("Not found or unauthorized");
       return prisma.eventTemplateVenue.update({
         where: { id: params.matchId },

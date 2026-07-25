@@ -1,5 +1,5 @@
 import VenueRepo from "../repositories/venue.repository";
-import { VenueStatus, BillingRate, VenueCategory } from "@prisma/client";
+import { VenueStatus, BillingRate, VenueCategory, TransactionStatus } from "@prisma/client";
 
 export default class VenueSvc {
   private static isAdminRole(role?: string) {
@@ -11,7 +11,7 @@ export default class VenueSvc {
   // ───────────────────────────────────────────────────────────
 
   static async createVenue(data: {
-    mayorId: string;
+    venueFoxerId: string;
     name: string;
     description: string;
     category: VenueCategory;
@@ -47,7 +47,7 @@ export default class VenueSvc {
     // venue_authority perk: skip the review queue and auto-approve
     const { default: PassportSvc } = await import("./passport.service");
     const hasVenueAuthority = await PassportSvc.hasPerk(
-      data.mayorId,
+      data.venueFoxerId,
       "venue_authority",
     );
 
@@ -71,7 +71,7 @@ export default class VenueSvc {
     import("./passport.service")
       .then(({ default: P, XP_REWARDS, UserPath }) => {
         return P.awardXP(
-          data.mayorId,
+          data.venueFoxerId,
           UserPath.venueFoxer,
           XP_REWARDS.uploadVenue,
         );
@@ -85,19 +85,19 @@ export default class VenueSvc {
   // READ — Delegate all queries to repository
   // ───────────────────────────────────────────────────────────
 
-  static async getVenues(filters?: { mayorId?: string; hostId?: string; page?: number; limit?: number }) {
+  static async getVenues(filters?: { venueFoxerId?: string; hostId?: string; page?: number; limit?: number }) {
     const { venues, total } = await VenueRepo.findAllVenues(filters);
     const { default: PassportSvc } = await import("./passport.service");
     const sorted = await PassportSvc.sortByFeaturedPerk(
       venues,
       "venue_spotlight",
-      "mayorId",
+      "venueFoxerId",
     );
     // Add city_badge / mayor_verified badge for each venue owner
     const enriched = await PassportSvc.enrichWithOwnerBadge(
       sorted,
       ["mayor_verified", "city_badge"],
-      "mayorId",
+      "venueFoxerId",
     );
     return { venues: enriched, total };
   }
@@ -117,7 +117,7 @@ export default class VenueSvc {
         PassportSvc.enrichWithOwnerBadge(
           [venue],
           ["mayor_verified", "city_badge"],
-          "mayorId",
+          "venueFoxerId",
         ),
         requesterId
           ? PassportSvc.hasPerk(requesterId, "vip_lounge")
@@ -194,9 +194,9 @@ export default class VenueSvc {
     return items;
   }
 
-  static async getVenueByIdForMayor(id: string, mayorId: string) {
+  static async getVenueByIdForMayor(id: string, venueFoxerId: string) {
     // Mayor can see their own venues regardless of status
-    const venue = await VenueRepo.findVenueByIdAndOwner(id, mayorId);
+    const venue = await VenueRepo.findVenueByIdAndOwner(id, venueFoxerId);
     if (!venue) {
       throw new Error("Venue not found or access denied");
     }
@@ -233,7 +233,7 @@ export default class VenueSvc {
     if (!venue) throw new Error("Venue not found");
 
     const isAdmin = this.isAdminRole(requesterRole);
-    if (!isAdmin && venue.mayorId !== requesterId) {
+    if (!isAdmin && venue.venueFoxerId !== requesterId) {
       throw new Error("Unauthorized");
     }
 
@@ -260,18 +260,18 @@ export default class VenueSvc {
     if (!venue) throw new Error("Venue not found");
 
     const isAdmin = this.isAdminRole(requesterRole);
-    if (!isAdmin && venue.mayorId !== requesterId) {
+    if (!isAdmin && venue.venueFoxerId !== requesterId) {
       throw new Error("Unauthorized");
     }
 
     return VenueRepo.archiveVenue(id);
   }
 
-  static async getOwnerStats(mayorId: string) {
+  static async getOwnerStats(venueFoxerId: string) {
     const { prisma } = await import("../utils/prisma");
 
     const venues = await prisma.venue.findMany({
-      where: { mayorId },
+      where: { venueFoxerId },
       select: { id: true, status: true },
     });
 
@@ -290,6 +290,15 @@ export default class VenueSvc {
       averageRating = Math.round((agg._avg.rating ?? 0) * 10) / 10;
     }
 
-    return { totalVenues, activeListings, averageRating, totalRevenue: 0 };
+    let totalRevenue = 0;
+    if (venueIds.length > 0) {
+      const revenueAgg = await prisma.eventVenueTransaction.aggregate({
+        where: { venueId: { in: venueIds }, status: TransactionStatus.approved },
+        _sum: { agreedPrice: true },
+      });
+      totalRevenue = revenueAgg._sum.agreedPrice ?? 0;
+    }
+
+    return { totalVenues, activeListings, averageRating, totalRevenue };
   }
 }

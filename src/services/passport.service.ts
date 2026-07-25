@@ -185,7 +185,7 @@ export default class PassportSvc {
           () => {},
         );
       if (prevLevel < 18 && level >= 18)
-        PassportSvc.awardBadgeByName(userId, "Grand Mayor").catch(() => {});
+        PassportSvc.awardBadgeByName(userId, "Grand Foxer").catch(() => {});
     }
 
     return { level, currentXP, requiredXP, totalXP: newTotalXP };

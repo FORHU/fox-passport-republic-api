@@ -1,13 +1,13 @@
 import { prisma } from "../utils/prisma";
 import { VenueStatus, BillingRate, VenueCategory } from "@prisma/client";
 
-const mayorSelect = {
+const ownerSelect = {
   select: { id: true, name: true, email: true, imgId: true },
 } as const;
 
 export default class VenueRepo {
   static async createVenue(data: {
-    mayorId: string;
+    venueFoxerId: string;
     name: string;
     description: string;
     category: VenueCategory;
@@ -35,7 +35,7 @@ export default class VenueRepo {
             images: { connect: imgIds.map((id) => ({ id })) },
           }),
       },
-      include: { mayor: mayorSelect, images: true },
+      include: { venueFoxer: ownerSelect, images: true },
     });
   }
 
@@ -44,7 +44,7 @@ export default class VenueRepo {
       where: { id },
       include: {
         images: true,
-        mayor: {
+        venueFoxer: {
           select: {
             id: true,
             name: true,
@@ -57,27 +57,24 @@ export default class VenueRepo {
     });
   }
 
-  // NOTE: `hostId` is accepted as a deprecated alias for `mayorId` so the frontend's
-  // existing `?hostId=` query param keeps working unmodified during the transition
-  // (Venues are created by Mayors, not Hosts — `hostId` was a naming holdover. See
-  // CONTEXT.md "Mayor"). Remove the alias once the frontend is updated to send `mayorId`.
+  // NOTE: `hostId` and `mayorId` are accepted as deprecated aliases for `venueFoxerId`
+  // so existing query params keep working during the transition.
   static async findAllVenues(filters?: {
+    venueFoxerId?: string;
     mayorId?: string;
     hostId?: string;
     status?: VenueStatus;
     page?: number;
     limit?: number;
   }) {
-    const mayorId = filters?.mayorId ?? filters?.hostId;
+    const venueFoxerId = filters?.venueFoxerId ?? filters?.mayorId ?? filters?.hostId;
     const page = filters?.page ?? 1;
     const limit = filters?.limit ?? 50;
     const skip = (page - 1) * limit;
 
     const where = {
-      ...(mayorId ? { mayorId } : {}),
-      // Public browse (no mayorId) → only available venues by default
-      // Mayor viewing own venues (with mayorId) → all statuses unless a specific status is passed
-      ...(mayorId
+      ...(venueFoxerId ? { venueFoxerId } : {}),
+      ...(venueFoxerId
         ? filters?.status ? { status: filters.status } : {}
         : { status: filters?.status ?? VenueStatus.available }),
     };
@@ -86,7 +83,7 @@ export default class VenueRepo {
       prisma.venue.findMany({
         where,
         orderBy: { createdAt: "desc" },
-        include: { mayor: mayorSelect, images: true },
+        include: { venueFoxer: ownerSelect, images: true },
         skip,
         take: limit,
       }),
@@ -97,25 +94,26 @@ export default class VenueRepo {
   }
 
   static async findAllVenuesAdmin(filters?: {
+    venueFoxerId?: string;
     mayorId?: string;
     hostId?: string;
     status?: VenueStatus;
   }) {
-    const mayorId = filters?.mayorId ?? filters?.hostId;
+    const venueFoxerId = filters?.venueFoxerId ?? filters?.mayorId ?? filters?.hostId;
     return prisma.venue.findMany({
       where: {
-        ...(mayorId ? { mayorId } : {}),
+        ...(venueFoxerId ? { venueFoxerId } : {}),
         ...(filters?.status ? { status: filters.status } : {}),
       },
       orderBy: { createdAt: "desc" },
-      include: { mayor: mayorSelect, images: true },
+      include: { venueFoxer: ownerSelect, images: true },
     });
   }
 
-  static async findVenueByIdAndOwner(id: string, mayorId: string) {
+  static async findVenueByIdAndOwner(id: string, venueFoxerId: string) {
     return prisma.venue.findFirst({
-      where: { id: String(id), mayorId: String(mayorId) },
-      include: { mayor: mayorSelect, images: true },
+      where: { id: String(id), venueFoxerId: String(venueFoxerId) },
+      include: { venueFoxer: ownerSelect, images: true },
     });
   }
 
@@ -154,7 +152,7 @@ export default class VenueRepo {
           images: { set: imgIds.map((fid) => ({ id: fid })) },
         }),
       },
-      include: { mayor: mayorSelect, images: true },
+      include: { venueFoxer: ownerSelect, images: true },
     });
   }
 

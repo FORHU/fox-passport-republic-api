@@ -16,7 +16,7 @@ export default class BookingSvc {
     if (venueId && !eventId) {
       const venue = await prisma.venue.findUnique({
         where: { id: venueId },
-        include: { mayor: true },
+        include: { venueFoxer: true },
       });
       if (!venue) throw new Error("Venue not found");
 
@@ -46,7 +46,7 @@ export default class BookingSvc {
       const event = await prisma.event.create({
         data: {
           clientId: userId,
-          organizerId: venue.mayorId,
+          organizerId: venue.venueFoxerId,
           name: `${venue.name} Booking`,
           description: venue.description,
           eventCategory: "other" as any,
@@ -70,7 +70,7 @@ export default class BookingSvc {
         data: {
           eventId: event.id,
           venueId: venue.id,
-          providerId: venue.mayorId,
+          providerId: venue.venueFoxerId,
           agreedPrice: itemsTotal,
           status: "pending",
           currency: "PHP",
@@ -368,7 +368,7 @@ export default class BookingSvc {
 
     const organizerId = (booking.event as any)?.organizerId;
     if (organizerId !== hostId) {
-      throw new Error("Unauthorized — you are not the host of this event");
+      throw new Error("Unauthorized — you are not the organizer of this event");
     }
 
     // Don't release a payout for an unpaid/cancelled booking.

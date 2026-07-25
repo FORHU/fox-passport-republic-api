@@ -58,18 +58,11 @@ const BULK_ASSET_NAMES: Partial<Record<AssetCategory, { name: string; desc: stri
 
 const ASSET_CATEGORIES = [AssetCategory.sound_system, AssetCategory.decorations, AssetCategory.furnitures, AssetCategory.equipment, AssetCategory.other] as const;
 
-const COVER_URLS: Partial<Record<AssetCategory, string>> = {
+const COVER_URLS: Record<AssetCategory, string> = {
   [AssetCategory.sound_system]:  "https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&auto=format&fit=crop",
   [AssetCategory.decorations]:   "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=800&auto=format&fit=crop",
-  [AssetCategory.furnitures]:    "https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=800&auto=format&fit=crop",
+  [AssetCategory.furnitures]:    "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&auto=format&fit=crop",
   [AssetCategory.equipment]:     "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=800&auto=format&fit=crop",
-  [AssetCategory.other]:         "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop",
-};
-
-const COVER_URLS: Record<AssetCategory, string> = {
-  [AssetCategory.sound_system]: "https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&auto=format&fit=crop",
-  [AssetCategory.decorations]:  "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=800&auto=format&fit=crop",
-  [AssetCategory.furnitures]:   "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&auto=format&fit=crop",
   [AssetCategory.other]:         "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop",
 };
 

@@ -1,4 +1,4 @@
-import { PrismaClient, VenueStatus, BillingRate, VenueCategory } from "@prisma/client";
+﻿import { PrismaClient, VenueStatus, BillingRate, VenueCategory } from "@prisma/client";
 
 const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
   "Manila":          { lat: 14.5995, lng: 120.9842 },
@@ -53,7 +53,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
     }
     const venues = [
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Grand Palace Hall",
         description: "A luxury hall for large events and grand celebrations.",
         category: VenueCategory.indoor,
@@ -72,7 +72,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no smoking", "no outside food", "venue hours 6am-12am"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "The Loft BGC",
         description: "Trendy rooftop loft in the heart of Bonifacio Global City.",
         category: VenueCategory.indoor,
@@ -91,7 +91,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no outside alcohol", "venue hours 10am-2am"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Skyline Function Hall Cebu",
         description: "Modern events hall with panoramic city views in Cebu Business Park.",
         category: VenueCategory.indoor,
@@ -110,7 +110,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no outside food", "venue hours 7am-12am"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Summit Corporate Center",
         description: "Sleek professional business center designed for premium conferences and corporate networking events.",
         category: VenueCategory.indoor,
@@ -129,7 +129,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["corporate attire required", "no loud music"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Metropolitan Theater Studio",
         description: "Art-deco inspired multi-purpose indoor studio optimized for rehearsals, intimate plays, and gallery viewings.",
         category: VenueCategory.indoor,
@@ -148,7 +148,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no heavy props without notice", "clean as you go"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "The Emerald Conservatory",
         description: "Glass-walled indoor oasis surrounded by exotic flora, providing a refreshing botanical ambiance.",
         category: VenueCategory.indoor,
@@ -167,7 +167,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no picking of flowers", "caterer registration required"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Legacy Grand Ballroom",
         description: "Opulent ballroom adorned with crystal chandeliers, perfect for grand debut celebrations and awards nights.",
         category: VenueCategory.indoor,
@@ -186,7 +186,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no firecrackers", "corkage fees apply for outside liquor"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Vantage Point Boardroom",
         description: "High-end boardroom setup providing complete privacy for high-level executive panel discussions.",
         category: VenueCategory.indoor,
@@ -205,7 +205,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["confidentiality respected", "strictly no smoking"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Nexus Esports Arena",
         description: "High-tech indoor arena engineered specifically for competitive gaming tournaments and tech product launches.",
         category: VenueCategory.indoor,
@@ -224,7 +224,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no outside beverages on gaming floor", "venue hours 9am-2am"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Brickworks Heritage Hall",
         description: "Charming refurbished historical space featuring exposed brick structures for rustic internal socials.",
         category: VenueCategory.indoor,
@@ -243,7 +243,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no tape or nails on historic brick walls"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Casa Veranda Tagaytay",
         description: "Scenic hillside events venue overlooking Taal Lake.",
         category: VenueCategory.outdoor,
@@ -262,7 +262,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no confetti", "venue hours 8am-10pm"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "The Ridge Amphitheater",
         description: "Stunning stone tier open-air amphitheater perfect for dramatic sunset weddings and concerts.",
         category: VenueCategory.outdoor,
@@ -281,7 +281,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["noise level monitoring after 10pm", "boho decor allowed"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Skyline Overlook Terrace",
         description: "Spacious open concrete deck providing unobstructed view of the metropolitan skyline.",
         category: VenueCategory.outdoor,
@@ -300,7 +300,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no climbing on perimeter railings", "event hours 4pm-12am"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Vista Green Golf Meadows",
         description: "Manicured expansive fairway grass meadow available for large corporate team building activities.",
         category: VenueCategory.outdoor,
@@ -319,7 +319,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no driving vehicles on grass", "clean up mandatory"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Aero View Canopy Plaza",
         description: "Modern hardscape pavilion beneath high structural sails, shielding guests while preserving fresh airflow.",
         category: VenueCategory.outdoor,
@@ -338,7 +338,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no hanging heavy weights from canopy frame"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Horizon Farmstead Orchard",
         description: "Idyllic country setting featuring rustic pathways and organic fruit orchards for peaceful daytime socials.",
         category: VenueCategory.outdoor,
@@ -357,7 +357,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["strictly zero plastic waste left behind", "daytime bookings only"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Canyon View Lakeside Deck",
         description: "Stunning timber floating deck suspended over an inland quarry lake, presenting a dramatic backdrop.",
         category: VenueCategory.outdoor,
@@ -376,7 +376,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["maximum weight limit enforced", "adult events only"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "The Quarry Rock Plaza",
         description: "Rugged stone clearing nestled against dramatic carved cliffs, offering a distinct dramatic visual theme.",
         category: VenueCategory.outdoor,
@@ -395,7 +395,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["hard hats required during setup near rockface"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Serenity Coastal Pier",
         description: "Elegant wooden boardwalk extending out into the calm ocean, designed for memorable pre-wedding ceremonies.",
         category: VenueCategory.outdoor,
@@ -414,7 +414,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["subject to weather cancellation policies", "no fishing"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Highland Pine Crest Lawn",
         description: "Cool mountain meadow lined with fully mature pine trees, ideal for natural crisp styling themes.",
         category: VenueCategory.outdoor,
@@ -433,10 +433,10 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no bonfires outside designated pits", "hours 8am-8pm"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Pinecrest Mountain Estate",
         description: "A gorgeous mix of pine-covered outdoor lawns and a cozy indoor rustic glasshouse.",
-        category: VenueCategory.mix,
+        category: VenueCategory.other,
         capacity: 180,
         price: 40000,
         billingRate: BillingRate.daily,
@@ -452,10 +452,10 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no open flames indoor", "venue hours 8am-11pm"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "The Lakeshore Pavilion",
         description: "A scenic lakeside escape featuring a spacious air-conditioned pavilion alongside a beautiful open-air pier deck.",
-        category: VenueCategory.mix,
+        category: VenueCategory.other,
         capacity: 250,
         price: 42000,
         billingRate: BillingRate.daily,
@@ -471,10 +471,10 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no fishing in the lake", "venue hours 8am-11pm"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Solana Estate",
         description: "Transition seamlessly from a sophisticated white grand marquee to an elegant manicured outdoor patio pool.",
-        category: VenueCategory.mix,
+        category: VenueCategory.other,
         capacity: 350,
         price: 55000,
         billingRate: BillingRate.daily,
@@ -490,10 +490,10 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["caterer must use protective ground mats"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "The Glass Mansion Cavite",
         description: "Magnificent air-conditioned glass hall structure nestled within completely private forest greenery.",
-        category: VenueCategory.mix,
+        category: VenueCategory.other,
         capacity: 300,
         price: 48000,
         billingRate: BillingRate.daily,
@@ -509,10 +509,10 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no high-powered lasers directed outside"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Bella Vista Ranch",
         description: "Charming blend of a wide open pasture lawn alongside a massive exposed-beam timber barn structure.",
-        category: VenueCategory.mix,
+        category: VenueCategory.other,
         capacity: 400,
         price: 52000,
         billingRate: BillingRate.daily,
@@ -528,10 +528,10 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no smoking inside timber barn"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Aura Rooftop Lounge",
         description: "Sleek glass enclosed sky lounge that steps out directly into an open sky observation deck.",
-        category: VenueCategory.mix,
+        category: VenueCategory.other,
         capacity: 150,
         price: 38000,
         billingRate: BillingRate.daily,
@@ -547,10 +547,10 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["dress code enforced", "no outside catering"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Riverstone Courtyard",
         description: "Beautiful stone courtyard layout integrated with an indoor historical industrial stone cellar room.",
-        category: VenueCategory.mix,
+        category: VenueCategory.other,
         capacity: 100,
         price: 26000,
         billingRate: BillingRate.daily,
@@ -566,10 +566,10 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["music volume reduction after 11pm"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "La Terraza Marikina",
         description: "Classic Spanish-Filipino heritage house layout boasting internal historic salons and wide tiled exterior courtyards.",
-        category: VenueCategory.mix,
+        category: VenueCategory.other,
         capacity: 220,
         price: 34000,
         billingRate: BillingRate.daily,
@@ -585,10 +585,10 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no alterations or tape on historical wood carvings"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Verdant Horizon Pavilion",
         description: "Semi-open permanent pavilion structural framework backing straight into tiered landscape hillside grass steps.",
-        category: VenueCategory.mix,
+        category: VenueCategory.other,
         capacity: 280,
         price: 43000,
         billingRate: BillingRate.daily,
@@ -604,10 +604,10 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["rain contingency canvas tents available for hire"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "The Warehouse Marquee",
         description: "Raw industrial bare metal warehouse warehouse linking to an adjacent grass clearing for versatile styling options.",
-        category: VenueCategory.mix,
+        category: VenueCategory.other,
         capacity: 500,
         price: 49000,
         billingRate: BillingRate.daily,
@@ -623,7 +623,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["diy setups allowed", "waste removal fee applies"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "The Grand Plaza Ballroom",
         description: "Five-star hotel ballroom with high-end luxury finishes and chandeliers.",
         category: VenueCategory.hotel,
@@ -642,7 +642,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["strict dress code", "no pet access", "venue hours 9am-12am"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Vista Deck Infinity Pool",
         description: "An exclusive hotel deck with an infinity pool overlooking the city skyline.",
         category: VenueCategory.hotel,
@@ -661,7 +661,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no glass bottles around pool", "venue hours 2am wrap-up"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Regency Sky Salon",
         description: "Bespoke executive boardroom lounge located on the penthouse floor of a world-class luxury hotel brand.",
         category: VenueCategory.hotel,
@@ -680,7 +680,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["exclusively internal high-end catering packages only"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "The Heritage Atrium",
         description: "Historic style central open-roof atrium enclosed by luxury colonial suites and premium restaurant arches.",
         category: VenueCategory.hotel,
@@ -699,7 +699,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no high-decibel audio past 10pm"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Aparri Horizon Hall",
         description: "Modern seaside resort hotel event center boasting glass front doors displaying northern wave crests.",
         category: VenueCategory.hotel,
@@ -718,7 +718,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["room package bundles available"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Centennial Crown Pavilion",
         description: "Vast standalone dome pavilion building located within premier central economic luxury hotel grounds.",
         category: VenueCategory.hotel,
@@ -737,7 +737,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["strict contractor setup regulations apply"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Palawan Oasis Boardroom Suite",
         description: "Eco-luxury hotel conference workspace constructed completely out of high-grade local native hardwoods.",
         category: VenueCategory.hotel,
@@ -756,7 +756,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["zero eco footprint guidelines must be respected"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "The Sapphire Lounge Deck",
         description: "Elevated pool deck level lounge looking out to scenic views, ideal for premier cocktail mixers.",
         category: VenueCategory.hotel,
@@ -775,7 +775,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no outside catering or liquor brought internally"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Crown Plaza Skyline Salon",
         description: "Contemporary elevated hall offering unobstructed views through floor to ceiling panoramic windows.",
         category: VenueCategory.hotel,
@@ -794,7 +794,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["decor installations require advance site review"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Starlight Garden Courtyard Hotel",
         description: "Manicured interior garden courtyard layout bordered by clean modern colonial balcony guest corridors.",
         category: VenueCategory.hotel,
@@ -813,7 +813,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["curfew for high noise volumes enforced by 10pm"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Boracay Beach Resort",
         description: "Stunning beachfront venue with panoramic ocean views.",
         category: VenueCategory.beach_resort,
@@ -832,7 +832,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no glass on beach", "no smoking in rooms"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Siargao Surf Pavilion",
         description: "Thatch-roofed premium open wooden pavilion stepping directly onto the pristine white sand surf coast lines.",
         category: VenueCategory.beach_resort,
@@ -851,7 +851,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["strict ecological trash sorting protocols enforced"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Pearl Farm Beach Cove",
         description: "Exclusive luxury private cove sanctuary bordered by tranquil clear blue southern waters.",
         category: VenueCategory.beach_resort,
@@ -870,7 +870,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["boat transfers must be booked in advance"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "El Nido Limestone Shore",
         description: "Dramatically beautiful beach footprint set between monolithic ocean limestone cliffs.",
         category: VenueCategory.beach_resort,
@@ -889,7 +889,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["strictly zero plastic permitted on coastal sand grounds"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Panglao Azure Reef Resort",
         description: "Expansive modern terrace boardwalk platform bordering pristine tropical palm tree arrays.",
         category: VenueCategory.beach_resort,
@@ -908,7 +908,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["caterer clean up operations must end by 1am"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Nasugbu Sunset Sands",
         description: "Wide beach plain property presenting completely unobstructed west views of open golden sunsets.",
         category: VenueCategory.beach_resort,
@@ -927,7 +927,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no loud speakers after midnight"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "San Juan Surfside Deck",
         description: "Rustic wooden beach elevated terrace overview matching the casual vibrant atmosphere of surf districts.",
         category: VenueCategory.beach_resort,
@@ -946,7 +946,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["outside alcohol demands flat corkage fee payments"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Zambales Pine-Sand Shore",
         description: "Unique shoreline location where coastal pine forests reach directly down onto natural grey sand shores.",
         category: VenueCategory.beach_resort,
@@ -965,7 +965,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no open fires outside designated sand trenches"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Pagudpud Emerald Sands",
         description: "Quiet northern beach location boasting beautiful turquoise waters and fine white sands.",
         category: VenueCategory.beach_resort,
@@ -984,7 +984,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["protection rules for local coastal plants apply"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Caramoan Hidden Lagoon Resort",
         description: "Premium island getaway venue offering complete privacy surrounded by unique jagged limestone rocks.",
         category: VenueCategory.beach_resort,
@@ -1003,7 +1003,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["all logistical materials must arrive via authorized water vessels"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Garden Gazebo",
         description: "A beautiful outdoor garden space perfect for intimate gatherings.",
         category: VenueCategory.garden,
@@ -1022,7 +1022,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no smoking", "venue hours 7am-10pm"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Orchid Heritage Gardens",
         description: "Classic old Manila style manicured estate grounds featuring vast vine archways and water structures.",
         category: VenueCategory.garden,
@@ -1041,7 +1041,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no picking of rare orchid varieties"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "The Rosewood Grass Lawn",
         description: "Spacious flat bermuda grass lawn fully surrounded by beautifully sculpted hedges.",
         category: VenueCategory.garden,
@@ -1060,7 +1060,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["tent weights must use sandbags rather than driving lawn stakes"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Highland Eden Sanctuary",
         description: "Cool mountain hillside terraced garden landscape displaying extensive arrays of colorful northern blooms.",
         category: VenueCategory.garden,
@@ -1079,7 +1079,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["event load out operations must conclude by 9pm due to local residential codes"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Lotus Pond Zen Retreat",
         description: "Tranquil asian-inspired courtyard garden built around wide natural lotus water features.",
         category: VenueCategory.garden,
@@ -1098,7 +1098,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no stepping onto delicate pond rock lips"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "The Secret English Garden",
         description: "Charming stone-walled garden path maze bursting with colorful climbing white roses.",
         category: VenueCategory.garden,
@@ -1117,7 +1117,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no hard structure alterations permitted on old brick perimeter lines"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Monet's Meadow Park",
         description: "Rustic country garden featuring wild French wildflower patches and beautiful weeping willow trees.",
         category: VenueCategory.garden,
@@ -1136,7 +1136,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["biodegradable wedding confetti options only"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "The Olive Grove Lawn",
         description: "Unique Mediterranean style garden plot lined with fully mature oil-producing silver olive trees.",
         category: VenueCategory.garden,
@@ -1155,7 +1155,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no open heating equipment placed beneath lower low tree branches"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Sunflower Valley Fields",
         description: "Expansive dynamic event property highlighting bright tall seasonal sunflower plantations.",
         category: VenueCategory.garden,
@@ -1174,7 +1174,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["daytime function parameters apply exclusively"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Whispering Palms Oasis Garden",
         description: "Beautiful tropical layout rich in broad-leaf local foliage options and tall palm arrays.",
         category: VenueCategory.garden,
@@ -1193,7 +1193,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["sound amplification must conclude by 11pm sharp"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Industrial Hangar Studio",
         description: "An expansive raw warehouse space perfect for rave parties, art galleries, and concerts.",
         category: VenueCategory.other,
@@ -1212,7 +1212,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["outside catering allowed", "loud volume permitted", "venue hours 24/7"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Lio Beach Eco-Hangar",
         description: "An open-air, sustainable bamboo architectural wonder designed for premium eco-weddings and cultural exhibits.",
         category: VenueCategory.other,
@@ -1231,7 +1231,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["strict zero-plastic policy", "biodegradable confetti only", "venue hours 9am-10pm"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "The Subterranean Wine Cave",
         description: "Unique underground carved stone vault workspace providing distinct natural cool climate settings.",
         category: VenueCategory.other,
@@ -1250,7 +1250,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["strictly over 18 years old allowed entry", "no high heat cooking appliances"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Abandoned Quarry Arena",
         description: "Vast open excavated excavation plot configured specifically for automotive drift matches and extreme sports.",
         category: VenueCategory.other,
@@ -1269,7 +1269,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["strict safety sign-offs required for all track activities"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Vintage Train Depot Station",
         description: "Restored brick train station terminal matching historical layouts, giving rich cinematic retro styling tones.",
         category: VenueCategory.other,
@@ -1288,7 +1288,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no track access beyond designated exhibition perimeter lines"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Floating Mangrove Base",
         description: "Eco-conscious wooden platform node constructed gently above shallow tidal mangrove estuary waterways.",
         category: VenueCategory.other,
@@ -1307,7 +1307,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["strictly zero chemical waste discharges allowed into surrounding waters"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "The Neon Glass Hangar",
         description: "Ultra-modern transparent acrylic hangar warehouse building complete with integrated wall programmable neon strip arrays.",
         category: VenueCategory.other,
@@ -1326,7 +1326,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no external modifications to acrylic panels"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Mountaintop Observatory Deck",
         description: "High elevation concrete helipad space repurposed for clear open air astronomy viewing gatherings.",
         category: VenueCategory.other,
@@ -1345,7 +1345,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no powerful floodlights permitted during star telescope viewing blocks"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Old Convent Crypt Vault",
         description: "Historic masonry underground chambers matching gothic design signatures, useful for dramatic art themes.",
         category: VenueCategory.other,
@@ -1364,7 +1364,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         policies: ["no open smoke or fog machine devices within fragile structure layers"],
       },
       {
-        mayorId: host.id,
+        venueFoxerId: host.id,
         name: "Industrial Rooftop Water Tower Deck",
         description: "Raw open-air steel structural deck situated beneath a historic skyline landmark water tower landmark.",
         category: VenueCategory.other,
@@ -1386,7 +1386,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
 
     for (const v of venues) {
       const venueId = `seed-venue-${v.name.trim().toLowerCase().replace(/\s+/g, '-')}`;
-      const { mayorId, ...venueData } = v as any;
+      const { venueFoxerId, ...venueData } = v as any;
       const coords = CITY_COORDS[venueData.city] ?? {};
 
       await prisma.venue.upsert({
@@ -1394,13 +1394,13 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         update: {
           ...venueData,
           ...coords,
-          mayorId: executionHost.id // Use the resolved executionHost instance
+          venueFoxerId: executionHost.id // Use the resolved executionHost instance
         },
         create: {
           id: venueId,
           ...venueData,
           ...coords,
-          mayorId: executionHost.id
+          venueFoxerId: executionHost.id
         },
       });
       console.log(`✓ Seeded venue: ${v.name}`);
@@ -1454,7 +1454,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
           id: "seed-venue-reyes-rooftop-pasig",
           name: "Reyes Rooftop Pasig",
           description: "Open-air rooftop lounge with stunning Ortigas skyline views.",
-          category: VenueCategory.mix,
+          category: VenueCategory.other,
           capacity: 100,
           price: 22000,
           billingRate: BillingRate.daily,
@@ -1474,8 +1474,8 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
       for (const rv of reyesVenues) {
         await prisma.venue.upsert({
           where: { id: rv.id },
-          update: { ...rv, mayorId: hostReyes.id },
-          create: { ...rv, mayorId: hostReyes.id },
+          update: { ...rv, venueFoxerId: hostReyes.id },
+          create: { ...rv, venueFoxerId: hostReyes.id },
         });
         console.log(`✓ Seeded Host Reyes venue: ${rv.name}`);
       }

@@ -373,7 +373,7 @@ model Service {
 
 model Venue {
   id             String                  @id @default(uuid())
-  mayorId        String
+  venueFoxerId   String
   category       String
   name           String
   description    String
@@ -398,7 +398,7 @@ model Venue {
   transactions   EventVenueTransaction[]
   images         File[]
   templateVenues EventTemplateVenue[]
-  mayor          User                    @relation(fields: [mayorId], references: [id], onDelete: Cascade)
+  venueFoxer     User                    @relation(fields: [venueFoxerId], references: [id], onDelete: Cascade)
   cancellationPolicyId      String?
   cancellationPolicy  CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id])
 

@@ -44,13 +44,12 @@ export default class VenueCtrl {
     }
 
     try {
-      // mayorId comes from the authenticated user's JWT token
-      const mayorId = (req as any).user?.userId;
-      if (!mayorId) {
+      const venueFoxerId = (req as any).user?.userId;
+      if (!venueFoxerId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const venueData = { ...value, mayorId };
+      const venueData = { ...value, venueFoxerId };
       const venue = await VenueSvc.createVenue(venueData as any);
       return res
         .status(201)
@@ -61,13 +60,13 @@ export default class VenueCtrl {
   }
 
   // READ Venues Controller with optional query parameters for filtering
-  // `hostId` accepted as a deprecated alias for `mayorId` (see venue.repository.ts)
+  // `mayorId` and `hostId` accepted as deprecated aliases for `venueFoxerId`
   static async getVenues(req: Request, res: Response) {
     try {
-      const { mayorId: _mayorId, hostId, page, limit } = req.query;
-      const mayorId = (_mayorId ?? hostId) as string | undefined;
+      const { venueFoxerId: _vfId, mayorId: _mayorId, hostId, page, limit } = req.query;
+      const venueFoxerId = (_vfId ?? _mayorId ?? hostId) as string | undefined;
       const { venues, total } = await VenueSvc.getVenues({
-        ...(mayorId && { mayorId }),
+        ...(venueFoxerId && { venueFoxerId }),
         page: page ? Number(page) : undefined,
         limit: limit ? Math.min(Number(limit), 50) : undefined,
       });
@@ -190,11 +189,11 @@ export default class VenueCtrl {
       try {
         const full = await prisma.venue.findUnique({
           where: { id: venue.id },
-          include: { mayor: { select: { email: true, name: true } } },
+          include: { venueFoxer: { select: { email: true, name: true } } },
         });
-        if (full?.mayor?.email) {
+        if (full?.venueFoxer?.email) {
           sendApprovedEmail({
-            to: full.mayor.email,
+            to: full.venueFoxer.email,
             entityName: full.name,
             entityType: "Venue",
           });
@@ -233,11 +232,11 @@ export default class VenueCtrl {
       try {
         const full = await prisma.venue.findUnique({
           where: { id: venue.id },
-          include: { mayor: { select: { email: true, name: true } } },
+          include: { venueFoxer: { select: { email: true, name: true } } },
         });
-        if (full?.mayor?.email) {
+        if (full?.venueFoxer?.email) {
           sendRejectedEmail({
-            to: full.mayor.email,
+            to: full.venueFoxer.email,
             entityName: full.name,
             entityType: "Venue",
             reason,
@@ -257,9 +256,9 @@ export default class VenueCtrl {
 
   static async getOwnerStats(req: Request, res: Response) {
     try {
-      const mayorId = (req as any).user?.userId;
-      if (!mayorId) return res.status(401).json({ message: "Unauthorized" });
-      const stats = await VenueSvc.getOwnerStats(String(mayorId));
+      const venueFoxerId = (req as any).user?.userId;
+      if (!venueFoxerId) return res.status(401).json({ message: "Unauthorized" });
+      const stats = await VenueSvc.getOwnerStats(String(venueFoxerId));
       return res.status(200).json(stats);
     } catch (error: any) {
       return res.status(500).json({ message: error.message || error });

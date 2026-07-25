@@ -8,7 +8,7 @@ const badges = [
   { name: "First Review",       description: "Left your first event review",                   icon: "reviews",            color: "#3b82f6", rarity: BadgeRarity.Common,    path: UserPath.user,     criteria: "reviews:1" },
   { name: "Trendsetter",        description: "Your event went viral",                          icon: "trending_up",        color: "#f59e0b", rarity: BadgeRarity.Legendary, path: UserPath.gearFoxer,    criteria: null },
   { name: "Culture Vulture",    description: "Attended 20+ cultural events",                   icon: "palette",            color: "#ec4899", rarity: BadgeRarity.Epic,      path: UserPath.user,         criteria: "cultural_events:20" },
-  { name: "Host Master",        description: "Hosted 50+ successful events",                   icon: "workspace_premium",  color: "#f59e0b", rarity: BadgeRarity.Legendary, path: UserPath.eventFoxer,   criteria: "hosted_events:50" },
+  { name: "Event Master",       description: "Created 50+ successful events",                   icon: "workspace_premium",  color: "#f59e0b", rarity: BadgeRarity.Legendary, path: UserPath.eventFoxer,   criteria: "hosted_events:50" },
   { name: "Social Butterfly",   description: "Connected with 100+ users",                      icon: "diversity_3",        color: "#3b82f6", rarity: BadgeRarity.Rare,      path: UserPath.gearFoxer,    criteria: "connections:100" },
   { name: "Foodie Explorer",    description: "Tried 25+ food events",                          icon: "restaurant",         color: "#22c55e", rarity: BadgeRarity.Uncommon,  path: UserPath.user,         criteria: "food_events:25" },
   { name: "VIP Foxer",          description: "Reached VIP status",                             icon: "hotel_class",        color: "#f59e0b", rarity: BadgeRarity.Legendary, path: UserPath.gearFoxer,    criteria: null },
@@ -17,12 +17,21 @@ const badges = [
   { name: "Event Evangelist",   description: "Brought 500+ attendees to the platform",         icon: "campaign",           color: "#f97316", rarity: BadgeRarity.Legendary, path: UserPath.gearFoxer,    criteria: "platform_attendees:500" },
   { name: "Visionary Leader",   description: "Approved 10 successful city initiatives",        icon: "account_balance",    color: "#ccff00", rarity: BadgeRarity.Legendary, path: UserPath.venueFoxer,   criteria: "city_initiatives:10" },
   { name: "City Builder",       description: "Listed 3 approved venues in your city",          icon: "location_city",      color: "#a855f7", rarity: BadgeRarity.Uncommon,  path: UserPath.venueFoxer,   criteria: "approved_venues:3" },
-  { name: "District Champion",  description: "Reached District Head rank as Mayor",            icon: "maps_home_work",     color: "#a855f7", rarity: BadgeRarity.Rare,      path: UserPath.venueFoxer,   criteria: null },
-  { name: "Grand Mayor",        description: "Achieved the highest Mayor rank",                icon: "workspace_premium",  color: "#a855f7", rarity: BadgeRarity.Legendary, path: UserPath.venueFoxer,   criteria: null },
+  { name: "District Champion",  description: "Reached District Head rank as Venue Foxer",      icon: "maps_home_work",     color: "#a855f7", rarity: BadgeRarity.Rare,      path: UserPath.venueFoxer,   criteria: null },
+  { name: "Grand Foxer",        description: "Achieved the highest Venue Foxer rank",          icon: "workspace_premium",  color: "#a855f7", rarity: BadgeRarity.Legendary, path: UserPath.venueFoxer,   criteria: null },
+];
+
+const BADGE_RENAMES: Array<{ from: string; to: string }> = [
+  { from: "Grand Mayor", to: "Grand Foxer" },
+  { from: "Host Master", to: "Event Master" },
 ];
 
 export async function seedBadges(prisma: PrismaClient) {
   console.log("Seeding badges...");
+
+  for (const { from, to } of BADGE_RENAMES) {
+    await prisma.badge.updateMany({ where: { name: from }, data: { name: to } });
+  }
 
   for (const badge of badges) {
     await prisma.badge.upsert({

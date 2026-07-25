@@ -109,9 +109,9 @@ export default class ReviewSvc {
           if (data.entityType === "venue") {
             const venue = await prisma.venue.findUnique({
               where: { id: data.entityId },
-              select: { mayorId: true },
+              select: { venueFoxerId: true },
             });
-            providerId = venue?.mayorId ?? null;
+            providerId = venue?.venueFoxerId ?? null;
             providerPath = UserPath.venueFoxer;
           } else if (data.entityType === "asset") {
             const asset = await prisma.asset.findUnique({
@@ -202,9 +202,9 @@ export default class ReviewSvc {
     if (review.entityType === "venue") {
       const venue = await prisma.venue.findUnique({
         where: { id: String(review.entityId) },
-        select: { mayorId: true },
+        select: { venueFoxerId: true },
       });
-      isVenueHost = venue?.mayorId === String(userId);
+      isVenueHost = venue?.venueFoxerId === String(userId);
     } else if (review.entityType === "event") {
       const event = await prisma.event.findUnique({
         where: { id: String(review.entityId) },
