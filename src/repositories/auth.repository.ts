@@ -10,6 +10,10 @@ export default class AuthRepo {
     otpCode?: string;
     otpExpiry?: Date;
   }) {
+    const count = await prisma.user.count();
+    const year = new Date().getFullYear();
+    const citizenId = `FX-${year}-${String(count + 1).padStart(5, '0')}`;
+
     return prisma.user.create({
       data: {
         email: data.email,
@@ -17,6 +21,7 @@ export default class AuthRepo {
         username: data.username,
         name: data.name,
         phone: data.mobileNumber,
+        citizenId,
         updatedAt: new Date(),
       },
       select: {
@@ -24,6 +29,7 @@ export default class AuthRepo {
         email: true,
         username: true,
         name: true,
+        citizenId: true,
         systemRole: true,
         roleType: true,
         createdAt: true,

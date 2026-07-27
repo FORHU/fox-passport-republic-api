@@ -18,6 +18,7 @@ model User {
   username            String?                   @unique
   phone               String?
   imgId               String?
+  citizenId           String?                   @unique
   systemRole          SystemRole                @default(user)
   roleType            RoleType[]
   createdAt           DateTime                  @default(now())
