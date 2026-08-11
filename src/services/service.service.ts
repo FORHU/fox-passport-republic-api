@@ -42,7 +42,7 @@ export default class ServiceSvc {
       imgIds: data.imgIds,
     };
 
-    return ServiceRepo.createService(serviceData as any);
+    return ServiceRepo.createService(serviceData);
   }
 
   static async getAllServices(filters?: {

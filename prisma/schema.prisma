@@ -7,54 +7,53 @@ datasource db {
 }
 
 model User {
-  id                  String                    @id @default(uuid())
-  email               String                    @unique
-  password            String
-  name                String
-  address             String?
-  city                String?
-  state               String?
-  country             String?                   @default("Philippines")
-  username            String?                   @unique
-  phone               String?
-  imgId               String?
-  systemRole          SystemRole                @default(user)
-  roleType            RoleType[]
-  createdAt           DateTime                  @default(now())
-  updatedAt           DateTime                  @updatedAt
-  bookings            Booking[]
-  serviceBookings     ServiceBooking[]
-  assetBookings       AssetBooking[]
-  assetTransactions   EventAssetTransaction[]   @relation("AssetProvider")
-  clientEvents        Event[]                   @relation("EventClient")
-  organizedEvents     Event[]                   @relation("EventOrganizer")
-  serviceTransactions EventServiceTransaction[] @relation("ServiceProvider")
-  eventTemplates      EventTemplate[]
-  venueTransactions   EventVenueTransaction[]   @relation("VenueProvider")
-  favorites           Favorite[]
-  files               File[]
-  passport            Passport?
-  reviews             Review[]
-  reviewReplies       ReviewReply[]
-  assets              Asset[]
-  reviewsGiven        RoleRequest[]             @relation("Reviewer")
-  roleRequests        RoleRequest[]             @relation("Applicant")
-  services            Service[]
-  venues              Venue[]
-  bookingAttendees    BookingAttendee[]
-  invitedAttendees    BookingAttendee[]         @relation("Inviter")
-  notifications       Notification[]
-  waitlistEntries    Waitlist[]
-  stripeCustomerId     String?                   @unique
-  stripeChargesEnabled      Boolean             @default(false)
-  stripePayoutsEnabled      Boolean             @default(false)
-  isEmailVerified     Boolean                   @default(false)
-  payouts                   Payout[]
-  stripeAccountId          String?   @unique
-  stripeOnboardingComplete Boolean   @default(false)
+  id                       String                    @id @default(uuid())
+  email                    String                    @unique
+  password                 String
+  name                     String
+  address                  String?
+  city                     String?
+  state                    String?
+  country                  String?                   @default("Philippines")
+  username                 String?                   @unique
+  phone                    String?
+  imgId                    String?
+  systemRole               SystemRole                @default(user)
+  roleType                 RoleType[]
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  bookings                 Booking[]
+  serviceBookings          ServiceBooking[]
+  assetBookings            AssetBooking[]
+  assetTransactions        EventAssetTransaction[]   @relation("AssetProvider")
+  clientEvents             Event[]                   @relation("EventClient")
+  organizedEvents          Event[]                   @relation("EventOrganizer")
+  serviceTransactions      EventServiceTransaction[] @relation("ServiceProvider")
+  eventTemplates           EventTemplate[]
+  venueTransactions        EventVenueTransaction[]   @relation("VenueProvider")
+  favorites                Favorite[]
+  files                    File[]
+  passport                 Passport?
+  reviews                  Review[]
+  reviewReplies            ReviewReply[]
+  assets                   Asset[]
+  reviewsGiven             RoleRequest[]             @relation("Reviewer")
+  roleRequests             RoleRequest[]             @relation("Applicant")
+  services                 Service[]
+  venues                   Venue[]
+  bookingAttendees         BookingAttendee[]
+  invitedAttendees         BookingAttendee[]         @relation("Inviter")
+  notifications            Notification[]
+  waitlistEntries          Waitlist[]
+  stripeCustomerId         String?                   @unique
+  stripeChargesEnabled     Boolean                   @default(false)
+  stripePayoutsEnabled     Boolean                   @default(false)
+  isEmailVerified          Boolean                   @default(false)
+  payouts                  Payout[]
+  stripeAccountId          String?                   @unique
+  stripeOnboardingComplete Boolean                   @default(false)
   foxerSpecializations     FoxerSpecialization[]
 }
-
 
 model RoleRequest {
   id                      String                   @id @default(uuid())
@@ -79,13 +78,13 @@ model RoleRequest {
 }
 
 model FoxerSpecialization {
-  id         String   @id @default(uuid())
-  userId     String
-  roleType   RoleType
-  category   String
-  source     String   // "declared" | "earned"
-  createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  userId    String
+  roleType  RoleType
+  category  String
+  source    String // "declared" | "earned"
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, roleType, category])
   @@index([roleType, category])
@@ -165,7 +164,7 @@ model InvestorApplication {
   id              String      @id @default(uuid())
   requestId       String      @unique
   companyName     String?
-  investmentRange Float
+  investmentRange Decimal     @db.Decimal(12, 2)
   interests       String[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -200,46 +199,46 @@ model EventFoxerApplication {
 }
 
 model File {
-  id                    String                    @id @default(uuid())
-  url                   String
-  name                  String
-  type                  String
-  uploadedBy            String?
-  venueId               String?
-  assetId               String?
-  serviceId             String?
-  templateId            String?
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
-  deletedAt             DateTime?
-  asset                 Asset?                    @relation(fields: [assetId], references: [id])
-  service               Service?                  @relation(fields: [serviceId], references: [id])
-  template              EventTemplate?            @relation(fields: [templateId], references: [id])
-  user                  User?                     @relation(fields: [uploadedBy], references: [id])
-  venue                 Venue?                    @relation(fields: [venueId], references: [id])
-  gearFoxerBirPermit        GearFoxerApplication[]    @relation("GearFoxerBirPermit")
-  gearFoxerNbi              GearFoxerApplication[]    @relation("GearFoxerNBI")
-  gearFoxerSelfie           GearFoxerApplication[]    @relation("GearFoxerSelfie")
-  gearFoxerTinId            GearFoxerApplication[]    @relation("GearFoxerTinId")
-  gearFoxerValidId1         GearFoxerApplication[]    @relation("GearFoxerValidId1")
-  serviceFoxerBirPermit     ServiceFoxerApplication[] @relation("ServiceFoxerBirPermit")
-  serviceFoxerNbi           ServiceFoxerApplication[] @relation("ServiceFoxerNBI")
-  serviceFoxerSelfie        ServiceFoxerApplication[] @relation("ServiceFoxerSelfie")
-  serviceFoxerTinId         ServiceFoxerApplication[] @relation("ServiceFoxerTinId")
-  serviceFoxerValidId1      ServiceFoxerApplication[] @relation("ServiceFoxerValidId1")
-  eventFoxerBirPermit       EventFoxerApplication[]   @relation("EventFoxerBirPermit")
-  eventFoxerNbi             EventFoxerApplication[]   @relation("EventFoxerNBI")
-  eventFoxerPortfolio       EventFoxerApplication[]   @relation("EventFoxerPortfolio")
-  eventFoxerSelfie          EventFoxerApplication[]   @relation("EventFoxerSelfie")
-  eventFoxerTinId           EventFoxerApplication[]   @relation("EventFoxerTinId")
-  eventFoxerValidId1        EventFoxerApplication[]   @relation("EventFoxerValidId1")
-  investorProof             InvestorApplication[]     @relation("InvestorProof")
-  venueFoxerBirPermit       VenueFoxerApplication[]   @relation("VenueFoxerBirPermit")
-  venueFoxerNbi             VenueFoxerApplication[]   @relation("VenueFoxerNBI")
-  venueFoxerSelfie          VenueFoxerApplication[]   @relation("VenueFoxerSelfie")
-  venueFoxerTinId           VenueFoxerApplication[]   @relation("VenueFoxerTinId")
-  venueFoxerValidId1        VenueFoxerApplication[]   @relation("VenueFoxerValidId1")
-  eventFoxerPortfolioMany   EventFoxerApplication[]   @relation("EventFoxerPortfolioMany")
+  id                      String                    @id @default(uuid())
+  url                     String
+  name                    String
+  type                    String
+  uploadedBy              String?
+  venueId                 String?
+  assetId                 String?
+  serviceId               String?
+  templateId              String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  deletedAt               DateTime?
+  asset                   Asset?                    @relation(fields: [assetId], references: [id])
+  service                 Service?                  @relation(fields: [serviceId], references: [id])
+  template                EventTemplate?            @relation(fields: [templateId], references: [id])
+  user                    User?                     @relation(fields: [uploadedBy], references: [id])
+  venue                   Venue?                    @relation(fields: [venueId], references: [id])
+  gearFoxerBirPermit      GearFoxerApplication[]    @relation("GearFoxerBirPermit")
+  gearFoxerNbi            GearFoxerApplication[]    @relation("GearFoxerNBI")
+  gearFoxerSelfie         GearFoxerApplication[]    @relation("GearFoxerSelfie")
+  gearFoxerTinId          GearFoxerApplication[]    @relation("GearFoxerTinId")
+  gearFoxerValidId1       GearFoxerApplication[]    @relation("GearFoxerValidId1")
+  serviceFoxerBirPermit   ServiceFoxerApplication[] @relation("ServiceFoxerBirPermit")
+  serviceFoxerNbi         ServiceFoxerApplication[] @relation("ServiceFoxerNBI")
+  serviceFoxerSelfie      ServiceFoxerApplication[] @relation("ServiceFoxerSelfie")
+  serviceFoxerTinId       ServiceFoxerApplication[] @relation("ServiceFoxerTinId")
+  serviceFoxerValidId1    ServiceFoxerApplication[] @relation("ServiceFoxerValidId1")
+  eventFoxerBirPermit     EventFoxerApplication[]   @relation("EventFoxerBirPermit")
+  eventFoxerNbi           EventFoxerApplication[]   @relation("EventFoxerNBI")
+  eventFoxerPortfolio     EventFoxerApplication[]   @relation("EventFoxerPortfolio")
+  eventFoxerSelfie        EventFoxerApplication[]   @relation("EventFoxerSelfie")
+  eventFoxerTinId         EventFoxerApplication[]   @relation("EventFoxerTinId")
+  eventFoxerValidId1      EventFoxerApplication[]   @relation("EventFoxerValidId1")
+  investorProof           InvestorApplication[]     @relation("InvestorProof")
+  venueFoxerBirPermit     VenueFoxerApplication[]   @relation("VenueFoxerBirPermit")
+  venueFoxerNbi           VenueFoxerApplication[]   @relation("VenueFoxerNBI")
+  venueFoxerSelfie        VenueFoxerApplication[]   @relation("VenueFoxerSelfie")
+  venueFoxerTinId         VenueFoxerApplication[]   @relation("VenueFoxerTinId")
+  venueFoxerValidId1      VenueFoxerApplication[]   @relation("VenueFoxerValidId1")
+  eventFoxerPortfolioMany EventFoxerApplication[]   @relation("EventFoxerPortfolioMany")
 }
 
 model Passport {
@@ -308,194 +307,194 @@ model PassportStamp {
 }
 
 model Asset {
-  id               String                  @id @default(uuid())
-  ownerId          String
-  category         String
-  name             String
-  description      String
-  quantity         Int                     @default(1)
-  price            Float
-  currency         String                  @default("USD")
-  billingRate      BillingRate
-  condition        AssetCondition          @default(good)
-  status           AssetStatus             @default(available)
-  rejectionReason  String?
-  city             String?
-  state            String?
-  country          String?                 @default("Philippines")
-  lat              Float?
-  lng              Float?
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  deletedAt        DateTime?
-  transactions     EventAssetTransaction[]
-  images           File[]
-  bookings         AssetBooking[]
-  owner            User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  templateAssets   EventTemplateAsset[]
-  cancellationPolicyId      String?
-  cancellationPolicy  CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id])
+  id                   String                  @id @default(uuid())
+  ownerId              String
+  category             String
+  name                 String
+  description          String
+  quantity             Int                     @default(1)
+  price                Decimal                 @db.Decimal(12, 2)
+  currency             String                  @default("USD")
+  billingRate          BillingRate
+  condition            AssetCondition          @default(good)
+  status               AssetStatus             @default(available)
+  rejectionReason      String?
+  city                 String?
+  state                String?
+  country              String?                 @default("Philippines")
+  lat                  Float?
+  lng                  Float?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  deletedAt            DateTime?
+  transactions         EventAssetTransaction[]
+  images               File[]
+  bookings             AssetBooking[]
+  owner                User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  templateAssets       EventTemplateAsset[]
+  cancellationPolicyId String?
+  cancellationPolicy   CancellationPolicy?     @relation(fields: [cancellationPolicyId], references: [id])
 
   @@map("assets")
 }
 
 model Service {
-  id                String                    @id @default(uuid())
-  ownerId           String
-  category          ServiceCategory
-  name              String
-  description       String
-  city              String                    @default("Unknown City")
-  state             String?
-  country           String                    @default("Unknown Country")
-  lat               Float?
-  lng               Float?
-  isWillingToTravel Boolean                   @default(false)
-  tags              String[]
-  price             Float
-  currency          String                    @default("USD")
-  billingRate       BillingRate
-  status            ServiceStatus             @default(draft)
-  rejectionReason   String?
-  createdAt         DateTime                  @default(now())
-  updatedAt         DateTime                  @updatedAt
-  deletedAt         DateTime?
-  transactions      EventServiceTransaction[]
-  images            File[]
-  templateServices  EventTemplateService[]
-  bookings          ServiceBooking[]
-  owner             User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade) 
-  cancellationPolicyId      String?
-  cancellationPolicy  CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id])
+  id                   String                    @id @default(uuid())
+  ownerId              String
+  category             ServiceCategory
+  name                 String
+  description          String
+  city                 String                    @default("Unknown City")
+  state                String?
+  country              String                    @default("Unknown Country")
+  lat                  Float?
+  lng                  Float?
+  isWillingToTravel    Boolean                   @default(false)
+  tags                 String[]
+  price                Decimal                   @db.Decimal(12, 2)
+  currency             String                    @default("USD")
+  billingRate          BillingRate
+  status               ServiceStatus             @default(draft)
+  rejectionReason      String?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  deletedAt            DateTime?
+  transactions         EventServiceTransaction[]
+  images               File[]
+  templateServices     EventTemplateService[]
+  bookings             ServiceBooking[]
+  owner                User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  cancellationPolicyId String?
+  cancellationPolicy   CancellationPolicy?       @relation(fields: [cancellationPolicyId], references: [id])
 
   @@map("services")
 }
 
 model Venue {
-  id             String                  @id @default(uuid())
-  mayorId        String
-  category       String
-  name           String
-  description    String
-  capacity       Int
-  price          Float
-  billingRate    BillingRate
-  address        String
-  city           String
-  state          String?
-  country        String
-  lat            Float?
-  lng            Float?
-  status         VenueStatus             @default(draft)
-  rejectionReason String?
-  spaceType      String[]
-  amenities      String[]
-  techAv         String[]
-  staffing       String[]
-  policies       String[]
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-  transactions   EventVenueTransaction[]
-  images         File[]
-  templateVenues EventTemplateVenue[]
-  mayor          User                    @relation(fields: [mayorId], references: [id], onDelete: Cascade)
-  cancellationPolicyId      String?
-  cancellationPolicy  CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id])
+  id                   String                  @id @default(uuid())
+  mayorId              String
+  category             String
+  name                 String
+  description          String
+  capacity             Int
+  price                Decimal                 @db.Decimal(12, 2)
+  billingRate          BillingRate
+  address              String
+  city                 String
+  state                String?
+  country              String
+  lat                  Float?
+  lng                  Float?
+  status               VenueStatus             @default(draft)
+  rejectionReason      String?
+  spaceType            String[]
+  amenities            String[]
+  techAv               String[]
+  staffing             String[]
+  policies             String[]
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  transactions         EventVenueTransaction[]
+  images               File[]
+  templateVenues       EventTemplateVenue[]
+  mayor                User                    @relation(fields: [mayorId], references: [id], onDelete: Cascade)
+  cancellationPolicyId String?
+  cancellationPolicy   CancellationPolicy?     @relation(fields: [cancellationPolicyId], references: [id])
 
   @@map("venues")
 }
 
 model EventTemplate {
-  id               String                 @id @default(uuid())
-  ownerId          String
-  name             String
-  description      String
-  category         EventCategory
-  status           EventTemplateStatus    @default(draft)
-  rejectionReason  String?
-  isPublic         Boolean                @default(false)
-  targetCity       String?
-  targetState      String?
-  targetCountry    String?                @default("Philippines")
-  lat              Float?
-  lng              Float?
-  hostMarkupPct    Float                  @default(0)
-  platformFeePct    Float                  @default(0.05) //might change later on
-  maxAttendees     Int?
-  publicOpenAt     DateTime?
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
-  events           Event[]
-  images           File[]
-  owner            User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  id                   String                 @id @default(uuid())
+  ownerId              String
+  name                 String
+  description          String
+  category             EventCategory
+  status               EventTemplateStatus    @default(draft)
+  rejectionReason      String?
+  isPublic             Boolean                @default(false)
+  targetCity           String?
+  targetState          String?
+  targetCountry        String?                @default("Philippines")
+  lat                  Float?
+  lng                  Float?
+  hostMarkupPct        Float                  @default(0)
+  platformFeePct       Float                  @default(0.05) //might change later on
+  maxAttendees         Int?
+  publicOpenAt         DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  events               Event[]
+  images               File[]
+  owner                User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   cancellationPolicyId String?
-  cancellationPolicy  CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id])
-  templateAssets   EventTemplateAsset[]
-  templateServices EventTemplateService[]
-  templateVenues   EventTemplateVenue[]
-  waitlist         Waitlist[]
+  cancellationPolicy   CancellationPolicy?    @relation(fields: [cancellationPolicyId], references: [id])
+  templateAssets       EventTemplateAsset[]
+  templateServices     EventTemplateService[]
+  templateVenues       EventTemplateVenue[]
+  waitlist             Waitlist[]
 }
 
 model EventTemplateAsset {
-  id              String          @id @default(uuid())
-  templateId      String
-  assetId         String?
-  description     String?
-  quantity        Int             @default(1)
-  currency        String          @default("PHP")
-  agreedPrice     Float           @default(0)
-  isOptional      Boolean         @default(false)
-  date            DateTime?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  matched              Boolean              @default(false)
-  matchedAt            DateTime?
-  matchConstraint      MatchConstraint      @default(NONE)
-  matchRequestStatus   MatchRequestStatus   @default(pending)
-  asset                Asset?               @relation(fields: [assetId], references: [id])
-  template             EventTemplate        @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  id                 String             @id @default(uuid())
+  templateId         String
+  assetId            String?
+  description        String?
+  quantity           Int                @default(1)
+  currency           String             @default("PHP")
+  agreedPrice        Decimal            @default(0) @db.Decimal(12, 2)
+  isOptional         Boolean            @default(false)
+  date               DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  matched            Boolean            @default(false)
+  matchedAt          DateTime?
+  matchConstraint    MatchConstraint    @default(NONE)
+  matchRequestStatus MatchRequestStatus @default(pending)
+  asset              Asset?             @relation(fields: [assetId], references: [id])
+  template           EventTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@map("event_template_assets")
 }
 
 model EventTemplateService {
-  id              String          @id @default(uuid())
-  templateId      String
-  serviceId       String?
-  description     String?
-  currency        String          @default("PHP")
-  agreedPrice     Float           @default(0)
-  isOptional      Boolean         @default(false)
-  date            DateTime?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  matched              Boolean              @default(false)
-  matchedAt            DateTime?
-  matchConstraint      MatchConstraint      @default(NONE)
-  matchRequestStatus   MatchRequestStatus   @default(pending)
-  service              Service?             @relation(fields: [serviceId], references: [id])
-  template             EventTemplate        @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  id                 String             @id @default(uuid())
+  templateId         String
+  serviceId          String?
+  description        String?
+  currency           String             @default("PHP")
+  agreedPrice        Decimal            @default(0) @db.Decimal(12, 2)
+  isOptional         Boolean            @default(false)
+  date               DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  matched            Boolean            @default(false)
+  matchedAt          DateTime?
+  matchConstraint    MatchConstraint    @default(NONE)
+  matchRequestStatus MatchRequestStatus @default(pending)
+  service            Service?           @relation(fields: [serviceId], references: [id])
+  template           EventTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@map("event_template_services")
 }
 
 model EventTemplateVenue {
-  id              String          @id @default(uuid())
-  templateId      String
-  venueId         String?
-  description     String?
-  currency        String          @default("PHP")
-  agreedPrice     Float           @default(0)
-  isOptional      Boolean         @default(false)
-  date            DateTime?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  matched              Boolean              @default(false)
-  matchedAt            DateTime?
-  matchConstraint      MatchConstraint      @default(NONE)
-  matchRequestStatus   MatchRequestStatus   @default(pending)
-  template             EventTemplate        @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  venue                Venue?               @relation(fields: [venueId], references: [id])
+  id                 String             @id @default(uuid())
+  templateId         String
+  venueId            String?
+  description        String?
+  currency           String             @default("PHP")
+  agreedPrice        Decimal            @default(0) @db.Decimal(12, 2)
+  isOptional         Boolean            @default(false)
+  date               DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  matched            Boolean            @default(false)
+  matchedAt          DateTime?
+  matchConstraint    MatchConstraint    @default(NONE)
+  matchRequestStatus MatchRequestStatus @default(pending)
+  template           EventTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  venue              Venue?             @relation(fields: [venueId], references: [id])
 
   @@map("event_template_venues")
 }
@@ -511,10 +510,10 @@ model Event {
   startAt             DateTime
   endAt               DateTime
   guestCount          Int
-  totalAmount         Float
-  itemsTotal          Float                     @default(0)
-  hostMarkupAmount    Float                     @default(0)
-  platformFeeAmount   Float                     @default(0)
+  totalAmount         Decimal                   @db.Decimal(12, 2)
+  itemsTotal          Decimal                   @default(0) @db.Decimal(12, 2)
+  hostMarkupAmount    Decimal                   @default(0) @db.Decimal(12, 2)
+  platformFeeAmount   Decimal                   @default(0) @db.Decimal(12, 2)
   eventStatus         EventStatus               @default(pending)
   requestStatus       RequestStatus             @default(pending)
   rejectionReason     String?
@@ -527,79 +526,79 @@ model Event {
   assetTransactions   EventAssetTransaction[]
   client              User                      @relation("EventClient", fields: [clientId], references: [id])
   host                User                      @relation("EventOrganizer", fields: [organizerId], references: [id])
-  template            EventTemplate?             @relation(fields: [templateId], references: [id])
+  template            EventTemplate?            @relation(fields: [templateId], references: [id])
   serviceTransactions EventServiceTransaction[]
   venueTransactions   EventVenueTransaction[]
 }
 
 model EventAssetTransaction {
-  id          String            @id @default(uuid())
-  eventId     String
-  bookingId   String?
-  assetId     String
-  providerId  String
-  quantity    Int               @default(1)
-  status      TransactionStatus @default(pending)
-  agreedPrice Float
-  included    Boolean           @default(true)
-  currency    String            @default("PHP")
-  stripeTransferId String?       @unique
-  disputeReason String?
-  disputeAt   DateTime?
-  lockedAt    DateTime?
-  releasedAt  DateTime?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  asset       Asset             @relation(fields: [assetId], references: [id])
-  event       Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  booking     Booking?          @relation(fields: [bookingId], references: [id])
-  provider    User              @relation("AssetProvider", fields: [providerId], references: [id])
+  id               String            @id @default(uuid())
+  eventId          String
+  bookingId        String?
+  assetId          String
+  providerId       String
+  quantity         Int               @default(1)
+  status           TransactionStatus @default(pending)
+  agreedPrice      Decimal           @db.Decimal(12, 2)
+  included         Boolean           @default(true)
+  currency         String            @default("PHP")
+  stripeTransferId String?           @unique
+  disputeReason    String?
+  disputeAt        DateTime?
+  lockedAt         DateTime?
+  releasedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  asset            Asset             @relation(fields: [assetId], references: [id])
+  event            Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  booking          Booking?          @relation(fields: [bookingId], references: [id])
+  provider         User              @relation("AssetProvider", fields: [providerId], references: [id])
 }
 
 model EventServiceTransaction {
-  id          String            @id @default(uuid())
-  eventId     String
-  bookingId   String?
-  serviceId   String
-  providerId  String
-  status      TransactionStatus @default(pending)
-  agreedPrice Float
-  included    Boolean           @default(true)
-  currency    String            @default("PHP")
-  stripeTransferId String?       @unique
-  disputeReason String?
-  disputeAt   DateTime?
-  lockedAt    DateTime?
-  releasedAt  DateTime?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  event       Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  booking     Booking?          @relation(fields: [bookingId], references: [id])
-  provider    User              @relation("ServiceProvider", fields: [providerId], references: [id])
-  service     Service           @relation(fields: [serviceId], references: [id])
+  id               String            @id @default(uuid())
+  eventId          String
+  bookingId        String?
+  serviceId        String
+  providerId       String
+  status           TransactionStatus @default(pending)
+  agreedPrice      Decimal           @db.Decimal(12, 2)
+  included         Boolean           @default(true)
+  currency         String            @default("PHP")
+  stripeTransferId String?           @unique
+  disputeReason    String?
+  disputeAt        DateTime?
+  lockedAt         DateTime?
+  releasedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  event            Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  booking          Booking?          @relation(fields: [bookingId], references: [id])
+  provider         User              @relation("ServiceProvider", fields: [providerId], references: [id])
+  service          Service           @relation(fields: [serviceId], references: [id])
 }
 
 model EventVenueTransaction {
-  id          String            @id @default(uuid())
-  eventId     String
-  bookingId   String?
-  venueId     String
-  providerId  String
-  status      TransactionStatus @default(pending)
-  agreedPrice Float
-  included    Boolean           @default(true)
-  currency    String            @default("PHP")
-  stripeTransferId String?       @unique
-  disputeReason String?
-  disputeAt   DateTime?
-  lockedAt    DateTime?
-  releasedAt  DateTime?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  event       Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  booking     Booking?          @relation(fields: [bookingId], references: [id])
-  provider    User              @relation("VenueProvider", fields: [providerId], references: [id])
-  venue       Venue             @relation(fields: [venueId], references: [id])
+  id               String            @id @default(uuid())
+  eventId          String
+  bookingId        String?
+  venueId          String
+  providerId       String
+  status           TransactionStatus @default(pending)
+  agreedPrice      Decimal           @db.Decimal(12, 2)
+  included         Boolean           @default(true)
+  currency         String            @default("PHP")
+  stripeTransferId String?           @unique
+  disputeReason    String?
+  disputeAt        DateTime?
+  lockedAt         DateTime?
+  releasedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  event            Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  booking          Booking?          @relation(fields: [bookingId], references: [id])
+  provider         User              @relation("VenueProvider", fields: [providerId], references: [id])
+  venue            Venue             @relation(fields: [venueId], references: [id])
 }
 
 model Booking {
@@ -607,10 +606,10 @@ model Booking {
   eventId             String
   userId              String
   guestCount          Int
-  totalAmount         Float
-  hostMarkup         Float                   @default(0)
-  platformFee        Float                   @default(0)
-  stripePaymentId     String?                    @unique
+  totalAmount         Decimal                   @db.Decimal(12, 2)
+  hostMarkup          Decimal                   @default(0) @db.Decimal(12, 2)
+  platformFee         Decimal                   @default(0) @db.Decimal(12, 2)
+  stripePaymentId     String?                   @unique
   status              BookingStatus             @default(pending)
   startAt             DateTime
   endAt               DateTime
@@ -655,22 +654,22 @@ model BookingAttendee {
 }
 
 model Payment {
-  id            String        @id @default(uuid())
-  bookingId     String
-  amount        Float
-  currency      String
-  method        String
-  paymentType   PaymentType
-  status        PaymentStatus
-  transactionId String?       @unique
-  expiresAt     DateTime?
-  paidAt        DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  hostMarkupAmount Float       @default(0)
-  platformFeeAmount Float     @default(0)
-  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  refunds       Refund[]
+  id                String        @id @default(uuid())
+  bookingId         String
+  amount            Decimal       @db.Decimal(12, 2)
+  currency          String
+  method            String
+  paymentType       PaymentType
+  status            PaymentStatus
+  transactionId     String?       @unique
+  expiresAt         DateTime?
+  paidAt            DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  hostMarkupAmount  Decimal       @default(0) @db.Decimal(12, 2)
+  platformFeeAmount Decimal       @default(0) @db.Decimal(12, 2)
+  booking           Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  refunds           Refund[]
 }
 
 model Favorite {
@@ -693,12 +692,12 @@ model Review {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  booking    Booking?  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  booking    Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  reviewReplies ReviewReply[]
 
   @@unique([bookingId])
   @@index([userId, entityId, entityType])
-
-  reviewReplies ReviewReply[]
 }
 
 model ReviewReply {
@@ -721,9 +720,9 @@ model ServiceBooking {
   guestCount           Int               @default(1)
   location             String
   notes                String?
-  totalAmount          Float
-  platformFee          Float            @default(0)
-  platformFeeAmount    Float             @default(0)
+  totalAmount          Decimal           @db.Decimal(12, 2)
+  platformFee          Decimal           @default(0) @db.Decimal(12, 2)
+  platformFeeAmount    Decimal           @default(0) @db.Decimal(12, 2)
   status               ItemBookingStatus @default(pending)
   paymentStatus        PaymentStatus     @default(pending)
   paymentTransactionId String?
@@ -749,9 +748,9 @@ model AssetBooking {
   fulfillmentType      String            @default("pickup")
   deliveryAddress      String?
   notes                String?
-  totalAmount          Float
-  platformFee          Float            @default(0)
-  platformFeeAmount    Float             @default(0)
+  totalAmount          Decimal           @db.Decimal(12, 2)
+  platformFee          Decimal           @default(0) @db.Decimal(12, 2)
+  platformFeeAmount    Decimal           @default(0) @db.Decimal(12, 2)
   status               ItemBookingStatus @default(pending)
   paymentStatus        PaymentStatus     @default(pending)
   paymentTransactionId String?
@@ -779,14 +778,15 @@ model Notification {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
-} 
+}
+
 model Payout {
   id               String       @id @default(uuid())
   recipientId      String
   role             RoleType
   sourceType       String // "assetBooking" | "serviceBooking" | "booking"
   sourceId         String
-  amount           Float
+  amount           Decimal      @db.Decimal(12, 2)
   currency         String       @default("PHP")
   stripeTransferId String?
   status           PayoutStatus @default(pending)
@@ -805,7 +805,7 @@ model Refund {
   id             String       @id @default(uuid())
   bookingId      String
   paymentId      String?
-  amount         Float
+  amount         Decimal      @db.Decimal(12, 2)
   currency       String       @default("PHP")
   stripeRefundId String?      @unique
   status         RefundStatus @default(pending)
@@ -827,27 +827,27 @@ model Refund {
 }
 
 model CancellationPolicy {
-  id          String   @id @default(uuid())
-  name        String   //"Flexible", "Moderate", "Strict"
+  id          String             @id @default(uuid())
+  name        String //"Flexible", "Moderate", "Strict"
   asset       Asset[]
   venue       Venue[]
   service     Service[]
   templates   EventTemplate[]
   description String?
-  isActive    Boolean  @default(true)
+  isActive    Boolean            @default(true)
   rules       CancellationRule[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   @@map("cancellation_policies")
 }
 
 model CancellationRule {
-  id       String   @id @default(uuid())
-  policyId String
+  id               String             @id @default(uuid())
+  policyId         String
   hoursBeforeEvent Int
   refundPercent    Int
-  policy   CancellationPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  policy           CancellationPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
 }
 
 enum RefundStatus {
@@ -934,7 +934,7 @@ enum EventStatus {
   completed
   cancelled
 }
- 
+
 enum TransactionStatus {
   pending
   approved
@@ -1065,4 +1065,12 @@ enum BadgeRarity {
   Rare
   Epic
   Legendary
+}
+
+model StripeEvent {
+  id        String   @id
+  type      String
+  createdAt DateTime @default(now())
+
+  @@map("stripe_events")
 }

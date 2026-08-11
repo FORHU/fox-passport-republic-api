@@ -4,12 +4,35 @@ import { prisma } from "../utils/prisma";
 import VenueSvc from "../services/venue.service";
 import { sendApprovedEmail } from "../utils/emails/approved";
 import { sendRejectedEmail } from "../utils/emails/rejected";
-import { VenueStatus, VenueCategory } from "@prisma/client";
+import { VenueStatus, VenueCategory, BillingRate } from "@prisma/client";
+
+interface CreateVenuePayload {
+  name: string;
+  description: string;
+  category: VenueCategory;
+  capacity: number;
+  address: string;
+  city: string;
+  state?: string;
+  country: string;
+  lat?: number;
+  lng?: number;
+  imgIds: string[];
+  spaceType?: string[];
+  amenities?: string[];
+  techAv?: string[];
+  staffing?: string[];
+  policies?: string[];
+  status?: VenueStatus;
+  price?: number;
+  billingRate?: BillingRate;
+  cancellationPolicyId?: string;
+}
 
 export default class VenueCtrl {
   // Create Venue Controller
   static async createVenue(req: Request, res: Response) {
-    const schema = Joi.object({
+    const schema = Joi.object<CreateVenuePayload>({
       name: Joi.string().required(),
       description: Joi.string().required(),
       category: Joi.string()
@@ -45,17 +68,18 @@ export default class VenueCtrl {
 
     try {
       // mayorId comes from the authenticated user's JWT token
-      const mayorId = (req as any).user?.userId;
+      const mayorId = req.user?.userId;
       if (!mayorId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
       const venueData = { ...value, mayorId };
-      const venue = await VenueSvc.createVenue(venueData as any);
+      const venue = await VenueSvc.createVenue(venueData);
       return res
         .status(201)
         .json({ message: "Venue created successfully", venue });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ message: error.message || error });
     }
   }
@@ -72,7 +96,8 @@ export default class VenueCtrl {
         limit: limit ? Math.min(Number(limit), 50) : undefined,
       });
       return res.status(200).json({ venues, total });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ message: error.message || error });
     }
   }
@@ -81,10 +106,11 @@ export default class VenueCtrl {
   static async getVenueById(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const requesterId = (req as any).user?.userId as string | undefined;
+      const requesterId = req.user?.userId as string | undefined;
       const venue = await VenueSvc.getVenueById(id, requesterId);
       return res.status(200).json({ venue });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(404).json({ message: error.message || error });
     }
   }
@@ -126,20 +152,22 @@ export default class VenueCtrl {
     }
 
     try {
-      const requesterId = (req as any).user?.userId as string | undefined;
-      const requesterRole = (req as any).user?.role as string | undefined;
+      const requesterId = req.user?.userId;
+      const requesterRole = req.user?.systemRole;
       if (!requesterId)
         return res.status(401).json({ message: "Unauthorized" });
 
       const venue = await VenueSvc.updateVenue({
         id: String(req.params.id),
         requesterId,
-        data: value as any,
+        requesterRole,
+        data: value,
       });
       return res
         .status(200)
         .json({ message: "Venue updated successfully", venue });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       const status =
         err.message === "Unauthorized"
           ? 403
@@ -152,8 +180,8 @@ export default class VenueCtrl {
 
   static async deleteVenue(req: Request, res: Response) {
     try {
-      const requesterId = (req as any).user?.userId as string | undefined;
-      const requesterRole = (req as any).user?.role as string | undefined;
+      const requesterId = req.user?.userId;
+      const requesterRole = req.user?.systemRole;
       if (!requesterId)
         return res.status(401).json({ message: "Unauthorized" });
 
@@ -163,7 +191,8 @@ export default class VenueCtrl {
         requesterRole,
       });
       return res.status(200).json({ message: "Venue deleted successfully" });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       const status =
         err.message === "Unauthorized"
           ? 403
@@ -176,7 +205,7 @@ export default class VenueCtrl {
 
   static async approveVenue(req: Request, res: Response) {
     try {
-      const user = (req as any).user;
+      const user = req.user;
       if (!user || user.systemRole !== "admin") {
         return res
           .status(403)
@@ -206,14 +235,15 @@ export default class VenueCtrl {
       return res
         .status(200)
         .json({ message: "Venue approved successfully", venue });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(404).json({ message: error.message || error });
     }
   }
 
   static async rejectVenue(req: Request, res: Response) {
     try {
-      const user = (req as any).user;
+      const user = req.user;
       if (!user || user.systemRole !== "admin") {
         return res
           .status(403)
@@ -250,7 +280,8 @@ export default class VenueCtrl {
       return res
         .status(200)
         .json({ message: "Venue rejected successfully", venue });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(404).json({ message: error.message || error });
     }
   }

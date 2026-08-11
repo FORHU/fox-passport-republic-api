@@ -23,7 +23,8 @@ export default class AttendeeCtrl {
       );
 
       return res.status(201).json({ success: true, data: attendee });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -32,7 +33,8 @@ export default class AttendeeCtrl {
     try {
       await BookingSvc.removeAttendee(req.params.id, req.user!.userId);
       return res.status(200).json({ success: true, message: "Guest removed" });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -53,7 +55,8 @@ export default class AttendeeCtrl {
       );
 
       return res.status(200).json({ success: true, data: attendee });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }

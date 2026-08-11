@@ -78,7 +78,7 @@ export default class ReviewSvc {
     if (data.bookingId) {
       await prisma.booking.update({
         where: { id: String(data.bookingId) },
-        data: { hasReview: true } as any,
+        data: { hasReview: true },
       });
     }
 
@@ -220,7 +220,10 @@ export default class ReviewSvc {
     return ReviewRepo.createReply(reviewId, userId, text);
   }
 
-  static async updateReview(id: string, data: any) {
+  static async updateReview(
+    id: string,
+    data: Partial<{ rating: number; comment: string }>,
+  ) {
     return ReviewRepo.updateReview(id, data);
   }
 

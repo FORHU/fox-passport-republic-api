@@ -19,7 +19,8 @@ export default class WaitlistCtrl {
         req.user!.userId,
       );
       return res.status(201).json({ success: true, data: result });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
     }
   }
@@ -39,7 +40,8 @@ export default class WaitlistCtrl {
       return res
         .status(200)
         .json({ success: true, message: "Removed from waitlist" });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
     }
   }
@@ -60,7 +62,8 @@ export default class WaitlistCtrl {
         req.user?.userId,
       );
       return res.status(200).json({ success: true, data: result });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
     }
   }

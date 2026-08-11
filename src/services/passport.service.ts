@@ -243,7 +243,7 @@ export default class PassportSvc {
 
   // Sort a list of items so owners with the given perk appear first.
   // perkPriority: ordered highest→lowest. Items are scored by their highest matching perk.
-  static async sortByFeaturedPerk<T extends Record<string, any>>(
+  static async sortByFeaturedPerk<T extends Record<string, unknown>>(
     items: T[],
     perkPriority: string | string[],
     ownerField = "ownerId",
@@ -264,7 +264,9 @@ export default class PassportSvc {
     const perkMap = new Map(passports.map((p) => [p.userId, p.perks]));
 
     const score = (item: T) => {
-      const perks = perkMap.get(item[ownerField]) ?? [];
+      const ownerId = item[ownerField];
+      const perks =
+        (typeof ownerId === "string" ? perkMap.get(ownerId) : undefined) ?? [];
       for (let i = 0; i < priority.length; i++) {
         if (perks.includes(priority[i])) return priority.length - i;
       }
@@ -285,7 +287,7 @@ export default class PassportSvc {
 
   // Enrich a list of items with the highest-priority badge each owner holds.
   // Returns items with an added `ownerBadge: string | null` field.
-  static async enrichWithOwnerBadge<T extends Record<string, any>>(
+  static async enrichWithOwnerBadge<T extends Record<string, unknown>>(
     items: T[],
     badgePriority: string | string[],
     ownerField = "ownerId",
@@ -306,7 +308,9 @@ export default class PassportSvc {
     const perkMap = new Map(passports.map((p) => [p.userId, p.perks]));
 
     return items.map((item) => {
-      const perks = perkMap.get(item[ownerField]) ?? [];
+      const ownerId = item[ownerField];
+      const perks =
+        (typeof ownerId === "string" ? perkMap.get(ownerId) : undefined) ?? [];
       const badge = priority.find((b) => perks.includes(b)) ?? null;
       return { ...item, ownerBadge: badge };
     });

@@ -7,7 +7,8 @@ export default class CancellationPolicyCtrl {
     try {
       const policies = await CancellationPolicySvc.getAll();
       return res.status(200).json({ success: true, data: policies });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -20,7 +21,8 @@ export default class CancellationPolicyCtrl {
 
       const policy = await CancellationPolicySvc.getById(value.id);
       return res.status(200).json({ success: true, data: policy });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(404).json({ success: false, message: error.message });
     }
   }
@@ -47,7 +49,8 @@ export default class CancellationPolicyCtrl {
 
       const policy = await CancellationPolicySvc.create(value);
       return res.status(201).json({ success: true, data: policy });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -81,7 +84,8 @@ export default class CancellationPolicyCtrl {
 
       const policy = await CancellationPolicySvc.update(params.id, value);
       return res.status(200).json({ success: true, data: policy });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -96,7 +100,8 @@ export default class CancellationPolicyCtrl {
       return res
         .status(200)
         .json({ success: true, message: "Policy deactivated" });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }

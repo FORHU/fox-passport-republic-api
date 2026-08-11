@@ -26,6 +26,7 @@ export const registerSocketGateway = (io: Server) => {
       };
       socket.userId = decoded.userId;
       next();
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
       next(new Error("Invalid or expired token"));
     }

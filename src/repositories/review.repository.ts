@@ -11,8 +11,10 @@ const REPLY_INCLUDE = {
 function mapReplies<T extends { reviewReplies?: unknown }>(
   obj: T,
 ): Omit<T, "reviewReplies"> & { replies: T["reviewReplies"] } {
-  const { reviewReplies, ...rest } = obj as any;
-  return { ...rest, replies: reviewReplies } as any;
+  const { reviewReplies, ...rest } = obj;
+  return { ...rest, replies: reviewReplies } as Omit<T, "reviewReplies"> & {
+    replies: T["reviewReplies"];
+  };
 }
 
 function mapRepliesList<T extends { reviewReplies?: unknown }>(

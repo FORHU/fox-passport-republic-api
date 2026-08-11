@@ -5,10 +5,53 @@ import PaymentRepo from "../repositories/payment.repository";
 import PayoutSvc from "./payout.service";
 import { prisma } from "../utils/prisma";
 import crypto from "crypto";
-import { BookingStatus, PaymentType, ItemBookingStatus } from "@prisma/client";
+import {
+  BookingStatus,
+  ItemBookingStatus,
+  EventCategory,
+  InviteStatus,
+  Prisma,
+} from "@prisma/client";
+
+/** Attendee supplied when creating a booking or invited afterwards. */
+export interface AttendeeInput {
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+  /** Set when the guest already has a platform account. */
+  userId?: string;
+}
+
+/**
+ * Payload accepted by `createBooking`. Two paths share this shape:
+ *  - direct venue booking — `venueId` plus `startDate`/`endDate`
+ *  - booking an existing event — `eventId`, dates come from the event
+ *
+ * That is why the date fields are optional here: neither path requires all of
+ * them, and which subset is mandatory is enforced in the branch that uses it.
+ */
+export interface CreateBookingInput {
+  userId: string;
+  eventId?: string;
+  venueId?: string;
+  startDate?: string | Date;
+  endDate?: string | Date;
+  guestCount?: number;
+  totalAmount?: number;
+  currency?: string;
+  specialRequests?: string;
+  attendees?: AttendeeInput[];
+}
+
+/** Caller identity used for role-based visibility filtering. */
+export interface BookingViewerContext {
+  userId?: string;
+  systemRole?: string;
+}
 
 export default class BookingSvc {
-  static async createBooking(data: any) {
+  static async createBooking(data: CreateBookingInput) {
     const { attendees, eventId, venueId, startDate, endDate, userId, ...rest } =
       data;
 
@@ -19,6 +62,12 @@ export default class BookingSvc {
         include: { mayor: true },
       });
       if (!venue) throw new Error("Venue not found");
+
+      // A direct venue booking has no event to inherit dates from, so the
+      // caller must supply them.
+      if (!startDate || !endDate) {
+        throw new Error("startDate and endDate are required to book a venue");
+      }
 
       const startAt = new Date(startDate);
       const endAt = new Date(endDate);
@@ -38,9 +87,9 @@ export default class BookingSvc {
               : venue.billingRate === "monthly"
                 ? Math.ceil(days / 30)
                 : 1;
-      const itemsTotal = venue.price * rateMultiplier;
-      const platformFeeAmount = Math.round(itemsTotal * 0.05 * 100) / 100;
-      const totalAmount = data.totalAmount || itemsTotal + platformFeeAmount;
+      const itemsTotal = venue.price.mul(rateMultiplier);
+      const platformFeeAmount = itemsTotal.mul(0.05);
+      const totalAmount = data.totalAmount || itemsTotal.add(platformFeeAmount);
 
       // Create a minimal Event (no template — direct venue booking)
       const event = await prisma.event.create({
@@ -49,7 +98,7 @@ export default class BookingSvc {
           organizerId: venue.mayorId,
           name: `${venue.name} Booking`,
           description: venue.description,
-          eventCategory: "other" as any,
+          eventCategory: EventCategory.other,
           startAt,
           endAt,
           guestCount: data.guestCount || 1,
@@ -81,10 +130,12 @@ export default class BookingSvc {
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24);
 
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { specialRequests, ...bookingData } = rest;
 
       const booking = await BookingRepo.create({
         ...bookingData,
+        guestCount: data.guestCount ?? 1,
         totalAmount,
         startAt,
         endAt,
@@ -96,8 +147,8 @@ export default class BookingSvc {
 
       await PaymentSvc.createPayment({
         bookingId: booking.id,
-        amount: totalAmount,
-        currency: data.currency || "PHP",
+        amount: Number(totalAmount),
+        currency: data.currency ?? "PHP",
         method: "pending",
         paymentType: "full",
         expiresAt,
@@ -118,12 +169,13 @@ export default class BookingSvc {
     }
 
     // ── Existing event-based booking path ────────────────────────────────
+    if (!data.eventId) throw new Error("eventId is required");
     const event = await EventRequestRepo.findById(data.eventId);
     if (!event) throw new Error("Event not found");
 
     // early_bird: if template has publicOpenAt in the future, only early_bird holders can book
     const { default: PassportSvc } = await import("./passport.service");
-    const template = (event as any).template;
+    const template = event.template;
     if (
       template?.publicOpenAt &&
       new Date() < new Date(template.publicOpenAt)
@@ -143,7 +195,7 @@ export default class BookingSvc {
       "priority_access",
     );
 
-    const attendeesWithTickets = (attendees || []).map((a: any) => ({
+    const attendeesWithTickets = (attendees ?? []).map((a) => ({
       ...a,
       invitedById: userId,
       isDraft: true,
@@ -155,17 +207,19 @@ export default class BookingSvc {
 
     const totalAmount = data.totalAmount || 0;
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { specialRequests: _, ...cleanRest } = rest;
 
     const booking = await BookingRepo.create({
       ...cleanRest,
+      guestCount: data.guestCount ?? 1,
       totalAmount,
       startAt: event.startAt,
       endAt: event.endAt,
       expiresAt,
       ticketCode: `BKG-${crypto.randomBytes(5).toString("hex").toUpperCase()}`,
-      ...(hasPriorityAccess ? { status: "confirmed" as any } : {}),
-      event: { connect: { id: eventId } },
+      ...(hasPriorityAccess ? { status: BookingStatus.confirmed } : {}),
+      event: { connect: { id: data.eventId } },
       user: { connect: { id: userId } },
       attendees: { create: attendeesWithTickets },
     });
@@ -189,13 +243,17 @@ export default class BookingSvc {
     return booking;
   }
 
-  static async getAllBookings(filters: any, page = 1, limit = 10) {
+  static async getAllBookings(
+    filters: Prisma.BookingWhereInput,
+    page = 1,
+    limit = 10,
+  ) {
     await PaymentRepo.cancelExpiredPayments();
     const skip = (page - 1) * limit;
     return BookingRepo.findAll(filters, skip, limit);
   }
 
-  static async getBookingById(id: string, userContext?: any) {
+  static async getBookingById(id: string, userContext?: BookingViewerContext) {
     // Lazy cleanup
     await PaymentRepo.cancelExpiredPayments();
     const booking = await BookingRepo.findById(id);
@@ -203,7 +261,7 @@ export default class BookingSvc {
 
     // Role-based visibility filtering
     const isOwner = booking.userId === userContext?.userId;
-    const isHost = (booking.event as any)?.host?.id === userContext?.userId;
+    const isHost = booking.event?.host?.id === userContext?.userId;
     const isAdmin = userContext?.systemRole === "admin";
 
     if (isHost && !isAdmin && !isOwner) {
@@ -214,7 +272,11 @@ export default class BookingSvc {
     return booking;
   }
 
-  static async addAttendee(bookingId: string, data: any, inviterId: string) {
+  static async addAttendee(
+    bookingId: string,
+    data: AttendeeInput,
+    inviterId: string,
+  ) {
     const booking = await BookingRepo.findById(bookingId);
     if (!booking) throw new Error("Booking not found");
     if (booking.isGuestListLocked) throw new Error("Guest list is locked");
@@ -241,7 +303,7 @@ export default class BookingSvc {
     const attendee = await BookingRepo.findAttendeeById(attendeeId);
     if (!attendee) throw new Error("Attendee not found");
 
-    const booking = attendee.booking as any;
+    const booking = attendee.booking;
     if (booking.userId !== userId) throw new Error("Unauthorized");
     if (booking.isGuestListLocked) throw new Error("Guest list is locked");
 
@@ -259,7 +321,7 @@ export default class BookingSvc {
 
   static async respondToInvite(
     identifier: string,
-    status: any,
+    status: InviteStatus,
     userId?: string,
   ) {
     let attendee = await BookingRepo.findAttendeeByTicketCode(identifier);
@@ -296,7 +358,7 @@ export default class BookingSvc {
     if (!booking) throw new Error("Booking not found");
 
     const isOwner = booking.userId === requesterId;
-    const isOrganizer = (booking.event as any)?.organizerId === requesterId;
+    const isOrganizer = booking.event?.organizerId === requesterId;
     if (!isOwner && !isOrganizer) throw new Error("Unauthorized");
 
     const updated = await BookingRepo.updateStatus(
@@ -322,7 +384,7 @@ export default class BookingSvc {
         .then(async ({ default: PassportSvc, XP_REWARDS, UserPath }) => {
           const venueTx = await prisma.eventVenueTransaction.findFirst({
             where: {
-              eventId: (booking.event as any)?.id ?? (booking as any).eventId,
+              eventId: booking.event?.id ?? booking.eventId,
             },
             select: { providerId: true, venueId: true },
           });
@@ -347,8 +409,8 @@ export default class BookingSvc {
       // Check EventFoxer specialization
       import("./specialization.service")
         .then(async ({ default: SpecializationSvc }) => {
-          const organizerId = (booking.event as any)?.organizerId;
-          const eventCategory = (booking.event as any)?.eventCategory;
+          const organizerId = booking.event?.organizerId;
+          const eventCategory = booking.event?.eventCategory;
           if (organizerId && eventCategory) {
             await SpecializationSvc.checkEventFoxer(organizerId, eventCategory);
           }
@@ -366,7 +428,7 @@ export default class BookingSvc {
     const booking = await BookingRepo.findById(id);
     if (!booking) throw new Error("Booking not found");
 
-    const organizerId = (booking.event as any)?.organizerId;
+    const organizerId = booking.event?.organizerId;
     if (organizerId !== hostId) {
       throw new Error("Unauthorized — you are not the host of this event");
     }
