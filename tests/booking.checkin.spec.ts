@@ -63,9 +63,9 @@ describe("BookingSvc.checkInAndSettle", () => {
       event: { organizerId: "host1" },
     });
 
-    await expect(BookingSvc.checkInAndSettle("b1", "someone-else")).rejects.toThrow(
-      /not the host/,
-    );
+    await expect(
+      BookingSvc.checkInAndSettle("b1", "someone-else"),
+    ).rejects.toThrow(/not the host/);
   });
 
   it("rejects an unpaid (pending) booking", async () => {
