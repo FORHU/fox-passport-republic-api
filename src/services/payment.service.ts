@@ -198,11 +198,14 @@ export default class PaymentSvc {
     // Use the server-computed, trustworthy Event.totalAmount (itemsTotal +
     // hostMarkupAmount + platformFeeAmount) rather than re-summing only the item
     // transactions — re-summing silently excluded Host markup and platform fee.
-    const totalAgreed = (booking as any).event?.totalAmount ?? 0;
+    // These columns are Prisma `Decimal`, not `number`. decimal.js defines
+    // valueOf() as a *string*, so `0 + amount` concatenates instead of adding —
+    // the previous `any` casts hid that. Convert explicitly before arithmetic.
+    const totalAgreed = Number(booking.event?.totalAmount ?? 0);
 
-    const paidAmount = (booking.payments || [])
-      .filter((p: any) => p.status === PaymentStatus.completed)
-      .reduce((sum: number, p: any) => sum + p.amount, 0);
+    const paidAmount = (booking.payments ?? [])
+      .filter((p) => p.status === PaymentStatus.completed)
+      .reduce((sum, p) => sum + Number(p.amount), 0);
 
     return {
       totalAmount: totalAgreed,

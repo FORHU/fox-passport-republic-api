@@ -2,10 +2,67 @@ import {
   EventCategory,
   MatchConstraint,
   MatchRequestStatus,
+  Prisma,
 } from "@prisma/client";
 import { prisma } from "../utils/prisma";
 import EventTemplateRepo from "../repositories/event-template.repository";
 import { PLATFORM_FEE_PERCENT } from "../config";
+
+/** A money column as Prisma returns it, or a plain number from an in-memory draft. */
+type Amount = Prisma.Decimal | number | null | undefined;
+
+/**
+ * Money columns come back as Prisma `Decimal`, whose `valueOf()` is a *string*.
+ * `a + b` on two of those concatenates rather than adds, so every amount is
+ * converted through here before arithmetic.
+ */
+function toAmount(value: Amount): number {
+  if (value === null || value === undefined) return 0;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Price for one attached item: the negotiated price when there is one,
+ * otherwise the supplier's listed price.
+ *
+ * `agreedPrice` is `Decimal @default(0)` and non-nullable, so it always arrives
+ * as a *truthy object*. The original `agreedPrice || listed` therefore never
+ * fell back, and items nobody had negotiated a price for were silently counted
+ * as 0. Comparing the converted number restores the intended fallback.
+ */
+function itemPrice(agreedPrice: Amount, listedPrice: Amount): number {
+  const agreed = toAmount(agreedPrice);
+  return agreed > 0 ? agreed : toAmount(listedPrice);
+}
+
+interface PricedItem {
+  /** Optional: the lite browse query selects prices without row ids. */
+  id?: string;
+  agreedPrice?: Amount;
+}
+
+/**
+ * The minimum shape `calculateItemsTotal` needs. Deliberately structural rather
+ * than a single `EventTemplateGetPayload`, because callers pass templates loaded
+ * with different `include` sets as well as unsaved drafts.
+ */
+export interface TemplateForPricing {
+  /** Percentage the Host adds on top of the summed item prices. */
+  hostMarkupPct?: number | null;
+  templateAssets?:
+    | (PricedItem & {
+        quantity?: number | null;
+        asset?: { price?: Amount } | null;
+      })[]
+    | null;
+  templateServices?:
+    | (PricedItem & { service?: { price?: Amount } | null })[]
+    | null;
+  templateVenues?:
+    | (PricedItem & { venue?: { price?: Amount } | null })[]
+    | null;
+}
 
 export default class EventTemplateSvc {
   static async createTemplate(data: {
@@ -85,7 +142,7 @@ export default class EventTemplateSvc {
           ...t,
           ...totals,
           price: totals.totalAmount,
-          rating: (t as any).rating ?? null,
+          rating: "rating" in t ? t.rating : null,
         };
       }),
       total,
@@ -114,13 +171,13 @@ export default class EventTemplateSvc {
         limit: filters.limit ?? 50,
       });
     const { default: PassportSvc } = await import("./passport.service");
-    const withTotals = templates.map((t: any) => {
+    const withTotals = templates.map((t) => {
       const totals = this.calculateTotalsBreakdown(t);
       return {
         ...t,
         ...totals,
         price: totals.totalAmount,
-        rating: (t as any).rating ?? null,
+        rating: "rating" in t ? t.rating : null,
       };
     });
     const sorted = await PassportSvc.sortByFeaturedPerk(
@@ -131,7 +188,7 @@ export default class EventTemplateSvc {
     // maxPrice is enforced after price computation (server-computed totalAmount)
     const filtered =
       filters.maxPrice != null
-        ? sorted.filter((t: any) => (t.price ?? 0) <= filters.maxPrice!)
+        ? sorted.filter((t) => (t.price ?? 0) <= filters.maxPrice!)
         : sorted;
     return { templates: filtered, total };
   }
@@ -153,7 +210,7 @@ export default class EventTemplateSvc {
    * standalone since a few callers only need the raw supplier total.
    */
   static calculateItemsTotal(
-    template: any,
+    template: TemplateForPricing,
     exclusions?: {
       excludedAssetIds?: string[];
       excludedServiceIds?: string[];
@@ -167,9 +224,9 @@ export default class EventTemplateSvc {
 
     // Sum Assets
     if (template.templateAssets) {
-      template.templateAssets.forEach((ta: any) => {
-        if (excludedAssetIds.includes(ta.id)) return;
-        const price = ta.agreedPrice || ta.asset?.price || 0;
+      template.templateAssets.forEach((ta) => {
+        if (ta.id && excludedAssetIds.includes(ta.id)) return;
+        const price = itemPrice(ta.agreedPrice, ta.asset?.price);
         const qty = ta.quantity || 1;
         total += price * qty;
       });
@@ -177,19 +234,17 @@ export default class EventTemplateSvc {
 
     // Sum Services
     if (template.templateServices) {
-      template.templateServices.forEach((ts: any) => {
-        if (excludedServiceIds.includes(ts.id)) return;
-        const price = ts.agreedPrice || ts.service?.price || 0;
-        total += price;
+      template.templateServices.forEach((ts) => {
+        if (ts.id && excludedServiceIds.includes(ts.id)) return;
+        total += itemPrice(ts.agreedPrice, ts.service?.price);
       });
     }
 
     // Sum Venues
     if (template.templateVenues) {
-      template.templateVenues.forEach((tv: any) => {
-        if (excludedVenueIds.includes(tv.id)) return;
-        const price = tv.agreedPrice || tv.venue?.price || 0;
-        total += price;
+      template.templateVenues.forEach((tv) => {
+        if (tv.id && excludedVenueIds.includes(tv.id)) return;
+        total += itemPrice(tv.agreedPrice, tv.venue?.price);
       });
     }
 
@@ -197,7 +252,7 @@ export default class EventTemplateSvc {
   }
 
   /** @deprecated use calculateItemsTotal / calculateTotalsBreakdown */
-  static calculateTotalAmount(template: any): number {
+  static calculateTotalAmount(template: TemplateForPricing): number {
     return this.calculateItemsTotal(template);
   }
 
@@ -210,7 +265,7 @@ export default class EventTemplateSvc {
    * the Host's or any provider's share (see docs/adr/0002-stripe-connect-payouts.md).
    */
   static calculateTotalsBreakdown(
-    template: any,
+    template: TemplateForPricing,
     exclusions?: {
       excludedAssetIds?: string[];
       excludedServiceIds?: string[];
@@ -295,7 +350,7 @@ export default class EventTemplateSvc {
     // to 0 at the repo layer, which is what providers actually get paid (the citizen's
     // total is computed from the live price, so an unset agreedPrice meant the citizen
     // was charged correctly but the provider would be paid $0).
-    const finalAgreedPrice = agreedPrice ?? asset.price * quantity;
+    const finalAgreedPrice = agreedPrice ?? asset.price.toNumber() * quantity;
 
     return EventTemplateRepo.attachAsset(
       templateId,
@@ -369,7 +424,7 @@ export default class EventTemplateSvc {
     }
 
     // See attachAsset's comment — default to the service's own listed price.
-    const finalAgreedPrice = agreedPrice ?? service.price;
+    const finalAgreedPrice = agreedPrice ?? service.price.toNumber();
 
     return EventTemplateRepo.attachService(
       templateId,
@@ -409,7 +464,7 @@ export default class EventTemplateSvc {
     if (!venueId) {
       return EventTemplateRepo.attachVenue(
         templateId,
-        undefined as any,
+        undefined,
         undefined,
         description,
         matchedAt,
@@ -440,7 +495,7 @@ export default class EventTemplateSvc {
     }
 
     // See attachAsset's comment — default to the venue's own listed price.
-    const finalAgreedPrice = agreedPrice ?? venue.price;
+    const finalAgreedPrice = agreedPrice ?? venue.price.toNumber();
 
     return EventTemplateRepo.attachVenue(
       templateId,
@@ -493,16 +548,20 @@ export default class EventTemplateSvc {
     );
     if (!template) throw new Error("Template not found");
 
-    const filters: any = {};
+    const filters: { state?: string; country?: string; category?: string } = {};
     if (params.scope === "state") {
-      filters.state = template.targetState;
-      filters.country = template.targetCountry;
+      filters.state = template.targetState ?? undefined;
+      filters.country = template.targetCountry ?? undefined;
     } else if (params.scope === "country") {
-      filters.country = template.targetCountry;
+      filters.country = template.targetCountry ?? undefined;
     }
     if (params.category) filters.category = params.category;
 
-    let results: any[] = [];
+    let results: {
+      id: string;
+      state: string | null;
+      country: string | null;
+    }[] = [];
     if (params.type === "venue")
       results = await EventTemplateRepo.searchVenuesByLocation(filters);
     else if (params.type === "service")
@@ -550,7 +609,11 @@ export default class EventTemplateSvc {
     );
 
     // Fetch provider to validate location
-    let provider: any;
+    let provider: {
+      id: string;
+      state: string | null;
+      country: string | null;
+    } | null = null;
     if (params.type === "venue")
       provider = await prisma.venue.findUnique({
         where: { id: params.providerId },
