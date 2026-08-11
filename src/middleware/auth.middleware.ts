@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { ACCESS_TOKEN_SECRET } from "../config";
+import { AuthorizableRole, toAuthenticatedUser } from "../types/auth";
 
 /**
  * Authentication Middleware
@@ -13,10 +14,8 @@ export const authenticate = (
 ) => {
   try {
     const authHeader = req.headers.authorization;
-    console.log(`[Auth] Header received: ${authHeader?.substring(0, 20)}...`);
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      console.warn(`[Auth] Invalid header format: ${authHeader}`);
       return res.status(401).json({
         success: false,
         message: "No token provided",
@@ -25,21 +24,19 @@ export const authenticate = (
 
     const token = authHeader.substring(7).replace(/"/g, ""); // Remove 'Bearer ' and any accidental quotes
 
-    // Verify token
-    const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET) as any;
+    const user = toAuthenticatedUser(jwt.verify(token, ACCESS_TOKEN_SECRET));
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token",
+      });
+    }
 
-    // Attach user to request
-    req.user = {
-      userId: decoded.userId,
-      systemRole: decoded.systemRole || "user",
-      roleType: decoded.roleType || [],
-      email: decoded.email,
-      // Keep role for backward compatibility if needed, mapping to systemRole
-      role: decoded.systemRole || decoded.role || "user",
-    };
+    req.user = user;
 
     next();
-  } catch (error: any) {
+  } catch (e: unknown) {
+    const error = e as Error;
     if (error.name === "TokenExpiredError") {
       return res.status(401).json({
         success: false,
@@ -67,20 +64,13 @@ export const optionalAuth = (
     const authHeader = req.headers.authorization;
 
     if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.substring(7);
-      const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET) as any;
-
-      req.user = {
-        userId: decoded.userId,
-        systemRole: decoded.systemRole || "user",
-        roleType: decoded.roleType || [],
-        email: decoded.email,
-        role: decoded.systemRole || decoded.role || "user",
-      };
+      const token = authHeader.substring(7).replace(/"/g, "");
+      const user = toAuthenticatedUser(jwt.verify(token, ACCESS_TOKEN_SECRET));
+      if (user) req.user = user;
     }
 
     next();
-  } catch (error) {
+  } catch {
     // Don't fail if token is invalid in optional auth
     next();
   }
@@ -92,7 +82,7 @@ export const optionalAuth = (
  *
  * @param allowedRoles - Array of allowed roles (can be SystemRole or RoleType)
  */
-export const requireRole = (allowedRoles: string[]) => {
+export const requireRole = (allowedRoles: AuthorizableRole[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     // Check if user is authenticated
     if (!req.user) {
@@ -102,22 +92,17 @@ export const requireRole = (allowedRoles: string[]) => {
       });
     }
 
-    const userSystemRole = req.user.systemRole;
-    const userRoleTypes = req.user.roleType;
+    const { systemRole, roleType } = req.user;
 
     // Check if user has required SystemRole or any required RoleType
-    const hasSystemRole = allowedRoles.includes(userSystemRole);
-    const hasRoleType = allowedRoles.some((role) =>
-      userRoleTypes.includes(role as any),
-    );
+    const hasSystemRole = allowedRoles.includes(systemRole);
+    const hasRoleType = roleType.some((role) => allowedRoles.includes(role));
 
     if (!hasSystemRole && !hasRoleType) {
       return res.status(403).json({
         success: false,
         message: "Insufficient permissions",
         requiredRoles: allowedRoles,
-        userSystemRole,
-        userRoleTypes,
       });
     }
 
@@ -126,19 +111,18 @@ export const requireRole = (allowedRoles: string[]) => {
 };
 
 /**
- * Check if user is admin or super_admin
+ * Check if user is an admin.
+ *
+ * Note: `SystemRole` is only `user | admin` — there is no `super_admin` tier.
+ * A previous `requireSuperAdmin` guarded against a role no user could hold,
+ * so every request it protected was rejected.
  */
-export const requireAdmin = requireRole(["admin", "super_admin"]);
+export const requireAdmin = requireRole(["admin"]);
 
 /**
- * Check if user is super_admin only
+ * Check if user can act as an event host (EventFoxer) or is an admin
  */
-export const requireSuperAdmin = requireRole(["super_admin"]);
-
-/**
- * Check if user is host, admin, or super_admin
- */
-export const requireHost = requireRole(["eventFoxer", "admin", "super_admin"]);
+export const requireHost = requireRole(["eventFoxer", "admin"]);
 
 /**
  * Resource Owner or Admin Middleware
@@ -162,7 +146,7 @@ export const requireOwnerOrAdmin = (
 
     const ownerId = getUserIdFromRequest(req);
     const isOwner = req.user.userId === ownerId;
-    const isAdmin = ["admin", "super_admin"].includes(req.user.role);
+    const isAdmin = req.user.systemRole === "admin";
 
     if (!isOwner && !isAdmin) {
       return res.status(403).json({

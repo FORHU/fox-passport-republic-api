@@ -1,6 +1,10 @@
 import express from "express";
 import VenueCtrl from "../controllers/venue.controller";
-import { authenticate, requireRole } from "../middleware/auth.middleware";
+import {
+  authenticate,
+  requireRole,
+  requireAdmin,
+} from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -33,14 +37,9 @@ router.delete(
 router.patch(
   "/:id/approve",
   authenticate,
-  requireRole(["admin", "super_admin"]),
+  requireAdmin,
   VenueCtrl.approveVenue,
 );
-router.patch(
-  "/:id/reject",
-  authenticate,
-  requireRole(["admin", "super_admin"]),
-  VenueCtrl.rejectVenue,
-);
+router.patch("/:id/reject", authenticate, requireAdmin, VenueCtrl.rejectVenue);
 
 export default router;
