@@ -1,8 +1,8 @@
 import AuthRepo from "../repositories/auth.repository";
-import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { generateOTP, saveOTP, verifyOTP, deleteOTP } from "../utils/otp.utils";
 import { sendTemplatedEmail } from "../utils/helpers";
+import { hashPassword, verifyPassword, needsRehash } from "../utils/password";
 
 import {
   ACCESS_TOKEN_SECRET,
@@ -29,12 +29,7 @@ export default class AuthSvc {
       throw new Error("Username is already taken");
     }
 
-    // Hash password (same method as login)
-    const salt = crypto.randomBytes(16).toString("hex");
-    const hash = crypto
-      .pbkdf2Sync(data.password, salt, 1000, 64, "sha512")
-      .toString("hex");
-    const hashedPassword = `${salt}:${hash}`;
+    const hashedPassword = await hashPassword(data.password);
 
     const user = await AuthRepo.createUser({
       email: data.email,
@@ -76,21 +71,21 @@ export default class AuthSvc {
     const accessToken = jwt.sign(
       {
         userId: user.id,
-        systemRole: (user as any).systemRole || "user",
-        roleType: (user as any).roleType || [],
+        systemRole: user.systemRole || "user",
+        roleType: user.roleType || [],
         email: user.email,
       },
       ACCESS_TOKEN_SECRET,
       {
-        expiresIn: ACCESS_TOKEN_EXPIRY as any,
+        expiresIn: ACCESS_TOKEN_EXPIRY,
       },
     );
 
     const refreshToken = jwt.sign(
       {
         userId: user.id,
-        systemRole: (user as any).systemRole || "user",
-        roleType: (user as any).roleType || [],
+        systemRole: user.systemRole || "user",
+        roleType: user.roleType || [],
         email: user.email,
       },
       REFRESH_TOKEN_SECRET,
@@ -123,8 +118,6 @@ export default class AuthSvc {
 
     await AuthRepo.updateUser(user.id, { isEmailVerified: true });
     await deleteOTP(email);
-    await AuthRepo.updateUser(user.id, { isEmailVerified: true });
-    await deleteOTP(email);
 
     return {
       message: "Email verified successfully! You can now login.",
@@ -137,14 +130,22 @@ export default class AuthSvc {
       throw "Invalid credentials";
     }
 
-    // Verify password
-    const [salt, storedHash] = user.password.split(":");
-    const hash = crypto
-      .pbkdf2Sync(password, salt, 1000, 64, "sha512")
-      .toString("hex");
-
-    if (storedHash !== hash) {
+    // Verify password (accepts both bcrypt and the legacy PBKDF2 format)
+    const isPasswordValid = await verifyPassword(password, user.password);
+    if (!isPasswordValid) {
       throw "Invalid credentials";
+    }
+
+    // Transparently upgrade legacy/low-cost hashes now that we have the plaintext.
+    if (needsRehash(user.password)) {
+      try {
+        await AuthRepo.updateUser(user.id, {
+          password: await hashPassword(password),
+        });
+      } catch (error) {
+        // A failed upgrade must never block a valid login.
+        console.error("Failed to upgrade password hash:", error);
+      }
     }
 
     // Update login status
@@ -154,21 +155,21 @@ export default class AuthSvc {
     const accessToken = jwt.sign(
       {
         userId: user.id,
-        systemRole: (user as any).systemRole || "user",
-        roleType: (user as any).roleType || [],
+        systemRole: user.systemRole || "user",
+        roleType: user.roleType || [],
         email: user.email,
       },
       ACCESS_TOKEN_SECRET,
       {
-        expiresIn: ACCESS_TOKEN_EXPIRY as any,
+        expiresIn: ACCESS_TOKEN_EXPIRY,
       },
     );
 
     const refreshToken = jwt.sign(
       {
         userId: user.id,
-        systemRole: (user as any).systemRole || "user",
-        roleType: (user as any).roleType || [],
+        systemRole: user.systemRole || "user",
+        roleType: user.roleType || [],
         email: user.email,
       },
       REFRESH_TOKEN_SECRET,
@@ -183,8 +184,8 @@ export default class AuthSvc {
         email: user.email,
         username: user.username,
         name: user.name,
-        systemRole: (user as any).systemRole || "user",
-        roleType: (user as any).roleType || [],
+        systemRole: user.systemRole || "user",
+        roleType: user.roleType || [],
       },
     };
   }
@@ -207,12 +208,12 @@ export default class AuthSvc {
       const accessToken = jwt.sign(
         {
           userId: user.id,
-          systemRole: (user as any).systemRole || "user",
-          roleType: (user as any).roleType || [],
+          systemRole: user.systemRole || "user",
+          roleType: user.roleType || [],
           email: user.email,
         },
         ACCESS_TOKEN_SECRET,
-        { expiresIn: ACCESS_TOKEN_EXPIRY as any },
+        { expiresIn: ACCESS_TOKEN_EXPIRY },
       );
 
       return {
@@ -224,6 +225,7 @@ export default class AuthSvc {
           name: user.name,
         },
       };
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       throw "Invalid refresh token";
     }
@@ -285,15 +287,8 @@ export default class AuthSvc {
       throw new Error("Invalid or expired reset code");
     }
 
-    // Hash new password (same method as registration)
-    const salt = crypto.randomBytes(16).toString("hex");
-    const hash = crypto
-      .pbkdf2Sync(newPassword, salt, 1000, 64, "sha512")
-      .toString("hex");
-    const hashedPassword = `${salt}:${hash}`;
+    const hashedPassword = await hashPassword(newPassword);
 
-    await AuthRepo.updateUser(user.id, { password: hashedPassword });
-    await deleteOTP(email);
     await AuthRepo.updateUser(user.id, { password: hashedPassword });
     await deleteOTP(email);
 
