@@ -4,8 +4,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    include: ["tests/**/*.spec.ts"],
-    exclude: ["tests/app.spec.ts", "tests/event-template.submit.spec.ts"],
+    include: ["tests/**/*.{test,spec}.ts"],
     testTimeout: 15000,
   },
 });

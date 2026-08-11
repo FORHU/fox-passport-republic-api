@@ -1,13 +1,16 @@
 import jwt from "jsonwebtoken";
 import { prisma } from "../src/utils/prisma";
+import { RoleType, SystemRole } from "@prisma/client";
 
 const TEST_SECRET = process.env.ACCESS_TOKEN_SECRET || "accesssecret123";
 
-export function createTestToken(userId: string, email = "test@test.com") {
-  return jwt.sign(
-    { userId, systemRole: "user", roleType: [], email },
-    TEST_SECRET,
-  );
+export function createTestToken(
+  userId: string,
+  email = "test@test.com",
+  roleType: RoleType[] = [],
+  systemRole: SystemRole = "user",
+) {
+  return jwt.sign({ userId, systemRole, roleType, email }, TEST_SECRET);
 }
 
 export async function seedTestUser(email = "waitlist-test@test.com") {
@@ -82,7 +85,10 @@ export async function cleanupWaitlist() {
   await prisma.waitlist.deleteMany({});
 }
 
-export async function cleanupTestData(userIds: string[], templateIds: string[]) {
+export async function cleanupTestData(
+  userIds: string[],
+  templateIds: string[],
+) {
   // Delete in dependency order: waitlist → bookings (by event) → events → templates → users
   await prisma.waitlist.deleteMany({});
   if (templateIds.length > 0) {
