@@ -56,7 +56,7 @@ export default class EventTransactionSvc {
             assetId: item.assetId!,
             providerId: item.asset.ownerId,
             quantity: item.quantity,
-            agreedPrice: item.asset.price * item.quantity,
+            agreedPrice: item.asset.price.toNumber() * item.quantity,
             currency: item.currency,
           }),
         );

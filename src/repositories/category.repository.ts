@@ -145,14 +145,17 @@ export default class CategoryRepo {
     return { id: found.name, name: found.name, slug: found.name.toLowerCase() };
   }
 
-  static async createCategory(_data?: any): Promise<never> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  static async createCategory(_data?: unknown): Promise<never> {
     throw new Error("Category model does not exist in current schema");
   }
 
-  static async updateCategory(_id?: string, _data?: any): Promise<never> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  static async updateCategory(_id?: string, _data?: unknown): Promise<never> {
     throw new Error("Category model does not exist in current schema");
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   static async deleteCategory(_id?: string): Promise<never> {
     throw new Error("Category model does not exist in current schema");
   }
@@ -162,6 +165,7 @@ export default class CategoryRepo {
     return !!category;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   static async slugExists(slug: string, _excludeId?: string) {
     const category = await this.getCategoryBySlug(slug);
     return !!category;

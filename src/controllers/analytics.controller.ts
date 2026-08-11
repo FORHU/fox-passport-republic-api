@@ -5,7 +5,7 @@ import AnalyticsSvc from "../services/analytics.service";
 export default class AnalyticsCtrl {
   static async getEventStats(req: Request, res: Response) {
     try {
-      const userId = (req as any).user?.userId as string;
+      const userId = req.user?.userId as string;
       const hasAnalyticsPro = await PassportSvc.hasPerk(
         userId,
         "analytics_pro",
@@ -19,7 +19,8 @@ export default class AnalyticsCtrl {
       }
       const stats = await AnalyticsSvc.getEventStats(userId);
       return res.status(200).json({ success: true, data: stats });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }

@@ -20,7 +20,8 @@ export default class UsersCtrl {
     try {
       const user = await UsersSvc.createUser(value);
       return res.status(201).json(user);
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ message: err.message });
     }
   }
@@ -60,7 +61,8 @@ export default class UsersCtrl {
           totalPages: result.totalPages,
         },
       });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(500).json({ success: false, message: err.message });
     }
   }
@@ -70,7 +72,8 @@ export default class UsersCtrl {
     try {
       const foxer = await UsersSvc.getFoxerById(req.params.id);
       return res.status(200).json({ success: true, data: foxer });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(404).json({ success: false, message: err.message });
     }
   }
@@ -80,7 +83,8 @@ export default class UsersCtrl {
     try {
       const user = await UsersSvc.getUserById(req.params.id);
       return res.json(user);
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(404).json({ message: err.message });
     }
   }
@@ -103,7 +107,8 @@ export default class UsersCtrl {
     try {
       const updatedUser = await UsersSvc.updateUser(req.params.id, value);
       return res.json(updatedUser);
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ message: err.message });
     }
   }
@@ -117,7 +122,12 @@ export default class UsersCtrl {
           .status(401)
           .json({ success: false, message: "Unauthorized" });
 
-      const user = (await UsersSvc.becomeHost(userId)) as any;
+      const user = await UsersSvc.becomeHost(userId);
+      if (!user) {
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
+      }
       return res.status(200).json({
         success: true,
         message: "You are now a host!",
@@ -130,7 +140,8 @@ export default class UsersCtrl {
           isHost: (user.roleType as string[]).includes("host"),
         },
       });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
     }
   }
@@ -146,7 +157,8 @@ export default class UsersCtrl {
 
       const stats = await UsersSvc.getFoxerStats(userId);
       return res.status(200).json({ success: true, data: stats });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(500).json({ success: false, message: err.message });
     }
   }

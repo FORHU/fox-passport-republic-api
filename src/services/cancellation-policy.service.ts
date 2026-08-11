@@ -26,11 +26,18 @@ export default class CancellationPolicySvc {
     }));
   }
 
-  private static toApi(policy: any): any {
-    if (!policy) return policy;
+  /**
+   * Re-shapes a stored policy's rules into the API's from/to hour ranges,
+   * leaving every other column untouched.
+   */
+  private static toApi<
+    T extends {
+      rules?: { id: string; hoursBeforeEvent: number; refundPercent: number }[];
+    },
+  >(policy: T) {
     return {
       ...policy,
-      rules: this.toApiRules(policy.rules || []),
+      rules: this.toApiRules(policy.rules ?? []),
     };
   }
 

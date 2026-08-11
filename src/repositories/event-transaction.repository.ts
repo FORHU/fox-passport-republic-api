@@ -1,5 +1,5 @@
 import { prisma } from "../utils/prisma";
-import { TransactionStatus } from "@prisma/client";
+import { Prisma, TransactionStatus } from "@prisma/client";
 
 export default class EventTransactionRepo {
   // ASSETS
@@ -19,7 +19,9 @@ export default class EventTransactionRepo {
     });
   }
 
-  static async createAssetTransaction(data: any) {
+  static async createAssetTransaction(
+    data: Prisma.EventAssetTransactionUncheckedCreateInput,
+  ) {
     return prisma.eventAssetTransaction.create({ data });
   }
 
@@ -52,7 +54,9 @@ export default class EventTransactionRepo {
     });
   }
 
-  static async createServiceTransaction(data: any) {
+  static async createServiceTransaction(
+    data: Prisma.EventServiceTransactionUncheckedCreateInput,
+  ) {
     return prisma.eventServiceTransaction.create({ data });
   }
 
@@ -85,7 +89,9 @@ export default class EventTransactionRepo {
     });
   }
 
-  static async createVenueTransaction(data: any) {
+  static async createVenueTransaction(
+    data: Prisma.EventVenueTransactionUncheckedCreateInput,
+  ) {
     return prisma.eventVenueTransaction.create({ data });
   }
 

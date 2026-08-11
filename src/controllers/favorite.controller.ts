@@ -11,7 +11,8 @@ export default class FavoriteCtrl {
         type,
       );
       return res.status(200).json({ success: true, data: result });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -20,21 +21,32 @@ export default class FavoriteCtrl {
     try {
       const favorites = await FavoriteSvc.getUserFavorites(req.user!.userId);
       return res.status(200).json({ success: true, data: favorites });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
 
   static async checkFavorite(req: Request, res: Response) {
     try {
-      const { targetId, type } = req.query as any;
+      const { targetId, type } = req.query as {
+        targetId?: string;
+        type?: "venue" | "event";
+      };
+      if (!targetId || (type !== "venue" && type !== "event")) {
+        return res.status(400).json({
+          success: false,
+          message: "targetId and type ('venue' | 'event') are required",
+        });
+      }
       const isFavorite = await FavoriteSvc.checkFavorite(
         req.user!.userId,
         targetId,
         type,
       );
       return res.status(200).json({ success: true, data: { isFavorite } });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -48,7 +60,8 @@ export default class FavoriteCtrl {
         type,
       );
       return res.status(201).json({ success: true, data: result });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -60,7 +73,8 @@ export default class FavoriteCtrl {
       return res
         .status(200)
         .json({ success: true, message: "Favorite removed successfully" });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -76,7 +90,8 @@ export default class FavoriteCtrl {
       return res
         .status(200)
         .json({ success: true, message: "Favorite removed successfully" });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }

@@ -1,4 +1,5 @@
 import * as dotenv from "dotenv";
+import type { SignOptions } from "jsonwebtoken";
 dotenv.config();
 
 export const DATABASE_URL = process.env.DATABASE_URL as string;
@@ -17,8 +18,16 @@ export const MAILER_EMAIL = process.env.MAILER_EMAIL as string;
 export const MAILER_PASSWORD = process.env.MAILER_PASSWORD as string;
 export const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET as string;
 export const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET as string;
-export const ACCESS_TOKEN_EXPIRY = process.env.ACCESS_TOKEN_EXPIRY as any;
-export const REFRESH_TOKEN_EXPIRY = process.env.REFRESH_TOKEN_EXPIRY as any;
+
+// `expiresIn` accepts a number of seconds or an ms-style string ("15m", "7d").
+// Env vars are always strings, so narrow to the string half of that union
+// rather than widening to `any`.
+type TokenExpiry = Extract<SignOptions["expiresIn"], string>;
+
+export const ACCESS_TOKEN_EXPIRY = (process.env.ACCESS_TOKEN_EXPIRY ??
+  "15m") as TokenExpiry;
+export const REFRESH_TOKEN_EXPIRY = (process.env.REFRESH_TOKEN_EXPIRY ??
+  "7d") as TokenExpiry;
 export const REDIS_HOST = process.env.REDIS_HOST as string;
 export const REDIS_PORT = Number(process.env.REDIS_PORT || 6379);
 export const REDIS_PASSWORD = process.env.REDIS_PASSWORD as string;

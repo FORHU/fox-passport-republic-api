@@ -13,7 +13,8 @@ export default class ReviewCtrl {
         comment: req.body.comment,
       });
       return res.status(201).json({ success: true, data: review });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -32,7 +33,8 @@ export default class ReviewCtrl {
       }
       const reviews = await ReviewSvc.getAllReviews(includeRepliesFlag);
       return res.status(200).json({ success: true, data: reviews });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -47,7 +49,8 @@ export default class ReviewCtrl {
           .status(404)
           .json({ success: false, message: "Review not found" });
       return res.status(200).json({ success: true, data: review });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -61,7 +64,8 @@ export default class ReviewCtrl {
         includeReplies,
       );
       return res.status(200).json({ success: true, data: result });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -72,7 +76,8 @@ export default class ReviewCtrl {
       const includeReplies = req.query.includeReplies === "true";
       const activity = await ReviewSvc.getRecentActivity(limit, includeReplies);
       return res.status(200).json({ success: true, data: activity });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -83,7 +88,8 @@ export default class ReviewCtrl {
       const includeReplies = req.query.includeReplies === "true";
       const reviews = await ReviewSvc.getUserReviews(userId, includeReplies);
       return res.status(200).json({ success: true, data: reviews });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -94,7 +100,8 @@ export default class ReviewCtrl {
       const { text } = req.body;
       const reply = await ReviewSvc.replyToReview(id, req.user!.userId, text);
       return res.status(201).json({ success: true, data: reply });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -104,7 +111,8 @@ export default class ReviewCtrl {
       const { id } = req.params;
       const review = await ReviewSvc.updateReview(id, req.body);
       return res.status(200).json({ success: true, data: review });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -116,7 +124,8 @@ export default class ReviewCtrl {
       return res
         .status(200)
         .json({ success: true, message: "Review deleted successfully" });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }

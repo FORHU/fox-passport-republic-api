@@ -28,7 +28,7 @@ export default class MatchController {
         venueId,
         foxerId,
       } = value;
-      const clientId = (req as any).user?.userId || (req as any).user?.id;
+      const clientId = req.user?.userId;
 
       if (!clientId) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -46,9 +46,9 @@ export default class MatchController {
       });
 
       // Only create a Stripe payment intent when there's a known amount to charge
-      if (eventRequest.totalAmount > 0) {
+      if (eventRequest.totalAmount.gt(0)) {
         const { clientSecret } = await PaymentSvc.createPaymentIntent({
-          amount: eventRequest.totalAmount,
+          amount: eventRequest.totalAmount.toNumber(),
           currency: "php",
           bookingId: booking.id,
           description: `Match Request: ${style}`,
@@ -65,29 +65,32 @@ export default class MatchController {
         bookingId: booking.id,
         clientSecret: null,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       res.status(500).json({ message: error.message });
     }
   }
 
   static async getMyMatches(req: Request, res: Response) {
     try {
-      const clientId = (req as any).user?.id || (req as any).user?.userId;
+      const clientId = req.user?.userId;
       if (!clientId) return res.status(401).json({ message: "Unauthorized" });
       const matches = await MatchSvc.getMyMatches(clientId);
       res.status(200).json({ success: true, data: matches });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       res.status(500).json({ message: error.message });
     }
   }
 
   static async acceptMatch(req: Request, res: Response) {
     try {
-      const foxerId = (req as any).user?.id || (req as any).user?.userId;
+      const foxerId = req.user?.userId;
       if (!foxerId) return res.status(401).json({ message: "Unauthorized" });
       await MatchSvc.acceptMatch(req.params.id, foxerId);
       res.status(200).json({ success: true, message: "Match accepted" });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       const status =
         error.message === "Unauthorized"
           ? 403
@@ -100,12 +103,13 @@ export default class MatchController {
 
   static async declineMatch(req: Request, res: Response) {
     try {
-      const foxerId = (req as any).user?.id || (req as any).user?.userId;
+      const foxerId = req.user?.userId;
       if (!foxerId) return res.status(401).json({ message: "Unauthorized" });
       const { reason } = req.body;
       await MatchSvc.declineMatch(req.params.id, foxerId, reason);
       res.status(200).json({ success: true, message: "Match declined" });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       const status =
         error.message === "Unauthorized"
           ? 403
@@ -118,13 +122,14 @@ export default class MatchController {
 
   static async getFoxerClientInbox(req: Request, res: Response) {
     try {
-      const foxerId = (req as any).user?.id || (req as any).user?.userId;
+      const foxerId = req.user?.userId;
       if (!foxerId) return res.status(401).json({ message: "Unauthorized" });
       const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
       const offset = parseInt(req.query.offset as string) || 0;
       const result = await MatchSvc.getFoxerClientInbox(foxerId, limit, offset);
       res.status(200).json({ success: true, ...result });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       res.status(500).json({ message: error.message });
     }
   }

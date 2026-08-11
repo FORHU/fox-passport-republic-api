@@ -28,6 +28,7 @@ class RedisUtil {
 
       await this.client.connect();
       console.log("✅ Redis connected successfully");
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       console.error(
         "❌ Redis connection failed — app will continue without Redis",

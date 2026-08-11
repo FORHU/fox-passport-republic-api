@@ -47,7 +47,7 @@ export default class MatchSvc {
         { matched: true, matchConstraint: MatchConstraint.SAME_STATE },
         `Matched venue ${venue.name} for request`,
         new Date(),
-        venue.price,
+        venue.price.toNumber(),
         false,
       );
     } else {

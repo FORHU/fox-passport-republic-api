@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../utils/prisma";
 import { SystemRole, RoleType } from "@prisma/client";
 
@@ -423,10 +424,9 @@ export default class UsersRepo {
         (serviceAgg._count.id ?? 0) +
         (assetAgg._count.id ?? 0) +
         (eventBookingAgg._count.id ?? 0),
-      totalRevenue:
-        (serviceAgg._sum.totalAmount ?? 0) +
-        (assetAgg._sum.totalAmount ?? 0) +
-        (eventBookingAgg._sum.totalAmount ?? 0),
+      totalRevenue: new Prisma.Decimal(serviceAgg._sum.totalAmount ?? 0)
+        .add(assetAgg._sum.totalAmount ?? 0)
+        .add(eventBookingAgg._sum.totalAmount ?? 0),
       rating: reviewAgg._avg.rating ?? 5.0,
     };
   }

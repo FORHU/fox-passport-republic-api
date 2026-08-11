@@ -36,7 +36,8 @@ export default class AuthCtrl {
       return res
         .status(201)
         .json({ message: "User registered successfully", user });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ message: error.message || error });
     }
   }
@@ -55,7 +56,8 @@ export default class AuthCtrl {
 
       const result = await AuthSvc.verifyEmail(value.email, value.otpCode);
       return res.status(200).json(result);
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ message: error.message });
     }
   }
@@ -76,7 +78,8 @@ export default class AuthCtrl {
     try {
       const result = await AuthSvc.login({ email, password });
       return res.json(result);
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Login error:", error);
       return res.status(401).json({
         message: error.message || error,
@@ -99,7 +102,8 @@ export default class AuthCtrl {
     try {
       const result = await AuthSvc.refreshToken(refreshToken);
       return res.json(result);
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Refresh token error:", error);
       return res.status(401).json({ message: error.message || error });
     }
@@ -119,7 +123,8 @@ export default class AuthCtrl {
       const result = await AuthSvc.forgotPassword(value.email);
 
       return res.status(200).json(result);
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({
         message: error.message || "Failed to process request",
       });
@@ -146,7 +151,8 @@ export default class AuthCtrl {
       );
 
       return res.status(200).json(result);
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({
         message: error.message || "Failed to reset password",
       });
@@ -166,7 +172,8 @@ export default class AuthCtrl {
 
       const result = await AuthSvc.resendVerificationOTP(value.email);
       return res.status(200).json(result);
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ message: error.message });
     }
   }
@@ -179,7 +186,8 @@ export default class AuthCtrl {
         success: true,
         message: "Logged out successfully",
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({
         success: false,
         message: error.message || "Failed to logout",

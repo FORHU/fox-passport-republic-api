@@ -27,7 +27,8 @@ export default class PaymentController {
         count: payments.length,
         data: payments,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Get all payments error:", error);
       return res.status(500).json({
         success: false,
@@ -53,7 +54,8 @@ export default class PaymentController {
         success: true,
         data: payment,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Get payment by ID error:", error);
       if (error.message === "Payment not found") {
         return res.status(404).json({ success: false, message: error.message });
@@ -84,7 +86,8 @@ export default class PaymentController {
         success: true,
         data: payment,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Get payment by transaction ID error:", error);
       if (error.message === "Payment not found") {
         return res.status(404).json({ success: false, message: error.message });
@@ -126,7 +129,8 @@ export default class PaymentController {
         message: "Payment created successfully",
         data: payment,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Create payment error:", error);
       return res.status(500).json({
         success: false,
@@ -167,7 +171,8 @@ export default class PaymentController {
         message: "Payment updated successfully",
         data: payment,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Update payment error:", error);
       if (error.message === "Payment not found") {
         return res.status(404).json({ success: false, message: error.message });
@@ -197,7 +202,8 @@ export default class PaymentController {
         count: payments.length,
         data: payments,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Get booking payments error:", error);
       return res.status(500).json({
         success: false,
@@ -223,7 +229,8 @@ export default class PaymentController {
         success: true,
         data: balance,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Get remaining balance error:", error);
       return res.status(500).json({
         success: false,
@@ -252,7 +259,8 @@ export default class PaymentController {
         success: true,
         data: intentData,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Create payment intent error:", error);
       return res.status(500).json({
         success: false,
@@ -280,7 +288,8 @@ export default class PaymentController {
         apiVersion: "2025-08-27.basil",
       });
       event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       console.error(`❌ Webhook signature verification failed: ${err.message}`);
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }

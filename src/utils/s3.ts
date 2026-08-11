@@ -24,9 +24,10 @@ const s3Client = new S3Client({
 // This middleware runs just before signing and removes the Checksum property
 // that the AWS SDK v3 often injects automatically.
 s3Client.middlewareStack.add(
-  (next) => (args: any) => {
-    if (args.input) {
-      delete args.input.ChecksumAlgorithm;
+  (next) => (args) => {
+    const input = args.input as { ChecksumAlgorithm?: unknown } | undefined;
+    if (input) {
+      delete input.ChecksumAlgorithm;
     }
     return next(args);
   },
@@ -51,7 +52,7 @@ export async function getPutObjectPresignedUrl(params: {
     ContentType: contentType,
     // Explicitly set to undefined to prevent SDK injection
     ChecksumAlgorithm: undefined,
-  } as any);
+  });
 
   // Sign only the host to keep it as simple as possible for the browser
   const url = await getSignedUrl(s3Client, command, {

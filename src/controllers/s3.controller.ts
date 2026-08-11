@@ -48,7 +48,8 @@ class S3Controller {
       );
 
       return res.status(200).json(result);
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       const message = err?.message || "Failed to generate presigned URL";
       return res.status(500).json({ message });
     }
@@ -73,7 +74,8 @@ class S3Controller {
       const result = await S3Svc.generateDownloadUrl(value.key);
 
       return res.status(200).json(result);
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       const message = err?.message || "Failed to generate presigned URL";
       return res.status(500).json({ message });
     }
