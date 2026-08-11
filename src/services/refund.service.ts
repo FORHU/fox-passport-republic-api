@@ -1,4 +1,10 @@
 import Stripe from "stripe";
+import {
+  PaymentStatus,
+  Prisma,
+  RefundStatus,
+  type Refund,
+} from "@prisma/client";
 import { prisma } from "../utils/prisma";
 import { STRIPE_SECRET_KEY } from "../config";
 import { sendBookingCancelledEmail } from "../utils/emails/cancellation";
@@ -113,10 +119,10 @@ export default class RefundSvc {
     const now = new Date();
 
     const policy = (booking.event.template?.cancellationPolicy ??
-      (booking.event as any).venueTransactions?.[0]?.venue
-        ?.cancellationPolicy ??
-      (booking.event as any).serviceTransactions?.[0]?.service
-        ?.cancellationPolicy) as CancellationPolicy | undefined;
+      booking.event.venueTransactions?.[0]?.venue?.cancellationPolicy ??
+      booking.event.serviceTransactions?.[0]?.service?.cancellationPolicy) as
+      | CancellationPolicy
+      | undefined;
 
     const { refundPercent, hoursUntilEvent, matchedRule } =
       RefundSvc.computeRefund(booking.startAt, policy, now);
@@ -141,10 +147,9 @@ export default class RefundSvc {
       .filter(
         (p) => p.status === "completed" || (p.status as string) === "succeeded",
       )
-      .reduce((sum, p) => sum + p.amount, 0);
+      .reduce((sum, p) => sum.add(p.amount), new Prisma.Decimal(0));
 
-    const estimatedRefund =
-      Math.round(((totalPaid * refundPercent) / 100) * 100) / 100;
+    const estimatedRefund = totalPaid.mul(refundPercent).div(100);
 
     return {
       eligible,
@@ -208,10 +213,10 @@ export default class RefundSvc {
       throw new Error("Booking is already cancelled");
 
     const policy = (booking.event.template?.cancellationPolicy ??
-      (booking.event as any).venueTransactions?.[0]?.venue
-        ?.cancellationPolicy ??
-      (booking.event as any).serviceTransactions?.[0]?.service
-        ?.cancellationPolicy) as CancellationPolicy | undefined;
+      booking.event.venueTransactions?.[0]?.venue?.cancellationPolicy ??
+      booking.event.serviceTransactions?.[0]?.service?.cancellationPolicy) as
+      | CancellationPolicy
+      | undefined;
     const { refundPercent, hoursUntilEvent } = RefundSvc.computeRefund(
       booking.startAt,
       policy,
@@ -235,6 +240,7 @@ export default class RefundSvc {
       if (payment.transactionId?.startsWith("pi_")) {
         try {
           await stripe.paymentIntents.cancel(payment.transactionId);
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (err) {
           // If it can't be cancelled (e.g. already captured/succeeded on Stripe's
           // side), fall through — it'll be handled as a completed payment on the
@@ -244,7 +250,7 @@ export default class RefundSvc {
 
       await prisma.payment.update({
         where: { id: payment.id },
-        data: { status: "voided" as any },
+        data: { status: PaymentStatus.cancelled },
       });
     }
 
@@ -256,15 +262,14 @@ export default class RefundSvc {
       return { booking: updated, refunds: [] };
     }
 
-    const refunds: any[] = [];
+    const refunds: Refund[] = [];
 
     for (const payment of completedPayments) {
       let stripeRefundId: string | null = null;
-      let refundStatus: "pending" | "succeeded" | "failed" = "pending";
+      let refundStatus: RefundStatus = RefundStatus.pending;
       let failureReason: string | null = null;
 
-      const estimatedRefund =
-        Math.round(((payment.amount * refundPercent) / 100) * 100) / 100;
+      const estimatedRefund = payment.amount.mul(refundPercent).div(100);
 
       if (refundPercent <= 0) {
         // Nothing to refund for this payment under the policy — record it as
@@ -276,7 +281,7 @@ export default class RefundSvc {
             amount: 0,
             currency: payment.currency,
             stripeRefundId: null,
-            status: "succeeded" as any,
+            status: RefundStatus.succeeded,
             failureReason: null,
             initiatedBy: userId,
           },
@@ -289,7 +294,7 @@ export default class RefundSvc {
         try {
           const refund = await stripe.refunds.create({
             payment_intent: payment.transactionId,
-            amount: Math.round(estimatedRefund * 100),
+            amount: Math.round(estimatedRefund.toNumber() * 100),
           });
           stripeRefundId = refund.id;
           refundStatus =
@@ -298,7 +303,8 @@ export default class RefundSvc {
             failureReason = refund.failure_reason ?? "Unknown Stripe error";
             refundStatus = "failed";
           }
-        } catch (err: any) {
+        } catch (e: unknown) {
+          const err = e as Error;
           stripeRefundId = null;
           refundStatus = "failed";
           failureReason = err.message ?? "Stripe refund failed";
@@ -312,7 +318,7 @@ export default class RefundSvc {
           amount: estimatedRefund,
           currency: payment.currency,
           stripeRefundId,
-          status: refundStatus as any,
+          status: refundStatus,
           failureReason,
           initiatedBy: userId,
         },
@@ -335,10 +341,13 @@ export default class RefundSvc {
 
     const eventName = booking.event?.name ?? "Unknown Event";
     const userEmail = booking.user?.email;
-    const totalPaid = completedPayments.reduce((s, p) => s + p.amount, 0);
+    const totalPaid = completedPayments.reduce(
+      (s, p) => s.add(p.amount),
+      new Prisma.Decimal(0),
+    );
     const totalRefunded = refunds.reduce(
-      (s: number, r: any) => s + (r.amount ?? 0),
-      0,
+      (s, r) => s.add(r.amount ?? 0),
+      new Prisma.Decimal(0),
     );
 
     if (userEmail) {
@@ -349,7 +358,7 @@ export default class RefundSvc {
         startDate: booking.startAt?.toISOString() ?? "N/A",
         totalPaid: `PHP ${totalPaid.toFixed(2)}`,
         refundAmount: `PHP ${totalRefunded.toFixed(2)}`,
-        refundStatus: refunds.some((r: any) => r.status === "failed")
+        refundStatus: refunds.some((r) => r.status === RefundStatus.failed)
           ? "Some refunds failed — contact support"
           : "Processed successfully",
       });
@@ -393,7 +402,7 @@ export default class RefundSvc {
     });
     if (!refund) throw new Error("Refund not found");
 
-    let stripeFailureDetail: Record<string, any> | null = null;
+    let stripeFailureDetail: Record<string, unknown> | null = null;
 
     if (refund.stripeRefundId) {
       try {
@@ -421,6 +430,7 @@ export default class RefundSvc {
     };
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   static async retryRefund(refundId: string, adminId: string) {
     const refund = await prisma.refund.findUnique({
       where: { id: refundId },
@@ -437,7 +447,7 @@ export default class RefundSvc {
     try {
       const sr = await stripe.refunds.create({
         payment_intent: refund.payment.transactionId,
-        amount: Math.round(refund.amount * 100),
+        amount: Math.round(refund.amount.toNumber() * 100),
       });
 
       const newRefundStatus =
@@ -448,7 +458,7 @@ export default class RefundSvc {
       const updated = await prisma.refund.update({
         where: { id: refundId },
         data: {
-          status: newRefundStatus as any,
+          status: newRefundStatus,
           stripeRefundId: sr.id,
           failureReason: newFailureReason,
           failureCode: null,
@@ -467,7 +477,8 @@ export default class RefundSvc {
       }
 
       return updated;
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error & { code?: string };
       await prisma.refund.update({
         where: { id: refundId },
         data: {
@@ -614,12 +625,15 @@ export default class RefundSvc {
 // Fire-and-forget in-app notifications mirroring the booking-cancelled email
 // (guest who booked + the host/organizer).
 function notifyBookingCancelled(
-  booking: any,
+  booking: {
+    user?: { id: string } | null;
+    event?: { organizerId?: string | null } | null;
+  } | null,
   eventName: string,
   bookingId: string,
 ) {
-  const guestId = booking?.user?.id as string | undefined;
-  const hostId = booking?.event?.organizerId as string | undefined;
+  const guestId = booking?.user?.id;
+  const hostId = booking?.event?.organizerId;
 
   if (guestId) {
     NotificationService.create({
