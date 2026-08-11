@@ -1,5 +1,11 @@
 import { prisma } from "../utils/prisma";
-import { RoleType } from "@prisma/client";
+import {
+  AssetCategory,
+  EventCategory,
+  RoleType,
+  ServiceCategory,
+} from "@prisma/client";
+import { toEnum } from "../utils/enums";
 
 export default class SearchRepo {
   // Aggregate discovery search: given a location (city) and optional category,
@@ -15,10 +21,16 @@ export default class SearchRepo {
       ? { contains: location, mode: "insensitive" as const }
       : undefined;
 
+    // The same `category` string is matched against three different enums
+    // below, so it is narrowed separately for each.
+    const eventCategory = toEnum(EventCategory, category);
+    const assetCategory = toEnum(AssetCategory, category);
+    const serviceCategory = toEnum(ServiceCategory, category);
+
     const templateWhere = {
       isPublic: true,
       ...(cityFilter && { targetCity: cityFilter }),
-      ...(category && { category: category as any }),
+      ...(eventCategory && { category: eventCategory }),
     };
     const gearFoxerWhere = {
       roleType: { has: "gearFoxer" as RoleType },
@@ -64,7 +76,7 @@ export default class SearchRepo {
             where: {
               status: "available",
               deletedAt: null,
-              ...(category ? { category: category as any } : {}),
+              ...(assetCategory && { category: assetCategory }),
             },
             take: 3,
             orderBy: { createdAt: "desc" },
@@ -99,7 +111,7 @@ export default class SearchRepo {
             where: {
               status: "available",
               deletedAt: null,
-              ...(category ? { category: category as any } : {}),
+              ...(serviceCategory && { category: serviceCategory }),
             },
             take: 3,
             orderBy: { createdAt: "desc" },

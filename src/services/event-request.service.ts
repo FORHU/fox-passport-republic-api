@@ -1,3 +1,5 @@
+import { EventCategory } from "@prisma/client";
+import { toEnum } from "../utils/enums";
 import EventRequestRepo from "../repositories/event-request.repository";
 import EventTemplateRepo from "../repositories/event-template.repository";
 import EventTemplateSvc from "./event-template.service";
@@ -14,12 +16,15 @@ export default class EventRequestSvc {
     totalAmount?: number;
     currency?: string;
   }) {
+    const eventCategory = toEnum(EventCategory, data.eventCategory);
+    if (!eventCategory) throw new Error("Invalid event category");
+
     return EventRequestRepo.create({
       client: { connect: { id: data.clientId } },
       host: { connect: { id: data.clientId } },
       name: data.name,
       description: data.description,
-      eventCategory: data.eventCategory as any,
+      eventCategory,
       startAt: data.startAt,
       endAt: data.endAt,
       guestCount: data.guestCount,
@@ -113,7 +118,9 @@ export default class EventRequestSvc {
     const result = await EventRequestRepo.updateStatus(id, "completed");
 
     // Award completeEvent XP to the event organizer (eventFoxer path)
-    const organizerId = (request as any).organizerId ?? (request as any).hostId;
+    // `hostId` was a second fallback here, but Event has no such column — the
+    // organizer FK is the only one.
+    const organizerId = request.organizerId;
     if (organizerId) {
       import("./passport.service")
         .then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {

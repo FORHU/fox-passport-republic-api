@@ -1,5 +1,6 @@
 import { prisma } from "../utils/prisma";
-import { Prisma } from "@prisma/client";
+import { EventStatus, Prisma, RequestStatus } from "@prisma/client";
+import { toEnum } from "../utils/enums";
 
 export default class EventRequestRepo {
   static async create(data: Prisma.EventCreateInput) {
@@ -52,11 +53,11 @@ export default class EventRequestRepo {
 
   // Admin — all events with any status
   static async findAllAdmin(filters?: { requestStatus?: string }) {
+    // An unrecognised status drops the filter rather than failing the query.
+    const requestStatus = toEnum(RequestStatus, filters?.requestStatus);
     return prisma.event.findMany({
       where: {
-        ...(filters?.requestStatus && {
-          requestStatus: filters.requestStatus as any,
-        }),
+        ...(requestStatus && { requestStatus }),
       },
       include: {
         template: EventRequestRepo.templateInclude,
@@ -97,14 +98,14 @@ export default class EventRequestRepo {
     });
   }
 
-  static async updateStatus(id: string, status: any) {
+  static async updateStatus(id: string, status: EventStatus) {
     return prisma.event.update({
       where: { id },
       data: { eventStatus: status },
     });
   }
 
-  static async updateRequestStatus(id: string, status: any) {
+  static async updateRequestStatus(id: string, status: RequestStatus) {
     return prisma.event.update({
       where: { id },
       data: { requestStatus: status },

@@ -5,6 +5,7 @@ import {
   AssetCategory,
 } from "@prisma/client";
 import { prisma } from "../utils/prisma";
+import { toEnum } from "../utils/enums";
 
 export default class AssetRepo {
   // READ ALL (public — available only)
@@ -18,10 +19,11 @@ export default class AssetRepo {
     const page = filters?.page ?? 1;
     const limit = filters?.limit ?? 50;
     const skip = (page - 1) * limit;
+    const category = toEnum(AssetCategory, filters?.category);
 
     const where = {
       ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
-      ...(filters?.category && { category: filters.category as any }),
+      ...(category && { category }),
       ...(filters?.city && {
         city: { contains: filters.city, mode: "insensitive" as const },
       }),
@@ -52,10 +54,11 @@ export default class AssetRepo {
     category?: string;
     status?: AssetStatus;
   }) {
+    const category = toEnum(AssetCategory, filters?.category);
     return prisma.asset.findMany({
       where: {
         ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
-        ...(filters?.category && { category: filters.category as any }),
+        ...(category && { category }),
         ...(filters?.status && { status: filters.status }),
         deletedAt: null,
       },
