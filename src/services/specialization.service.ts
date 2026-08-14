@@ -1,4 +1,5 @@
-import { RoleType } from "@prisma/client";
+import { EventCategory, RoleType } from "@prisma/client";
+import { toEnum } from "../utils/enums";
 import { prisma } from "../utils/prisma";
 
 const EARNED_THRESHOLD = 3;
@@ -7,6 +8,8 @@ const EARNED_MIN_RATING = 4.0;
 export default class SpecializationSvc {
   // Called after an event booking completes — checks EventFoxer specialization
   static async checkEventFoxer(organizerId: string, eventCategory: string) {
+    const category = toEnum(EventCategory, eventCategory);
+    if (!category) return;
     await SpecializationSvc.maybeGrant(
       organizerId,
       RoleType.eventFoxer,
@@ -15,7 +18,7 @@ export default class SpecializationSvc {
         const events = await prisma.event.findMany({
           where: {
             organizerId,
-            eventCategory: eventCategory as any,
+            eventCategory: category,
             eventStatus: "completed",
           },
           select: { id: true },
@@ -29,9 +32,10 @@ export default class SpecializationSvc {
         });
         if (bookingIds.length === 0) return false;
 
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const bIds = bookingIds.map((b) => b.id);
         const templates = await prisma.eventTemplate.findMany({
-          where: { ownerId: organizerId, category: eventCategory as any },
+          where: { ownerId: organizerId, category },
           select: { id: true },
         });
         const tIds = templates.map((t) => t.id);

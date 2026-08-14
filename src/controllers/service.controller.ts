@@ -5,10 +5,32 @@ import ServiceSvc from "../services/service.service";
 import { sendApprovedEmail } from "../utils/emails/approved";
 import { sendRejectedEmail } from "../utils/emails/rejected";
 import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
+import { toEnum } from "../utils/enums";
+
+interface CreateServicePayload {
+  category: ServiceCategory;
+  name: string;
+  description: string;
+  city: string;
+  state?: string;
+  country: string;
+  lat?: number;
+  lng?: number;
+  isWillingToTravel?: boolean;
+  tags?: string[];
+  price: number;
+  currency?: string;
+  billingRate?: BillingRate;
+  imgIds: string[];
+  status?: ServiceStatus;
+  cancellationPolicyId?: string;
+}
+
+type UpdateServicePayload = Partial<CreateServicePayload>;
 
 export default class ServiceCtrl {
   static async createService(req: Request, res: Response) {
-    const schema = Joi.object({
+    const schema = Joi.object<CreateServicePayload>({
       category: Joi.string()
         .valid(...Object.values(ServiceCategory))
         .required(),
@@ -39,19 +61,20 @@ export default class ServiceCtrl {
     }
 
     try {
-      const ownerId = (req as any).user?.userId;
+      const ownerId = req.user?.userId;
       if (!ownerId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
       const service = await ServiceSvc.createService({
         ownerId: String(ownerId),
-        ...(value as any),
+        ...value,
       });
       return res
         .status(201)
         .json({ message: "Service created successfully", service });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ message: err.message || err });
     }
   }
@@ -59,18 +82,23 @@ export default class ServiceCtrl {
   static async getServices(req: Request, res: Response) {
     try {
       const { ownerId, category, status, city, page, limit } = req.query;
+      // Unrecognised values drop their filter instead of reaching Prisma,
+      // which would reject them and turn a bad query string into a 500.
+      const serviceCategory = toEnum(ServiceCategory, category);
+      const serviceStatus = toEnum(ServiceStatus, status);
 
       const { services, total } = await ServiceSvc.getAllServices({
         ...(ownerId && { ownerId: String(ownerId) }),
-        ...(category && { category: category as any }),
-        ...(status && { status: status as ServiceStatus }),
+        ...(serviceCategory && { category: serviceCategory }),
+        ...(serviceStatus && { status: serviceStatus }),
         ...(city && { city: String(city) }),
         page: page ? Number(page) : undefined,
         limit: limit ? Math.min(Number(limit), 50) : undefined,
       });
 
       return res.status(200).json({ services, total });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(500).json({ message: err.message || err });
     }
   }
@@ -84,13 +112,14 @@ export default class ServiceCtrl {
 
       const service = await ServiceSvc.getServiceById(String(id));
       return res.status(200).json({ service });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(404).json({ message: err.message || err });
     }
   }
 
   static async updateService(req: Request, res: Response) {
-    const schema = Joi.object({
+    const schema = Joi.object<UpdateServicePayload>({
       category: Joi.string()
         .valid(...Object.values(ServiceCategory))
         .optional(),
@@ -125,7 +154,7 @@ export default class ServiceCtrl {
         return res.status(400).json({ message: "Invalid service id" });
       }
 
-      const ownerId = (req as any).user?.userId;
+      const ownerId = req.user?.userId;
       if (!ownerId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -133,12 +162,13 @@ export default class ServiceCtrl {
       const service = await ServiceSvc.updateService(
         String(id),
         String(ownerId),
-        value as any,
+        value,
       );
       return res
         .status(200)
         .json({ message: "Service updated successfully", service });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       const status = err.message.includes("Unauthorized") ? 403 : 400;
       return res.status(status).json({ message: err.message || err });
     }
@@ -147,7 +177,7 @@ export default class ServiceCtrl {
   static async deleteService(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const requesterId = (req as any).user?.userId;
+      const requesterId = req.user?.userId;
 
       if (!requesterId) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -158,7 +188,8 @@ export default class ServiceCtrl {
         String(requesterId),
       );
       return res.status(200).json(result);
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       const status = err.message.includes("authorized") ? 403 : 400;
       return res.status(status).json({ message: err.message || err });
     }
@@ -166,7 +197,7 @@ export default class ServiceCtrl {
 
   static async approveService(req: Request, res: Response) {
     try {
-      const user = (req as any).user;
+      const user = req.user;
       if (!user || user.systemRole !== "admin") {
         return res
           .status(403)
@@ -196,14 +227,15 @@ export default class ServiceCtrl {
       return res
         .status(200)
         .json({ message: "Service approved successfully", service });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(404).json({ message: error.message || error });
     }
   }
 
   static async rejectService(req: Request, res: Response) {
     try {
-      const user = (req as any).user;
+      const user = req.user;
       if (!user || user.systemRole !== "admin") {
         return res
           .status(403)
@@ -240,7 +272,8 @@ export default class ServiceCtrl {
       return res
         .status(200)
         .json({ message: "Service rejected successfully", service });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(404).json({ message: error.message || error });
     }
   }

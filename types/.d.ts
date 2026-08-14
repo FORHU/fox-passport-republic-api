@@ -1,6 +1,6 @@
 declare namespace Express {
     interface Request {
-        user?: any;
+        user?: import("../src/types/auth").AuthenticatedUser;
         file?: Express.Multer.File;
     }
 }

@@ -1,9 +1,22 @@
 import VenueRepo from "../repositories/venue.repository";
-import { VenueStatus, BillingRate, VenueCategory } from "@prisma/client";
+import {
+  VenueStatus,
+  BillingRate,
+  VenueCategory,
+  SystemRole,
+} from "@prisma/client";
 
 export default class VenueSvc {
-  private static isAdminRole(role?: string) {
-    return role ? ["admin", "super_admin", "venueFoxer"].includes(role) : false;
+  /**
+   * Admins may act on any venue; everyone else must own it.
+   *
+   * This takes a `SystemRole` specifically. It previously accepted a loose
+   * string and also matched `"venueFoxer"`, which would have let any
+   * VenueFoxer mutate any other VenueFoxer's venue had a RoleType ever been
+   * passed in — ownership is the correct check for them, and it happens below.
+   */
+  private static isAdminRole(role?: SystemRole) {
+    return role === "admin";
   }
 
   // ───────────────────────────────────────────────────────────
@@ -200,7 +213,7 @@ export default class VenueSvc {
   static async updateVenue(params: {
     id: string;
     requesterId: string;
-    requesterRole?: string;
+    requesterRole?: SystemRole;
     data: Partial<{
       name: string;
       description: string;
@@ -247,7 +260,7 @@ export default class VenueSvc {
   static async deleteVenue(params: {
     id: string;
     requesterId: string;
-    requesterRole?: string;
+    requesterRole?: SystemRole;
   }) {
     const { id, requesterId, requesterRole } = params;
     const venue = await VenueRepo.findVenueById(id);

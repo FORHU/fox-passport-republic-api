@@ -37,7 +37,7 @@ export default class ServiceBookingSvc {
     const endDate = data.endDate ? new Date(data.endDate) : scheduledDate;
 
     const itemsTotal = calculateItemsTotal({
-      price: service.price,
+      price: service.price.toNumber(),
       quantity: 1,
       startDate: scheduledDate,
       endDate,
@@ -103,7 +103,7 @@ export default class ServiceBookingSvc {
     const booking = await ServiceBookingRepo.findById(id);
     if (!booking) throw new Error("Service booking not found");
 
-    const isOwner = (booking.service as any)?.owner?.id === requesterId;
+    const isOwner = booking.service?.owner?.id === requesterId;
     const isBooker = booking.userId === requesterId;
     if (!isOwner && !isBooker) throw new Error("Unauthorized");
 
@@ -121,8 +121,7 @@ export default class ServiceBookingSvc {
       import("./passport.service")
         .then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
           const ownerId =
-            (booking.service as any)?.ownerId ??
-            (booking.service as any)?.owner?.id;
+            booking.service?.ownerId ?? booking.service?.owner?.id;
           if (ownerId)
             return PassportSvc.awardXP(
               ownerId,
@@ -133,11 +132,9 @@ export default class ServiceBookingSvc {
         .catch(() => {});
       import("./specialization.service")
         .then(({ default: SpecializationSvc }) => {
-          const serviceId =
-            (booking.service as any)?.id ?? (booking as any).serviceId;
+          const serviceId = booking.service?.id ?? booking.serviceId;
           const ownerId =
-            (booking.service as any)?.ownerId ??
-            (booking.service as any)?.owner?.id;
+            booking.service?.ownerId ?? booking.service?.owner?.id;
           if (serviceId && ownerId)
             return SpecializationSvc.checkServiceFoxer(serviceId, ownerId);
         })

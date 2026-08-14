@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import NotificationRepository from "./user-notification.repository";
 import { CreateNotificationInput } from "./user-notification.types";
 import { io } from "../../infrastructure/socket/socket.server";
@@ -7,7 +8,7 @@ export default class NotificationService {
   static async create(input: CreateNotificationInput) {
     const notification = await NotificationRepository.create({
       ...input,
-      metadata: (input.metadata ?? undefined) as any,
+      metadata: (input.metadata ?? undefined) as Prisma.InputJsonValue,
     });
     emitToUser(io, input.userId, "new_notification", {
       ...notification,

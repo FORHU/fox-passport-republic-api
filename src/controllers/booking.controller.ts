@@ -1,15 +1,17 @@
 import { Request, Response } from "express";
+import { Prisma } from "@prisma/client";
 import BookingSvc from "../services/booking.service";
 import Joi from "joi";
 import PaymentSvc from "../services/payment.service";
 import { prisma } from "../utils/prisma";
-import { PaymentStatus } from "@prisma/client";
+import { PaymentStatus, RefundStatus, type Refund } from "@prisma/client";
 import EventTemplateSvc from "../services/event-template.service";
 import RefundSvc from "../services/refund.service";
 import { STRIPE_SECRET_KEY } from "../config";
 import Stripe from "stripe";
 import { sendBookingCancelledEmail } from "../utils/emails/cancellation";
 import { sendBookingConfirmationEmail } from "../utils/emails/confirmation";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { sendRefundUpdateEmail } from "../utils/emails/refund";
 import WaitlistSvc from "../services/waitlist.service";
 import NotificationService from "../modules/notifications/user-notification.service";
@@ -164,7 +166,8 @@ export default class BookingCtrl {
       return res
         .status(201)
         .json({ success: true, data: { booking, eventId: event.id } });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -199,7 +202,8 @@ export default class BookingCtrl {
       });
 
       return res.status(201).json({ success: true, data: booking });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -230,7 +234,8 @@ export default class BookingCtrl {
       });
 
       return res.status(201).json({ success: true, data: booking });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -261,7 +266,8 @@ export default class BookingCtrl {
         ...new Set(bookings.map((b) => b.startAt.toISOString().split("T")[0])),
       ];
       return res.status(200).json({ success: true, data: { bookedDates } });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -280,7 +286,8 @@ export default class BookingCtrl {
         req.user!.userId,
       );
       return res.status(200).json({ success: true, data: result });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -349,11 +356,10 @@ export default class BookingCtrl {
         apiVersion: "2025-08-27.basil",
       });
 
-      const cancellationPolicy = (booking.event.template?.cancellationPolicy ??
-        (booking.event as any).venueTransactions?.[0]?.venue
-          ?.cancellationPolicy ??
-        (booking.event as any).serviceTransactions?.[0]?.service
-          ?.cancellationPolicy) as any;
+      const cancellationPolicy =
+        booking.event.template?.cancellationPolicy ??
+        booking.event.venueTransactions?.[0]?.venue?.cancellationPolicy ??
+        booking.event.serviceTransactions?.[0]?.service?.cancellationPolicy;
       const { refundPercent, hoursUntilEvent, matchedRule } =
         RefundSvc.computeRefund(booking.startAt, cancellationPolicy);
 
@@ -384,6 +390,7 @@ export default class BookingCtrl {
         if (payment.transactionId?.startsWith("pi_")) {
           try {
             await stripe.paymentIntents.cancel(payment.transactionId);
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
           } catch (err) {
             // fall through
           }
@@ -391,7 +398,7 @@ export default class BookingCtrl {
 
         await prisma.payment.update({
           where: { id: payment.id },
-          data: { status: "cancelled" as any },
+          data: { status: PaymentStatus.cancelled },
         });
       }
 
@@ -432,15 +439,14 @@ export default class BookingCtrl {
           .json({ success: true, data: { booking: updated, refunds: [] } });
       }
 
-      const refunds: any[] = [];
+      const refunds: Refund[] = [];
 
       for (const payment of completedPayments) {
         let stripeRefundId: string | null = null;
-        let refundStatus: "pending" | "succeeded" | "failed" = "pending";
+        let refundStatus: RefundStatus = RefundStatus.pending;
         let failureReason: string | null = null;
 
-        const estimatedRefund =
-          Math.round(((payment.amount * refundPercent) / 100) * 100) / 100;
+        const estimatedRefund = payment.amount.mul(refundPercent).div(100);
 
         if (refundPercent <= 0) {
           const refund = await prisma.refund.create({
@@ -450,7 +456,7 @@ export default class BookingCtrl {
               amount: 0,
               currency: payment.currency,
               stripeRefundId: null,
-              status: "succeeded" as any,
+              status: RefundStatus.succeeded,
               failureReason: null,
               initiatedBy: req.user!.userId,
               adminNotes: matchedRuleInfo,
@@ -464,7 +470,7 @@ export default class BookingCtrl {
           try {
             const refund = await stripe.refunds.create({
               payment_intent: payment.transactionId,
-              amount: Math.round(estimatedRefund * 100),
+              amount: Math.round(estimatedRefund.toNumber() * 100),
             });
             stripeRefundId = refund.id;
             refundStatus =
@@ -473,7 +479,8 @@ export default class BookingCtrl {
               failureReason = refund.failure_reason ?? "Unknown Stripe error";
               refundStatus = "failed";
             }
-          } catch (err: any) {
+          } catch (e: unknown) {
+            const err = e as Error;
             stripeRefundId = null;
             refundStatus = "failed";
             failureReason = err.message ?? "Stripe refund failed";
@@ -487,7 +494,7 @@ export default class BookingCtrl {
             amount: estimatedRefund,
             currency: payment.currency,
             stripeRefundId,
-            status: refundStatus as any,
+            status: refundStatus,
             failureReason,
             initiatedBy: req.user!.userId,
             adminNotes: matchedRuleInfo,
@@ -511,10 +518,13 @@ export default class BookingCtrl {
 
       const eventName = booking.event?.name ?? "Unknown Event";
       const userEmail = booking.user?.email;
-      const totalPaid = completedPayments.reduce((s, p) => s + p.amount, 0);
+      const totalPaid = completedPayments.reduce(
+        (s, p) => s.add(p.amount),
+        new Prisma.Decimal(0),
+      );
       const totalRefunded = refunds.reduce(
-        (s: number, r: any) => s + (r.amount ?? 0),
-        0,
+        (s, r) => s.add(r.amount ?? 0),
+        new Prisma.Decimal(0),
       );
 
       if (userEmail) {
@@ -525,7 +535,7 @@ export default class BookingCtrl {
           startDate: booking.startAt?.toISOString() ?? "N/A",
           totalPaid: `PHP ${totalPaid.toFixed(2)}`,
           refundAmount: `PHP ${totalRefunded.toFixed(2)}`,
-          refundStatus: refunds.some((r: any) => r.status === "failed")
+          refundStatus: refunds.some((r) => r.status === RefundStatus.failed)
             ? "Some refunds failed — contact support"
             : "Processed successfully",
         });
@@ -546,7 +556,8 @@ export default class BookingCtrl {
       return res
         .status(200)
         .json({ success: true, data: { booking: updated, refunds } });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -555,6 +566,7 @@ export default class BookingCtrl {
     try {
       const limit = Math.min(Number(req.query.limit) || 4, 20);
       const page = Math.max(Number(req.query.page) || 1, 1);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { page: _p, limit: _l, ...filters } = req.query;
       const { bookings, total } = await BookingSvc.getAllBookings(
         filters,
@@ -571,7 +583,8 @@ export default class BookingCtrl {
           totalPages: Math.ceil(total / limit),
         },
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -581,7 +594,8 @@ export default class BookingCtrl {
     try {
       const booking = await BookingSvc.getBookingById(req.params.id, req.user);
       return res.status(200).json({ success: true, data: booking });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(404).json({ success: false, message: error.message });
     }
   }
@@ -594,7 +608,8 @@ export default class BookingCtrl {
         req.user!.userId,
       );
       return res.status(200).json({ success: true, data: result });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -604,7 +619,8 @@ export default class BookingCtrl {
     try {
       const bookings = await BookingSvc.getUpcomingBookings(req.user!.userId);
       return res.status(200).json({ success: true, data: bookings });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -629,7 +645,8 @@ export default class BookingCtrl {
           totalPages: Math.ceil(total / limit),
         },
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -748,20 +765,19 @@ export default class BookingCtrl {
 
       // Send booking confirmation email (fire-and-forget)
       try {
-        const userEmail = req.user?.email || (booking as any).user?.email;
-        const eventName = (booking as any).event?.name ?? "Your Booking";
+        const userEmail = req.user?.email || booking.user?.email;
+        const eventName = booking.event?.name ?? "Your Booking";
         const venueName =
-          (booking as any).venueTransactions?.find((vt: any) => vt.included)
-            ?.venue?.name ??
-          (booking as any).venueTransactions?.[0]?.venue?.name ??
-          (booking as any).event?.name ??
+          booking.venueTransactions?.find((vt) => vt.included)?.venue?.name ??
+          booking.venueTransactions?.[0]?.venue?.name ??
+          booking.event?.name ??
           "Venue";
         if (userEmail) {
           sendBookingConfirmationEmail({
             to: userEmail,
             eventName,
             bookingId,
-            startDate: (booking as any).startAt?.toISOString() ?? "N/A",
+            startDate: booking.startAt?.toISOString() ?? "N/A",
             totalPaid: `PHP ${value.amount.toFixed(2)}`,
             venueName,
           });
@@ -769,7 +785,7 @@ export default class BookingCtrl {
 
         // In-app notification (guest + host), mirroring the confirmation email
         const guestId = req.user!.userId;
-        const hostId = (booking as any).event?.host?.id as string | undefined;
+        const hostId = booking.event?.host?.id as string | undefined;
         NotificationService.create({
           userId: guestId,
           type: "BOOKING_CONFIRMED",
@@ -798,7 +814,8 @@ export default class BookingCtrl {
       return res
         .status(200)
         .json({ success: true, data: { booking, payment } });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -829,7 +846,8 @@ export default class BookingCtrl {
         req.user!.userId,
       );
       return res.status(200).json({ success: true, data: booking });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
     }
   }
@@ -842,7 +860,8 @@ export default class BookingCtrl {
         req.user!.userId,
       );
       return res.status(200).json({ success: true, data: booking });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
     }
   }
@@ -852,7 +871,8 @@ export default class BookingCtrl {
     try {
       const booking = await BookingSvc.dispute(req.params.id, req.user!.userId);
       return res.status(200).json({ success: true, data: booking });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
     }
   }
@@ -890,7 +910,8 @@ export default class BookingCtrl {
         data: result.booking,
         payoutTriggered: result.payoutTriggered,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       const msg = error.message;
       if (msg.includes("not the host"))
         return res.status(403).json({ success: false, message: msg });
@@ -940,7 +961,8 @@ export default class BookingCtrl {
       });
 
       return res.status(200).json({ success: true, data: updated });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -977,7 +999,8 @@ export default class BookingCtrl {
       }
 
       return res.status(200).json({ success: true, data: results });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -986,14 +1009,18 @@ export default class BookingCtrl {
 // Fire-and-forget in-app notifications mirroring the booking-cancelled email
 // (guest who booked + the host/organizer).
 function notifyBookingCancelled(
-  booking: any,
+  booking: {
+    user?: { id: string } | null;
+    event?: {
+      host?: { id: string } | null;
+      organizerId?: string | null;
+    } | null;
+  } | null,
   eventName: string,
   bookingId: string,
 ) {
-  const guestId = booking?.user?.id as string | undefined;
-  const hostId =
-    (booking?.event?.host?.id as string | undefined) ??
-    (booking?.event?.organizerId as string | undefined);
+  const guestId = booking?.user?.id;
+  const hostId = booking?.event?.host?.id ?? booking?.event?.organizerId;
 
   if (guestId) {
     NotificationService.create({

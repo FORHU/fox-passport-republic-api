@@ -4,6 +4,14 @@ import { RoleType, RequestStatus } from "@prisma/client";
 import { prisma } from "../utils/prisma";
 import NotificationService from "../modules/notifications/user-notification.service";
 
+/**
+ * Provider-specific application payload. Each RoleType supplies a different
+ * set of fields, so this stays an open record validated at the route layer.
+ */
+export type RoleApplicationData = Record<string, unknown> & {
+  specializations?: string[];
+};
+
 export default class RoleRequestService {
   /**
    * Submit an application for a specific role
@@ -11,7 +19,7 @@ export default class RoleRequestService {
   static async submitApplication(
     userId: string,
     roleType: RoleType,
-    applicationData: any,
+    applicationData: RoleApplicationData,
   ) {
     // 1. Check if user already has this role
     const user = await UsersRepo.findUserById(userId);
@@ -88,7 +96,7 @@ export default class RoleRequestService {
         });
 
         const appKey = `${request.roleType}Application` as keyof typeof request;
-        const app = request[appKey] as any;
+        const app = request[appKey] as { specializations?: string[] } | null;
         const declared: string[] = app?.specializations ?? [];
         if (declared.length > 0) {
           await tx.foxerSpecialization.createMany({

@@ -28,7 +28,8 @@ export default class AssetBookingCtrl {
       const userId = req.user!.userId;
       const booking = await AssetBookingSvc.create({ ...value, userId });
       return res.status(201).json({ success: true, data: booking });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
     }
   }
@@ -43,7 +44,8 @@ export default class AssetBookingCtrl {
     try {
       const data = await AssetBookingSvc.getAvailability(assetId);
       return res.status(200).json({ success: true, data });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(404).json({ success: false, message: err.message });
     }
   }
@@ -58,7 +60,8 @@ export default class AssetBookingCtrl {
         status,
       });
       return res.status(200).json({ success: true, data: bookings });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(500).json({ success: false, message: err.message });
     }
   }
@@ -68,7 +71,8 @@ export default class AssetBookingCtrl {
     try {
       const booking = await AssetBookingSvc.getById(req.params.id);
       return res.status(200).json({ success: true, data: booking });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(404).json({ success: false, message: err.message });
     }
   }
@@ -93,7 +97,8 @@ export default class AssetBookingCtrl {
         req.user!.userId,
       );
       return res.status(200).json({ success: true, data: booking });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
     }
   }
@@ -117,7 +122,8 @@ export default class AssetBookingCtrl {
         req.user!.userId,
       );
       return res.status(200).json({ success: true, data: booking });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
     }
   }
@@ -130,7 +136,8 @@ export default class AssetBookingCtrl {
         req.user!.userId,
       );
       return res.status(200).json({ success: true, data: booking });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
     }
   }
@@ -143,7 +150,8 @@ export default class AssetBookingCtrl {
         req.user!.userId,
       );
       return res.status(200).json({ success: true, data: booking });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
     }
   }
@@ -158,7 +166,8 @@ export default class AssetBookingCtrl {
         reason,
       );
       return res.status(200).json({ success: true, data: booking });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
     }
   }

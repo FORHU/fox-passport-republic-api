@@ -6,7 +6,7 @@ export default class ProfileCtrl {
   // Get current user profile
   static async getProfile(req: Request, res: Response) {
     try {
-      const userId = (req as any).user?.userId;
+      const userId = req.user?.userId;
 
       if (!userId) {
         return res.status(401).json({
@@ -20,7 +20,8 @@ export default class ProfileCtrl {
         success: true,
         data: profile,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({
         success: false,
         message: error.message || "Failed to fetch profile",
@@ -31,7 +32,7 @@ export default class ProfileCtrl {
   // Update profile
   static async updateProfile(req: Request, res: Response) {
     try {
-      const userId = (req as any).user?.userId;
+      const userId = req.user?.userId;
 
       if (!userId) {
         return res.status(401).json({
@@ -62,7 +63,8 @@ export default class ProfileCtrl {
         message: "Profile updated successfully",
         data: updatedProfile,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({
         success: false,
         message: error.message || "Failed to update profile",
@@ -73,7 +75,7 @@ export default class ProfileCtrl {
   // Change password
   static async changePassword(req: Request, res: Response) {
     try {
-      const userId = (req as any).user?.userId;
+      const userId = req.user?.userId;
 
       if (!userId) {
         return res.status(401).json({
@@ -109,7 +111,8 @@ export default class ProfileCtrl {
         success: true,
         message: "Password changed successfully",
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({
         success: false,
         message: error.message || "Failed to change password",
@@ -120,7 +123,7 @@ export default class ProfileCtrl {
   // Delete account
   static async deleteAccount(req: Request, res: Response) {
     try {
-      const userId = (req as any).user?.userId;
+      const userId = req.user?.userId;
 
       if (!userId) {
         return res.status(401).json({
@@ -151,7 +154,8 @@ export default class ProfileCtrl {
         success: true,
         message: "Account deleted successfully",
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({
         success: false,
         message: error.message || "Failed to delete account",

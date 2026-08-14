@@ -8,7 +8,7 @@ export default class RoleRequestRepo {
   static async createRequest(
     userId: string,
     roleType: RoleType,
-    applicationData: any,
+    applicationData: Record<string, unknown>,
     applicationModel: string,
   ) {
     return prisma.roleRequest.create({

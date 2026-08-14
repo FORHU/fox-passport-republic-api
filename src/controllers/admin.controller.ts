@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+
 import { prisma } from "../utils/prisma";
 import {
   RequestStatus,
@@ -6,8 +7,10 @@ import {
   AssetStatus,
   ServiceStatus,
   EventTemplateStatus,
+  BookingStatus,
   Prisma,
 } from "@prisma/client";
+import { toEnum } from "../utils/enums";
 import EventRequestRepo from "../repositories/event-request.repository";
 import VenueRepo from "../repositories/venue.repository";
 import AssetRepo from "../repositories/asset.repository";
@@ -40,7 +43,8 @@ export default class AdminCtrl {
         bookingType: "event" as const,
         reason: r.failureReason || "Refund failed",
         description: r.adminNotes || undefined,
-        status: (r.status === "failed" ? "refund_failed" : r.status) as any,
+        // A failed refund surfaces to admins as its own dispute state.
+        status: r.status === "failed" ? ("refund_failed" as const) : r.status,
         createdAt: r.createdAt.toISOString(),
         resolvedAt: r.resolvedAt?.toISOString(),
         resolvedBy: r.resolvedBy || undefined,
@@ -71,7 +75,8 @@ export default class AdminCtrl {
       }));
 
       return res.status(200).json({ success: true, data: disputes });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -99,7 +104,8 @@ export default class AdminCtrl {
       }));
 
       return res.status(200).json({ success: true, data: mapped });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -132,7 +138,8 @@ export default class AdminCtrl {
         },
       });
       return res.status(200).json({ success: true, data: updated });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -150,7 +157,8 @@ export default class AdminCtrl {
         orderBy: { createdAt: "desc" },
       });
       return res.status(200).json({ success: true, data: bookings });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -169,7 +177,8 @@ export default class AdminCtrl {
         data: { status: value.resolution },
       });
       return res.status(200).json({ success: true, data: booking });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -185,7 +194,8 @@ export default class AdminCtrl {
         orderBy: { createdAt: "desc" },
       });
       return res.status(200).json({ success: true, data: bookings });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -204,7 +214,8 @@ export default class AdminCtrl {
         data: { status: value.resolution },
       });
       return res.status(200).json({ success: true, data: booking });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -233,7 +244,8 @@ export default class AdminCtrl {
         },
       });
       return res.status(201).json({ success: true, data: refund });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -256,7 +268,7 @@ export default class AdminCtrl {
         prisma.eventTemplate.count(),
         prisma.roleRequest.count({ where: { status: RequestStatus.pending } }),
         prisma.booking.findMany({
-          where: { status: { not: "cancelled" as any } },
+          where: { status: { not: BookingStatus.cancelled } },
           select: {
             totalAmount: true,
             createdAt: true,
@@ -269,12 +281,14 @@ export default class AdminCtrl {
       ]);
 
       const eventRevenue = bookings.reduce(
-        (sum, b) => sum + (b.totalAmount ?? 0),
-        0,
+        (sum, b) => sum.add(b.totalAmount ?? 0),
+        new Prisma.Decimal(0),
       );
-      const serviceRevenue = serviceBookings._sum.totalAmount ?? 0;
-      const assetRevenue = assetBookings._sum.totalAmount ?? 0;
-      const totalRevenue = eventRevenue + serviceRevenue + assetRevenue;
+      const serviceRevenue =
+        serviceBookings._sum.totalAmount ?? new Prisma.Decimal(0);
+      const assetRevenue =
+        assetBookings._sum.totalAmount ?? new Prisma.Decimal(0);
+      const totalRevenue = eventRevenue.add(serviceRevenue).add(assetRevenue);
       const totalBookings = bookings.length;
 
       // Bookings per day-of-week (0=Sun … 6=Sat), last 30 days
@@ -305,7 +319,8 @@ export default class AdminCtrl {
           categoryStats,
         },
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -316,7 +331,8 @@ export default class AdminCtrl {
     try {
       const venues = await VenueRepo.findAllVenuesAdmin();
       return res.status(200).json({ success: true, data: venues });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -327,7 +343,8 @@ export default class AdminCtrl {
         status: VenueStatus.pending,
       });
       return res.status(200).json({ success: true, data: venues });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -357,7 +374,8 @@ export default class AdminCtrl {
         .catch(() => {});
 
       return res.status(200).json({ success: true, data: venue });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(404).json({ success: false, message: error.message });
     }
   }
@@ -369,7 +387,8 @@ export default class AdminCtrl {
         data: { status: VenueStatus.archived },
       });
       return res.status(200).json({ success: true, data: venue });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(404).json({ success: false, message: error.message });
     }
   }
@@ -382,7 +401,8 @@ export default class AdminCtrl {
         status: AssetStatus.pending,
       });
       return res.status(200).json({ success: true, data: assets });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -406,7 +426,8 @@ export default class AdminCtrl {
         .catch(() => {});
 
       return res.status(200).json({ success: true, data: asset });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(404).json({ success: false, message: error.message });
     }
   }
@@ -418,7 +439,8 @@ export default class AdminCtrl {
         data: { status: AssetStatus.rejected },
       });
       return res.status(200).json({ success: true, data: asset });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(404).json({ success: false, message: error.message });
     }
   }
@@ -427,7 +449,8 @@ export default class AdminCtrl {
     try {
       const assets = await AssetRepo.findAllAssetsAdmin({});
       return res.status(200).json({ success: true, data: assets });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -440,7 +463,8 @@ export default class AdminCtrl {
         status: ServiceStatus.pending,
       });
       return res.status(200).json({ success: true, data: services });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -464,7 +488,8 @@ export default class AdminCtrl {
         .catch(() => {});
 
       return res.status(200).json({ success: true, data: service });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(404).json({ success: false, message: error.message });
     }
   }
@@ -476,7 +501,8 @@ export default class AdminCtrl {
         data: { status: ServiceStatus.rejected },
       });
       return res.status(200).json({ success: true, data: service });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(404).json({ success: false, message: error.message });
     }
   }
@@ -485,7 +511,8 @@ export default class AdminCtrl {
     try {
       const services = await ServiceRepo.getAllServicesAdmin({});
       return res.status(200).json({ success: true, data: services });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -495,8 +522,9 @@ export default class AdminCtrl {
   static async getAllEventTemplates(req: Request, res: Response) {
     try {
       const { status } = req.query as { status?: string };
+      const templateStatus = toEnum(EventTemplateStatus, status);
       const templates = await prisma.eventTemplate.findMany({
-        where: status ? { status: status as any } : {},
+        where: templateStatus ? { status: templateStatus } : {},
         include: {
           owner: { select: { id: true, name: true, email: true } },
           images: true,
@@ -504,7 +532,8 @@ export default class AdminCtrl {
         orderBy: { createdAt: "desc" },
       });
       return res.status(200).json({ success: true, data: templates });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -520,7 +549,8 @@ export default class AdminCtrl {
         orderBy: { createdAt: "desc" },
       });
       return res.status(200).json({ success: true, data: templates });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -532,7 +562,8 @@ export default class AdminCtrl {
         data: { status: EventTemplateStatus.published, isPublic: true },
       });
       return res.status(200).json({ success: true, data: template });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2025"
@@ -562,7 +593,8 @@ export default class AdminCtrl {
         },
       });
       return res.status(200).json({ success: true, data: template });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2025"
@@ -583,7 +615,8 @@ export default class AdminCtrl {
         requestStatus: "pending",
       });
       return res.status(200).json({ success: true, data: events });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -595,7 +628,8 @@ export default class AdminCtrl {
         requestStatus: requestStatus as string | undefined,
       });
       return res.status(200).json({ success: true, data: events });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -614,7 +648,8 @@ export default class AdminCtrl {
         });
       }
       return res.status(200).json({ success: true, data: event });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(404).json({ success: false, message: error.message });
     }
   }
@@ -636,7 +671,8 @@ export default class AdminCtrl {
         }
       }
       return res.status(200).json({ success: true, data: event });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(404).json({ success: false, message: error.message });
     }
   }
@@ -647,7 +683,8 @@ export default class AdminCtrl {
     try {
       const refunds = await RefundSvc.getFailedRefunds();
       return res.status(200).json({ success: true, data: refunds });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -656,7 +693,8 @@ export default class AdminCtrl {
     try {
       const result = await RefundSvc.getFailureReason(req.params.id);
       return res.status(200).json({ success: true, data: result });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -668,7 +706,8 @@ export default class AdminCtrl {
         req.user!.userId,
       );
       return res.status(200).json({ success: true, data: result });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -687,7 +726,8 @@ export default class AdminCtrl {
         value.notes,
       );
       return res.status(200).json({ success: true, data: result });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }

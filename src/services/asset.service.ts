@@ -44,7 +44,7 @@ export default class AssetSvc {
       imgIds: data.imgIds,
     };
 
-    const asset = await AssetRepo.createAsset(assetData as any);
+    const asset = await AssetRepo.createAsset(assetData);
     return asset;
   }
 

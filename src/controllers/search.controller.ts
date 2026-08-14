@@ -42,7 +42,8 @@ export default class SearchCtrl {
           serviceFoxers: result.serviceFoxers,
         },
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }

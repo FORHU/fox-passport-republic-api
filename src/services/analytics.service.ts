@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../utils/prisma";
 
 export default class AnalyticsSvc {
@@ -34,7 +35,10 @@ export default class AnalyticsSvc {
       const confirmedBookings = allBookings.filter((b) =>
         ["confirmed", "completed"].includes(b.status),
       );
-      const revenue = confirmedBookings.reduce((s, b) => s + b.totalAmount, 0);
+      const revenue = confirmedBookings.reduce(
+        (s, b) => s.add(b.totalAmount),
+        new Prisma.Decimal(0),
+      );
       const totalGuests = t.events.reduce((s, e) => s + (e.guestCount ?? 0), 0);
       const completedEvents = t.events.filter(
         (e) => e.eventStatus === "completed",
@@ -61,7 +65,7 @@ export default class AnalyticsSvc {
         completedEvents,
         totalBookings: allBookings.length,
         confirmedBookings: confirmedBookings.length,
-        revenue: Math.round(revenue * 100) / 100,
+        revenue: Math.round(revenue.toNumber() * 100) / 100,
         totalGuests,
         monthlyBookings: Object.entries(monthlyBuckets).map(
           ([month, count]) => ({ month, count }),
