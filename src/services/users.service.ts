@@ -1,11 +1,11 @@
-import bcrypt from "bcryptjs";
 import UsersRepo from "../repositories/users.repository";
-import { SystemRole } from "@prisma/client";
+import { RoleType, SystemRole } from "@prisma/client";
+import { hashPassword } from "../utils/password";
 
 export default class UsersSvc {
   // GET ALL USERS (optionally filtered by roleType)
   static async getAllUsers(roleTypes?: string[]) {
-    return UsersRepo.getAllUsers(roleTypes as any);
+    return UsersRepo.getAllUsers(roleTypes as RoleType[] | undefined);
   }
 
   // GET FOXERS (public listing, optionally filtered by roleType, specialization, city)
@@ -19,7 +19,7 @@ export default class UsersSvc {
     return UsersRepo.findFoxers(
       limit,
       page,
-      roleType as any,
+      roleType as RoleType,
       specialization,
       city,
     );
@@ -52,7 +52,7 @@ export default class UsersSvc {
     const existingUser = await UsersRepo.getUserByEmail(data.email);
     if (existingUser) throw new Error("Email already exists");
 
-    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const hashedPassword = await hashPassword(data.password);
 
     return UsersRepo.createUser({
       ...data,

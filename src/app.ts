@@ -3,6 +3,7 @@ import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import router from "./routes";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { isDev, FRONTEND_URL } from "./config";
 import cors from "cors";
 import setup from "./setup";
@@ -79,18 +80,32 @@ app.use("/api", (req, res) => {
 });
 
 // Global error handler
+/** An Error that carries an HTTP status for the global handler to honour. */
+interface HttpError extends Error {
+  status?: number;
+}
+
+function toHttpError(err: unknown): HttpError {
+  if (err instanceof Error) return err as HttpError;
+  return new Error(
+    typeof err === "string" ? err : "An unexpected error occurred",
+  );
+}
+
 app.use(
   (
-    err: any,
+    err: unknown,
     req: express.Request,
     res: express.Response,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     next: express.NextFunction,
   ) => {
-    console.error("❌ GLOBAL ERROR:", err.message);
-    res.status(err.status || 400).json({
+    const error = toHttpError(err);
+    console.error("❌ GLOBAL ERROR:", error.message);
+    res.status(error.status || 400).json({
       success: false,
-      message: err.message || "An unexpected error occurred",
-      stack: isDev ? err.stack : undefined,
+      message: error.message || "An unexpected error occurred",
+      stack: isDev ? error.stack : undefined,
     });
   },
 );

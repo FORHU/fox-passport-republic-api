@@ -7,7 +7,8 @@ export default class PassportCtrl {
     try {
       const passport = await PassportSvc.getOrCreate(req.user!.userId);
       return res.status(200).json({ success: true, data: passport });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(500).json({ success: false, message: err.message });
     }
   }
@@ -20,7 +21,8 @@ export default class PassportCtrl {
           .status(404)
           .json({ success: false, message: "Passport not found" });
       return res.status(200).json({ success: true, data: passport });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(500).json({ success: false, message: err.message });
     }
   }
@@ -31,7 +33,8 @@ export default class PassportCtrl {
         orderBy: [{ path: "asc" }, { rarity: "asc" }],
       });
       return res.status(200).json({ success: true, data: badges });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(500).json({ success: false, message: err.message });
     }
   }
@@ -41,7 +44,8 @@ export default class PassportCtrl {
       const limit = Math.min(Number(req.query.limit) || 20, 50);
       const data = await PassportSvc.getLeaderboard(limit);
       return res.status(200).json({ success: true, data });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(500).json({ success: false, message: err.message });
     }
   }
@@ -49,7 +53,7 @@ export default class PassportCtrl {
   // host_support perk: returns priority support contact — 403 without perk
   static async getPrioritySupportContact(req: Request, res: Response) {
     try {
-      const userId = (req as any).user?.userId as string;
+      const userId = req.user?.userId as string;
       const hasHostSupport = await PassportSvc.hasPerk(userId, "host_support");
       if (!hasHostSupport) {
         return res.status(403).json({
@@ -66,7 +70,8 @@ export default class PassportCtrl {
           note: "Exclusive to Event Foxers with Host Support perk",
         },
       });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(500).json({ success: false, message: err.message });
     }
   }
@@ -74,7 +79,7 @@ export default class PassportCtrl {
   // founding_citizen perk: returns OG badge info for a user — for profile display
   static async getMyBadges(req: Request, res: Response) {
     try {
-      const userId = (req as any).user?.userId as string;
+      const userId = req.user?.userId as string;
       const perks = await PassportSvc.getPerks(userId);
       return res.status(200).json({
         success: true,
@@ -83,7 +88,8 @@ export default class PassportCtrl {
           perks,
         },
       });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(500).json({ success: false, message: err.message });
     }
   }

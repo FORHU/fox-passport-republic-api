@@ -1,3 +1,4 @@
+import type { Attachment } from "nodemailer/lib/mailer";
 import { SendMailOptions, createTransport } from "nodemailer";
 import {
   MAILER_EMAIL,
@@ -12,13 +13,14 @@ export async function sendEmail({
   subject,
   text,
   html,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   attachments,
 }: {
   to: string;
   subject: string;
   text?: string;
   html?: string;
-  attachments?: any[];
+  attachments?: Attachment[];
 }): Promise<string> {
   const transporter = createTransport({
     host: MAILER_TRANSPORT_HOST,

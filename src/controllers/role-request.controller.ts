@@ -21,7 +21,11 @@ export default class RoleRequestController {
    */
   static async apply(req: Request, res: Response) {
     try {
-      const userId = (req as any).user?.userId;
+      const userId = req.user?.userId;
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
       const { roleType } = req.body;
 
       // `data` is sent as a JSON string in multipart form-data
@@ -41,7 +45,7 @@ export default class RoleRequestController {
       }
 
       // Process each uploaded file through the 4-step pipeline
-      const files = (req as any).files as
+      const files = req.files as
         | Record<string, Express.Multer.File[]>
         | undefined;
 
@@ -57,7 +61,7 @@ export default class RoleRequestController {
           //    (uploadFile handles this internally: generates key + uploads)
 
           // 2. UPLOAD THE FILE — upload file buffer to S3
-          const { key } = await S3Svc.uploadFile(userId, file as any);
+          const { key } = await S3Svc.uploadFile(userId, file);
 
           // 3. GET CLOUDFRONT URL — get public URL for the uploaded file
           const { url } = await S3Svc.generateDownloadUrl(key);
@@ -97,7 +101,8 @@ export default class RoleRequestController {
         message: `Application for ${roleType} submitted successfully`,
         data: application,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Application error:", error);
       return res.status(400).json({ success: false, message: error.message });
     }
@@ -105,10 +110,15 @@ export default class RoleRequestController {
 
   static async listMine(req: Request, res: Response) {
     try {
-      const userId = (req as any).user?.userId;
+      const userId = req.user?.userId;
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
       const requests = await RoleRequestService.getMyRequests(userId);
       return res.status(200).json({ success: true, data: requests });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -127,7 +137,8 @@ export default class RoleRequestController {
         success: true,
         data: requests,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -137,7 +148,11 @@ export default class RoleRequestController {
    */
   static async review(req: Request, res: Response) {
     try {
-      const adminId = (req as any).user?.userId;
+      const adminId = req.user?.userId;
+      if (!adminId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
       const { id } = req.params;
       const { status, rejectionReason } = req.body;
 
@@ -163,7 +178,8 @@ export default class RoleRequestController {
         message: `Application ${status} successfully`,
         data: updatedRequest,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Review error:", error);
       return res.status(400).json({ success: false, message: error.message });
     }

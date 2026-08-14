@@ -1,5 +1,6 @@
 import { prisma } from "../utils/prisma";
 import { Prisma, BookingStatus } from "@prisma/client";
+import { BookingWithRelations } from "../types/prisma";
 
 export default class BookingRepo {
   static async create(data: Prisma.BookingCreateInput) {
@@ -13,7 +14,7 @@ export default class BookingRepo {
     });
   }
 
-  static async findAll(filters: any, skip = 0, take = 10) {
+  static async findAll(filters: Prisma.BookingWhereInput, skip = 0, take = 10) {
     const [bookings, total] = await Promise.all([
       prisma.booking.findMany({
         where: filters,
@@ -30,7 +31,7 @@ export default class BookingRepo {
     return { bookings, total };
   }
 
-  static async findById(id: string) {
+  static async findById(id: string): Promise<BookingWithRelations | null> {
     return prisma.booking.findUnique({
       where: { id },
       include: {

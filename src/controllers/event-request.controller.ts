@@ -30,7 +30,11 @@ export default class EventRequestCtrl {
       return res.status(400).json({ success: false, message: error.message });
 
     try {
-      const clientId = (req as any).user.userId;
+      const clientId = req.user?.userId;
+      if (!clientId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
       const templateId = value.templateId;
 
       let request;
@@ -59,7 +63,8 @@ export default class EventRequestCtrl {
         });
       }
       return res.status(201).json({ success: true, data: { id: request.id } });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -67,7 +72,11 @@ export default class EventRequestCtrl {
   static async approve(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { userId, systemRole } = (req as any).user;
+      if (!req.user)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
+      const { userId, systemRole } = req.user;
       const updated = await EventRequestSvc.approveRequest(
         id,
         userId,
@@ -91,7 +100,8 @@ export default class EventRequestCtrl {
       }
 
       return res.status(200).json({ success: true, data: updated });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -103,7 +113,11 @@ export default class EventRequestCtrl {
       return res.status(400).json({ success: false, message: error.message });
     try {
       const { id } = req.params;
-      const { userId, systemRole } = (req as any).user;
+      if (!req.user)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
+      const { userId, systemRole } = req.user;
       const updated = await EventRequestSvc.rejectRequest(
         id,
         value.reason,
@@ -129,7 +143,8 @@ export default class EventRequestCtrl {
       }
 
       return res.status(200).json({ success: true, data: updated });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -139,7 +154,8 @@ export default class EventRequestCtrl {
       const { id } = req.params;
       const updated = await EventRequestSvc.completeEvent(id);
       return res.status(200).json({ success: true, data: updated });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -148,17 +164,23 @@ export default class EventRequestCtrl {
     try {
       const events = await EventRequestRepo.findAllApproved();
       return res.status(200).json({ success: true, data: events });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
 
   static async listMyRequests(req: Request, res: Response) {
     try {
-      const clientId = (req as any).user.userId;
+      const clientId = req.user?.userId;
+      if (!clientId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
       const requests = await EventRequestSvc.getMyRequests(clientId);
       return res.status(200).json({ success: true, data: requests });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -168,7 +190,8 @@ export default class EventRequestCtrl {
       const { id } = req.params;
       const request = await EventRequestSvc.getRequestById(id);
       return res.status(200).json({ success: true, data: request });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(404).json({ success: false, message: error.message });
     }
   }

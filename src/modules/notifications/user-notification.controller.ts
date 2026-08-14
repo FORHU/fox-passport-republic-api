@@ -8,7 +8,8 @@ export default class NotificationController {
       const { notifications, unreadCount } =
         await NotificationService.getForUser(req.user!.userId, limit);
       res.json({ success: true, notifications, unreadCount });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       res.status(400).json({ success: false, message: err.message });
     }
   }
@@ -21,7 +22,8 @@ export default class NotificationController {
         req.user!.userId,
       );
       res.json({ success: true, data: notification });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       res.status(400).json({ success: false, message: err.message });
     }
   }
@@ -30,7 +32,8 @@ export default class NotificationController {
     try {
       await NotificationService.markAllAsRead(req.user!.userId);
       res.json({ success: true, message: "All notifications marked as read" });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       res.status(400).json({ success: false, message: err.message });
     }
   }

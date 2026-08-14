@@ -1,6 +1,10 @@
 import express from "express";
 import EventTemplateCtrl from "../controllers/event-template.controller";
-import { authenticate, requireRole } from "../middleware/auth.middleware";
+import {
+  authenticate,
+  requireRole,
+  requireAdmin,
+} from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -120,13 +124,13 @@ router.patch(
 router.patch(
   "/:id/approve",
   authenticate,
-  requireRole(["admin", "super_admin"]),
+  requireAdmin,
   EventTemplateCtrl.approveEventTemplate,
 );
 router.patch(
   "/:id/reject",
   authenticate,
-  requireRole(["admin", "super_admin"]),
+  requireAdmin,
   EventTemplateCtrl.rejectEventTemplate,
 );
 

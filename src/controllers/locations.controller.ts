@@ -13,7 +13,8 @@ export default class LocationsCtrl {
       const limit = Math.min(Number(req.query.limit) || 8, 20);
       const locations = await LocationsSvc.searchCities(q, limit);
       return res.status(200).json({ status: "success", data: { locations } });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(500).json({ status: "error", message: err.message });
     }
   }

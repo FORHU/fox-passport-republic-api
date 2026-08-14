@@ -1,6 +1,10 @@
 import express from "express";
 import ServiceCtrl from "../controllers/service.controller";
-import { authenticate, requireRole } from "../middleware/auth.middleware";
+import {
+  authenticate,
+  requireRole,
+  requireAdmin,
+} from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -32,13 +36,13 @@ router.delete(
 router.patch(
   "/:id/approve",
   authenticate,
-  requireRole(["admin", "super_admin"]),
+  requireAdmin,
   ServiceCtrl.approveService,
 );
 router.patch(
   "/:id/reject",
   authenticate,
-  requireRole(["admin", "super_admin"]),
+  requireAdmin,
   ServiceCtrl.rejectService,
 );
 

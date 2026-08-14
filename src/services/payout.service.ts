@@ -75,7 +75,7 @@ export default class PayoutSvc {
 
     try {
       const transfer = await stripe.transfers.create({
-        amount: Math.round(payout.amount * 100),
+        amount: Math.round(payout.amount.toNumber() * 100),
         currency: payout.currency.toLowerCase(),
         destination: recipient.stripeAccountId,
         transfer_group: payout.sourceId,
@@ -88,7 +88,8 @@ export default class PayoutSvc {
           failureReason: null,
         },
       });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       await prisma.payout.update({
         where: { id: payoutId },
         data: {
@@ -125,7 +126,7 @@ export default class PayoutSvc {
         role: RoleType.gearFoxer,
         sourceType: "assetBooking",
         sourceId: booking.id,
-        amount: booking.totalAmount - booking.platformFeeAmount,
+        amount: booking.totalAmount.sub(booking.platformFeeAmount).toNumber(),
       }),
     ]);
     this.logFailures(results, "assetBooking", bookingId);
@@ -145,7 +146,7 @@ export default class PayoutSvc {
         role: RoleType.serviceFoxer,
         sourceType: "serviceBooking",
         sourceId: booking.id,
-        amount: booking.totalAmount - booking.platformFeeAmount,
+        amount: booking.totalAmount.sub(booking.platformFeeAmount).toNumber(),
       }),
     ]);
     this.logFailures(results, "serviceBooking", bookingId);
@@ -183,7 +184,7 @@ export default class PayoutSvc {
           role: RoleType.gearFoxer,
           sourceType: "eventAssetTransaction",
           sourceId: tx.id,
-          amount: tx.agreedPrice,
+          amount: tx.agreedPrice.toNumber(),
         }),
       );
     }
@@ -194,7 +195,7 @@ export default class PayoutSvc {
           role: RoleType.serviceFoxer,
           sourceType: "eventServiceTransaction",
           sourceId: tx.id,
-          amount: tx.agreedPrice,
+          amount: tx.agreedPrice.toNumber(),
         }),
       );
     }
@@ -205,7 +206,7 @@ export default class PayoutSvc {
           role: RoleType.venueFoxer,
           sourceType: "eventVenueTransaction",
           sourceId: tx.id,
-          amount: tx.agreedPrice,
+          amount: tx.agreedPrice.toNumber(),
         }),
       );
     }
@@ -217,7 +218,7 @@ export default class PayoutSvc {
         role: RoleType.eventFoxer,
         sourceType: "eventHostMarkup",
         sourceId: booking.id,
-        amount: booking.event.hostMarkupAmount,
+        amount: booking.event.hostMarkupAmount.toNumber(),
       }),
     );
 

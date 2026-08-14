@@ -1,6 +1,8 @@
 import { prisma } from "../utils/prisma";
 import {
+  Prisma,
   EventCategory,
+  EventTemplateStatus,
   AssetCategory,
   ServiceCategory,
   VenueCategory,
@@ -8,6 +10,24 @@ import {
   ServiceStatus,
   VenueStatus,
 } from "@prisma/client";
+import { toEnum } from "../utils/enums";
+
+/**
+ * Template update payload. `imgIds` is not a column — callers pass image IDs
+ * and this repository translates them into a relation `set`.
+ */
+type UpdateTemplateData = Omit<
+  Prisma.EventTemplateUncheckedUpdateInput,
+  "images"
+> & {
+  imgIds?: string[];
+};
+
+/**
+ * Extra match columns (constraint, requested provider, request status, ...)
+ * merged into a template-item row when an EventFoxer requests a match.
+ */
+type MatchData = Record<string, string | number | boolean | Date | null>;
 
 export default class EventTemplateRepo {
   // CREATE
@@ -47,10 +67,12 @@ export default class EventTemplateRepo {
     const limit = filters?.limit ?? 50;
     const skip = (page - 1) * limit;
 
+    const category = toEnum(EventCategory, filters?.category);
+
     const where = {
       ...(filters?.ownerId && { ownerId: filters.ownerId }),
       ...(filters?.isPublic !== undefined && { isPublic: filters.isPublic }),
-      ...(filters?.category && { category: filters.category as any }),
+      ...(category && { category }),
       ...((filters?.city || filters?.targetCity) && {
         targetCity: {
           contains: (filters.city ?? filters.targetCity) as string,
@@ -100,10 +122,12 @@ export default class EventTemplateRepo {
     const limit = filters.limit;
     const skip = (page - 1) * limit;
 
+    const category = toEnum(EventCategory, filters.category);
+
     const where = {
       isPublic: true,
-      status: "published" as any,
-      ...(filters.category && { category: filters.category as any }),
+      status: EventTemplateStatus.published,
+      ...(category && { category }),
     };
 
     const [templates, total] = await prisma.$transaction([
@@ -147,7 +171,7 @@ export default class EventTemplateRepo {
   }
 
   // UPDATE
-  static async updateTemplate(id: string, data: any) {
+  static async updateTemplate(id: string, data: UpdateTemplateData) {
     const { imgIds, ...rest } = data;
     return prisma.eventTemplate.update({
       where: { id },
@@ -199,7 +223,7 @@ export default class EventTemplateRepo {
     templateId: string,
     assetId?: string,
     quantity: number = 1,
-    matchData?: any,
+    matchData?: MatchData,
     description?: string,
     matchedAt?: Date,
     agreedPrice?: number,
@@ -220,7 +244,10 @@ export default class EventTemplateRepo {
     });
   }
 
-  static async updateAssetMatch(id: string, data: any) {
+  static async updateAssetMatch(
+    id: string,
+    data: Prisma.EventTemplateAssetUncheckedUpdateInput,
+  ) {
     return prisma.eventTemplateAsset.update({
       where: { id },
       data,
@@ -258,7 +285,7 @@ export default class EventTemplateRepo {
   static async attachService(
     templateId: string,
     serviceId?: string,
-    matchData?: any,
+    matchData?: MatchData,
     description?: string,
     matchedAt?: Date,
     agreedPrice?: number,
@@ -278,7 +305,10 @@ export default class EventTemplateRepo {
     });
   }
 
-  static async updateServiceMatch(id: string, data: any) {
+  static async updateServiceMatch(
+    id: string,
+    data: Prisma.EventTemplateServiceUncheckedUpdateInput,
+  ) {
     return prisma.eventTemplateService.update({
       where: { id },
       data,
@@ -316,7 +346,7 @@ export default class EventTemplateRepo {
   static async attachVenue(
     templateId: string,
     venueId?: string,
-    matchData?: any,
+    matchData?: MatchData,
     description?: string,
     matchedAt?: Date,
     agreedPrice?: number,
@@ -336,7 +366,10 @@ export default class EventTemplateRepo {
     });
   }
 
-  static async updateVenueMatch(id: string, data: any) {
+  static async updateVenueMatch(
+    id: string,
+    data: Prisma.EventTemplateVenueUncheckedUpdateInput,
+  ) {
     return prisma.eventTemplateVenue.update({
       where: { id },
       data,

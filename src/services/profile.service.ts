@@ -1,5 +1,5 @@
-import bcrypt from "bcryptjs";
 import ProfileRepo from "../repositories/profile.repository";
+import { hashPassword, verifyPassword } from "../utils/password";
 
 export default class ProfileSvc {
   // Get user profile
@@ -57,7 +57,7 @@ export default class ProfileSvc {
     }
 
     // Verify current password
-    const isPasswordValid = await bcrypt.compare(
+    const isPasswordValid = await verifyPassword(
       currentPassword,
       user.password,
     );
@@ -66,7 +66,7 @@ export default class ProfileSvc {
     }
 
     // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await hashPassword(newPassword);
 
     // Update password
     await ProfileRepo.updatePasswordHash(userId, hashedPassword);
@@ -84,7 +84,7 @@ export default class ProfileSvc {
     }
 
     // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await verifyPassword(password, user.password);
     if (!isPasswordValid) {
       throw new Error("Password is incorrect");
     }
