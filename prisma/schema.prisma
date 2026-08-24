@@ -842,6 +842,7 @@ model CancellationPolicy {
   @@map("cancellation_policies")
 }
 
+
 model CancellationRule {
   id               String             @id @default(uuid())
   policyId         String
@@ -1074,3 +1075,5 @@ model StripeEvent {
 
   @@map("stripe_events")
 }
+
+
