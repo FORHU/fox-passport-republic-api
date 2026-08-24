@@ -1,5 +1,0 @@
-allowBuilds:
-  '@prisma/engines': false
-  bcrypt: false
-  prisma: false
-  ws: false

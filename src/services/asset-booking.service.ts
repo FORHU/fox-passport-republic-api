@@ -25,8 +25,11 @@ export default class AssetBookingSvc {
     deliveryAddress?: string;
     notes?: string;
   }) {
-    const asset = await prisma.asset.findUnique({ where: { id: data.assetId } });
-    if (!asset || asset.deletedAt) throw new Error("Asset not found or unavailable");
+    const asset = await prisma.asset.findUnique({
+      where: { id: data.assetId },
+    });
+    if (!asset || asset.deletedAt)
+      throw new Error("Asset not found or unavailable");
 
     if (data.quantity > asset.quantity) {
       throw new Error(`Only ${asset.quantity} unit(s) available`);
@@ -36,13 +39,20 @@ export default class AssetBookingSvc {
     const endDate = new Date(data.endDate);
 
     const itemsTotal = calculateItemsTotal({
-      price: asset.price,
+      price: asset.price.toNumber(),
       quantity: data.quantity,
       startDate,
       endDate,
       billingRate: asset.billingRate,
     });
-    const platformFeeAmount = itemsTotal * (PLATFORM_FEE_PERCENT / 100);
+    // lower_fees perk: gear foxer owner pays 0% platform commission
+    const { default: PassportSvc } = await import("./passport.service");
+    const ownerHasLowerFees = await PassportSvc.hasPerk(
+      asset.ownerId,
+      "lower_fees",
+    );
+    const effectiveFeePercent = ownerHasLowerFees ? 0 : PLATFORM_FEE_PERCENT;
+    const platformFeeAmount = itemsTotal * (effectiveFeePercent / 100);
     const totalAmount = itemsTotal + platformFeeAmount;
 
     return AssetBookingRepo.create({
@@ -59,7 +69,11 @@ export default class AssetBookingSvc {
     });
   }
 
-  static async getAll(filters?: { userId?: string; ownerId?: string; status?: string }) {
+  static async getAll(filters?: {
+    userId?: string;
+    ownerId?: string;
+    status?: string;
+  }) {
     return AssetBookingRepo.findAll({
       userId: filters?.userId,
       ownerId: filters?.ownerId,
@@ -73,11 +87,17 @@ export default class AssetBookingSvc {
     return booking;
   }
 
-  static async confirmPayment(id: string, transactionId: string, method: string, requesterId: string) {
+  static async confirmPayment(
+    id: string,
+    transactionId: string,
+    method: string,
+    requesterId: string,
+  ) {
     const booking = await AssetBookingRepo.findById(id);
     if (!booking) throw new Error("Asset booking not found");
     if (booking.userId !== requesterId) throw new Error("Unauthorized");
-    if (booking.status === ItemBookingStatus.cancelled) throw new Error("Booking is cancelled");
+    if (booking.status === ItemBookingStatus.cancelled)
+      throw new Error("Booking is cancelled");
 
     return AssetBookingRepo.confirmPayment(id, transactionId, method);
   }
@@ -86,19 +106,40 @@ export default class AssetBookingSvc {
     const booking = await AssetBookingRepo.findById(id);
     if (!booking) throw new Error("Asset booking not found");
 
-    const isOwner = (booking.asset as any)?.owner?.id === requesterId;
+    const isOwner = booking.asset?.owner?.id === requesterId;
     const isBooker = booking.userId === requesterId;
     if (!isOwner && !isBooker) throw new Error("Unauthorized");
 
-    const updated = await AssetBookingRepo.updateStatus(id, status as ItemBookingStatus);
+    const updated = await AssetBookingRepo.updateStatus(
+      id,
+      status as ItemBookingStatus,
+    );
 
     if (status === ItemBookingStatus.completed) {
-      // Payout failures must never fail the status-update response — log and move on.
       try {
         await PayoutSvc.createPayoutsForAssetBooking(id);
       } catch (err) {
         console.error(`Payout failed for asset booking ${id}`, err);
       }
+      import("./passport.service")
+        .then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
+          const ownerId = booking.asset?.ownerId ?? booking.asset?.owner?.id;
+          if (ownerId)
+            return PassportSvc.awardXP(
+              ownerId,
+              UserPath.gearFoxer,
+              XP_REWARDS.listingBooked,
+            );
+        })
+        .catch(() => {});
+      import("./specialization.service")
+        .then(({ default: SpecializationSvc }) => {
+          const assetId = booking.asset?.id ?? booking.assetId;
+          const ownerId = booking.asset?.ownerId ?? booking.asset?.owner?.id;
+          if (assetId && ownerId)
+            return SpecializationSvc.checkGearFoxer(assetId, ownerId);
+        })
+        .catch(() => {});
     }
 
     return updated;
@@ -111,16 +152,20 @@ export default class AssetBookingSvc {
   static async confirmArrival(id: string, requesterId: string) {
     const booking = await AssetBookingRepo.findById(id);
     if (!booking) throw new Error("Asset booking not found");
-    if (booking.userId !== requesterId) throw new Error("Only the client can confirm arrival");
-    if (!["confirmed", "pending"].includes(booking.status)) throw new Error("Booking cannot be confirmed at this stage");
+    if (booking.userId !== requesterId)
+      throw new Error("Only the client can confirm arrival");
+    if (!["confirmed", "pending"].includes(booking.status))
+      throw new Error("Booking cannot be confirmed at this stage");
     return AssetBookingRepo.confirmArrival(id);
   }
 
-  static async dispute(id: string, requesterId: string) {
+  static async dispute(id: string, requesterId: string, reason?: string) {
     const booking = await AssetBookingRepo.findById(id);
     if (!booking) throw new Error("Asset booking not found");
-    if (booking.userId !== requesterId) throw new Error("Only the client can report a dispute");
-    if (["completed", "cancelled", "disputed"].includes(booking.status)) throw new Error("Booking cannot be disputed at this stage");
-    return AssetBookingRepo.dispute(id);
+    if (booking.userId !== requesterId)
+      throw new Error("Only the client can report a dispute");
+    if (["completed", "cancelled", "disputed"].includes(booking.status))
+      throw new Error("Booking cannot be disputed at this stage");
+    return AssetBookingRepo.dispute(id, reason);
   }
 }

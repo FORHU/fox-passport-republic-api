@@ -1,8 +1,7 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../utils/prisma";
 
 export default class AuthRepo {
-
-
   static async createUser(data: {
     email: string;
     password: string;
@@ -76,7 +75,10 @@ export default class AuthRepo {
     });
   }
 
-  static async updateUser(userId: number | string, data: any) {
+  static async updateUser(
+    userId: number | string,
+    data: Prisma.UserUpdateInput,
+  ) {
     return prisma.user.update({
       where: {
         id: String(userId),

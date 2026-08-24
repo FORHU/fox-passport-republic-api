@@ -1,30 +1,64 @@
-import { AssetCondition, AssetStatus, BillingRate, AssetCategory } from "@prisma/client";
-import { prisma } from "../utils/prisma"; 
+import {
+  AssetCondition,
+  AssetStatus,
+  BillingRate,
+  AssetCategory,
+} from "@prisma/client";
+import { prisma } from "../utils/prisma";
+import { toEnum } from "../utils/enums";
 
 export default class AssetRepo {
   // READ ALL (public — available only)
-  static async findAllAssets(filters?: { ownerId?: string; category?: string }) {
-    return prisma.asset.findMany({
-      where: {
-        ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
-        ...(filters?.category && { category: filters.category as any }),
-        ...(filters?.ownerId ? {} : { status: AssetStatus.available }),
-        deletedAt: null,
-      },
-      include: {
-        owner: { select: { id: true, name: true, email: true } },
-        images: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+  static async findAllAssets(filters?: {
+    ownerId?: string;
+    category?: string;
+    city?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = filters?.page ?? 1;
+    const limit = filters?.limit ?? 50;
+    const skip = (page - 1) * limit;
+    const category = toEnum(AssetCategory, filters?.category);
+
+    const where = {
+      ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
+      ...(category && { category }),
+      ...(filters?.city && {
+        city: { contains: filters.city, mode: "insensitive" as const },
+      }),
+      ...(filters?.ownerId ? {} : { status: AssetStatus.available }),
+      deletedAt: null,
+    };
+
+    const [assets, total] = await prisma.$transaction([
+      prisma.asset.findMany({
+        where,
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          images: true,
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.asset.count({ where }),
+    ]);
+
+    return { assets, total };
   }
 
   // READ ALL (admin — no status filter)
-  static async findAllAssetsAdmin(filters?: { ownerId?: string; category?: string; status?: AssetStatus }) {
+  static async findAllAssetsAdmin(filters?: {
+    ownerId?: string;
+    category?: string;
+    status?: AssetStatus;
+  }) {
+    const category = toEnum(AssetCategory, filters?.category);
     return prisma.asset.findMany({
       where: {
         ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
-        ...(filters?.category && { category: filters.category as any }),
+        ...(category && { category }),
         ...(filters?.status && { status: filters.status }),
         deletedAt: null,
       },
@@ -64,9 +98,10 @@ export default class AssetRepo {
         billingRate: data.billingRate,
         condition: data.condition,
         status: data.status,
-        ...(data.imgIds && data.imgIds.length > 0 && {
-          images: { connect: data.imgIds.map((id) => ({ id })) },
-        }),
+        ...(data.imgIds &&
+          data.imgIds.length > 0 && {
+            images: { connect: data.imgIds.map((id) => ({ id })) },
+          }),
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
@@ -100,7 +135,7 @@ export default class AssetRepo {
       condition: AssetCondition;
       status: AssetStatus;
       imgIds: string[];
-    }>
+    }>,
   ) {
     return prisma.asset.update({
       where: { id: String(id) },
@@ -114,9 +149,10 @@ export default class AssetRepo {
         billingRate: data.billingRate ?? undefined,
         condition: data.condition ?? undefined,
         status: data.status ?? undefined,
-        ...(data.imgIds && data.imgIds.length > 0 && {
-          images: { connect: data.imgIds.map((id) => ({ id })) },
-        }),
+        ...(data.imgIds &&
+          data.imgIds.length > 0 && {
+            images: { connect: data.imgIds.map((id) => ({ id })) },
+          }),
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
@@ -132,5 +168,4 @@ export default class AssetRepo {
       data: { deletedAt: new Date() },
     });
   }
-
 }

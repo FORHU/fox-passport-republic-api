@@ -1,5 +1,9 @@
 import crypto from "crypto";
-import { getPutObjectPresignedUrl, getGetObjectPresignedUrl, uploadToS3 } from "../utils/s3";
+import {
+  getPutObjectPresignedUrl,
+  getGetObjectPresignedUrl,
+  uploadToS3,
+} from "../utils/s3";
 
 export default class S3Svc {
   static async generateUploadUrl(
@@ -8,9 +12,21 @@ export default class S3Svc {
     contentType?: string,
     sizeOfFile?: number,
   ) {
-    const ext = (S3Svc.getFileExtension(originalFilename) || "bin").toLowerCase();
+    const ext = (
+      S3Svc.getFileExtension(originalFilename) || "bin"
+    ).toLowerCase();
 
-    const allowedExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "ico", "webp", "pdf"];
+    const allowedExtensions = [
+      "jpg",
+      "jpeg",
+      "png",
+      "gif",
+      "bmp",
+      "tiff",
+      "ico",
+      "webp",
+      "pdf",
+    ];
     if (!allowedExtensions.includes(ext)) {
       throw new Error("Only images and PDF files are allowed");
     }
@@ -29,11 +45,9 @@ export default class S3Svc {
     return { url, key };
   }
 
-  static async generateDownloadUrl(
-    key: string
-  ) {
+  static async generateDownloadUrl(key: string) {
     const url = await getGetObjectPresignedUrl({
-      key
+      key,
     });
 
     return { url, key };
@@ -47,11 +61,28 @@ export default class S3Svc {
 
   static async uploadFile(
     userId: string,
-    file: { buffer: Buffer; originalname: string; mimetype: string; size: number }
+    file: {
+      buffer: Buffer;
+      originalname: string;
+      mimetype: string;
+      size: number;
+    },
   ) {
-    const ext = (S3Svc.getFileExtension(file.originalname) || "bin").toLowerCase();
+    const ext = (
+      S3Svc.getFileExtension(file.originalname) || "bin"
+    ).toLowerCase();
 
-    const allowedExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "ico", "webp", "pdf"];
+    const allowedExtensions = [
+      "jpg",
+      "jpeg",
+      "png",
+      "gif",
+      "bmp",
+      "tiff",
+      "ico",
+      "webp",
+      "pdf",
+    ];
     if (!allowedExtensions.includes(ext)) {
       throw new Error("Only images and PDF files are allowed");
     }
@@ -71,4 +102,3 @@ export default class S3Svc {
     return { key };
   }
 }
-

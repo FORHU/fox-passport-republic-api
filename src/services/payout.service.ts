@@ -66,7 +66,8 @@ export default class PayoutSvc {
         where: { id: payoutId },
         data: {
           status: PayoutStatus.failed,
-          failureReason: "Recipient has not completed Stripe Connect onboarding",
+          failureReason:
+            "Recipient has not completed Stripe Connect onboarding",
         },
       });
       return;
@@ -74,19 +75,27 @@ export default class PayoutSvc {
 
     try {
       const transfer = await stripe.transfers.create({
-        amount: Math.round(payout.amount * 100),
+        amount: Math.round(payout.amount.toNumber() * 100),
         currency: payout.currency.toLowerCase(),
         destination: recipient.stripeAccountId,
         transfer_group: payout.sourceId,
       });
       await prisma.payout.update({
         where: { id: payoutId },
-        data: { status: PayoutStatus.paid, stripeTransferId: transfer.id, failureReason: null },
+        data: {
+          status: PayoutStatus.paid,
+          stripeTransferId: transfer.id,
+          failureReason: null,
+        },
       });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       await prisma.payout.update({
         where: { id: payoutId },
-        data: { status: PayoutStatus.failed, failureReason: err.message ?? "Stripe transfer failed" },
+        data: {
+          status: PayoutStatus.failed,
+          failureReason: err.message ?? "Stripe transfer failed",
+        },
       });
     }
   }
@@ -114,10 +123,10 @@ export default class PayoutSvc {
     const results = await Promise.allSettled([
       this.createAndFire({
         recipientId: booking.asset.ownerId,
-        role: RoleType.foxerAsset,
+        role: RoleType.gearFoxer,
         sourceType: "assetBooking",
         sourceId: booking.id,
-        amount: booking.totalAmount - booking.platformFeeAmount,
+        amount: booking.totalAmount.sub(booking.platformFeeAmount).toNumber(),
       }),
     ]);
     this.logFailures(results, "assetBooking", bookingId);
@@ -134,10 +143,10 @@ export default class PayoutSvc {
     const results = await Promise.allSettled([
       this.createAndFire({
         recipientId: booking.service.ownerId,
-        role: RoleType.foxerService,
+        role: RoleType.serviceFoxer,
         sourceType: "serviceBooking",
         sourceId: booking.id,
-        amount: booking.totalAmount - booking.platformFeeAmount,
+        amount: booking.totalAmount.sub(booking.platformFeeAmount).toNumber(),
       }),
     ]);
     this.logFailures(results, "serviceBooking", bookingId);
@@ -169,50 +178,65 @@ export default class PayoutSvc {
     // on the (sourceType, sourceId, recipientId, role) unique constraint and silently
     // drop the second item's payout.
     for (const tx of booking.assetTransactions) {
-      jobs.push(this.createAndFire({
-        recipientId: tx.providerId,
-        role: RoleType.foxerAsset,
-        sourceType: "eventAssetTransaction",
-        sourceId: tx.id,
-        amount: tx.agreedPrice,
-      }));
+      jobs.push(
+        this.createAndFire({
+          recipientId: tx.providerId,
+          role: RoleType.gearFoxer,
+          sourceType: "eventAssetTransaction",
+          sourceId: tx.id,
+          amount: tx.agreedPrice.toNumber(),
+        }),
+      );
     }
     for (const tx of booking.serviceTransactions) {
-      jobs.push(this.createAndFire({
-        recipientId: tx.providerId,
-        role: RoleType.foxerService,
-        sourceType: "eventServiceTransaction",
-        sourceId: tx.id,
-        amount: tx.agreedPrice,
-      }));
+      jobs.push(
+        this.createAndFire({
+          recipientId: tx.providerId,
+          role: RoleType.serviceFoxer,
+          sourceType: "eventServiceTransaction",
+          sourceId: tx.id,
+          amount: tx.agreedPrice.toNumber(),
+        }),
+      );
     }
     for (const tx of booking.venueTransactions) {
-      jobs.push(this.createAndFire({
-        recipientId: tx.providerId,
-        role: RoleType.mayor,
-        sourceType: "eventVenueTransaction",
-        sourceId: tx.id,
-        amount: tx.agreedPrice,
-      }));
+      jobs.push(
+        this.createAndFire({
+          recipientId: tx.providerId,
+          role: RoleType.venueFoxer,
+          sourceType: "eventVenueTransaction",
+          sourceId: tx.id,
+          amount: tx.agreedPrice.toNumber(),
+        }),
+      );
     }
     // Host's own cut — one per booking (sourceId = booking.id is fine here, there's
     // only ever one Host per Event).
-    jobs.push(this.createAndFire({
-      recipientId: booking.event.organizerId,
-      role: RoleType.host,
-      sourceType: "eventHostMarkup",
-      sourceId: booking.id,
-      amount: booking.event.hostMarkupAmount,
-    }));
+    jobs.push(
+      this.createAndFire({
+        recipientId: booking.event.organizerId,
+        role: RoleType.eventFoxer,
+        sourceType: "eventHostMarkup",
+        sourceId: booking.id,
+        amount: booking.event.hostMarkupAmount.toNumber(),
+      }),
+    );
 
     const results = await Promise.allSettled(jobs);
     this.logFailures(results, "booking", bookingId);
   }
 
-  private static logFailures(results: PromiseSettledResult<void>[], sourceType: string, sourceId: string) {
+  private static logFailures(
+    results: PromiseSettledResult<void>[],
+    sourceType: string,
+    sourceId: string,
+  ) {
     for (const r of results) {
       if (r.status === "rejected") {
-        console.error(`Payout job failed for ${sourceType} ${sourceId}`, r.reason);
+        console.error(
+          `Payout job failed for ${sourceType} ${sourceId}`,
+          r.reason,
+        );
       }
     }
   }

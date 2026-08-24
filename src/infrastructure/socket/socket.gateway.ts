@@ -1,6 +1,6 @@
 import { Server, Socket } from "socket.io";
 import jwt from "jsonwebtoken";
-import { ACCESS_TOKEN_SECRET} from "../../config";
+import { ACCESS_TOKEN_SECRET } from "../../config";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -9,16 +9,24 @@ interface AuthenticatedSocket extends Socket {
 export const registerSocketGateway = (io: Server) => {
   // Middleware: verify JWT before allowing connection
   io.use((socket: AuthenticatedSocket, next) => {
-    const token = socket.handshake.auth?.token;
+    const rawToken = socket.handshake.auth?.token;
 
-    if (!token) {
+    if (!rawToken) {
       return next(new Error("Authentication token missing"));
     }
 
+    // Mirror the HTTP auth middleware: strip "Bearer " prefix and any accidental quotes
+    const token = String(rawToken)
+      .replace(/^Bearer\s+/i, "")
+      .replace(/"/g, "");
+
     try {
-      const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET) as { userId: string };
+      const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET) as {
+        userId: string;
+      };
       socket.userId = decoded.userId;
       next();
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
       next(new Error("Invalid or expired token"));
     }

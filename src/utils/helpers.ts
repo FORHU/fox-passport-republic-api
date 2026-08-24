@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { sendEmail } from "./mailer";
+import { LOGO_DATA_URI } from "./emails/base";
 
 /**
  
@@ -11,38 +12,58 @@ Sends a templated email using the specified parameters.*
 @param {Object} params.email_data - The data to populate the email template.
 @param {Array} [params.attachments=[]] - Optional attachments to include in the email.
 @param {string|null} [params.cc=null] - Optional CC recipient for the email.*/
-export const sendTemplatedEmail = ({
+/** Placeholder values substituted into an email template. */
+export interface EmailData {
+  /** Recipient address — every template is sent to this address. */
+  email: string;
+  [placeholder: string]: string | number;
+}
+
+export interface EmailAttachment {
+  filename: string;
+  path?: string;
+  content?: string | Buffer;
+  contentType?: string;
+}
+
+export interface SendTemplatedEmailParams {
+  template_name: string;
+  subject: string;
+  email_data: EmailData;
+  attachments?: EmailAttachment[];
+  cc?: string | null;
+}
+
+export const sendTemplatedEmail = async ({
   template_name,
   subject,
   email_data,
   attachments = [],
-  cc = null,
-}: any) => {
+}: SendTemplatedEmailParams): Promise<void> => {
   const html = getHTMLContents({ template_name, email_data });
 
-  handleSendEmail({
+  await sendEmail({
     to: email_data.email,
     subject,
     html,
     attachments,
-    cc,
   });
 };
 
-export const handleSendEmail = ({ to, subject, html, attachments }: any) => {
-  /**
-     
-  Adds a job to the email queue to send an email verification email to the user.
-  @param {string} to - The email address to send the verification email to.
-  @param {string} subject - The subject of the verification email.
-  @param {string} html - The HTML content of the verification email.*/
+export interface SendEmailParams {
+  to: string;
+  subject: string;
+  html: string;
+  attachments?: EmailAttachment[];
+}
 
-  sendEmail({
-    to,
-    subject,
-    html,
-    attachments,
-  });
+export const handleSendEmail = ({
+  to,
+  subject,
+  html,
+  attachments,
+}: SendEmailParams) => {
+  sendEmail({ to, subject, html, attachments });
 };
 
 /**
@@ -53,12 +74,18 @@ Generates HTML content by replacing placeholders in an email template with provi
 @param {Object} params.email_data - An object containing key-value pairs where the key is the placeholder in the template and the value is the data to replace it with.
 @returns {string} The generated HTML content with placeholders replaced by the provided data.*/
 
-export const getHTMLContents = ({ template_name, email_data }: any): string => {
+export const getHTMLContents = ({
+  template_name,
+  email_data,
+}: Pick<SendTemplatedEmailParams, "template_name" | "email_data">): string => {
   const filePath = path.join(process.cwd(), `email-template/${template_name}`);
   let html = fs.readFileSync(filePath, "utf8");
-  for (const key in email_data) {
-    const placeholder = `${key}`;
-    html = html.replace(new RegExp(placeholder, "g"), email_data[key]);
+  const data: Record<string, string | number> = {
+    ...email_data,
+    LOGO_URL: LOGO_DATA_URI,
+  };
+  for (const key in data) {
+    html = html.replace(new RegExp(key, "g"), String(data[key]));
   }
   return html;
 };
@@ -67,7 +94,7 @@ export const stringBacktickToArray = (input: string = ""): string[] => {
   return input
     .replace(/"/g, "")
     .split(",")
-    .map((id: any) => id.trim());
+    .map((id) => id.trim());
 };
 
 export const ACTIONS = {

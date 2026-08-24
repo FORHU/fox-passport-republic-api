@@ -20,7 +20,8 @@ export default class UsersCtrl {
     try {
       const user = await UsersSvc.createUser(value);
       return res.status(201).json(user);
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ message: err.message });
     }
   }
@@ -28,7 +29,9 @@ export default class UsersCtrl {
   // READ ALL
   static async getAllUsers(req: Request, res: Response) {
     const roleTypeParam = req.query.roleType as string | undefined;
-    const roleTypes = roleTypeParam ? roleTypeParam.split(',').map(r => r.trim()) : undefined;
+    const roleTypes = roleTypeParam
+      ? roleTypeParam.split(",").map((r) => r.trim())
+      : undefined;
     const users = await UsersSvc.getAllUsers(roleTypes);
     return res.json(users);
   }
@@ -39,9 +42,27 @@ export default class UsersCtrl {
       const limit = Math.min(Number(req.query.limit) || 9, 30);
       const page = Math.max(Number(req.query.page) || 1, 1);
       const roleType = req.query.roleType as string | undefined;
-      const foxers = await UsersSvc.getFoxers(limit, page, roleType);
-      return res.status(200).json({ success: true, data: foxers });
-    } catch (err: any) {
+      const specialization = req.query.specialization as string | undefined;
+      const city = req.query.city as string | undefined;
+      const result = await UsersSvc.getFoxers(
+        limit,
+        page,
+        roleType,
+        specialization,
+        city,
+      );
+      return res.status(200).json({
+        success: true,
+        data: result.foxers,
+        pagination: {
+          page,
+          limit,
+          total: result.total,
+          totalPages: result.totalPages,
+        },
+      });
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(500).json({ success: false, message: err.message });
     }
   }
@@ -51,7 +72,8 @@ export default class UsersCtrl {
     try {
       const foxer = await UsersSvc.getFoxerById(req.params.id);
       return res.status(200).json({ success: true, data: foxer });
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(404).json({ success: false, message: err.message });
     }
   }
@@ -61,7 +83,8 @@ export default class UsersCtrl {
     try {
       const user = await UsersSvc.getUserById(req.params.id);
       return res.json(user);
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(404).json({ message: err.message });
     }
   }
@@ -84,8 +107,59 @@ export default class UsersCtrl {
     try {
       const updatedUser = await UsersSvc.updateUser(req.params.id, value);
       return res.json(updatedUser);
-    } catch (err: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       return res.status(400).json({ message: err.message });
+    }
+  }
+
+  // BECOME HOST
+  static async becomeHost(req: Request, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
+
+      const user = await UsersSvc.becomeHost(userId);
+      if (!user) {
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
+      }
+      return res.status(200).json({
+        success: true,
+        message: "You are now a host!",
+        data: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          name: user.name,
+          role: user.systemRole,
+          isHost: (user.roleType as string[]).includes("host"),
+        },
+      });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res.status(400).json({ success: false, message: err.message });
+    }
+  }
+
+  // FOXER STATS
+  static async getFoxerStats(req: Request, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
+
+      const stats = await UsersSvc.getFoxerStats(userId);
+      return res.status(200).json({ success: true, data: stats });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res.status(500).json({ success: false, message: err.message });
     }
   }
 

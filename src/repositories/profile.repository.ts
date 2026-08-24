@@ -29,7 +29,10 @@ export default class ProfileRepo {
     });
   }
 
-  static async findByUsernameExcludingUserId(username: string, excludeUserId: string) {
+  static async findByUsernameExcludingUserId(
+    username: string,
+    excludeUserId: string,
+  ) {
     return prisma.user.findFirst({
       where: {
         username,
@@ -46,7 +49,8 @@ export default class ProfileRepo {
       username?: string;
       phone?: string;
       imgId?: string;
-    }
+      city?: string;
+    },
   ) {
     return prisma.user.update({
       where: { id: String(userId) },
@@ -58,6 +62,7 @@ export default class ProfileRepo {
         name: true,
         phone: true,
         imgId: true,
+        city: true,
         systemRole: true,
         roleType: true,
         updatedAt: true,
@@ -80,4 +85,3 @@ export default class ProfileRepo {
     });
   }
 }
-

@@ -22,6 +22,12 @@ import matchRoutes from "./match.routes";
 import bookingRoutes from "./booking.routes";
 import notificationRoutes from "../modules/notifications/user-notification.routes";
 import stripeConnectRoutes from "./stripe-connect.routes";
+import cancellationPolicyRoutes from "./cancellation-policy.routes";
+import waitlistRoutes from "./waitlist.routes";
+import locationsRoutes from "./locations.routes";
+import passportRoutes from "./passport.routes";
+import analyticsRoutes from "./analytics.routes";
+import searchRoutes from "./search.routes";
 
 const router = express.Router();
 
@@ -42,11 +48,7 @@ router.use("/v1/categories", categoryRoutes);
 
 // Feature Routes
 router.use("/v1/venues", venueRoutes);
-router.use("/v1/venues/", venueRoutes); // Trailing slash alias
-router.use("/v1/venue", venueRoutes); // Singular alias
-router.use("/v1/venue/", venueRoutes); // Singular alias with trailing slash
 router.use("/v1/payments", paymentRoutes);
-router.use("/v1/payments/", paymentRoutes); // Trailing slash alias
 router.use("/v1/notifications", notificationRoutes);
 // Booking sub-routes must be registered BEFORE the generic /:id routes
 router.use("/v1/service/bookings", serviceBookingRoutes);
@@ -54,7 +56,6 @@ router.use("/v1/asset/bookings", assetBookingRoutes);
 router.use("/v1/asset", assetRoutes);
 router.use("/v1/service", serviceRoutes);
 router.use("/v1/files", fileRoutes);
-router.use("/v1/file", fileRoutes);
 router.use("/v1/event-templates", eventTemplateRoutes);
 router.use("/v1/event-requests", eventRequestRoutes);
 router.use("/v1/event-transactions", eventTransactionRoutes);
@@ -63,6 +64,12 @@ router.use("/v1/reviews", reviewRoutes);
 router.use("/v1/favorites", favoriteRoutes);
 router.use("/v1/matches", matchRoutes);
 router.use("/v1/bookings", bookingRoutes);
+router.use("/v1/cancellation-policies", cancellationPolicyRoutes);
+router.use("/v1/waitlist", waitlistRoutes);
+router.use("/v1/locations", locationsRoutes);
+router.use("/v1/passport", passportRoutes);
+router.use("/v1/analytics", analyticsRoutes);
+router.use("/v1/search", searchRoutes);
 router.use("/v1/stripe-connect", stripeConnectRoutes);
 
 // Admin Routes
@@ -72,4 +79,3 @@ router.use("/v1/admin", adminRoutes);
 router.use("/v1/s3", s3Routes);
 
 export default router;
-

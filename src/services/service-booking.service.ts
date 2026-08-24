@@ -7,7 +7,9 @@ import PayoutSvc from "./payout.service";
 
 export default class ServiceBookingSvc {
   static async getAvailability(serviceId: string) {
-    const service = await prisma.service.findUnique({ where: { id: serviceId } });
+    const service = await prisma.service.findUnique({
+      where: { id: serviceId },
+    });
     if (!service) throw new Error("Service not found");
     const bookedDates = await ServiceBookingRepo.getBookedDates(serviceId);
     return { bookedDates };
@@ -25,20 +27,30 @@ export default class ServiceBookingSvc {
     location: string;
     notes?: string;
   }) {
-    const service = await prisma.service.findUnique({ where: { id: data.serviceId } });
-    if (!service || service.deletedAt) throw new Error("Service not found or unavailable");
+    const service = await prisma.service.findUnique({
+      where: { id: data.serviceId },
+    });
+    if (!service || service.deletedAt)
+      throw new Error("Service not found or unavailable");
 
     const scheduledDate = new Date(data.scheduledDate);
     const endDate = data.endDate ? new Date(data.endDate) : scheduledDate;
 
     const itemsTotal = calculateItemsTotal({
-      price: service.price,
+      price: service.price.toNumber(),
       quantity: 1,
       startDate: scheduledDate,
       endDate,
       billingRate: service.billingRate,
     });
-    const platformFeeAmount = itemsTotal * (PLATFORM_FEE_PERCENT / 100);
+    // service_lower_fees perk: service foxer owner pays 0% platform commission
+    const { default: PassportSvc } = await import("./passport.service");
+    const ownerHasLowerFees = await PassportSvc.hasPerk(
+      service.ownerId,
+      "service_lower_fees",
+    );
+    const effectiveFeePercent = ownerHasLowerFees ? 0 : PLATFORM_FEE_PERCENT;
+    const platformFeeAmount = itemsTotal * (effectiveFeePercent / 100);
     const totalAmount = itemsTotal + platformFeeAmount;
 
     return ServiceBookingRepo.create({
@@ -54,7 +66,11 @@ export default class ServiceBookingSvc {
     });
   }
 
-  static async getAll(filters?: { userId?: string; ownerId?: string; status?: string }) {
+  static async getAll(filters?: {
+    userId?: string;
+    ownerId?: string;
+    status?: string;
+  }) {
     return ServiceBookingRepo.findAll({
       userId: filters?.userId,
       ownerId: filters?.ownerId,
@@ -68,11 +84,17 @@ export default class ServiceBookingSvc {
     return booking;
   }
 
-  static async confirmPayment(id: string, transactionId: string, method: string, requesterId: string) {
+  static async confirmPayment(
+    id: string,
+    transactionId: string,
+    method: string,
+    requesterId: string,
+  ) {
     const booking = await ServiceBookingRepo.findById(id);
     if (!booking) throw new Error("Service booking not found");
     if (booking.userId !== requesterId) throw new Error("Unauthorized");
-    if (booking.status === ItemBookingStatus.cancelled) throw new Error("Booking is cancelled");
+    if (booking.status === ItemBookingStatus.cancelled)
+      throw new Error("Booking is cancelled");
 
     return ServiceBookingRepo.confirmPayment(id, transactionId, method);
   }
@@ -81,11 +103,14 @@ export default class ServiceBookingSvc {
     const booking = await ServiceBookingRepo.findById(id);
     if (!booking) throw new Error("Service booking not found");
 
-    const isOwner = (booking.service as any)?.owner?.id === requesterId;
+    const isOwner = booking.service?.owner?.id === requesterId;
     const isBooker = booking.userId === requesterId;
     if (!isOwner && !isBooker) throw new Error("Unauthorized");
 
-    const updated = await ServiceBookingRepo.updateStatus(id, status as ItemBookingStatus);
+    const updated = await ServiceBookingRepo.updateStatus(
+      id,
+      status as ItemBookingStatus,
+    );
 
     if (status === ItemBookingStatus.completed) {
       try {
@@ -93,6 +118,27 @@ export default class ServiceBookingSvc {
       } catch (err) {
         console.error(`Payout failed for service booking ${id}`, err);
       }
+      import("./passport.service")
+        .then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
+          const ownerId =
+            booking.service?.ownerId ?? booking.service?.owner?.id;
+          if (ownerId)
+            return PassportSvc.awardXP(
+              ownerId,
+              UserPath.serviceFoxer,
+              XP_REWARDS.listingBooked,
+            );
+        })
+        .catch(() => {});
+      import("./specialization.service")
+        .then(({ default: SpecializationSvc }) => {
+          const serviceId = booking.service?.id ?? booking.serviceId;
+          const ownerId =
+            booking.service?.ownerId ?? booking.service?.owner?.id;
+          if (serviceId && ownerId)
+            return SpecializationSvc.checkServiceFoxer(serviceId, ownerId);
+        })
+        .catch(() => {});
     }
 
     return updated;
@@ -105,16 +151,20 @@ export default class ServiceBookingSvc {
   static async confirmArrival(id: string, requesterId: string) {
     const booking = await ServiceBookingRepo.findById(id);
     if (!booking) throw new Error("Service booking not found");
-    if (booking.userId !== requesterId) throw new Error("Only the client can confirm arrival");
-    if (!["confirmed", "pending"].includes(booking.status)) throw new Error("Booking cannot be confirmed at this stage");
+    if (booking.userId !== requesterId)
+      throw new Error("Only the client can confirm arrival");
+    if (!["confirmed", "pending"].includes(booking.status))
+      throw new Error("Booking cannot be confirmed at this stage");
     return ServiceBookingRepo.confirmArrival(id);
   }
 
-  static async dispute(id: string, requesterId: string) {
+  static async dispute(id: string, requesterId: string, reason?: string) {
     const booking = await ServiceBookingRepo.findById(id);
     if (!booking) throw new Error("Service booking not found");
-    if (booking.userId !== requesterId) throw new Error("Only the client can report a dispute");
-    if (["completed", "cancelled", "disputed"].includes(booking.status)) throw new Error("Booking cannot be disputed at this stage");
-    return ServiceBookingRepo.dispute(id);
+    if (booking.userId !== requesterId)
+      throw new Error("Only the client can report a dispute");
+    if (["completed", "cancelled", "disputed"].includes(booking.status))
+      throw new Error("Booking cannot be disputed at this stage");
+    return ServiceBookingRepo.dispute(id, reason);
   }
 }

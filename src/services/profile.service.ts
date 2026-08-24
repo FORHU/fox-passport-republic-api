@@ -1,90 +1,97 @@
-import bcrypt from "bcryptjs";
 import ProfileRepo from "../repositories/profile.repository";
+import { hashPassword, verifyPassword } from "../utils/password";
 
 export default class ProfileSvc {
-    // Get user profile
-    static async getProfile(userId: string) {
-        const user = await ProfileRepo.findProfileById(userId);
+  // Get user profile
+  static async getProfile(userId: string) {
+    const user = await ProfileRepo.findProfileById(userId);
 
-        if (!user) {
-            throw new Error("User not found");
-        }
-
-        return user;
+    if (!user) {
+      throw new Error("User not found");
     }
 
-    // Update profile
-    static async updateProfile(userId: string, data: {
-        name?: string;
-        username?: string;
-        phone?: string;
-        profileImage?: string;
-    }) {
-        // Check if username is already taken (if updating username)
-        if (data.username) {
-            const existingUser = await ProfileRepo.findByUsernameExcludingUserId(
-                data.username,
-                userId
-            );
+    return user;
+  }
 
-            if (existingUser) {
-                throw new Error("Username already taken");
-            }
-        }
+  // Update profile
+  static async updateProfile(
+    userId: string,
+    data: {
+      name?: string;
+      username?: string;
+      phone?: string;
+      profileImage?: string;
+      city?: string;
+    },
+  ) {
+    // Check if username is already taken (if updating username)
+    if (data.username) {
+      const existingUser = await ProfileRepo.findByUsernameExcludingUserId(
+        data.username,
+        userId,
+      );
 
-        const { profileImage, ...rest } = data;
-        return ProfileRepo.updateProfile(userId, {
-            ...rest,
-            ...(profileImage !== undefined ? { imgId: profileImage } : {}),
-        });
+      if (existingUser) {
+        throw new Error("Username already taken");
+      }
     }
 
-    // Change password
-    static async changePassword(
-        userId: string,
-        currentPassword: string,
-        newPassword: string
-    ) {
-        // Get user with password
-        const user = await ProfileRepo.findUserForPasswordCheck(userId);
+    const { profileImage, ...rest } = data;
+    return ProfileRepo.updateProfile(userId, {
+      ...rest,
+      ...(profileImage !== undefined ? { imgId: profileImage } : {}),
+    } as Parameters<typeof ProfileRepo.updateProfile>[1]);
+  }
 
-        if (!user) {
-            throw new Error("User not found");
-        }
+  // Change password
+  static async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    // Get user with password
+    const user = await ProfileRepo.findUserForPasswordCheck(userId);
 
-        // Verify current password
-        const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
-        if (!isPasswordValid) {
-            throw new Error("Current password is incorrect");
-        }
-
-        // Hash new password
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-        // Update password
-        await ProfileRepo.updatePasswordHash(userId, hashedPassword);
-
-        return { message: "Password changed successfully" };
+    if (!user) {
+      throw new Error("User not found");
     }
 
-    // Delete account
-    static async deleteAccount(userId: string, password: string) {
-        // Get user with password
-        const user = await ProfileRepo.findUserForPasswordCheck(userId);
-
-        if (!user) {
-            throw new Error("User not found");
-        }
-
-        // Verify password
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid) {
-            throw new Error("Password is incorrect");
-        }
-
-        // Delete user (cascade will handle related records)
-        await ProfileRepo.deleteUser(userId);
-
-        return { message: "Account deleted successfully" };
+    // Verify current password
+    const isPasswordValid = await verifyPassword(
+      currentPassword,
+      user.password,
+    );
+    if (!isPasswordValid) {
+      throw new Error("Current password is incorrect");
     }
+
+    // Hash new password
+    const hashedPassword = await hashPassword(newPassword);
+
+    // Update password
+    await ProfileRepo.updatePasswordHash(userId, hashedPassword);
+
+    return { message: "Password changed successfully" };
+  }
+
+  // Delete account
+  static async deleteAccount(userId: string, password: string) {
+    // Get user with password
+    const user = await ProfileRepo.findUserForPasswordCheck(userId);
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Verify password
+    const isPasswordValid = await verifyPassword(password, user.password);
+    if (!isPasswordValid) {
+      throw new Error("Password is incorrect");
+    }
+
+    // Delete user (cascade will handle related records)
+    await ProfileRepo.deleteUser(userId);
+
+    return { message: "Account deleted successfully" };
+  }
 }
