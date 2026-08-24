@@ -897,15 +897,44 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
       }
     ];
 
+    // ── Bulk assets for pagination-testing foxers ─────────────────────────────
+    for (let i = 1; i <= 60; i++) {
+      const foxer = users.find((u: any) => u.email === `gf-${String(i).padStart(2, "0")}@foxers.ph`);
+      if (!foxer) continue;
+      const cat = ASSET_CATEGORIES[i % ASSET_CATEGORIES.length];
+      const catalog = BULK_ASSET_NAMES[cat] ?? [];
+      const pick = catalog.length
+        ? catalog[i % catalog.length]
+        : { name: `GF ${i} Event Asset`, desc: "Event asset for rent.", price: 5000, billingRate: BillingRate.daily, condition: AssetCondition.good };
+      const loc = CITIES[i % CITIES.length];
+      assets.push({
+        id: `seed-asset-gf-${i}-${cat}`,
+        ownerId: foxer.id,
+        category: cat,
+        name: pick.name,
+        description: pick.desc,
+        quantity: 1 + (i % 5),
+        price: pick.price,
+        currency: "PHP",
+        billingRate: pick.billingRate,
+        condition: pick.condition,
+        status: AssetStatus.available,
+        city: loc.city,
+        state: loc.state,
+        country: "Philippines",
+      } as any);
+    }
+
     for (const a of assets) {
-      const assetId = `seed-asset-${a.name.trim().toLowerCase().replace(/\s+/g, '-')}`;
+      const { id, ...rest } = a as any;
+      const assetId = id || `seed-asset-${a.name.trim().toLowerCase().replace(/\s+/g, '-')}`;
       const coords = CITY_COORDS[(a as any).city] ?? {};
       await prisma.asset.upsert({
         where: { id: assetId },
-        update: { ...a, ...coords },
+        update: { ...rest, ...coords },
         create: {
           id: assetId,
-          ...a,
+          ...rest,
           ...coords,
         },
       });
