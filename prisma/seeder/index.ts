@@ -1,4 +1,5 @@
 export * from "./user.seeder";
+export * from "./cancellation-policy.seeder";
 export * from "./venue.seeder";
 export * from "./asset.seeder";
 export * from "./service.seeder";
@@ -6,3 +7,7 @@ export * from "./event.seeder";
 export * from "./booking.seeder";
 export * from "./review.seeder";
 export * from "./item-booking.seeder";
+export * from "./badge.seeder";
+export * from "./passport.seeder";
+export * from "./specialization.seeder";
+export * from "./partner.seeder";

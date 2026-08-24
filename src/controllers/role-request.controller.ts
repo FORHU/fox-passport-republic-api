@@ -21,7 +21,11 @@ export default class RoleRequestController {
    */
   static async apply(req: Request, res: Response) {
     try {
-      const userId = (req as any).user?.userId;
+      const userId = req.user?.userId;
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
       const { roleType } = req.body;
 
       // `data` is sent as a JSON string in multipart form-data
@@ -30,13 +34,20 @@ export default class RoleRequestController {
           ? JSON.parse(req.body.data)
           : req.body.data || {};
 
-      if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
       if (!roleType || !Object.values(RoleType).includes(roleType)) {
-        return res.status(400).json({ success: false, message: "Invalid role type" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid role type" });
       }
 
       // Process each uploaded file through the 4-step pipeline
-      const files = (req as any).files as Record<string, Express.Multer.File[]> | undefined;
+      const files = req.files as
+        | Record<string, Express.Multer.File[]>
+        | undefined;
 
       if (files) {
         for (const [fieldName, fileArray] of Object.entries(files)) {
@@ -50,7 +61,7 @@ export default class RoleRequestController {
           //    (uploadFile handles this internally: generates key + uploads)
 
           // 2. UPLOAD THE FILE — upload file buffer to S3
-          const { key } = await S3Svc.uploadFile(userId, file as any);
+          const { key } = await S3Svc.uploadFile(userId, file);
 
           // 3. GET CLOUDFRONT URL — get public URL for the uploaded file
           const { url } = await S3Svc.generateDownloadUrl(key);
@@ -68,16 +79,47 @@ export default class RoleRequestController {
         }
       }
 
-      const application = await RoleRequestService.submitApplication(userId, roleType, data);
+      // Enforce max 3 declared specializations
+      if (
+        Array.isArray(data.specializations) &&
+        data.specializations.length > 3
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Maximum 3 specializations allowed",
+        });
+      }
+
+      const application = await RoleRequestService.submitApplication(
+        userId,
+        roleType,
+        data,
+      );
 
       return res.status(201).json({
         success: true,
         message: `Application for ${roleType} submitted successfully`,
         data: application,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Application error:", error);
       return res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  static async listMine(req: Request, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
+      const requests = await RoleRequestService.getMyRequests(userId);
+      return res.status(200).json({ success: true, data: requests });
+    } catch (e: unknown) {
+      const error = e as Error;
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
@@ -87,13 +129,16 @@ export default class RoleRequestController {
   static async list(req: Request, res: Response) {
     try {
       const { status } = req.query;
-      const requests = await RoleRequestService.getRequests(status as RequestStatus);
+      const requests = await RoleRequestService.getRequests(
+        status as RequestStatus,
+      );
 
       return res.status(200).json({
         success: true,
         data: requests,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -103,20 +148,29 @@ export default class RoleRequestController {
    */
   static async review(req: Request, res: Response) {
     try {
-      const adminId = (req as any).user?.userId;
+      const adminId = req.user?.userId;
+      if (!adminId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
       const { id } = req.params;
       const { status, rejectionReason } = req.body;
 
-      if (!id) return res.status(400).json({ success: false, message: "Request ID required" });
+      if (!id)
+        return res
+          .status(400)
+          .json({ success: false, message: "Request ID required" });
       if (![RequestStatus.approved, RequestStatus.rejected].includes(status)) {
-        return res.status(400).json({ success: false, message: "Invalid status" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid status" });
       }
 
       const updatedRequest = await RoleRequestService.reviewApplication(
         id,
         adminId,
         status,
-        rejectionReason
+        rejectionReason,
       );
 
       return res.status(200).json({
@@ -124,7 +178,8 @@ export default class RoleRequestController {
         message: `Application ${status} successfully`,
         data: updatedRequest,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Review error:", error);
       return res.status(400).json({ success: false, message: error.message });
     }

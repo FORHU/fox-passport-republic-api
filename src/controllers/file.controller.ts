@@ -7,7 +7,7 @@ export default class FileCtrl {
   static async uploadDirect(req: Request, res: Response) {
     try {
       const file = req.file;
-      const userId = (req as any).user?.userId;
+      const userId = req.user?.userId;
 
       if (!file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -18,7 +18,7 @@ export default class FileCtrl {
       }
 
       // 1. Upload to S3 from backend
-      const { key } = await S3Svc.uploadFile(userId, file as any);
+      const { key } = await S3Svc.uploadFile(userId, file);
 
       // 2. Generate Public URL
       const { url } = await S3Svc.generateDownloadUrl(key);
@@ -35,9 +35,10 @@ export default class FileCtrl {
         success: true,
         message: "File uploaded and registered successfully",
         fileId: dbFile.id,
-        key: key
+        key: key,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("[FileCtrl] Upload error:", error);
       return res.status(400).json({ success: false, message: error.message });
     }
@@ -59,7 +60,7 @@ export default class FileCtrl {
     }
 
     try {
-      const uploadedBy = (req as any).user?.userId;
+      const uploadedBy = req.user?.userId;
       if (!uploadedBy) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -67,9 +68,14 @@ export default class FileCtrl {
         ...value,
         uploadedBy: String(uploadedBy),
       });
-      return res.status(201).json({ message: "File created successfully", file });
-    } catch (err: any) {
-      return res.status(400).json({ message: err?.message || "Failed to create file" });
+      return res
+        .status(201)
+        .json({ message: "File created successfully", file });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res
+        .status(400)
+        .json({ message: err?.message || "Failed to create file" });
     }
   }
 }

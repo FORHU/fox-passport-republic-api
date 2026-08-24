@@ -1,16 +1,28 @@
-import bcrypt from "bcryptjs";
 import UsersRepo from "../repositories/users.repository";
-import { SystemRole } from "@prisma/client";
+import { RoleType, SystemRole } from "@prisma/client";
+import { hashPassword } from "../utils/password";
 
 export default class UsersSvc {
   // GET ALL USERS (optionally filtered by roleType)
   static async getAllUsers(roleTypes?: string[]) {
-    return UsersRepo.getAllUsers(roleTypes as any);
+    return UsersRepo.getAllUsers(roleTypes as RoleType[] | undefined);
   }
 
-  // GET FOXERS (public listing, optionally filtered by roleType)
-  static async getFoxers(limit = 9, page = 1, roleType?: string) {
-    return UsersRepo.findFoxers(limit, page, roleType as any);
+  // GET FOXERS (public listing, optionally filtered by roleType, specialization, city)
+  static async getFoxers(
+    limit = 9,
+    page = 1,
+    roleType?: string,
+    specialization?: string,
+    city?: string,
+  ) {
+    return UsersRepo.findFoxers(
+      limit,
+      page,
+      roleType as RoleType,
+      specialization,
+      city,
+    );
   }
 
   // GET SINGLE FOXER BY ID (public profile with services)
@@ -40,7 +52,7 @@ export default class UsersSvc {
     const existingUser = await UsersRepo.getUserByEmail(data.email);
     if (existingUser) throw new Error("Email already exists");
 
-    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const hashedPassword = await hashPassword(data.password);
 
     return UsersRepo.createUser({
       ...data,
@@ -58,12 +70,24 @@ export default class UsersSvc {
       systemRole: SystemRole;
       name: string;
       isActive: boolean;
-    }>
+    }>,
   ) {
     const user = await UsersRepo.findUserById(id);
     if (!user) throw new Error("User not found");
 
     return UsersRepo.updateUser(id, data);
+  }
+
+  // BECOME HOST — adds "host" to roleType array
+  static async becomeHost(userId: string) {
+    return UsersRepo.addRoleType(userId, "eventFoxer");
+  }
+
+  // FOXER STATS
+  static async getFoxerStats(userId: string) {
+    const user = await UsersRepo.findUserById(userId);
+    if (!user) throw new Error("User not found");
+    return UsersRepo.getFoxerStats(userId);
   }
 
   // DELETE
@@ -74,4 +98,3 @@ export default class UsersSvc {
     return UsersRepo.deleteUser(id);
   }
 }
-

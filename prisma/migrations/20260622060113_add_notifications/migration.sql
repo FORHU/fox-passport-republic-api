@@ -6,8 +6,8 @@
 -- the enum.
 
 
-ALTER TYPE "BookingStatus" ADD VALUE 'active';
-ALTER TYPE "BookingStatus" ADD VALUE 'disputed';
+--ALTER TYPE "BookingStatus" ADD VALUE 'active';
+--ALTER TYPE "BookingStatus" ADD VALUE 'disputed';
 
 -- AlterTable
 ALTER TABLE "Booking" ADD COLUMN     "hostMarkup" DOUBLE PRECISION NOT NULL DEFAULT 0,

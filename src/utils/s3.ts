@@ -1,4 +1,8 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
   AWS_ACCESS_KEY,
@@ -16,20 +20,21 @@ const s3Client = new S3Client({
   },
 });
 
-// ULTIMATE CHECKSUM KILLER: 
-// This middleware runs just before signing and removes the Checksum property 
+// ULTIMATE CHECKSUM KILLER:
+// This middleware runs just before signing and removes the Checksum property
 // that the AWS SDK v3 often injects automatically.
 s3Client.middlewareStack.add(
-  (next) => (args: any) => {
-    if (args.input) {
-      delete args.input.ChecksumAlgorithm;
+  (next) => (args) => {
+    const input = args.input as { ChecksumAlgorithm?: unknown } | undefined;
+    if (input) {
+      delete input.ChecksumAlgorithm;
     }
     return next(args);
   },
   {
     step: "initialize",
     name: "removeChecksumMiddleware",
-  }
+  },
 );
 
 /**
@@ -47,12 +52,12 @@ export async function getPutObjectPresignedUrl(params: {
     ContentType: contentType,
     // Explicitly set to undefined to prevent SDK injection
     ChecksumAlgorithm: undefined,
-  } as any);
+  });
 
   // Sign only the host to keep it as simple as possible for the browser
-  const url = await getSignedUrl(s3Client, command, { 
+  const url = await getSignedUrl(s3Client, command, {
     expiresIn: 3600,
-    signableHeaders: new Set(["host"])
+    signableHeaders: new Set(["host"]),
   });
 
   return url;
@@ -74,9 +79,7 @@ export async function uploadToS3(params: {
   return key;
 }
 
-export async function getGetObjectPresignedUrl(params: {
-  key: string;
-}) {
+export async function getGetObjectPresignedUrl(params: { key: string }) {
   const { key } = params;
   if (CLOUD_FRONT_DOMAIN) {
     const normalizedDomain = CLOUD_FRONT_DOMAIN.replace(/\/+$/, "");

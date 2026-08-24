@@ -1,0 +1,2 @@
+-- AlterTable
+-- "rejectionReason" was already added to "Event" in a previous run; no-op to keep history consistent.

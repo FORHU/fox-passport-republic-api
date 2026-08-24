@@ -5,7 +5,12 @@ export default class RoleRequestRepo {
   /**
    * Create a base role request with associated application data
    */
-  static async createRequest(userId: string, roleType: RoleType, applicationData: any, applicationModel: string) {
+  static async createRequest(
+    userId: string,
+    roleType: RoleType,
+    applicationData: Record<string, unknown>,
+    applicationModel: string,
+  ) {
     return prisma.roleRequest.create({
       data: {
         userId,
@@ -47,23 +52,62 @@ export default class RoleRequestRepo {
             email: true,
           },
         },
-        mayorApplication: {
-          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+        venueFoxerApplication: {
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+          },
         },
-        hostApplication: {
-          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true, portfolioFile: true }
+        eventFoxerApplication: {
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+            portfolioFile: true,
+          },
         },
-        foxerAssetApplication: {
-          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+        gearFoxerApplication: {
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+          },
         },
-        foxerServiceApplication: {
-          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+        serviceFoxerApplication: {
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+          },
         },
         investorApplication: true,
       },
       orderBy: {
         createdAt: "desc",
       },
+    });
+  }
+
+  static async getMyRequests(userId: string) {
+    return prisma.roleRequest.findMany({
+      where: { userId },
+      include: {
+        venueFoxerApplication: true,
+        eventFoxerApplication: true,
+        gearFoxerApplication: true,
+        serviceFoxerApplication: true,
+        investorApplication: true,
+      },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -75,17 +119,42 @@ export default class RoleRequestRepo {
       where: { id },
       include: {
         user: true,
-        mayorApplication: {
-          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+        venueFoxerApplication: {
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+          },
         },
-        hostApplication: {
-          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true, portfolioFile: true }
+        eventFoxerApplication: {
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+            portfolioFile: true,
+          },
         },
-        foxerAssetApplication: {
-          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+        gearFoxerApplication: {
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+          },
         },
-        foxerServiceApplication: {
-          include: { validId1: true, nbiFile: true, tinIdFile: true, birPermitFile: true, selfieFile: true }
+        serviceFoxerApplication: {
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+          },
         },
         investorApplication: true,
       },
@@ -102,7 +171,7 @@ export default class RoleRequestRepo {
       reviewedBy: string;
       reviewedAt: Date;
       rejectionReason?: string;
-    }
+    },
   ) {
     return prisma.roleRequest.update({
       where: { id },

@@ -1,4 +1,9 @@
-import { AssetCondition, BillingRate, AssetCategory, AssetStatus } from "@prisma/client";
+import {
+  AssetCondition,
+  BillingRate,
+  AssetCategory,
+  AssetStatus,
+} from "@prisma/client";
 import AssetRepo from "../repositories/asset.repository";
 import { v4 as uuidv4 } from "uuid";
 
@@ -39,20 +44,42 @@ export default class AssetSvc {
       imgIds: data.imgIds,
     };
 
-    const asset = await AssetRepo.createAsset(assetData as any);
+    const asset = await AssetRepo.createAsset(assetData);
     return asset;
   }
 
-  static async getAssets(filters?: { ownerId?: string; category?: AssetCategory }) {
-    return AssetRepo.findAllAssets(filters);
+  static async getAssets(filters?: {
+    ownerId?: string;
+    category?: AssetCategory;
+    city?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { assets, total } = await AssetRepo.findAllAssets(filters);
+    const { default: PassportSvc } = await import("./passport.service");
+    const sorted = await PassportSvc.sortByFeaturedPerk(
+      assets,
+      "gear_featured",
+      "ownerId",
+    );
+    const enriched = await PassportSvc.enrichWithOwnerBadge(
+      sorted,
+      "gear_verified",
+      "ownerId",
+    );
+    return { assets: enriched, total };
   }
 
   static async getAssetById(id: string) {
     const asset = await AssetRepo.findAssetById(id);
-    if (!asset) {
-      throw new Error("Asset not found");
-    }
-    return asset;
+    if (!asset) throw new Error("Asset not found");
+    const { default: PassportSvc } = await import("./passport.service");
+    const [enriched] = await PassportSvc.enrichWithOwnerBadge(
+      [asset],
+      "gear_verified",
+      "ownerId",
+    );
+    return enriched;
   }
 
   static async updateAsset(
@@ -68,7 +95,7 @@ export default class AssetSvc {
       currency?: string;
       billingRate?: BillingRate;
       status?: AssetStatus;
-    }>
+    }>,
   ) {
     const existing = await AssetRepo.findAssetById(id);
     if (!existing) {
@@ -81,7 +108,7 @@ export default class AssetSvc {
     return AssetRepo.updateAsset(id, data);
   }
 
-   static async deleteAsset(id: string, requesterId: string) {
+  static async deleteAsset(id: string, requesterId: string) {
     const asset = await AssetRepo.findAssetById(id);
 
     if (!asset) {

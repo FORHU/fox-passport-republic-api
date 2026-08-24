@@ -12,7 +12,8 @@ export default class CategoryController {
         count: categories.length,
         data: categories,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Get all categories error:", error);
       return res.status(500).json({
         success: false,
@@ -30,7 +31,8 @@ export default class CategoryController {
         count: categories.length,
         data: categories,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Get top-level categories error:", error);
       return res.status(500).json({
         success: false,
@@ -56,7 +58,8 @@ export default class CategoryController {
         success: true,
         data: category,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Get category by ID error:", error);
       if (error.message === "Category not found") {
         return res.status(404).json({
@@ -88,7 +91,8 @@ export default class CategoryController {
         success: true,
         data: category,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Get category by slug error:", error);
       if (error.message === "Category not found") {
         return res.status(404).json({
@@ -128,7 +132,8 @@ export default class CategoryController {
         message: "Category created successfully",
         data: category,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Create category error:", error);
       if (error.message.includes("already exists")) {
         return res.status(409).json({
@@ -151,7 +156,7 @@ export default class CategoryController {
       });
 
       const { error: paramsError, value: params } = paramsSchema.validate(
-        req.params
+        req.params,
       );
       if (paramsError) {
         return res.status(400).json({ message: paramsError.message });
@@ -179,7 +184,8 @@ export default class CategoryController {
         message: "Category updated successfully",
         data: category,
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Update category error:", error);
       if (error.message === "Category not found") {
         return res.status(404).json({
@@ -220,7 +226,8 @@ export default class CategoryController {
         success: true,
         message: "Category deleted successfully",
       });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       console.error("Delete category error:", error);
       if (error.message === "Category not found") {
         return res.status(404).json({

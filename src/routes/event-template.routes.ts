@@ -1,36 +1,137 @@
 import express from "express";
 import EventTemplateCtrl from "../controllers/event-template.controller";
-import { authenticate, requireRole } from "../middleware/auth.middleware";
+import {
+  authenticate,
+  requireRole,
+  requireAdmin,
+} from "../middleware/auth.middleware";
 
 const router = express.Router();
 
 // Public browse — no auth, only isPublic templates, supports ?category=
 router.get("/browse", EventTemplateCtrl.browsePublic);
 router.get("/browse/:id", EventTemplateCtrl.browsePublicById);
+router.get("/recommendations", EventTemplateCtrl.getRecommendations);
+
+// Trending — public, no auth, returns top N templates by booking count for a category
+router.get("/trending", EventTemplateCtrl.getTrending);
 
 // Public/Authenticated list
 router.get("/", authenticate, EventTemplateCtrl.getTemplates);
 router.get("/:id", authenticate, EventTemplateCtrl.getTemplateById);
 
 // Organizer only actions
-router.post("/", authenticate, requireRole(["host"]), EventTemplateCtrl.createTemplate);
-router.put("/:id", authenticate, requireRole(["host"]), EventTemplateCtrl.updateTemplate);
-router.delete("/:id", authenticate, requireRole(["host"]), EventTemplateCtrl.deleteTemplate);
+router.post(
+  "/",
+  authenticate,
+  requireRole(["eventFoxer"]),
+  EventTemplateCtrl.createTemplate,
+);
+router.post(
+  "/:id/submit",
+  authenticate,
+  requireRole(["eventFoxer"]),
+  EventTemplateCtrl.submitTemplate,
+);
+router.put(
+  "/:id",
+  authenticate,
+  requireRole(["eventFoxer"]),
+  EventTemplateCtrl.updateTemplate,
+);
+router.delete(
+  "/:id",
+  authenticate,
+  requireRole(["eventFoxer"]),
+  EventTemplateCtrl.deleteTemplate,
+);
 
 // Asset associations
-router.post("/:id/assets", authenticate, requireRole(["host"]), EventTemplateCtrl.attachAsset);
-router.delete("/:id/assets/:assetId", authenticate, requireRole(["host"]), EventTemplateCtrl.removeAsset);
+router.post(
+  "/:id/assets",
+  authenticate,
+  requireRole(["eventFoxer"]),
+  EventTemplateCtrl.attachAsset,
+);
+router.delete(
+  "/:id/assets/:assetId",
+  authenticate,
+  requireRole(["eventFoxer"]),
+  EventTemplateCtrl.removeAsset,
+);
 
 // Service associations
-router.post("/:id/services", authenticate, requireRole(["host"]), EventTemplateCtrl.attachService);
-router.delete("/:id/services/:serviceId", authenticate, requireRole(["host"]), EventTemplateCtrl.removeService);
+router.post(
+  "/:id/services",
+  authenticate,
+  requireRole(["eventFoxer"]),
+  EventTemplateCtrl.attachService,
+);
+router.delete(
+  "/:id/services/:serviceId",
+  authenticate,
+  requireRole(["eventFoxer"]),
+  EventTemplateCtrl.removeService,
+);
 
 // Venue associations
-router.post("/:id/venues", authenticate, requireRole(["host"]), EventTemplateCtrl.attachVenue);
-router.delete("/:id/venues/:venueId", authenticate, requireRole(["host"]), EventTemplateCtrl.removeVenue);
+router.post(
+  "/:id/venues",
+  authenticate,
+  requireRole(["eventFoxer"]),
+  EventTemplateCtrl.attachVenue,
+);
+router.delete(
+  "/:id/venues/:venueId",
+  authenticate,
+  requireRole(["eventFoxer"]),
+  EventTemplateCtrl.removeVenue,
+);
 
 // Location Matching
-router.get("/matching/search", authenticate, requireRole(["host"]), EventTemplateCtrl.matchSearch);
-router.post("/:id/match", authenticate, requireRole(["host"]), EventTemplateCtrl.matchItem);
+router.get(
+  "/matching/search",
+  authenticate,
+  requireRole(["eventFoxer"]),
+  EventTemplateCtrl.matchSearch,
+);
+router.post(
+  "/:id/match",
+  authenticate,
+  requireRole(["eventFoxer"]),
+  EventTemplateCtrl.matchItem,
+);
+
+// Match request management
+router.get(
+  "/matches/outgoing",
+  authenticate,
+  requireRole(["eventFoxer"]),
+  EventTemplateCtrl.getOutgoingMatchRequests,
+);
+router.get(
+  "/matches/incoming",
+  authenticate,
+  EventTemplateCtrl.getIncomingMatchRequests,
+);
+router.patch(
+  "/matches/:matchId/respond",
+  authenticate,
+  EventTemplateCtrl.respondToMatch,
+);
+
+// Admin routes
+router.patch(
+  "/:id/approve",
+  authenticate,
+  requireAdmin,
+  EventTemplateCtrl.approveEventTemplate,
+);
+router.patch(
+  "/:id/reject",
+  authenticate,
+  requireAdmin,
+  EventTemplateCtrl.rejectEventTemplate,
+);
 
 export default router;

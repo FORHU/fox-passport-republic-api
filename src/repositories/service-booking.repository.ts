@@ -32,7 +32,11 @@ export default class ServiceBookingRepo {
     });
   }
 
-  static async findAll(filters?: { userId?: string; ownerId?: string; status?: ItemBookingStatus }) {
+  static async findAll(filters?: {
+    userId?: string;
+    ownerId?: string;
+    status?: ItemBookingStatus;
+  }) {
     return prisma.serviceBooking.findMany({
       where: {
         ...(filters?.userId && { userId: filters.userId }),
@@ -51,7 +55,12 @@ export default class ServiceBookingRepo {
     return prisma.serviceBooking.findUnique({
       where: { id },
       include: {
-        service: { include: { images: true, owner: { select: { id: true, name: true, email: true } } } },
+        service: {
+          include: {
+            images: true,
+            owner: { select: { id: true, name: true, email: true } },
+          },
+        },
         user: { select: { id: true, name: true, email: true } },
       },
     });
@@ -68,7 +77,11 @@ export default class ServiceBookingRepo {
     });
   }
 
-  static async confirmPayment(id: string, transactionId: string, method: string) {
+  static async confirmPayment(
+    id: string,
+    transactionId: string,
+    method: string,
+  ) {
     return prisma.serviceBooking.update({
       where: { id },
       data: {
@@ -78,7 +91,12 @@ export default class ServiceBookingRepo {
         paymentMethod: method,
       },
       include: {
-        service: { include: { images: true, owner: { select: { id: true, name: true, email: true } } } },
+        service: {
+          include: {
+            images: true,
+            owner: { select: { id: true, name: true, email: true } },
+          },
+        },
         user: { select: { id: true, name: true, email: true } },
       },
     });
@@ -100,18 +118,32 @@ export default class ServiceBookingRepo {
       where: { id },
       data: { status: ItemBookingStatus.active },
       include: {
-        service: { include: { images: true, owner: { select: { id: true, name: true, email: true } } } },
+        service: {
+          include: {
+            images: true,
+            owner: { select: { id: true, name: true, email: true } },
+          },
+        },
         user: { select: { id: true, name: true, email: true } },
       },
     });
   }
 
-  static async dispute(id: string) {
+  static async dispute(id: string, reason?: string) {
     return prisma.serviceBooking.update({
       where: { id },
-      data: { status: ItemBookingStatus.disputed },
+      data: {
+        status: ItemBookingStatus.disputed,
+        disputeReason: reason ?? null,
+        disputeAt: new Date(),
+      },
       include: {
-        service: { include: { images: true, owner: { select: { id: true, name: true, email: true } } } },
+        service: {
+          include: {
+            images: true,
+            owner: { select: { id: true, name: true, email: true } },
+          },
+        },
         user: { select: { id: true, name: true, email: true } },
       },
     });
