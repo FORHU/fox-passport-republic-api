@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_URL = "http://localhost:3002/api/v1";
+const API_URL = "http://localhost:6002/api/v1";
 
 async function runTests() {
   console.log("Starting manual API tests...");

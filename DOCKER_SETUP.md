@@ -6,7 +6,7 @@ This guide covers setting up and running the backend API in Docker with PostgreS
 
 - Docker Desktop installed ([download](https://www.docker.com/products/docker-desktop))
 - Docker Compose (included with Docker Desktop)
-- Port 3002, 5432, 6379 available on your machine
+- Port 6002, 5432, 6379 available on your machine
 
 ## 🚀 Quick Start
 
@@ -28,7 +28,7 @@ docker-compose up -d
 This starts:
 - PostgreSQL on `localhost:5432`
 - Redis on `localhost:6379`
-- API on `localhost:3002`
+- API on `localhost:6002`
 
 Check status:
 ```bash
@@ -189,8 +189,8 @@ URL:      redis://:redis_password@localhost:6379
 
 ### API
 ```
-Frontend: http://localhost:3001
-API:      http://localhost:3002
+Frontend: http://localhost:6001
+API:      http://localhost:6002
 ```
 
 ---
@@ -201,9 +201,9 @@ API:      http://localhost:3002
 
 ```bash
 # Kill processes on ports
-npx kill-port 5432  # PostgreSQL
-npx kill-port 6379  # Redis
-npx kill-port 3002  # API
+pnpm dlx kill-port 5432  # PostgreSQL
+pnpm dlx kill-port 6379  # Redis
+pnpm dlx kill-port 6002  # API
 ```
 
 ### Database Migration Fails
@@ -329,7 +329,7 @@ docker-compose restart redis
 After running `docker-compose up -d`:
 
 - [ ] All 3 containers are running: `docker-compose ps`
-- [ ] API responds: `curl http://localhost:3002/api/v1`
+- [ ] API responds: `curl http://localhost:6002/api/v1`
 - [ ] Database connection works: `docker-compose exec postgres psql -U postgres -d fox_passport_db -c "SELECT 1"`
 - [ ] Redis works: `docker-compose exec redis redis-cli ping`
 - [ ] Migrations ran: Check API logs for success message
@@ -338,11 +338,11 @@ After running `docker-compose up -d`:
 
 ## 🎯 Next Steps
 
-1. **Test API**: Visit `http://localhost:3002/api/v1` in browser
+1. **Test API**: Visit `http://localhost:6002/api/v1` in browser
 2. **Check Logs**: `docker-compose logs -f api`
 3. **Monitor**: `docker stats` (shows CPU/memory usage)
 4. **Scale**: Modify `docker-compose.yml` to add more replicas
-5. **Connect Frontend**: Update frontend `.env` to point to `http://localhost:3002/api/v1`
+5. **Connect Frontend**: Update frontend `.env` to point to `http://localhost:6002/api/v1`
 
 ---
 

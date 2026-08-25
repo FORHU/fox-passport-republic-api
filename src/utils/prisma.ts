@@ -9,7 +9,15 @@ if (!DATABASE_URL) {
   );
 }
 
-const pool = new Pool({ connectionString: DATABASE_URL });
+// `max` is required: without it the adapter can issue concurrent queries on one
+// client, which pg warns about ("client.query() when the client is already
+// executing a query") and will hard-error in pg@9.
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  max: Number(process.env.DB_POOL_MAX ?? 10),
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
 const adapter = new PrismaPg(pool);
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };

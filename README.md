@@ -46,7 +46,7 @@ The application's configuration values are managed using the `dotenv` package. Y
 
 ### Available Configuration Variables
 
-- `PORT`: The port number the server will listen on. Default is 3000.
+- `PORT`: The port number the server will listen on. Default is 6002.
 
 - `MONGO_URI`: The URI for the MongoDB database. Default is `mongodb://localhost:27017/mydatabase`.
 
@@ -59,7 +59,7 @@ The application's configuration values are managed using the `dotenv` package. Y
 2. Create a `.env` file in the root of your project with the following content:
 
 ```plaintext
-PORT=3000
+PORT=6002
 MONGO_URI=mongodb://localhost:27017/mydatabase
 SESSION_SECRET=my-secret-key
 ```
