@@ -13,6 +13,7 @@ export default class MatchSvc {
     foxerId: string;
     style: string;
     date: Date;
+    endDate: Date;
     guestCount: number;
     requestContent: string;
     totalAmount: number;
@@ -78,7 +79,7 @@ export default class MatchSvc {
       name: `Match with ${data.style}`,
       description: data.requestContent || `Custom match for ${data.style}`,
       startAt: data.date,
-      endAt: new Date(data.date.getTime() + 4 * 60 * 60 * 1000),
+      endAt: data.endDate,
       guestCount: data.guestCount,
       totalAmount: data.totalAmount,
     });

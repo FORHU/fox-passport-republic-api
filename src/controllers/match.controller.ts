@@ -10,6 +10,7 @@ export default class MatchController {
         style: Joi.string().allow("", null).default("Own idea"),
         foxerId: Joi.string().required(),
         date: Joi.date().iso().required(),
+        endDate: Joi.date().iso().min(Joi.ref("date")).required(),
         guestCount: Joi.number().integer().min(1).required(),
         requestContent: Joi.string().allow("", null).optional(),
         totalAmount: Joi.number().min(0).optional(),
@@ -22,6 +23,7 @@ export default class MatchController {
       const {
         style,
         date,
+        endDate,
         guestCount,
         requestContent,
         totalAmount,
@@ -39,6 +41,7 @@ export default class MatchController {
         foxerId,
         style,
         date: new Date(date),
+        endDate: new Date(endDate),
         guestCount,
         requestContent,
         totalAmount,
