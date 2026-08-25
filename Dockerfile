@@ -1,19 +1,19 @@
 FROM node:22-alpine
 
-# Install pnpm globally
-RUN npm install -g pnpm
+# Enable pnpm (bundled with Node via corepack - no npm install needed)
+RUN corepack enable pnpm
 
 WORKDIR /app
 
 # Copy package files and prisma schema first for better caching
-COPY package*.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY prisma ./prisma/
 
 # Install dependencies using pnpm
 RUN pnpm install --frozen-lockfile
 
 # Generate Prisma client
-RUN pnpm prisma generate
+RUN pnpm exec prisma generate
 
 # Copy project files
 COPY . .
@@ -22,6 +22,6 @@ COPY . .
 RUN pnpm build
 
 # Optional: expose port for readability
-EXPOSE 3002
+EXPOSE 6002
 
-CMD ["sh", "-c", "pnpm prisma migrate deploy && pnpm start"]
+CMD ["sh", "-c", "pnpm exec prisma migrate deploy && pnpm start"]

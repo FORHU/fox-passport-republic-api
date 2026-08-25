@@ -49,7 +49,7 @@ check_docker() {
 }
 
 check_ports() {
-    local ports=(3002 5432 6379)
+    local ports=(6002 5432 6379)
     for port in "${ports[@]}"; do
         if netstat -tuln 2>/dev/null | grep -q ":$port "; then
             print_warning "Port $port is already in use"
@@ -74,7 +74,7 @@ start() {
     print_success "All services started!"
 
     print_info "Service URLs:"
-    echo "  API:        http://localhost:3002"
+    echo "  API:        http://localhost:6002"
     echo "  PostgreSQL: localhost:5432"
     echo "  Redis:      localhost:6379"
 }

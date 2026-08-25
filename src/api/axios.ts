@@ -5,7 +5,7 @@ import axios from "axios";
  * Configured with baseURL, interceptors for auth, and common settings.
  */
 const api = axios.create({
-  baseURL: "http://localhost:3002/api/v1",
+  baseURL: "http://localhost:6002/api/v1",
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",

@@ -3,16 +3,17 @@
     "version": "1.0.0",
     "main": "server.js",
     "license": "MIT",
+    "packageManager": "pnpm@10.34.5",
     "scripts": {
-        "dev": "npx kill-port 3002 && nodemon --watch src --ext ts --exec ts-node --files ./src/server.ts",
+        "dev": "pnpm dlx kill-port 6002 && nodemon --watch src --ext ts --exec ts-node --files ./src/server.ts",
         "lint": "eslint src/**/*.ts --fix",
         "format": "prettier --write \"src/**/*.ts\"",
         "test": "vitest run",
         "test:watch": "vitest",
         "build": "prisma generate && tsc",
         "start": "node ./dist/src/server.js",
-        "db:setup": "npx prisma generate && npx prisma migrate dev",
-        "kill": "npx kill-port 3002"
+        "db:setup": "pnpm exec prisma generate && pnpm exec prisma migrate dev",
+        "kill": "pnpm dlx kill-port 6002"
     },
     "dependencies": {
         "@aws-sdk/client-s3": "^3.998.0",
@@ -47,7 +48,7 @@
         "winston": "^3.11.0"
     },
     "prisma": {
-        "seed": "npx tsx prisma/seed.ts"
+        "seed": "pnpm exec tsx prisma/seed.ts"
     },
     "devDependencies": {
         "@types/bcryptjs": "^3.0.0",
