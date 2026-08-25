@@ -2,9 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main, updates-api, staging, onboard_ayisha, sofia-branchapi]
+    branches: [main, staging, updates-api, onboard_ayisha, sofia-branchapi]
   pull_request:
-    branches: [main]
+    branches: [main, staging]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:
