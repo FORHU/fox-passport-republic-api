@@ -60,23 +60,24 @@ The application's configuration values are managed using the `dotenv` package. Y
 
 ```plaintext
 PORT=6002
-MONGO_URI=mongodb://localhost:27017/mydatabase
-SESSION_SECRET=my-secret-key
+DATABASE_URL=postgresql://user:password@localhost:5432/foxpassportrepublic
+CORS_ORIGIN=http://localhost:6001
+FRONTEND_URL=http://localhost:6001
 ```
 ## Install project dependencies:
 ```plaintext
-yarn install
+pnpm install
 ```
 ## Start the server in development:
 ```plaintext
-yarn dev
+pnpm dev
 ```
 ## Start the server:
 ```plaintext
-yarn start
+pnpm start
 ```
 ## Testing
-We use Jest for testing. You can run the tests using the command:
+We use Vitest for testing. You can run the tests using the command:
 ```plaintext
-yarn test
+pnpm test
 ```
