@@ -54,11 +54,6 @@ export const REDIS_PASSWORD = process.env.REDIS_PASSWORD as string;
 export const REDIS_TTL_SECONDS = Number(process.env.REDIS_TTL_SECONDS) || 3600;
 export const SERVICE_ACCOUNT = process.env.SERVICE_ACCOUNT as string;
 export const S3_CDN_URL = process.env.S3_CDN_URL as string;
-export const SUPABASE_URL = process.env.SUPABASE_URL as string;
-export const SUPABASE_SERVICE_ROLE_KEY = process.env
-  .SUPABASE_SERVICE_ROLE_KEY as string;
-export const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY as string;
-
 export const AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY as string;
 export const AWS_SECRET_ACCESS_KEY = process.env
   .AWS_SECRET_ACCESS_KEY as string;
@@ -75,8 +70,16 @@ export const STRIPE_WEBHOOK_SECRET = process.env
 export const PLATFORM_FEE_PERCENT = Number(
   process.env.PLATFORM_FEE_PERCENT || 5,
 );
-export const STRIPE_CONNECT_REFRESH_URL = process.env
-  .STRIPE_CONNECT_REFRESH_URL as string;
-export const STRIPE_CONNECT_RETURN_URL = process.env
-  .STRIPE_CONNECT_RETURN_URL as string;
+// Where Stripe-hosted Express onboarding sends the provider back to:
+// `return` once they finish, `refresh` when the single-use link has expired and
+// a new one must be minted. Both are passed to `stripe.accountLinks.create`,
+// which rejects a missing or non-absolute URL - so these default off
+// FRONTEND_URL rather than being cast from a possibly-unset env var, which
+// previously reached Stripe as `undefined` and failed onboarding outright.
+export const STRIPE_CONNECT_RETURN_URL =
+  process.env.STRIPE_CONNECT_RETURN_URL ||
+  `${FRONTEND_URL}/creator-dashboard/stripe-dashboard`;
+export const STRIPE_CONNECT_REFRESH_URL =
+  process.env.STRIPE_CONNECT_REFRESH_URL ||
+  `${FRONTEND_URL}/creator-dashboard/stripe-onboard`;
 export const RESEND_API_KEY = process.env.RESEND_API_KEY as string;

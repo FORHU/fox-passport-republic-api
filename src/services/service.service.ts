@@ -68,6 +68,15 @@ export default class ServiceSvc {
     return { services: enriched, total };
   }
 
+  static async browseServices(filters: {
+    ownerCity?: string;
+    maxPrice?: number;
+    page?: number;
+    limit: number;
+  }) {
+    return ServiceRepo.findPublicServices(filters);
+  }
+
   static async getServiceById(id: string) {
     const service = await ServiceRepo.getServiceById(id);
     if (!service || service.deletedAt) throw new Error("Service not found");
