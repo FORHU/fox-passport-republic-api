@@ -3,8 +3,28 @@ import type { SignOptions } from "jsonwebtoken";
 dotenv.config();
 
 export const DATABASE_URL = process.env.DATABASE_URL as string;
-export const PORT = Number(process.env.PORT || 3002);
-export const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+export const PORT = Number(process.env.PORT || 6002);
+// Single base URL, used to build links in emails. Never a list - if a
+// comma-separated value is supplied we take the first entry, because
+// `${FRONTEND_URL}/dashboard` on a list produces a broken link.
+export const FRONTEND_URL = (
+  process.env.FRONTEND_URL ||
+  process.env.CORS_ORIGIN ||
+  "http://localhost:6001"
+)
+  .split(",")[0]
+  .trim();
+
+// Comma-separated allow-list for CORS and socket.io. Separate from
+// FRONTEND_URL because an allow-list and a link base are different things.
+export const CORS_ORIGINS = (
+  process.env.CORS_ORIGIN ||
+  process.env.FRONTEND_URL ||
+  ""
+)
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
 export const SECRET_KEY = process.env.SECRET_KEY as string;
 export const isDev = process.env.NODE_ENV !== "production";
 export const MAILER_TRANSPORT_HOST = process.env
@@ -45,8 +65,7 @@ export const AWS_SECRET_ACCESS_KEY = process.env
 export const AWS_S3_BUCKET = process.env.AWS_S3_BUCKET as string;
 export const AWS_REGION = process.env.AWS_REGION as string;
 export const CLOUD_FRONT_DOMAIN = process.env.CLOUD_FRONT_DOMAIN as
-  | string
-  | undefined;
+  string | undefined;
 
 export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY as string;
 export const STRIPE_WEBHOOK_SECRET = process.env

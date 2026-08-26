@@ -47,7 +47,7 @@ export async function sendApprovedEmail({
     </table>
 
     <div style="text-align:center;margin:24px 0;">
-      <a href="${process.env.FRONTEND_URL || "http://localhost:3000"}/dashboard"
+      <a href="${process.env.FRONTEND_URL || "http://localhost:6001"}/dashboard"
          style="display:inline-block;padding:14px 32px;border-radius:12px;font-size:15px;font-weight:700;text-decoration:none;background:#d4ff00;color:#111114;">
         View Dashboard
       </a>

@@ -114,6 +114,37 @@ export default class AssetCtrl {
     }
   }
 
+  // Public browse for the search page — item-level pagination (city matches the
+  // owner's city, price filters the item itself; only gearFoxer-owned assets).
+  static async browseAssets(req: Request, res: Response) {
+    try {
+      const { city, maxPrice, page, limit } = req.query;
+      const parsedLimit = limit ? Math.min(Number(limit), 50) : 10;
+      const parsedPage = page ? Number(page) : 1;
+
+      const { assets, total } = await AssetSvc.browseAssets({
+        ...(city && { ownerCity: String(city) }),
+        ...(maxPrice && { maxPrice: Number(maxPrice) }),
+        page: parsedPage,
+        limit: parsedLimit,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: assets,
+        pagination: {
+          page: parsedPage,
+          limit: parsedLimit,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / parsedLimit)),
+        },
+      });
+    } catch (e: unknown) {
+      const error = e as Error;
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
   //READ Asset by ID Controller
   static async getAssetById(req: Request, res: Response) {
     try {

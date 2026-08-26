@@ -15,6 +15,7 @@ export default class UsersSvc {
     roleType?: string,
     specialization?: string,
     city?: string,
+    maxPrice?: number,
   ) {
     return UsersRepo.findFoxers(
       limit,
@@ -22,6 +23,7 @@ export default class UsersSvc {
       roleType as RoleType,
       specialization,
       city,
+      maxPrice,
     );
   }
 
