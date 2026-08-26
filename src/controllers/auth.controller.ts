@@ -180,8 +180,11 @@ export default class AuthCtrl {
 
   static async logout(req: Request, res: Response) {
     try {
-      // In a stateless JWT system, logout is handled client-side by removing the token
-      // Optionally, you can blacklist the token here if using Redis
+      // Revokes the refresh token server-side so the session cannot be
+      // extended. Previously this returned 200 without doing anything, which
+      // meant a leaked refresh token stayed usable for its full lifetime.
+      await AuthSvc.logout(req.body?.refreshToken);
+
       return res.status(200).json({
         success: true,
         message: "Logged out successfully",
