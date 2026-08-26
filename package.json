@@ -21,7 +21,6 @@
         "@faker-js/faker": "^9.9.0",
         "@prisma/adapter-pg": "^7.4.1",
         "@prisma/client": "^7.4.2",
-        "@supabase/supabase-js": "^2.99.0",
         "@types/pg": "^8.16.0",
         "@types/winston": "^2.4.4",
         "axios": "^1.6.1",

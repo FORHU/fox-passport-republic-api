@@ -1,7 +1,7 @@
 import multer from "multer";
 import type { Request } from "express";
 
-// Configure storage to use memory so we can upload the buffer to Supabase
+// Keep the file in memory so the buffer can be handed straight to S3.
 const storage = multer.memoryStorage();
 
 // Only accept images; anything else is rejected before it reaches a controller.
