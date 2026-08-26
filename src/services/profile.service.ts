@@ -1,4 +1,5 @@
 import ProfileRepo from "../repositories/profile.repository";
+import { revokeAllForUser } from "./refresh-token.service";
 import { hashPassword, verifyPassword } from "../utils/password";
 
 export default class ProfileSvc {
@@ -70,6 +71,13 @@ export default class ProfileSvc {
 
     // Update password
     await ProfileRepo.updatePasswordHash(userId, hashedPassword);
+
+    // A password change must not leave older sessions alive. Note this revokes
+    // the caller's own session too - we do not know their jti here, only their
+    // userId - so the client is signed out and must log in with the new
+    // password. That is the safe default; keeping the current session alive
+    // would need the jti threaded through from the request.
+    await revokeAllForUser(userId);
 
     return { message: "Password changed successfully" };
   }
