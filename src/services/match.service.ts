@@ -13,6 +13,7 @@ export default class MatchSvc {
     foxerId: string;
     style: string;
     date: Date;
+    endDate?: Date;
     guestCount: number;
     requestContent: string;
     totalAmount: number;
@@ -78,7 +79,7 @@ export default class MatchSvc {
       name: `Match with ${data.style}`,
       description: data.requestContent || `Custom match for ${data.style}`,
       startAt: data.date,
-      endAt: new Date(data.date.getTime() + 4 * 60 * 60 * 1000),
+      endAt: data.endDate ?? new Date(data.date.getTime() + 4 * 60 * 60 * 1000),
       guestCount: data.guestCount,
       totalAmount: data.totalAmount,
     });
@@ -103,6 +104,19 @@ export default class MatchSvc {
       eventRequest.id,
       booking.id,
     );
+
+    // 5. Let the foxer know a client is waiting on their match request.
+    const client = await prisma.user.findUnique({
+      where: { id: data.clientId },
+      select: { name: true },
+    });
+    await NotificationSvc.create({
+      userId: data.foxerId,
+      type: "MATCH_REQUESTED",
+      title: "New match request",
+      message: `${client?.name ?? "A client"} booked you for "${data.style}" — review the details and respond.`,
+      metadata: { link: "/user/passport" },
+    });
 
     return { eventRequest, booking };
   }

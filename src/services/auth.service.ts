@@ -1,5 +1,11 @@
 import AuthRepo from "../repositories/auth.repository";
 import jwt from "jsonwebtoken";
+import {
+  issueRefreshToken,
+  verifyRefreshToken,
+  revokeRefreshToken,
+  revokeAllForUser,
+} from "./refresh-token.service";
 import { generateOTP, saveOTP, verifyOTP, deleteOTP } from "../utils/otp.utils";
 import { sendTemplatedEmail } from "../utils/helpers";
 import { hashPassword, verifyPassword, needsRehash } from "../utils/password";
@@ -81,16 +87,11 @@ export default class AuthSvc {
       },
     );
 
-    const refreshToken = jwt.sign(
-      {
-        userId: user.id,
-        systemRole: user.systemRole || "user",
-        roleType: user.roleType || [],
-        email: user.email,
-      },
-      REFRESH_TOKEN_SECRET,
-      { expiresIn: "7d" },
-    );
+    // Recorded in the RefreshToken table so this session can be revoked. The
+    // claims that used to be embedded here (role, email) were never read on
+    // refresh - the user is re-fetched - so the token now carries only what
+    // identifies it.
+    const refreshToken = await issueRefreshToken(user.id);
 
     return {
       id: user.id,
@@ -165,16 +166,25 @@ export default class AuthSvc {
       },
     );
 
-    const refreshToken = jwt.sign(
-      {
-        userId: user.id,
-        systemRole: user.systemRole || "user",
-        roleType: user.roleType || [],
-        email: user.email,
-      },
-      REFRESH_TOKEN_SECRET,
-      { expiresIn: "7d" },
-    );
+    // ONE ACTIVE SESSION PER ACCOUNT.
+    //
+    // Revoke every live refresh token for this user before issuing the new one,
+    // so signing in somewhere else ends the previous session rather than running
+    // alongside it. One set of credentials cannot be shared across people or
+    // devices and stay logged in on all of them.
+    //
+    // Caveat worth knowing: an access token already issued to the old session
+    // stays valid until it expires - it is a stateless JWT and nothing checks a
+    // revocation list on every request. With ACCESS_TOKEN_EXPIRY at 15m that is
+    // the longest the displaced session can linger, and it cannot renew itself
+    // because its refresh token is now revoked.
+    await revokeAllForUser(user.id);
+
+    // Recorded in the RefreshToken table so this session can be revoked. The
+    // claims that used to be embedded here (role, email) were never read on
+    // refresh - the user is re-fetched - so the token now carries only what
+    // identifies it.
+    const refreshToken = await issueRefreshToken(user.id);
 
     return {
       accessToken,
@@ -190,13 +200,32 @@ export default class AuthSvc {
     };
   }
 
+  /**
+   * End a session for real.
+   *
+   * Revokes the presented refresh token so it cannot mint further access
+   * tokens. Already-issued access tokens stay valid until they expire - they
+   * are stateless by design and short-lived - but the session cannot be
+   * extended past that point.
+   *
+   * Never throws on a bad token: logout must succeed from the client's point of
+   * view regardless, or a user holding a corrupt token can never sign out.
+   */
+  static async logout(refreshToken?: string) {
+    if (!refreshToken) return;
+    try {
+      const { jti } = await verifyRefreshToken(refreshToken);
+      await revokeRefreshToken(jti);
+    } catch {
+      // Already invalid, revoked or unparseable - nothing left to revoke.
+    }
+  }
+
   static async refreshToken(refreshToken: string) {
     try {
-      // Verify refresh token
-      const decoded = jwt.verify(
-        refreshToken,
-        process.env.REFRESH_TOKEN_SECRET!,
-      ) as { userId: string };
+      // Checks the signature AND that the jti is still live. A revoked or
+      // unknown jti is rejected, which is what makes logout mean something.
+      const decoded = await verifyRefreshToken(refreshToken);
 
       // Get user
       const user = await AuthRepo.findUserById(String(decoded.userId));
@@ -291,6 +320,11 @@ export default class AuthSvc {
 
     await AuthRepo.updateUser(user.id, { password: hashedPassword });
     await deleteOTP(email);
+
+    // End every existing session. A password reset is the one action that most
+    // often follows "someone else is in my account" - leaving their refresh
+    // token alive for the rest of its 7 days would defeat the point of resetting.
+    await revokeAllForUser(user.id);
 
     return {
       message:

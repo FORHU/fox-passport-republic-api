@@ -48,6 +48,55 @@ export default class AssetRepo {
     return { assets, total };
   }
 
+  // Public browse for the search page — item-level pagination (not nested under owner)
+  // so a page always holds exactly `limit` items instead of varying with how many
+  // items each owner happens to have.
+  static async findPublicAssets(filters: {
+    ownerCity?: string;
+    maxPrice?: number;
+    page?: number;
+    limit: number;
+  }) {
+    const page = filters.page ?? 1;
+    const limit = filters.limit;
+    const skip = (page - 1) * limit;
+
+    const where = {
+      status: AssetStatus.available,
+      deletedAt: null,
+      ...(filters.maxPrice !== undefined && {
+        price: { lte: filters.maxPrice },
+      }),
+      owner: {
+        roleType: { has: "gearFoxer" as const },
+        ...(filters.ownerCity && {
+          city: { contains: filters.ownerCity, mode: "insensitive" as const },
+        }),
+      },
+    };
+
+    const [assets, total] = await prisma.$transaction([
+      prisma.asset.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          category: true,
+          price: true,
+          billingRate: true,
+          images: { take: 1, select: { url: true } },
+          owner: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.asset.count({ where }),
+    ]);
+
+    return { assets, total };
+  }
+
   // READ ALL (admin — no status filter)
   static async findAllAssetsAdmin(filters?: {
     ownerId?: string;

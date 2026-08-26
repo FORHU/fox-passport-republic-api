@@ -53,6 +53,7 @@ model User {
   stripeAccountId          String?                   @unique
   stripeOnboardingComplete Boolean                   @default(false)
   foxerSpecializations     FoxerSpecialization[]
+  refreshTokens            RefreshToken[]
 }
 
 model RoleRequest {
@@ -842,7 +843,6 @@ model CancellationPolicy {
   @@map("cancellation_policies")
 }
 
-
 model CancellationRule {
   id               String             @id @default(uuid())
   policyId         String
@@ -1076,4 +1076,27 @@ model StripeEvent {
   @@map("stripe_events")
 }
 
+/// An issued refresh token, so a session can actually be ended.
+///
+/// Refresh was previously a stateless `jwt.verify`: nothing was stored, so
+/// `POST /auth/logout` could only return 200 and hope the client discarded the
+/// token. A refresh token that leaked stayed valid for its full 30 days with no
+/// way to revoke it. Recording the jti makes logout real and gives us a lever
+/// if a token is ever suspected stolen.
+///
+/// The token itself is never stored - only its jti, which is enough to check
+/// revocation and useless to an attacker who reads the table.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  jti       String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  userAgent String?
+  ip        String?
 
+  @@index([userId])
+  @@index([expiresAt])
+}
