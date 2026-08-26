@@ -77,6 +77,7 @@ export default class UsersRepo {
     roleType?: RoleType,
     specialization?: string,
     city?: string,
+    maxPrice?: number,
   ) {
     const allFoxerRoles: RoleType[] = [
       "serviceFoxer",
@@ -84,6 +85,15 @@ export default class UsersRepo {
       "eventFoxer",
       "venueFoxer",
     ];
+    const deletableItemWhere = {
+      status: "available" as const,
+      deletedAt: null,
+      price: { lte: maxPrice },
+    };
+    const venueItemWhere = {
+      status: "available" as const,
+      price: { lte: maxPrice },
+    };
     return {
       roleType: roleType ? { has: roleType } : { hasSome: allFoxerRoles },
       ...(specialization
@@ -99,6 +109,15 @@ export default class UsersRepo {
       ...(city
         ? { city: { contains: city, mode: "insensitive" as const } }
         : {}),
+      ...(maxPrice !== undefined
+        ? {
+            OR: [
+              { services: { some: deletableItemWhere } },
+              { assets: { some: deletableItemWhere } },
+              { venues: { some: venueItemWhere } },
+            ],
+          }
+        : {}),
     };
   }
 
@@ -109,9 +128,11 @@ export default class UsersRepo {
     roleType?: RoleType,
     specialization?: string,
     city?: string,
+    maxPrice?: number,
   ) {
     const skip = (page - 1) * limit;
-    const where = this.buildFoxerWhere(roleType, specialization, city);
+    const where = this.buildFoxerWhere(roleType, specialization, city, maxPrice);
+    const priceCap = maxPrice !== undefined ? { lte: maxPrice } : undefined;
     const [foxers, total] = await Promise.all([
       prisma.user.findMany({
         where,
@@ -128,7 +149,11 @@ export default class UsersRepo {
             orderBy: { source: "asc" },
           },
           services: {
-            where: { status: "available", deletedAt: null },
+            where: {
+              status: "available",
+              deletedAt: null,
+              ...(priceCap ? { price: priceCap } : {}),
+            },
             take: 3,
             orderBy: { createdAt: "desc" },
             select: {
@@ -143,7 +168,11 @@ export default class UsersRepo {
             },
           },
           assets: {
-            where: { status: "available", deletedAt: null },
+            where: {
+              status: "available",
+              deletedAt: null,
+              ...(priceCap ? { price: priceCap } : {}),
+            },
             take: 3,
             orderBy: { createdAt: "desc" },
             select: {
@@ -157,7 +186,10 @@ export default class UsersRepo {
             },
           },
           venues: {
-            where: { status: "available" },
+            where: {
+              status: "available",
+              ...(priceCap ? { price: priceCap } : {}),
+            },
             take: 3,
             orderBy: { createdAt: "desc" },
             select: {

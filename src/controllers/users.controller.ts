@@ -44,12 +44,16 @@ export default class UsersCtrl {
       const roleType = req.query.roleType as string | undefined;
       const specialization = req.query.specialization as string | undefined;
       const city = req.query.city as string | undefined;
+      const maxPrice = req.query.maxPrice
+        ? Number(req.query.maxPrice)
+        : undefined;
       const result = await UsersSvc.getFoxers(
         limit,
         page,
         roleType,
         specialization,
         city,
+        maxPrice,
       );
       return res.status(200).json({
         success: true,
