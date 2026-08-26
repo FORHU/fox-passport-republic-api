@@ -10,6 +10,7 @@ const router = express.Router();
 
 // Public routes
 router.get("/", AssetCtrl.getAssets);
+router.get("/browse", AssetCtrl.browseAssets);
 router.get("/:id", AssetCtrl.getAssetById);
 
 // Protected routes

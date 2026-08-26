@@ -103,6 +103,37 @@ export default class ServiceCtrl {
     }
   }
 
+  // Public browse for the search page — item-level pagination (city matches the
+  // owner's city, price filters the item itself; only serviceFoxer-owned services).
+  static async browseServices(req: Request, res: Response) {
+    try {
+      const { city, maxPrice, page, limit } = req.query;
+      const parsedLimit = limit ? Math.min(Number(limit), 50) : 10;
+      const parsedPage = page ? Number(page) : 1;
+
+      const { services, total } = await ServiceSvc.browseServices({
+        ...(city && { ownerCity: String(city) }),
+        ...(maxPrice && { maxPrice: Number(maxPrice) }),
+        page: parsedPage,
+        limit: parsedLimit,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: services,
+        pagination: {
+          page: parsedPage,
+          limit: parsedLimit,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / parsedLimit)),
+        },
+      });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
   static async getServiceById(req: Request, res: Response) {
     try {
       const { id } = req.params;
