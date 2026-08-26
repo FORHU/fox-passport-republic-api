@@ -43,6 +43,55 @@ export default class ServiceRepo {
     return { services, total };
   }
 
+  // Public browse for the search page — item-level pagination (not nested under owner)
+  // so a page always holds exactly `limit` items instead of varying with how many
+  // items each owner happens to have.
+  static async findPublicServices(filters: {
+    ownerCity?: string;
+    maxPrice?: number;
+    page?: number;
+    limit: number;
+  }) {
+    const page = filters.page ?? 1;
+    const limit = filters.limit;
+    const skip = (page - 1) * limit;
+
+    const where = {
+      status: ServiceStatus.available,
+      deletedAt: null,
+      ...(filters.maxPrice !== undefined && {
+        price: { lte: filters.maxPrice },
+      }),
+      owner: {
+        roleType: { has: "serviceFoxer" as const },
+        ...(filters.ownerCity && {
+          city: { contains: filters.ownerCity, mode: "insensitive" as const },
+        }),
+      },
+    };
+
+    const [services, total] = await prisma.$transaction([
+      prisma.service.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          category: true,
+          price: true,
+          billingRate: true,
+          images: { take: 1, select: { url: true } },
+          owner: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.service.count({ where }),
+    ]);
+
+    return { services, total };
+  }
+
   // READ ALL (admin — no status filter)
   static async getAllServicesAdmin(filters?: {
     ownerId?: string;
