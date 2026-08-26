@@ -2,6 +2,16 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import AuthSvc from "../services/auth.service";
 
+/**
+ * The service throws the bare string "Invalid credentials" for a bad email or
+ * password. Anything else - a Prisma error, a dropped connection, a bug - is a
+ * server fault and must not be reported to the client as an auth failure.
+ */
+function isCredentialFailure(e: unknown): boolean {
+  const message = typeof e === "string" ? e : (e as Error)?.message;
+  return message === "Invalid credentials";
+}
+
 export default class AuthCtrl {
   static async register(req: Request, res: Response) {
     const { email, password, username, name, mobileNumber } = req.body;
@@ -79,10 +89,18 @@ export default class AuthCtrl {
       const result = await AuthSvc.login({ email, password });
       return res.json(result);
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Login error:", error);
-      return res.status(401).json({
-        message: error.message || error,
+      console.error("Login error:", e);
+
+      // Only a genuine credential mismatch is a 401. This used to return 401
+      // for *any* throw, so infrastructure failures were indistinguishable from
+      // a wrong password - a missing database table once presented as "Invalid
+      // credentials" and cost real debugging time.
+      if (isCredentialFailure(e)) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      return res.status(500).json({
+        message: "Login failed. Please try again.",
       });
     }
   }

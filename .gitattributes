@@ -1,0 +1,20 @@
+# Normalise line endings.
+#
+# Without this, `npm run format` rewrites every file it touches: prettier writes
+# LF, the working tree is CRLF (core.autocrlf=true), and git reports the lot as
+# modified. One format run produced 199 changed files where only 38 had real
+# changes.
+#
+# `eol=lf` checks files out as LF so prettier's output matches what is on disk.
+* text=auto eol=lf
+
+# Binary — never touch these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
