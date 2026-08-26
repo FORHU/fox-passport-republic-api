@@ -70,7 +70,7 @@ timeout /t 3 /nobreak
 call :success "All services started!"
 
 call :info "Service URLs:"
-echo   API:        http://localhost:3002
+echo   API:        http://localhost:6002
 echo   PostgreSQL: localhost:5432
 echo   Redis:      localhost:6379
 echo.
