@@ -10,6 +10,7 @@ const router = express.Router();
 
 // Public routes
 router.get("/", ServiceCtrl.getServices);
+router.get("/browse", ServiceCtrl.browseServices);
 router.get("/:id", ServiceCtrl.getServiceById);
 
 // Protected routes

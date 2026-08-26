@@ -70,6 +70,15 @@ export default class AssetSvc {
     return { assets: enriched, total };
   }
 
+  static async browseAssets(filters: {
+    ownerCity?: string;
+    maxPrice?: number;
+    page?: number;
+    limit: number;
+  }) {
+    return AssetRepo.findPublicAssets(filters);
+  }
+
   static async getAssetById(id: string) {
     const asset = await AssetRepo.findAssetById(id);
     if (!asset) throw new Error("Asset not found");
