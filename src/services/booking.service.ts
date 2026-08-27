@@ -243,14 +243,86 @@ export default class BookingSvc {
     return booking;
   }
 
+  /**
+   * Filters accepted from the query string.
+   *
+   * `filters` used to be the raw `req.query` spread straight into a Prisma
+   * `where`. Express parses nested bracket syntax by default, so
+   * `?user[email][contains]=@gmail.com` became a Prisma operator the caller
+   * controlled — on an endpoint that also had no authentication and returned
+   * every customer's name and email.
+   *
+   * An allow-list of scalars, coerced, is the whole fix for that half.
+   */
+  private static buildFilters(
+    query: Record<string, unknown>,
+  ): Prisma.BookingWhereInput {
+    const where: Prisma.BookingWhereInput = {};
+
+    const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+
+    const status = str(query.status);
+    if (status && status in BookingStatus) {
+      where.status = status as BookingStatus;
+    }
+
+    const eventId = str(query.eventId);
+    if (eventId) where.eventId = eventId;
+
+    const userId = str(query.userId);
+    if (userId) where.userId = userId;
+
+    const ticketCode = str(query.ticketCode);
+    if (ticketCode) where.ticketCode = ticketCode;
+
+    if (query.checkedIn === "true") where.checkedIn = true;
+    if (query.checkedIn === "false") where.checkedIn = false;
+
+    // `hostId` is not a column on Booking — the host is the event's organiser.
+    // The client has been sending this for a while; unmapped it reached Prisma
+    // as an unknown field.
+    const hostId = str(query.hostId);
+    if (hostId) where.event = { organizerId: hostId };
+
+    return where;
+  }
+
+  /**
+   * Bookings carry the customer's name and email, so this is scoped to what the
+   * caller is party to. Admins see everything; anyone else sees bookings they
+   * made or bookings on events they organise.
+   *
+   * The scope is applied with AND over the requested filters, so a filter
+   * cannot widen it.
+   */
   static async getAllBookings(
-    filters: Prisma.BookingWhereInput,
+    query: Record<string, unknown>,
     page = 1,
     limit = 10,
+    viewer?: BookingViewerContext,
   ) {
     await PaymentRepo.cancelExpiredPayments();
+
+    const requested = this.buildFilters(query);
+
+    let where: Prisma.BookingWhereInput = requested;
+    if (viewer?.systemRole !== "admin") {
+      if (!viewer?.userId) throw new Error("Unauthorized");
+      where = {
+        AND: [
+          requested,
+          {
+            OR: [
+              { userId: viewer.userId },
+              { event: { organizerId: viewer.userId } },
+            ],
+          },
+        ],
+      };
+    }
+
     const skip = (page - 1) * limit;
-    return BookingRepo.findAll(filters, skip, limit);
+    return BookingRepo.findAll(where, skip, limit);
   }
 
   static async getBookingById(id: string, userContext?: BookingViewerContext) {
