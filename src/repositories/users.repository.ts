@@ -131,7 +131,12 @@ export default class UsersRepo {
     maxPrice?: number,
   ) {
     const skip = (page - 1) * limit;
-    const where = this.buildFoxerWhere(roleType, specialization, city, maxPrice);
+    const where = this.buildFoxerWhere(
+      roleType,
+      specialization,
+      city,
+      maxPrice,
+    );
     const priceCap = maxPrice !== undefined ? { lte: maxPrice } : undefined;
     const [foxers, total] = await Promise.all([
       prisma.user.findMany({
@@ -315,9 +320,32 @@ export default class UsersRepo {
   }
 
   // READ ONE
+  /**
+   * Explicit field list, not a bare row.
+   *
+   * The client omits `password` globally, but a bare `findUnique` still returns
+   * every other scalar — phone, address, Stripe customer and account ids — and
+   * this feeds a profile lookup that has no business publishing any of them.
+   * Adding a field here should be a deliberate decision, which is what an
+   * allow-list forces.
+   */
   static async findUserById(id: string) {
     return prisma.user.findUnique({
       where: { id: String(id) },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        email: true,
+        imgId: true,
+        city: true,
+        state: true,
+        country: true,
+        systemRole: true,
+        roleType: true,
+        isEmailVerified: true,
+        createdAt: true,
+      },
     });
   }
 
