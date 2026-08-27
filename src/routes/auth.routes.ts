@@ -11,5 +11,7 @@ router.post("/refresh-token", AuthCtrl.refreshToken);
 router.post("/forgot-password", AuthCtrl.forgotPassword);
 router.post("/reset-password", AuthCtrl.resetPassword);
 router.post("/resend-verification-otp", AuthCtrl.resendVerificationOTP);
+router.get("/google", AuthCtrl.googleRedirect);
+router.get("/google/callback", AuthCtrl.googleCallback);
 
 export default router;

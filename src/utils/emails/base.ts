@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { Resend } from "resend";
 import { RESEND_API_KEY, FRONTEND_URL } from "../../config";
+import { sendEmail as sendViaMailer } from "../mailer";
 
 export const LOGO_DATA_URI = (() => {
   const logoPath = path.join(
@@ -121,8 +122,17 @@ export async function sendResendEmail({
   console.log(`========================================\n`);
 
   if (!resend) {
-    console.log(`[DEV] Email would be sent to ${to}: ${subject}`);
-    return true;
+    // No Resend key configured — fall back to the same SMTP transport the
+    // auth flow uses (Ethereal in dev), so these emails are still
+    // inspectable instead of silently vanishing into a console log.
+    try {
+      await sendViaMailer({ to, subject, html });
+      console.log(`Email sent via SMTP fallback to ${to}: ${subject}`);
+      return true;
+    } catch (error) {
+      console.error(`SMTP fallback email failed to ${to}:`, error);
+      return false;
+    }
   }
 
   try {
