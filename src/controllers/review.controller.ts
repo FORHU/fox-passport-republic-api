@@ -1,5 +1,18 @@
 import { Request, Response } from "express";
+import Joi from "joi";
 import ReviewSvc from "../services/review.service";
+
+/**
+ * Ownership and existence failures are client errors and say so; anything else
+ * is a server fault. Collapsing every throw into 400 is the same mistake that
+ * made a missing table look like a wrong password on the login path.
+ */
+function reviewMutationStatus(e: unknown): number {
+  const message = (e as Error)?.message;
+  if (message === "Unauthorized") return 403;
+  if (message === "Review not found") return 404;
+  return 400;
+}
 
 export default class ReviewCtrl {
   static async createReview(req: Request, res: Response) {
@@ -107,26 +120,61 @@ export default class ReviewCtrl {
   }
 
   static async updateReview(req: Request, res: Response) {
+    // `req.body` used to be forwarded to `prisma.review.update` untouched, so
+    // any column on Review was writable. Only these two ever should be.
+    const schema = Joi.object({
+      rating: Joi.number().integer().min(1).max(5).optional(),
+      comment: Joi.string().allow("").optional(),
+    }).min(1);
+
+    const { error, value } = schema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
     try {
-      const { id } = req.params;
-      const review = await ReviewSvc.updateReview(id, req.body);
+      const requesterId = req.user?.userId;
+      if (!requesterId) {
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
+      }
+
+      const review = await ReviewSvc.updateReview({
+        id: String(req.params.id),
+        requesterId,
+        requesterRole: req.user?.systemRole,
+        data: value,
+      });
       return res.status(200).json({ success: true, data: review });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(400).json({ success: false, message: error.message });
+      return res
+        .status(reviewMutationStatus(e))
+        .json({ success: false, message: (e as Error).message });
     }
   }
 
   static async deleteReview(req: Request, res: Response) {
     try {
-      const { id } = req.params;
-      await ReviewSvc.deleteReview(id);
+      const requesterId = req.user?.userId;
+      if (!requesterId) {
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
+      }
+
+      await ReviewSvc.deleteReview({
+        id: String(req.params.id),
+        requesterId,
+        requesterRole: req.user?.systemRole,
+      });
       return res
         .status(200)
         .json({ success: true, message: "Review deleted successfully" });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(400).json({ success: false, message: error.message });
+      return res
+        .status(reviewMutationStatus(e))
+        .json({ success: false, message: (e as Error).message });
     }
   }
 }

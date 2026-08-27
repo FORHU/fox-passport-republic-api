@@ -220,14 +220,64 @@ export default class ReviewSvc {
     return ReviewRepo.createReply(reviewId, userId, text);
   }
 
-  static async updateReview(
-    id: string,
-    data: Partial<{ rating: number; comment: string }>,
+  /**
+   * A review may only be edited by the person who wrote it, or by an admin.
+   *
+   * This check was missing entirely: the route required a token but never asked
+   * *whose*, so any authenticated user could rewrite or delete any review by id.
+   * That is worse than it sounds, because `rating` feeds the Earned
+   * Specialization threshold in `specialization.service.ts` — and Earned
+   * specializations are never revoked. Deleting the bad reviews and inflating
+   * the rest was enough to mint a permanent badge.
+   *
+   * `createReview` and `replyToReview` both already verified the caller. Only
+   * update and delete were skipped.
+   */
+  private static async assertCanMutate(
+    reviewId: string,
+    requesterId: string,
+    requesterRole?: string,
   ) {
-    return ReviewRepo.updateReview(id, data);
+    const review = await prisma.review.findUnique({
+      where: { id: String(reviewId) },
+      select: { id: true, userId: true },
+    });
+    if (!review) throw new Error("Review not found");
+
+    const isAuthor = review.userId === String(requesterId);
+    const isAdmin = requesterRole === "admin";
+    if (!isAuthor && !isAdmin) throw new Error("Unauthorized");
+
+    return review;
   }
 
-  static async deleteReview(id: string) {
+  static async updateReview(params: {
+    id: string;
+    requesterId: string;
+    requesterRole?: string;
+    data: Partial<{ rating: number; comment: string }>;
+  }) {
+    const { id, requesterId, requesterRole, data } = params;
+    await this.assertCanMutate(id, requesterId, requesterRole);
+
+    // Only these two fields are writable. The controller validates as well, but
+    // the repository spreads whatever it is handed straight into
+    // `prisma.review.update`, so narrowing here too means a future caller
+    // cannot reintroduce mass assignment by skipping the schema.
+    const patch: Partial<{ rating: number; comment: string }> = {};
+    if (data.rating !== undefined) patch.rating = data.rating;
+    if (data.comment !== undefined) patch.comment = data.comment;
+
+    return ReviewRepo.updateReview(id, patch);
+  }
+
+  static async deleteReview(params: {
+    id: string;
+    requesterId: string;
+    requesterRole?: string;
+  }) {
+    const { id, requesterId, requesterRole } = params;
+    await this.assertCanMutate(id, requesterId, requesterRole);
     return ReviewRepo.deleteReview(id);
   }
 }

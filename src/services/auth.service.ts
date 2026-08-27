@@ -5,6 +5,8 @@ import {
   verifyRefreshToken,
   revokeRefreshToken,
   revokeAllForUser,
+  rotateRefreshToken,
+  RefreshTokenError,
 } from "./refresh-token.service";
 import { generateOTP, saveOTP, verifyOTP, deleteOTP } from "../utils/otp.utils";
 import { sendTemplatedEmail } from "../utils/helpers";
@@ -221,43 +223,56 @@ export default class AuthSvc {
     }
   }
 
-  static async refreshToken(refreshToken: string) {
-    try {
-      // Checks the signature AND that the jti is still live. A revoked or
-      // unknown jti is rejected, which is what makes logout mean something.
-      const decoded = await verifyRefreshToken(refreshToken);
+  /**
+   * Exchange a refresh token for a new access token *and a new refresh token*.
+   *
+   * Refresh tokens are single-use. The caller must persist the returned
+   * `refreshToken` — keeping the old one means the next refresh fails, because
+   * rotating revoked it.
+   *
+   * Errors are not flattened into one string here. `RefreshTokenError` means
+   * "this token is no good" and should be a 401; anything else is
+   * infrastructure and must not masquerade as an auth failure. That distinction
+   * is the same one that cost real debugging time when a missing table
+   * presented as a wrong password.
+   */
+  static async refreshToken(
+    refreshToken: string,
+    context?: { userAgent?: string; ip?: string },
+  ) {
+    // Verifies the signature, checks the jti is still live, revokes it, and
+    // issues its successor. Throws RefreshTokenReuseError if a token that was
+    // already rotated comes back — at which point every session is revoked.
+    const rotated = await rotateRefreshToken(refreshToken, context);
 
-      // Get user
-      const user = await AuthRepo.findUserById(String(decoded.userId));
-      if (!user) {
-        throw "User not found";
-      }
-
-      // Generate new access token with role
-      const accessToken = jwt.sign(
-        {
-          userId: user.id,
-          systemRole: user.systemRole || "user",
-          roleType: user.roleType || [],
-          email: user.email,
-        },
-        ACCESS_TOKEN_SECRET,
-        { expiresIn: ACCESS_TOKEN_EXPIRY },
-      );
-
-      return {
-        accessToken,
-        user: {
-          id: user.id,
-          email: user.email,
-          username: user.username,
-          name: user.name,
-        },
-      };
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (error) {
-      throw "Invalid refresh token";
+    const user = await AuthRepo.findUserById(rotated.userId);
+    if (!user) {
+      // The row cascade-deletes with the user, so this is close to unreachable;
+      // treat it as a dead token rather than a server fault.
+      throw new RefreshTokenError();
     }
+
+    const accessToken = jwt.sign(
+      {
+        userId: user.id,
+        systemRole: user.systemRole || "user",
+        roleType: user.roleType || [],
+        email: user.email,
+      },
+      ACCESS_TOKEN_SECRET,
+      { expiresIn: ACCESS_TOKEN_EXPIRY },
+    );
+
+    return {
+      accessToken,
+      refreshToken: rotated.refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        name: user.name,
+      },
+    };
   }
 
   // Send OTP to reset password
