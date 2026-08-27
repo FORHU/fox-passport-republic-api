@@ -1,6 +1,20 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import AuthSvc from "../services/auth.service";
+import {
+  RefreshTokenError,
+  RefreshTokenReuseError,
+} from "../services/refresh-token.service";
+
+/**
+ * The service throws the bare string "Invalid credentials" for a bad email or
+ * password. Anything else - a Prisma error, a dropped connection, a bug - is a
+ * server fault and must not be reported to the client as an auth failure.
+ */
+function isCredentialFailure(e: unknown): boolean {
+  const message = typeof e === "string" ? e : (e as Error)?.message;
+  return message === "Invalid credentials";
+}
 
 export default class AuthCtrl {
   static async register(req: Request, res: Response) {
@@ -79,10 +93,18 @@ export default class AuthCtrl {
       const result = await AuthSvc.login({ email, password });
       return res.json(result);
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Login error:", error);
-      return res.status(401).json({
-        message: error.message || error,
+      console.error("Login error:", e);
+
+      // Only a genuine credential mismatch is a 401. This used to return 401
+      // for *any* throw, so infrastructure failures were indistinguishable from
+      // a wrong password - a missing database table once presented as "Invalid
+      // credentials" and cost real debugging time.
+      if (isCredentialFailure(e)) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      return res.status(500).json({
+        message: "Login failed. Please try again.",
       });
     }
   }
@@ -100,12 +122,35 @@ export default class AuthCtrl {
     }
 
     try {
-      const result = await AuthSvc.refreshToken(refreshToken);
+      const result = await AuthSvc.refreshToken(refreshToken, {
+        userAgent: req.get("user-agent") ?? undefined,
+        ip: req.ip,
+      });
+      // `refreshToken` in the response is a NEW token — rotation made the one
+      // the caller sent single-use. Clients must store this or their next
+      // refresh fails.
       return res.json(result);
     } catch (e: unknown) {
+      if (e instanceof RefreshTokenReuseError) {
+        // Every session for the account has already been revoked by the time
+        // this is thrown. Log it loudly: it is the signal that a refresh token
+        // was copied, and it is the only place that signal exists.
+        console.error(
+          "[auth] Refresh token reuse detected — all sessions revoked.",
+          { ip: req.ip, userAgent: req.get("user-agent") },
+        );
+        return res.status(401).json({ message: "Invalid refresh token" });
+      }
+
+      if (e instanceof RefreshTokenError) {
+        return res.status(401).json({ message: "Invalid refresh token" });
+      }
+
+      // Not an auth failure. Answering 401 here is what made a missing table
+      // look like a wrong password on the login path; do not repeat it.
       const error = e as Error;
       console.error("Refresh token error:", error);
-      return res.status(401).json({ message: error.message || error });
+      return res.status(500).json({ message: "Failed to refresh session" });
     }
   }
 
