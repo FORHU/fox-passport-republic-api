@@ -1,6 +1,15 @@
+---
+domain: Fox Passport Republic
+updated: 2026-08-27
+---
+
 # Fox Passport Republic
 
-An event-booking marketplace. Citizens book Events (and the Assets/Services attached to them) that Hosts assemble out of inventory supplied by Mayors and Foxers.
+An event-booking marketplace. Citizens book Events (and the Assets/Services attached to them) that EventFoxers assemble out of inventory supplied by VenueFoxers, GearFoxers and ServiceFoxers.
+
+This file mirrors the `RoleType` / `SystemRole` enums in `prisma/schema.prisma`.
+**When they disagree, the schema wins** — it is the source of truth, and this file
+is the source of truth for the app's copy at `fox-passport-republic-app/CONTEXT.md`.
 
 ## Language
 

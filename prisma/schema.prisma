@@ -1097,6 +1097,13 @@ model RefreshToken {
   userAgent String?
   ip        String?
 
+  // Rotation. `rotatedAt` is set only when this token was exchanged for a
+  // successor; `revokedAt` alone means logout or a password change. Reuse
+  // detection has to tell those apart: presenting a logged-out token is
+  // ordinary, presenting a rotated one is evidence of a copy.
+  rotatedAt     DateTime?
+  replacedByJti String?
+
   @@index([userId])
   @@index([expiresAt])
 }
