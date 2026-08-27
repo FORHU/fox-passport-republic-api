@@ -9,6 +9,7 @@ export default class UsersSvc {
   }
 
   // GET FOXERS (public listing, optionally filtered by roleType, specialization, city)
+  // roleType may be a single value or a comma-separated list (e.g. "serviceFoxer,gearFoxer")
   static async getFoxers(
     limit = 9,
     page = 1,
@@ -17,10 +18,13 @@ export default class UsersSvc {
     city?: string,
     maxPrice?: number,
   ) {
+    const roleTypes = roleType
+      ? (roleType.split(",").map((r) => r.trim()).filter(Boolean) as RoleType[])
+      : undefined;
     return UsersRepo.findFoxers(
       limit,
       page,
-      roleType as RoleType,
+      roleTypes,
       specialization,
       city,
       maxPrice,
