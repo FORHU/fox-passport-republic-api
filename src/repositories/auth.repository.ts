@@ -32,11 +32,17 @@ export default class AuthRepo {
     });
   }
 
+  /**
+   * Loads the user WITH the password hash. The client omits it globally (see
+   * utils/prisma.ts), so login has to ask for it explicitly — which is the
+   * point: leaking it now takes a deliberate act, not a forgotten `select`.
+   */
   static async findUserByEmail(email: string) {
     return prisma.user.findUnique({
       where: {
         email,
       },
+      omit: { password: false },
     });
   }
 

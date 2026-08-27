@@ -43,7 +43,9 @@ router.patch(
 
 // ========== STANDARD BOOKING CRUD ROUTES ==========
 router.get("/availability", BookingCtrl.getAvailability); // must be before /:id
-router.get("/", BookingCtrl.getAllBookings);
+// Bookings include the customer's name and email, so this requires a session
+// and the service scopes results to what the caller is party to. It was public.
+router.get("/", authenticate, BookingCtrl.getAllBookings);
 router.get("/upcoming", authenticate, BookingCtrl.getUpcomingBookings); // must be before /:id
 router.get("/user/:userId", authenticate, BookingCtrl.getUserBookings);
 router.get("/:id", optionalAuth, BookingCtrl.getBookingById);
