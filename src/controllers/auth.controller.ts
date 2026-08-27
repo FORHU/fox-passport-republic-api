@@ -1,6 +1,10 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import AuthSvc from "../services/auth.service";
+import {
+  RefreshTokenError,
+  RefreshTokenReuseError,
+} from "../services/refresh-token.service";
 
 /**
  * The service throws the bare string "Invalid credentials" for a bad email or
@@ -118,12 +122,35 @@ export default class AuthCtrl {
     }
 
     try {
-      const result = await AuthSvc.refreshToken(refreshToken);
+      const result = await AuthSvc.refreshToken(refreshToken, {
+        userAgent: req.get("user-agent") ?? undefined,
+        ip: req.ip,
+      });
+      // `refreshToken` in the response is a NEW token — rotation made the one
+      // the caller sent single-use. Clients must store this or their next
+      // refresh fails.
       return res.json(result);
     } catch (e: unknown) {
+      if (e instanceof RefreshTokenReuseError) {
+        // Every session for the account has already been revoked by the time
+        // this is thrown. Log it loudly: it is the signal that a refresh token
+        // was copied, and it is the only place that signal exists.
+        console.error(
+          "[auth] Refresh token reuse detected — all sessions revoked.",
+          { ip: req.ip, userAgent: req.get("user-agent") },
+        );
+        return res.status(401).json({ message: "Invalid refresh token" });
+      }
+
+      if (e instanceof RefreshTokenError) {
+        return res.status(401).json({ message: "Invalid refresh token" });
+      }
+
+      // Not an auth failure. Answering 401 here is what made a missing table
+      // look like a wrong password on the login path; do not repeat it.
       const error = e as Error;
       console.error("Refresh token error:", error);
-      return res.status(401).json({ message: error.message || error });
+      return res.status(500).json({ message: "Failed to refresh session" });
     }
   }
 
