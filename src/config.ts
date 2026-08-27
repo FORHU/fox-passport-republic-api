@@ -83,3 +83,10 @@ export const STRIPE_CONNECT_REFRESH_URL =
   process.env.STRIPE_CONNECT_REFRESH_URL ||
   `${FRONTEND_URL}/creator-dashboard/stripe-onboard`;
 export const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
+
+export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID as string;
+export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET as string;
+export const GOOGLE_CALLBACK_URL = (
+  process.env.GOOGLE_CALLBACK_URL ||
+  `http://localhost:${PORT}/api/v1/auth/google/callback`
+).trim();
