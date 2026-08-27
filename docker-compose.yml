@@ -1,15 +1,61 @@
+# Local stack for the Fox Passport API.
+#
+# `docker compose up -d` starts the backing services only — Postgres, Redis and
+# pgAdmin — which is what you want while running the API itself with `pnpm dev`.
+# The API container is behind a profile so it does not fight `pnpm dev` for port
+# 6002:
+#
+#   docker compose up -d                    # services only (the common case)
+#   docker compose --profile app up -d      # services + the API in a container
+#
+# Every value is overridable from the environment, but the defaults are the
+# values this project already uses, so an existing `.env` and an existing
+# `pgdata` volume keep working untouched. Changing POSTGRES_USER or
+# POSTGRES_PASSWORD does NOT re-initialise a volume that already exists — it
+# just stops the credentials matching, so change those only alongside a
+# `docker compose down -v`.
+
 services:
   postgres:
     image: postgres:15
     container_name: local_postgres
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin123
-      POSTGRES_DB: foxpassportrepublic
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
+      POSTGRES_DB: ${POSTGRES_DB:-foxpassportrepublic}
     ports:
-      - "5433:5432"
+      # 5433 on the host, because 5432 is usually taken by a local Postgres.
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-foxpassportrepublic}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - fox_network
+
+  redis:
+    image: redis:7
+    container_name: local_redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      # 6378 on the host, for the same reason as Postgres above.
+      - "${REDIS_PORT:-6378}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
     networks:
       - fox_network
@@ -18,28 +64,44 @@ services:
     image: dpage/pgadmin4:latest
     container_name: local_pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@example.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: 'False'
-      PGADMIN_CONFIG_COOKIE_DEFAULT_SECURE: 'False'
-      PGADMIN_CONFIG_COOKIE_SameSite: 'Lax'
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "False"
+      PGADMIN_CONFIG_COOKIE_DEFAULT_SECURE: "False"
+      PGADMIN_CONFIG_COOKIE_SameSite: "Lax"
     ports:
-      - "5050:80"
+      - "${PGADMIN_PORT:-5050}:80"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - fox_network
 
-  redis:
-    image: redis:7
-    container_name: local_redis
-    command: [ "redis-server", "--appendonly", "yes" ]
+  api:
+    # Not started by a bare `docker compose up`. Use `--profile app`.
+    profiles: ["app"]
+    build: .
+    container_name: local_api
     ports:
-      - "6378:6379"
-    volumes:
-      - redisdata:/data
+      - "${PORT:-6002}:${PORT:-6002}"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # These override whatever `.env` says. Inside the container the other
+      # services are reachable by their compose service name — `localhost`
+      # would be the API container itself, which is the single most common way
+      # a working local setup fails once it is containerised.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@postgres:5432/${POSTGRES_DB:-foxpassportrepublic}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - fox_network
