@@ -566,12 +566,15 @@ export default class BookingCtrl {
     try {
       const limit = Math.min(Number(req.query.limit) || 4, 20);
       const page = Math.max(Number(req.query.page) || 1, 1);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { page: _p, limit: _l, ...filters } = req.query;
+      // The query object is passed whole and the service allow-lists it. It
+      // used to be spread into a Prisma `where` directly, which handed the
+      // caller arbitrary filter operators on an endpoint that also had no
+      // authentication.
       const { bookings, total } = await BookingSvc.getAllBookings(
-        filters,
+        req.query as Record<string, unknown>,
         page,
         limit,
+        { userId: req.user?.userId, systemRole: req.user?.systemRole },
       );
       return res.status(200).json({
         success: true,
