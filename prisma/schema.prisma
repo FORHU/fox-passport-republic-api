@@ -16,6 +16,7 @@ model User {
   state                    String?
   country                  String?                   @default("Philippines")
   username                 String?                   @unique
+  googleId                 String?                   @unique
   phone                    String?
   imgId                    String?
   systemRole               SystemRole                @default(user)

@@ -1,10 +1,12 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import AuthSvc from "../services/auth.service";
+import GoogleAuthSvc from "../services/google-auth.service";
 import {
   RefreshTokenError,
   RefreshTokenReuseError,
 } from "../services/refresh-token.service";
+import { FRONTEND_URL } from "../config";
 
 /**
  * The service throws the bare string "Invalid credentials" for a bad email or
@@ -220,6 +222,35 @@ export default class AuthCtrl {
     } catch (e: unknown) {
       const error = e as Error;
       return res.status(400).json({ message: error.message });
+    }
+  }
+
+  static googleRedirect(req: Request, res: Response) {
+    return res.redirect(GoogleAuthSvc.getAuthUrl());
+  }
+
+  static async googleCallback(req: Request, res: Response) {
+    const { code, error: googleError } = req.query;
+
+    if (googleError || typeof code !== "string") {
+      return res.redirect(`${FRONTEND_URL}/?googleAuthError=1`);
+    }
+
+    try {
+      const result = await GoogleAuthSvc.handleCallback(code);
+
+      const params = new URLSearchParams({
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        isNewUser: String(result.isNewUser),
+      });
+
+      return res.redirect(
+        `${FRONTEND_URL}/auth/google/callback?${params.toString()}`,
+      );
+    } catch (e: unknown) {
+      console.error("Google sign-in error:", e);
+      return res.redirect(`${FRONTEND_URL}/?googleAuthError=1`);
     }
   }
 
