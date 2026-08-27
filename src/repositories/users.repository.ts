@@ -74,7 +74,7 @@ export default class UsersRepo {
 
   // Shared where-clause builder for foxer listing + count
   static buildFoxerWhere(
-    roleType?: RoleType,
+    roleTypes?: RoleType[],
     specialization?: string,
     city?: string,
     maxPrice?: number,
@@ -95,13 +95,18 @@ export default class UsersRepo {
       price: { lte: maxPrice },
     };
     return {
-      roleType: roleType ? { has: roleType } : { hasSome: allFoxerRoles },
+      roleType:
+        roleTypes && roleTypes.length > 0
+          ? { hasSome: roleTypes }
+          : { hasSome: allFoxerRoles },
       ...(specialization
         ? {
             foxerSpecializations: {
               some: {
                 category: specialization,
-                ...(roleType ? { roleType } : {}),
+                ...(roleTypes && roleTypes.length > 0
+                  ? { roleType: { in: roleTypes } }
+                  : {}),
               },
             },
           }
@@ -125,14 +130,14 @@ export default class UsersRepo {
   static async findFoxers(
     limit = 9,
     page = 1,
-    roleType?: RoleType,
+    roleTypes?: RoleType[],
     specialization?: string,
     city?: string,
     maxPrice?: number,
   ) {
     const skip = (page - 1) * limit;
     const where = this.buildFoxerWhere(
-      roleType,
+      roleTypes,
       specialization,
       city,
       maxPrice,
