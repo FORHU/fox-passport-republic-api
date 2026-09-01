@@ -6,6 +6,11 @@ import EventTemplateRepo from "../repositories/event-template.repository";
 import { sendApprovedEmail } from "../utils/emails/approved";
 import { sendRejectedEmail } from "../utils/emails/rejected";
 import { EventCategory, EventTemplateStatus } from "@prisma/client";
+import {
+  announceAdminQueueChanged,
+  announceToUser,
+} from "../infrastructure/socket/invalidate";
+import { can } from "../types/permissions";
 
 export default class EventTemplateCtrl {
   static async createTemplate(req: Request, res: Response) {
@@ -37,6 +42,7 @@ export default class EventTemplateCtrl {
         ownerId,
         ...value,
       });
+      announceAdminQueueChanged();
       return res
         .status(201)
         .json({ message: "Template created successfully", template });
@@ -76,6 +82,7 @@ export default class EventTemplateCtrl {
         ownerId,
         data: value,
       });
+      announceAdminQueueChanged();
       return res
         .status(200)
         .json({ message: "Template updated successfully", template });
@@ -353,6 +360,7 @@ export default class EventTemplateCtrl {
         req.params.id,
         ownerId,
       );
+      announceAdminQueueChanged();
       return res
         .status(200)
         .json({ message: "Template submitted for review", template });
@@ -374,6 +382,7 @@ export default class EventTemplateCtrl {
         req.params.id,
         ownerId,
       );
+      announceAdminQueueChanged();
       return res.status(200).json(result);
     } catch (e: unknown) {
       const error = e as Error;
@@ -485,7 +494,7 @@ export default class EventTemplateCtrl {
   static async approveEventTemplate(req: Request, res: Response) {
     try {
       const user = req.user;
-      if (!user || user.systemRole !== "admin") {
+      if (!user || !can(user.systemRole, "queue:decide")) {
         return res
           .status(403)
           .json({ message: "Forbidden: Admin access required" });
@@ -511,6 +520,8 @@ export default class EventTemplateCtrl {
         console.error("Failed to send approval email:", emailErr);
       }
 
+      announceAdminQueueChanged();
+      announceToUser(template.ownerId, "events");
       return res
         .status(200)
         .json({ message: "Event template approved successfully", template });
@@ -549,7 +560,7 @@ export default class EventTemplateCtrl {
   static async rejectEventTemplate(req: Request, res: Response) {
     try {
       const user = req.user;
-      if (!user || user.systemRole !== "admin") {
+      if (!user || !can(user.systemRole, "queue:decide")) {
         return res
           .status(403)
           .json({ message: "Forbidden: Admin access required" });
@@ -582,6 +593,8 @@ export default class EventTemplateCtrl {
         console.error("Failed to send rejection email:", emailErr);
       }
 
+      announceAdminQueueChanged();
+      announceToUser(template.ownerId, "events");
       return res
         .status(200)
         .json({ message: "Event template rejected successfully", template });

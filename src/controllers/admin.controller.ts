@@ -1,4 +1,8 @@
 import { Request, Response } from "express";
+import {
+  announceAdminQueueChanged,
+  announceToUser,
+} from "../infrastructure/socket/invalidate";
 
 import { prisma } from "../utils/prisma";
 import {
@@ -17,6 +21,8 @@ import AssetRepo from "../repositories/asset.repository";
 import ServiceRepo from "../repositories/service.repository";
 import RefundSvc from "../services/refund.service";
 import Joi from "joi";
+import { notifyDecision } from "../modules/notifications/decision-notification";
+import { sendDecisionEmail } from "../modules/notifications/decision-email";
 
 export default class AdminCtrl {
   // ─── DISPUTES ────────────────────────────────────────────────────────────
@@ -373,6 +379,14 @@ export default class AdminCtrl {
         })
         .catch(() => {});
 
+      announceAdminQueueChanged();
+      announceToUser(venue.mayorId, "venues");
+      notifyDecision({
+        userId: venue.mayorId,
+        entity: "venue",
+        approved: true,
+      });
+      sendDecisionEmail({ entity: "venue", id: venue.id, approved: true });
       return res.status(200).json({ success: true, data: venue });
     } catch (e: unknown) {
       const error = e as Error;
@@ -385,6 +399,20 @@ export default class AdminCtrl {
       const venue = await prisma.venue.update({
         where: { id: req.params.id },
         data: { status: VenueStatus.archived },
+      });
+      announceAdminQueueChanged();
+      announceToUser(venue.mayorId, "venues");
+      notifyDecision({
+        userId: venue.mayorId,
+        entity: "venue",
+        approved: false,
+        reason: req.body?.reason,
+      });
+      sendDecisionEmail({
+        entity: "venue",
+        id: venue.id,
+        approved: false,
+        reason: req.body?.reason,
       });
       return res.status(200).json({ success: true, data: venue });
     } catch (e: unknown) {
@@ -425,6 +453,10 @@ export default class AdminCtrl {
         )
         .catch(() => {});
 
+      announceAdminQueueChanged();
+      announceToUser(asset.ownerId, "venues");
+      notifyDecision({ userId: asset.ownerId, entity: "item", approved: true });
+      sendDecisionEmail({ entity: "asset", id: asset.id, approved: true });
       return res.status(200).json({ success: true, data: asset });
     } catch (e: unknown) {
       const error = e as Error;
@@ -437,6 +469,20 @@ export default class AdminCtrl {
       const asset = await prisma.asset.update({
         where: { id: req.params.id },
         data: { status: AssetStatus.rejected },
+      });
+      announceAdminQueueChanged();
+      announceToUser(asset.ownerId, "venues");
+      notifyDecision({
+        userId: asset.ownerId,
+        entity: "item",
+        approved: false,
+        reason: req.body?.reason,
+      });
+      sendDecisionEmail({
+        entity: "asset",
+        id: asset.id,
+        approved: false,
+        reason: req.body?.reason,
       });
       return res.status(200).json({ success: true, data: asset });
     } catch (e: unknown) {
@@ -487,6 +533,14 @@ export default class AdminCtrl {
         )
         .catch(() => {});
 
+      announceAdminQueueChanged();
+      announceToUser(service.ownerId, "venues");
+      notifyDecision({
+        userId: service.ownerId,
+        entity: "service",
+        approved: true,
+      });
+      sendDecisionEmail({ entity: "service", id: service.id, approved: true });
       return res.status(200).json({ success: true, data: service });
     } catch (e: unknown) {
       const error = e as Error;
@@ -499,6 +553,20 @@ export default class AdminCtrl {
       const service = await prisma.service.update({
         where: { id: req.params.id },
         data: { status: ServiceStatus.rejected },
+      });
+      announceAdminQueueChanged();
+      announceToUser(service.ownerId, "venues");
+      notifyDecision({
+        userId: service.ownerId,
+        entity: "service",
+        approved: false,
+        reason: req.body?.reason,
+      });
+      sendDecisionEmail({
+        entity: "service",
+        id: service.id,
+        approved: false,
+        reason: req.body?.reason,
       });
       return res.status(200).json({ success: true, data: service });
     } catch (e: unknown) {
@@ -561,6 +629,18 @@ export default class AdminCtrl {
         where: { id: req.params.id },
         data: { status: EventTemplateStatus.published, isPublic: true },
       });
+      announceAdminQueueChanged();
+      announceToUser(template.ownerId, "events");
+      notifyDecision({
+        userId: template.ownerId,
+        entity: "event template",
+        approved: true,
+      });
+      sendDecisionEmail({
+        entity: "eventTemplate",
+        id: template.id,
+        approved: true,
+      });
       return res.status(200).json({ success: true, data: template });
     } catch (e: unknown) {
       const error = e as Error;
@@ -591,6 +671,20 @@ export default class AdminCtrl {
           isPublic: false,
           rejectionReason: reason,
         },
+      });
+      announceAdminQueueChanged();
+      announceToUser(template.ownerId, "events");
+      notifyDecision({
+        userId: template.ownerId,
+        entity: "event template",
+        approved: false,
+        reason: req.body?.reason,
+      });
+      sendDecisionEmail({
+        entity: "eventTemplate",
+        id: template.id,
+        approved: false,
+        reason: req.body?.reason,
       });
       return res.status(200).json({ success: true, data: template });
     } catch (e: unknown) {
@@ -647,6 +741,14 @@ export default class AdminCtrl {
           data: { isPublic: true },
         });
       }
+      announceAdminQueueChanged();
+      announceToUser(event.clientId, "events");
+      notifyDecision({
+        userId: event.clientId,
+        entity: "event",
+        approved: true,
+      });
+      sendDecisionEmail({ entity: "event", id: event.id, approved: true });
       return res.status(200).json({ success: true, data: event });
     } catch (e: unknown) {
       const error = e as Error;
@@ -670,6 +772,20 @@ export default class AdminCtrl {
           });
         }
       }
+      announceAdminQueueChanged();
+      announceToUser(event.clientId, "events");
+      notifyDecision({
+        userId: event.clientId,
+        entity: "event",
+        approved: false,
+        reason: req.body?.reason,
+      });
+      sendDecisionEmail({
+        entity: "event",
+        id: event.id,
+        approved: false,
+        reason: req.body?.reason,
+      });
       return res.status(200).json({ success: true, data: event });
     } catch (e: unknown) {
       const error = e as Error;
