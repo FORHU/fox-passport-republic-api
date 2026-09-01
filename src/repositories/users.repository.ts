@@ -4,23 +4,48 @@ import { SystemRole, RoleType } from "@prisma/client";
 
 export default class UsersRepo {
   // READ ALL (optionally filtered by roleType)
-  static async getAllUsers(roleTypes?: RoleType[]) {
-    return prisma.user.findMany({
-      where:
-        roleTypes && roleTypes.length > 0
-          ? { roleType: { hasSome: roleTypes } }
-          : undefined,
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        imgId: true,
-        systemRole: true,
-        roleType: true,
-        createdAt: true,
-      },
-    });
+  static async getAllUsers(
+    roleTypes?: RoleType[],
+    page = 1,
+    limit = 20,
+    search?: string,
+  ) {
+    const where: Prisma.UserWhereInput = {
+      ...(roleTypes && roleTypes.length > 0
+        ? { roleType: { hasSome: roleTypes } }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { email: { contains: search, mode: "insensitive" } },
+              { username: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          name: true,
+          imgId: true,
+          systemRole: true,
+          roleType: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    return { users, total };
   }
 
   // Compute avgRating + reviewCount for a list of foxers in one DB round-trip

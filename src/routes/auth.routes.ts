@@ -1,8 +1,10 @@
 import express from "express";
 import AuthCtrl from "../controllers/auth.controller";
+import { authenticate } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
+router.get("/socket-token", authenticate, AuthCtrl.getSocketToken);
 router.post("/register", AuthCtrl.register);
 router.post("/verify-email", AuthCtrl.verifyEmail);
 router.post("/login", AuthCtrl.login);

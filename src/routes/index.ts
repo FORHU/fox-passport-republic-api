@@ -21,6 +21,7 @@ import eventTransactionRoutes from "./event-transaction.routes";
 import matchRoutes from "./match.routes";
 import bookingRoutes from "./booking.routes";
 import notificationRoutes from "../modules/notifications/user-notification.routes";
+import conversationRoutes from "../modules/conversations/conversation.routes";
 import stripeConnectRoutes from "./stripe-connect.routes";
 import cancellationPolicyRoutes from "./cancellation-policy.routes";
 import waitlistRoutes from "./waitlist.routes";
@@ -50,6 +51,7 @@ router.use("/v1/categories", categoryRoutes);
 router.use("/v1/venues", venueRoutes);
 router.use("/v1/payments", paymentRoutes);
 router.use("/v1/notifications", notificationRoutes);
+router.use("/v1/conversations", conversationRoutes);
 // Booking sub-routes must be registered BEFORE the generic /:id routes
 router.use("/v1/service/bookings", serviceBookingRoutes);
 router.use("/v1/asset/bookings", assetBookingRoutes);
