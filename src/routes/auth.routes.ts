@@ -13,5 +13,6 @@ router.post("/reset-password", AuthCtrl.resetPassword);
 router.post("/resend-verification-otp", AuthCtrl.resendVerificationOTP);
 router.get("/google", AuthCtrl.googleRedirect);
 router.get("/google/callback", AuthCtrl.googleCallback);
+router.post("/google/exchange", AuthCtrl.googleExchange);
 
 export default router;

@@ -2,6 +2,7 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import AuthRepo from "../repositories/auth.repository";
+import redisUtil from "../utils/redis.util";
 import { issueRefreshToken } from "./refresh-token.service";
 import { hashPassword } from "../utils/password";
 import {
@@ -17,6 +18,21 @@ const client = new OAuth2Client(
   GOOGLE_CLIENT_SECRET,
   GOOGLE_CALLBACK_URL,
 );
+
+/**
+ * A completed Google sign-in, parked server-side between the callback and the
+ * app collecting it.
+ */
+interface PendingSession {
+  accessToken: string;
+  refreshToken: string;
+  isNewUser: boolean;
+}
+
+const EXCHANGE_PREFIX = "google:exchange:";
+// Long enough for one redirect and the app's server-side collection, short
+// enough that an abandoned sign-in leaves nothing usable behind.
+const EXCHANGE_TTL_SECONDS = 60;
 
 /** Turns an email local-part into a unique, database-safe username. */
 async function uniqueUsernameFromEmail(email: string): Promise<string> {
@@ -35,11 +51,23 @@ async function uniqueUsernameFromEmail(email: string): Promise<string> {
 }
 
 export default class GoogleAuthSvc {
-  static getAuthUrl(): string {
+  /**
+   * A single-use, unguessable value tying a callback back to the browser that
+   * started the flow. The caller stores it in an httpOnly cookie and compares
+   * it with the `state` Google echoes back; without that pairing an attacker
+   * can complete the flow in someone else's browser and land them in an
+   * attacker-controlled account.
+   */
+  static createState(): string {
+    return crypto.randomBytes(32).toString("hex");
+  }
+
+  static getAuthUrl(state: string): string {
     return client.generateAuthUrl({
       access_type: "online",
       scope: ["openid", "email", "profile"],
       prompt: "select_account",
+      state,
     });
   }
 
@@ -62,6 +90,16 @@ export default class GoogleAuthSvc {
     const payload = ticket.getPayload();
     if (!payload?.sub || !payload.email) {
       throw new Error("Google account is missing required profile data");
+    }
+
+    // Everything below keys off the email: it decides whether this identity is
+    // linked to an existing password account, and the new row is written with
+    // `isEmailVerified: true`. An unverified address makes both of those a
+    // claim rather than a fact - on a Workspace domain an administrator can set
+    // one arbitrarily - so the whole flow stops here unless Google vouches for
+    // it.
+    if (payload.email_verified !== true) {
+      throw new Error("Google account email is not verified");
     }
 
     const { sub: googleId, email, name } = payload;
@@ -121,5 +159,50 @@ export default class GoogleAuthSvc {
         roleType: user.roleType || [],
       },
     };
+  }
+
+  /**
+   * Parks a completed sign-in behind an opaque, single-use code.
+   *
+   * The tokens used to travel to the app as query parameters on a redirect,
+   * which put a *refresh* token - the long-lived credential the rest of the
+   * system rotates and treats as detectable on theft - into browser history,
+   * the `Referer` on the next request, and every access log along the way.
+   * What travels now is a reference that is useless a minute later and cannot
+   * be redeemed twice.
+   *
+   * Redis is optional elsewhere in this app; here it is not. Sign-in fails
+   * rather than falling back to putting the credential in a URL.
+   */
+  static async stashSession(session: PendingSession): Promise<string> {
+    const client = redisUtil.getClient();
+    if (!client) {
+      throw new Error("Sign-in is temporarily unavailable");
+    }
+
+    const code = crypto.randomBytes(32).toString("hex");
+    await client.set(`${EXCHANGE_PREFIX}${code}`, JSON.stringify(session), {
+      EX: EXCHANGE_TTL_SECONDS,
+    });
+    return code;
+  }
+
+  /**
+   * Redeems a code exactly once. `getDel` is atomic, so two racing requests
+   * cannot both walk away with the same session - the same reason the OTP
+   * helper uses it.
+   */
+  static async redeemSession(code: string): Promise<PendingSession | null> {
+    const client = redisUtil.getClient();
+    if (!client) return null;
+
+    const raw = await client.getDel(`${EXCHANGE_PREFIX}${code}`);
+    if (!raw) return null;
+
+    try {
+      return JSON.parse(raw) as PendingSession;
+    } catch {
+      return null;
+    }
   }
 }
