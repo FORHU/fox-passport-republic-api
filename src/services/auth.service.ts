@@ -19,6 +19,28 @@ import {
 } from "../config";
 
 export default class AuthSvc {
+  // Mints a short-lived token for the socket.io handshake. The socket client
+  // can't read the httpOnly access-token cookie, so it needs a token handed
+  // to it explicitly over a normal (cookie-authenticated) request instead —
+  // kept short-lived since, unlike the cookie, this one does reach client JS.
+  static issueSocketToken(user: {
+    userId: string;
+    systemRole: string;
+    roleType: string[];
+    email: string;
+  }) {
+    return jwt.sign(
+      {
+        userId: user.userId,
+        systemRole: user.systemRole,
+        roleType: user.roleType,
+        email: user.email,
+      },
+      ACCESS_TOKEN_SECRET,
+      { expiresIn: "5m" },
+    );
+  }
+
   static async register(data: {
     email: string;
     password: string;

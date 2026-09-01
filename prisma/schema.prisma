@@ -45,6 +45,9 @@ model User {
   bookingAttendees         BookingAttendee[]
   invitedAttendees         BookingAttendee[]         @relation("Inviter")
   notifications            Notification[]
+  conversationsAsA         Conversation[]            @relation("ConversationUserA")
+  conversationsAsB         Conversation[]            @relation("ConversationUserB")
+  messagesSent             Message[]
   waitlistEntries          Waitlist[]
   stripeCustomerId         String?                   @unique
   stripeChargesEnabled     Boolean                   @default(false)
@@ -780,6 +783,40 @@ model Notification {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+// One thread per unique pair of users (userAId < userBId, enforced by the
+// service layer) rather than per-booking, so the same two people reuse one
+// conversation across multiple bookings/matches instead of accumulating
+// duplicate threads.
+model Conversation {
+  id            String    @id @default(uuid())
+  userAId       String
+  userBId       String
+  contextType   String?
+  contextId     String?
+  contextLabel  String?
+  lastMessageAt DateTime?
+  createdAt     DateTime  @default(now())
+  userA         User      @relation("ConversationUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB         User      @relation("ConversationUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  messages      Message[]
+
+  @@unique([userAId, userBId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  senderId       String
+  content        String
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
 }
 
 model Payout {

@@ -254,6 +254,11 @@ export default class AuthCtrl {
     }
   }
 
+  static getSocketToken(req: Request, res: Response) {
+    const token = AuthSvc.issueSocketToken(req.user!);
+    return res.status(200).json({ token });
+  }
+
   static async logout(req: Request, res: Response) {
     try {
       // Revokes the refresh token server-side so the session cannot be
