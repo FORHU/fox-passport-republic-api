@@ -3,11 +3,13 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import AuthSvc from "../services/auth.service";
 import GoogleAuthSvc from "../services/google-auth.service";
+import { issueSocketTicket } from "../services/socket-ticket.service";
 import {
   RefreshTokenError,
   RefreshTokenReuseError,
 } from "../services/refresh-token.service";
 import { FRONTEND_URL, isDev } from "../config";
+import { announceAdminQueueChanged } from "../infrastructure/socket/invalidate";
 
 /**
  * The `state` cookie is scoped to the Google routes and lives for the length of
@@ -92,6 +94,7 @@ export default class AuthCtrl {
         name,
         mobileNumber,
       });
+      announceAdminQueueChanged();
       return res
         .status(201)
         .json({ message: "User registered successfully", user });
@@ -114,6 +117,7 @@ export default class AuthCtrl {
       }
 
       const result = await AuthSvc.verifyEmail(value.email, value.otpCode);
+      announceAdminQueueChanged();
       return res.status(200).json(result);
     } catch (e: unknown) {
       const error = e as Error;
@@ -322,6 +326,32 @@ export default class AuthCtrl {
     } catch (e: unknown) {
       console.error("Google sign-in error:", e);
       return res.redirect(`${FRONTEND_URL}/?googleAuthError=1`);
+    }
+  }
+
+  /**
+   * Mints a one-minute, single-use ticket for the socket handshake.
+   *
+   * Authenticated like any other route, so the caller proves itself with the
+   * httpOnly cookie the app already holds; the ticket is what crosses into
+   * client JavaScript, because a socket handshake cannot carry that cookie to
+   * a different origin.
+   */
+  static async socketTicket(req: Request, res: Response) {
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const ticket = await issueSocketTicket({
+        userId: req.user.userId,
+        systemRole: req.user.systemRole,
+      });
+      return res.status(200).json({ data: { ticket } });
+    } catch {
+      return res
+        .status(503)
+        .json({ message: "Realtime updates are temporarily unavailable" });
     }
   }
 

@@ -3,6 +3,7 @@ import { toEnum } from "../utils/enums";
 import EventRequestRepo from "../repositories/event-request.repository";
 import EventTemplateRepo from "../repositories/event-template.repository";
 import EventTemplateSvc from "./event-template.service";
+import { can } from "../types/permissions";
 
 export default class EventRequestSvc {
   static async createDirectEvent(data: {
@@ -90,7 +91,7 @@ export default class EventRequestSvc {
     if (!request) throw new Error("Request not found");
 
     // Only assigned host or admin can approve
-    if (request.organizerId !== userId && systemRole !== "admin") {
+    if (request.organizerId !== userId && !can(systemRole, "queue:read")) {
       throw new Error(
         "Unauthorized: Only the assigned host can approve this request",
       );
@@ -107,7 +108,7 @@ export default class EventRequestSvc {
   ) {
     const request = await EventRequestRepo.findById(id);
     if (!request) throw new Error("Request not found");
-    if (systemRole !== "admin")
+    if (!can(systemRole, "queue:decide"))
       throw new Error("Unauthorized: Only admins can reject requests");
     return EventRequestRepo.rejectRequest(id, reason);
   }

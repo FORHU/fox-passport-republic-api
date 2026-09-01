@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import CategorySvc from "../services/category.service";
+import { announceAdminQueueChanged } from "../infrastructure/socket/invalidate";
 
 export default class CategoryController {
   // GET ALL CATEGORIES
@@ -127,6 +128,7 @@ export default class CategoryController {
       }
 
       const category = await CategorySvc.createCategory(value);
+      announceAdminQueueChanged();
       return res.status(201).json({
         success: true,
         message: "Category created successfully",
@@ -179,6 +181,7 @@ export default class CategoryController {
       }
 
       const category = await CategorySvc.updateCategory(params.id, body);
+      announceAdminQueueChanged();
       return res.status(200).json({
         success: true,
         message: "Category updated successfully",
@@ -222,6 +225,7 @@ export default class CategoryController {
       }
 
       await CategorySvc.deleteCategory(value.id);
+      announceAdminQueueChanged();
       return res.status(200).json({
         success: true,
         message: "Category deleted successfully",

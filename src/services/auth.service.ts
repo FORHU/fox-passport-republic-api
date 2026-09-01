@@ -11,6 +11,7 @@ import {
 import { generateOTP, saveOTP, verifyOTP, deleteOTP } from "../utils/otp.utils";
 import { sendTemplatedEmail } from "../utils/helpers";
 import { hashPassword, verifyPassword, needsRehash } from "../utils/password";
+import { permissionsFor } from "../types/permissions";
 
 import {
   ACCESS_TOKEN_SECRET,
@@ -82,6 +83,10 @@ export default class AuthSvc {
         systemRole: user.systemRole || "user",
         roleType: user.roleType || [],
         email: user.email,
+        // Carried in the token so the app's edge middleware can gate /admin
+        // without a round trip. The API never trusts this - `can()` always
+        // re-derives from the role - it is a convenience for the client.
+        permissions: permissionsFor(user.systemRole),
       },
       ACCESS_TOKEN_SECRET,
       {
@@ -161,6 +166,10 @@ export default class AuthSvc {
         systemRole: user.systemRole || "user",
         roleType: user.roleType || [],
         email: user.email,
+        // Carried in the token so the app's edge middleware can gate /admin
+        // without a round trip. The API never trusts this - `can()` always
+        // re-derives from the role - it is a convenience for the client.
+        permissions: permissionsFor(user.systemRole),
       },
       ACCESS_TOKEN_SECRET,
       {
@@ -258,6 +267,10 @@ export default class AuthSvc {
         systemRole: user.systemRole || "user",
         roleType: user.roleType || [],
         email: user.email,
+        // Carried in the token so the app's edge middleware can gate /admin
+        // without a round trip. The API never trusts this - `can()` always
+        // re-derives from the role - it is a convenience for the client.
+        permissions: permissionsFor(user.systemRole),
       },
       ACCESS_TOKEN_SECRET,
       { expiresIn: ACCESS_TOKEN_EXPIRY },

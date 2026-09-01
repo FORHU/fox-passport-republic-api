@@ -6,6 +6,11 @@ import { sendApprovedEmail } from "../utils/emails/approved";
 import { sendRejectedEmail } from "../utils/emails/rejected";
 import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 import { toEnum } from "../utils/enums";
+import {
+  announceAdminQueueChanged,
+  announceToUser,
+} from "../infrastructure/socket/invalidate";
+import { can } from "../types/permissions";
 
 interface CreateServicePayload {
   category: ServiceCategory;
@@ -70,6 +75,7 @@ export default class ServiceCtrl {
         ownerId: String(ownerId),
         ...value,
       });
+      announceAdminQueueChanged();
       return res
         .status(201)
         .json({ message: "Service created successfully", service });
@@ -195,6 +201,7 @@ export default class ServiceCtrl {
         String(ownerId),
         value,
       );
+      announceAdminQueueChanged();
       return res
         .status(200)
         .json({ message: "Service updated successfully", service });
@@ -218,6 +225,7 @@ export default class ServiceCtrl {
         String(id),
         String(requesterId),
       );
+      announceAdminQueueChanged();
       return res.status(200).json(result);
     } catch (e: unknown) {
       const err = e as Error;
@@ -229,7 +237,7 @@ export default class ServiceCtrl {
   static async approveService(req: Request, res: Response) {
     try {
       const user = req.user;
-      if (!user || user.systemRole !== "admin") {
+      if (!user || !can(user.systemRole, "queue:decide")) {
         return res
           .status(403)
           .json({ message: "Forbidden: Admin access required" });
@@ -255,6 +263,8 @@ export default class ServiceCtrl {
         console.error("Failed to send approval email:", emailErr);
       }
 
+      announceAdminQueueChanged();
+      announceToUser(service.ownerId, "venues");
       return res
         .status(200)
         .json({ message: "Service approved successfully", service });
@@ -267,7 +277,7 @@ export default class ServiceCtrl {
   static async rejectService(req: Request, res: Response) {
     try {
       const user = req.user;
-      if (!user || user.systemRole !== "admin") {
+      if (!user || !can(user.systemRole, "queue:decide")) {
         return res
           .status(403)
           .json({ message: "Forbidden: Admin access required" });
@@ -300,6 +310,8 @@ export default class ServiceCtrl {
         console.error("Failed to send rejection email:", emailErr);
       }
 
+      announceAdminQueueChanged();
+      announceToUser(service.ownerId, "venues");
       return res
         .status(200)
         .json({ message: "Service rejected successfully", service });

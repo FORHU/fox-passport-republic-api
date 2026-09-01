@@ -15,6 +15,10 @@ import { sendBookingConfirmationEmail } from "../utils/emails/confirmation";
 import { sendRefundUpdateEmail } from "../utils/emails/refund";
 import WaitlistSvc from "../services/waitlist.service";
 import NotificationService from "../modules/notifications/user-notification.service";
+import {
+  announceAdminQueueChanged,
+  announceToUser,
+} from "../infrastructure/socket/invalidate";
 
 export default class BookingCtrl {
   // BOOK FROM TEMPLATE — creates an Event + Booking in one shot for a logged-in client
@@ -201,6 +205,8 @@ export default class BookingCtrl {
         ...value,
       });
 
+      announceAdminQueueChanged();
+      announceToUser(req.user!.userId, "bookings");
       return res.status(201).json({ success: true, data: booking });
     } catch (e: unknown) {
       const error = e as Error;

@@ -1,73 +1,97 @@
 import express from "express";
 import AdminCtrl from "../controllers/admin.controller";
 import BookingCtrl from "../controllers/booking.controller";
-import { authenticate, requireAdmin } from "../middleware/auth.middleware";
+import {
+  authenticate,
+  requireAdmin,
+  requirePermission,
+} from "../middleware/auth.middleware";
 
 const router = express.Router();
 
 // Stats
-router.get("/stats", authenticate, requireAdmin, AdminCtrl.getStats);
+router.get(
+  "/stats",
+  authenticate,
+  requirePermission("admin:access"),
+  AdminCtrl.getStats,
+);
 
 // Venues
-router.get("/venues", authenticate, requireAdmin, AdminCtrl.getAllVenues);
+router.get(
+  "/venues",
+  authenticate,
+  requirePermission("queue:read"),
+  AdminCtrl.getAllVenues,
+);
 router.get(
   "/venues/pending",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:read"),
   AdminCtrl.getPendingVenues,
 );
 router.patch(
   "/venues/:id/approve",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.approveVenue,
 );
 router.patch(
   "/venues/:id/reject",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.rejectVenue,
 );
 
 // Assets (equipment)
-router.get("/assets", authenticate, requireAdmin, AdminCtrl.getAllAssets);
+router.get(
+  "/assets",
+  authenticate,
+  requirePermission("queue:read"),
+  AdminCtrl.getAllAssets,
+);
 router.get(
   "/assets/pending",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:read"),
   AdminCtrl.getPendingAssets,
 );
 router.patch(
   "/assets/:id/approve",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.approveAsset,
 );
 router.patch(
   "/assets/:id/reject",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.rejectAsset,
 );
 
 // Services
-router.get("/services", authenticate, requireAdmin, AdminCtrl.getAllServices);
+router.get(
+  "/services",
+  authenticate,
+  requirePermission("queue:read"),
+  AdminCtrl.getAllServices,
+);
 router.get(
   "/services/pending",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:read"),
   AdminCtrl.getPendingServices,
 );
 router.patch(
   "/services/:id/approve",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.approveService,
 );
 router.patch(
   "/services/:id/reject",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.rejectService,
 );
 
@@ -75,25 +99,25 @@ router.patch(
 router.get(
   "/event-templates",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:read"),
   AdminCtrl.getAllEventTemplates,
 );
 router.get(
   "/event-templates/pending",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:read"),
   AdminCtrl.getPendingEventTemplates,
 );
 router.patch(
   "/event-templates/:id/approve",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.approveEventTemplate,
 );
 router.patch(
   "/event-templates/:id/reject",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.rejectEventTemplate,
 );
 
@@ -169,23 +193,28 @@ router.post(
 );
 
 // Events (booking requests)
-router.get("/events", authenticate, requireAdmin, AdminCtrl.getAllEvents);
+router.get(
+  "/events",
+  authenticate,
+  requirePermission("queue:read"),
+  AdminCtrl.getAllEvents,
+);
 router.get(
   "/events/pending",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:read"),
   AdminCtrl.getPendingEvents,
 );
 router.patch(
   "/events/:id/approve",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.approveEvent,
 );
 router.patch(
   "/events/:id/reject",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.rejectEvent,
 );
 

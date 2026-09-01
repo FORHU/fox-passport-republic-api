@@ -912,6 +912,7 @@ enum ComponentType {
 
 enum SystemRole {
   user
+  admin_secretary
   admin
 }
 
