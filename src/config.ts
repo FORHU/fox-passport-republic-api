@@ -1,5 +1,6 @@
 import * as dotenv from "dotenv";
 import type { SignOptions } from "jsonwebtoken";
+import { requireSecret } from "./utils/require-secret";
 dotenv.config();
 
 export const DATABASE_URL = process.env.DATABASE_URL as string;
@@ -36,8 +37,18 @@ export const MAILER_TRANSPORT_SECURE =
   process.env.MAILER_TRANSPORT_SECURE === "true";
 export const MAILER_EMAIL = process.env.MAILER_EMAIL as string;
 export const MAILER_PASSWORD = process.env.MAILER_PASSWORD as string;
-export const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET as string;
-export const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET as string;
+// Validated rather than cast: a missing secret used to 500 every login instead
+// of refusing to start, and a leftover dev value started up silently.
+export const ACCESS_TOKEN_SECRET = requireSecret(
+  "ACCESS_TOKEN_SECRET",
+  process.env.ACCESS_TOKEN_SECRET,
+  { isDev },
+);
+export const REFRESH_TOKEN_SECRET = requireSecret(
+  "REFRESH_TOKEN_SECRET",
+  process.env.REFRESH_TOKEN_SECRET,
+  { isDev },
+);
 
 // `expiresIn` accepts a number of seconds or an ms-style string ("15m", "7d").
 // Env vars are always strings, so narrow to the string half of that union
@@ -84,8 +95,17 @@ export const STRIPE_CONNECT_REFRESH_URL =
   `${FRONTEND_URL}/creator-dashboard/stripe-onboard`;
 export const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
 
+// Warned about rather than required: the app runs perfectly well without
+// Google sign-in, so a missing client id should not stop everyone else's
+// deployment. It should not be silent either - the button is rendered
+// unconditionally, so without these it leads somewhere broken.
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID as string;
 export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET as string;
+if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+  console.warn(
+    "⚠️  GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set — Google sign-in will fail.",
+  );
+}
 export const GOOGLE_CALLBACK_URL = (
   process.env.GOOGLE_CALLBACK_URL ||
   `http://localhost:${PORT}/api/v1/auth/google/callback`
