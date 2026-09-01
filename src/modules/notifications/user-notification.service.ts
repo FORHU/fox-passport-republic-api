@@ -3,6 +3,7 @@ import NotificationRepository from "./user-notification.repository";
 import { CreateNotificationInput } from "./user-notification.types";
 import { io } from "../../infrastructure/socket/socket.server";
 import { emitToUser } from "../../infrastructure/socket/socket.utils";
+import { SOCKET_EVENTS } from "../../infrastructure/socket/socket.constants";
 
 export default class NotificationService {
   static async create(input: CreateNotificationInput) {
@@ -10,12 +11,10 @@ export default class NotificationService {
       ...input,
       metadata: (input.metadata ?? undefined) as Prisma.InputJsonValue,
     });
-    emitToUser(io, input.userId, "new_notification", {
+    emitToUser(io, input.userId, SOCKET_EVENTS.NEW_NOTIFICATION, {
       ...notification,
       metadata: notification.metadata as
-        | Record<string, unknown>
-        | null
-        | undefined,
+        Record<string, unknown> | null | undefined,
     });
 
     return notification;

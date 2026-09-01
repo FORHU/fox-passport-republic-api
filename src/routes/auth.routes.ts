@@ -1,5 +1,6 @@
 import express from "express";
 import AuthCtrl from "../controllers/auth.controller";
+import { authenticate } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -14,5 +15,6 @@ router.post("/resend-verification-otp", AuthCtrl.resendVerificationOTP);
 router.get("/google", AuthCtrl.googleRedirect);
 router.get("/google/callback", AuthCtrl.googleCallback);
 router.post("/google/exchange", AuthCtrl.googleExchange);
+router.post("/socket-ticket", authenticate, AuthCtrl.socketTicket);
 
 export default router;
