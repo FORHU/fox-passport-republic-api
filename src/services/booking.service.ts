@@ -12,6 +12,7 @@ import {
   InviteStatus,
   Prisma,
 } from "@prisma/client";
+import { can } from "../types/permissions";
 
 /** Attendee supplied when creating a booking or invited afterwards. */
 export interface AttendeeInput {
@@ -306,7 +307,7 @@ export default class BookingSvc {
     const requested = this.buildFilters(query);
 
     let where: Prisma.BookingWhereInput = requested;
-    if (viewer?.systemRole !== "admin") {
+    if (!can(viewer?.systemRole, "bookings:read:all")) {
       if (!viewer?.userId) throw new Error("Unauthorized");
       where = {
         AND: [
@@ -334,7 +335,7 @@ export default class BookingSvc {
     // Role-based visibility filtering
     const isOwner = booking.userId === userContext?.userId;
     const isHost = booking.event?.host?.id === userContext?.userId;
-    const isAdmin = userContext?.systemRole === "admin";
+    const isAdmin = can(userContext?.systemRole, "bookings:read:all");
 
     if (isHost && !isAdmin && !isOwner) {
       // Host only sees finalized attendees
