@@ -155,14 +155,35 @@ Access tokens are stateless JWTs. Refresh tokens are recorded in the
 reads the table. Consequences worth knowing before you debug something:
 
 - `POST /auth/logout` genuinely revokes; a logged-out refresh token returns 401.
-- Login calls `revokeAllForUser` first, so **one account can hold one session**.
-  Signing in on a second device ends the first.
+- Password login calls `revokeAllForUser` first, so **one account can hold one
+  session**. Signing in on a second device ends the first. **Google sign-in does
+  not do this** — `GoogleAuthSvc.handleCallback` issues a refresh token without
+  revoking, so a Google sign-in leaves existing sessions alive. The two paths
+  disagree; which way it should resolve is an open decision, not a settled one.
 - Password change and password reset both revoke every session, including the
   caller's.
 - A jti that is not in the table is invalid, so tokens minted before the table
   existed do not work.
 - An access token already issued survives until it expires (`ACCESS_TOKEN_EXPIRY`);
   nothing consults a revocation list per request. It just cannot renew.
+
+### Google sign-in
+
+A second way to obtain a session, over three requests:
+
+| Step | Route | Notes |
+|---|---|---|
+| 1 | `GET /auth/google` | Redirects to Google. Mints a `state` and stores it in the httpOnly `g_oauth_state` cookie — `SameSite=Lax`, because `Strict` would be stripped on the top-level return from Google. |
+| 2 | `GET /auth/google/callback` | Rejects the callback unless the echoed `state` matches that cookie (constant-time), then requires `email_verified` on Google's ID token before linking or creating anything. Redirects to the app with `?xc=<opaque code>` — **never with tokens**. |
+| 3 | `POST /auth/google/exchange` | Redeems `xc` for the token pair. Called server-side by the app, once: `getDel` makes it atomic and single-use, and the entry lives 60 seconds. |
+
+Two consequences worth knowing before you debug it:
+
+- **Google sign-in requires Redis.** Step 2 parks the session there. Redis is
+  optional elsewhere in this app; here sign-in fails rather than falling back to
+  putting a refresh token in a URL.
+- A Google identity is linked to an existing password account with the same
+  **verified** address, with no confirmation from the account holder.
 
 ---
 
