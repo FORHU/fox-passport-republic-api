@@ -1,4 +1,5 @@
 import ProfileRepo from "../repositories/profile.repository";
+import { permissionsForUser } from "../types/permissions";
 import { revokeAllForUser } from "./refresh-token.service";
 import { hashPassword, verifyPassword } from "../utils/password";
 
@@ -11,7 +12,11 @@ export default class ProfileSvc {
       throw new Error("User not found");
     }
 
-    return user;
+    // Derived on read, never stored. The app holds no grant table, so this is
+    // where its server-side guards learn what the person may do - and deriving
+    // it here means it cannot go stale against the table the way a column
+    // would. The API never reads it back: `can()` re-derives from the role.
+    return { ...user, permissions: permissionsForUser(user) };
   }
 
   // Update profile

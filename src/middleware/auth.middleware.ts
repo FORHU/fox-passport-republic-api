@@ -133,7 +133,10 @@ export const requirePermission = (permission: Permission) => {
         .status(401)
         .json({ success: false, message: "Not authenticated" });
     }
-    if (!can(req.user.systemRole, permission)) {
+    // The whole user, not `req.user.systemRole`: a bare role string is answered
+    // from the SystemRole table alone, so passing one here would deny every
+    // supply-side capability to the people who actually hold it.
+    if (!can(req.user, permission)) {
       return res.status(403).json({
         success: false,
         message: "You do not have permission to do that",
