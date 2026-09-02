@@ -26,7 +26,13 @@ export default class ServiceRepo {
       deletedAt: null,
     };
 
-    const [services, total] = await prisma.$transaction([
+    // `Promise.all`, not `$transaction`: a list and its count need no
+    // transactional isolation, and demanding one means waiting for a free
+    // connection to *start* a transaction — which is what times out under a
+    // burst with "Unable to start a transaction in the given time". The count
+    // can now shift by one against a concurrent insert; a 500 on a browse page
+    // is the worse trade.
+    const [services, total] = await Promise.all([
       prisma.service.findMany({
         where,
         include: {
@@ -70,7 +76,7 @@ export default class ServiceRepo {
       },
     };
 
-    const [services, total] = await prisma.$transaction([
+    const [services, total] = await Promise.all([
       prisma.service.findMany({
         where,
         select: {
