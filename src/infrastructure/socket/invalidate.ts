@@ -11,13 +11,25 @@ import type { InvalidateTopic } from "./socket.types";
  * about it is best-effort by definition.
  */
 
-/** Every admin's approval queue just changed. */
-export function announceAdminQueueChanged(): void {
+/**
+ * Something every admin may be looking at just changed.
+ *
+ * The topic is a parameter because the admin console is not one screen: the
+ * approval queues read `admin:pending`, the disputes tables read `disputes`,
+ * and an invalidation aimed at the wrong one is indistinguishable from no
+ * invalidation at all.
+ */
+export function announceToAdmins(topic: InvalidateTopic): void {
   try {
-    emitInvalidateToAdmins(io, "admin:pending");
+    emitInvalidateToAdmins(io, topic);
   } catch {
     // Best-effort: clients still hold a slow poll and a focus refetch.
   }
+}
+
+/** Every admin's approval queue just changed. */
+export function announceAdminQueueChanged(): void {
+  announceToAdmins("admin:pending");
 }
 
 /** Something this one user is looking at just changed. */

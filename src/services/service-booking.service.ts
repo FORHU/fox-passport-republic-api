@@ -4,6 +4,20 @@ import { ItemBookingStatus } from "@prisma/client";
 import { calculateItemsTotal } from "../utils/pricing";
 import { PLATFORM_FEE_PERCENT } from "../config";
 import PayoutSvc from "./payout.service";
+import {
+  announceToAdmins,
+  announceToUser,
+} from "../infrastructure/socket/invalidate";
+
+/** Mirrors `announceBookingChanged` in asset-booking.service.ts. */
+function announceBookingChanged(
+  bookerId: string | null | undefined,
+  ownerId: string | null | undefined,
+) {
+  announceToUser(bookerId, "bookings");
+  if (ownerId && ownerId !== bookerId) announceToUser(ownerId, "bookings");
+  announceToAdmins("bookings");
+}
 
 export default class ServiceBookingSvc {
   static async getAvailability(serviceId: string) {
@@ -53,7 +67,7 @@ export default class ServiceBookingSvc {
     const platformFeeAmount = itemsTotal * (effectiveFeePercent / 100);
     const totalAmount = itemsTotal + platformFeeAmount;
 
-    return ServiceBookingRepo.create({
+    const booking = await ServiceBookingRepo.create({
       serviceId: data.serviceId,
       userId: data.userId,
       scheduledDate,
@@ -64,6 +78,9 @@ export default class ServiceBookingSvc {
       totalAmount,
       platformFeeAmount,
     });
+
+    announceBookingChanged(data.userId, service.ownerId);
+    return booking;
   }
 
   static async getAll(filters?: {
@@ -96,7 +113,13 @@ export default class ServiceBookingSvc {
     if (booking.status === ItemBookingStatus.cancelled)
       throw new Error("Booking is cancelled");
 
-    return ServiceBookingRepo.confirmPayment(id, transactionId, method);
+    const confirmed = await ServiceBookingRepo.confirmPayment(
+      id,
+      transactionId,
+      method,
+    );
+    announceBookingChanged(booking.userId, booking.service?.ownerId);
+    return confirmed;
   }
 
   static async updateStatus(id: string, status: string, requesterId: string) {
@@ -141,6 +164,7 @@ export default class ServiceBookingSvc {
         .catch(() => {});
     }
 
+    announceBookingChanged(booking.userId, booking.service?.ownerId);
     return updated;
   }
 
@@ -155,7 +179,9 @@ export default class ServiceBookingSvc {
       throw new Error("Only the client can confirm arrival");
     if (!["confirmed", "pending"].includes(booking.status))
       throw new Error("Booking cannot be confirmed at this stage");
-    return ServiceBookingRepo.confirmArrival(id);
+    const confirmed = await ServiceBookingRepo.confirmArrival(id);
+    announceBookingChanged(booking.userId, booking.service?.ownerId);
+    return confirmed;
   }
 
   static async dispute(id: string, requesterId: string, reason?: string) {
@@ -165,6 +191,10 @@ export default class ServiceBookingSvc {
       throw new Error("Only the client can report a dispute");
     if (["completed", "cancelled", "disputed"].includes(booking.status))
       throw new Error("Booking cannot be disputed at this stage");
-    return ServiceBookingRepo.dispute(id, reason);
+    const disputed = await ServiceBookingRepo.dispute(id, reason);
+    announceBookingChanged(booking.userId, booking.service?.ownerId);
+    // This is the only way a row reaches /admin/service-bookings/disputes.
+    announceToAdmins("disputes");
+    return disputed;
   }
 }

@@ -11,11 +11,20 @@ export default class NotificationService {
       ...input,
       metadata: (input.metadata ?? undefined) as Prisma.InputJsonValue,
     });
-    emitToUser(io, input.userId, SOCKET_EVENTS.NEW_NOTIFICATION, {
-      ...notification,
-      metadata: notification.metadata as
-        Record<string, unknown> | null | undefined,
-    });
+    // Best-effort, like every invalidation in `invalidate.ts`. The row is
+    // already written, and `RoleRequestSvc.review` awaits this with no
+    // try/catch of its own, so a throw here would answer 500 to a decision that
+    // has already committed - the applicant holds the role and the admin is
+    // told it failed.
+    try {
+      emitToUser(io, input.userId, SOCKET_EVENTS.NEW_NOTIFICATION, {
+        ...notification,
+        metadata: notification.metadata as
+          Record<string, unknown> | null | undefined,
+      });
+    } catch (e) {
+      console.error("Failed to push notification over the socket:", e);
+    }
 
     return notification;
   }

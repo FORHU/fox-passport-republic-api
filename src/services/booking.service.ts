@@ -13,6 +13,25 @@ import {
   Prisma,
 } from "@prisma/client";
 import { can } from "../types/permissions";
+import {
+  announceToAdmins,
+  announceToUser,
+} from "../infrastructure/socket/invalidate";
+
+/**
+ * A booking is on three screens at once: the guest's, the host's, and the admin
+ * Bookings tab. Announced from the service rather than the controllers because
+ * `checkInAndSettle` reaches `updateStatus` without passing through one, and
+ * every handler here has already loaded the booking to authorise the request.
+ */
+function announceBookingChanged(
+  guestId: string | null | undefined,
+  hostId: string | null | undefined,
+) {
+  announceToUser(guestId, "bookings");
+  if (hostId && hostId !== guestId) announceToUser(hostId, "bookings");
+  announceToAdmins("bookings");
+}
 
 /** Attendee supplied when creating a booking or invited afterwards. */
 export interface AttendeeInput {
@@ -491,6 +510,7 @@ export default class BookingSvc {
         .catch(() => {});
     }
 
+    announceBookingChanged(booking.userId, booking.event?.organizerId);
     return updated;
   }
 
@@ -530,7 +550,9 @@ export default class BookingSvc {
     if (!["confirmed", "pending"].includes(booking.status)) {
       throw new Error("Booking cannot be confirmed at this stage");
     }
-    return BookingRepo.confirmArrival(id);
+    const confirmed = await BookingRepo.confirmArrival(id);
+    announceBookingChanged(booking.userId, booking.event?.organizerId);
+    return confirmed;
   }
 
   static async dispute(id: string, requesterId: string) {
@@ -541,6 +563,10 @@ export default class BookingSvc {
     if (["completed", "cancelled", "disputed"].includes(booking.status)) {
       throw new Error("Booking cannot be disputed at this stage");
     }
-    return BookingRepo.dispute(id);
+    const disputed = await BookingRepo.dispute(id);
+    announceBookingChanged(booking.userId, booking.event?.organizerId);
+    // The only way a row reaches the admin Disputes tab.
+    announceToAdmins("disputes");
+    return disputed;
   }
 }
