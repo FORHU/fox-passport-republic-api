@@ -1,6 +1,6 @@
 import express from "express";
 import PaymentCtrl from "../controllers/payment.controller";
-import { authenticate, requireAdmin } from "../middleware/auth.middleware";
+import { authenticate, requirePermission } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -24,6 +24,11 @@ router.post("/create", authenticate, PaymentCtrl.createPayment);
 router.put("/:id", authenticate, PaymentCtrl.updatePayment);
 
 // Admin only
-router.get("/", authenticate, requireAdmin, PaymentCtrl.getAllPayments);
+router.get(
+  "/",
+  authenticate,
+  requirePermission("payments:read:all"),
+  PaymentCtrl.getAllPayments,
+);
 
 export default router;

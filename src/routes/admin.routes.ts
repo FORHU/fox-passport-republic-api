@@ -1,11 +1,7 @@
 import express from "express";
 import AdminCtrl from "../controllers/admin.controller";
 import BookingCtrl from "../controllers/booking.controller";
-import {
-  authenticate,
-  requireAdmin,
-  requirePermission,
-} from "../middleware/auth.middleware";
+import { authenticate, requirePermission } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -122,19 +118,24 @@ router.patch(
 );
 
 // Bookings
-router.get("/bookings", authenticate, requireAdmin, BookingCtrl.getAllBookings);
+router.get(
+  "/bookings",
+  authenticate,
+  requirePermission("bookings:read:all"),
+  BookingCtrl.getAllBookings,
+);
 
 // Asset Booking Disputes
 router.get(
   "/asset-bookings/disputes",
   authenticate,
-  requireAdmin,
+  requirePermission("disputes:resolve"),
   AdminCtrl.getAssetBookingDisputes,
 );
 router.patch(
   "/asset-bookings/:id/resolve",
   authenticate,
-  requireAdmin,
+  requirePermission("disputes:resolve"),
   AdminCtrl.resolveAssetBookingDispute,
 );
 
@@ -142,53 +143,63 @@ router.patch(
 router.get(
   "/service-bookings/disputes",
   authenticate,
-  requireAdmin,
+  requirePermission("disputes:resolve"),
   AdminCtrl.getServiceBookingDisputes,
 );
 router.patch(
   "/service-bookings/:id/resolve",
   authenticate,
-  requireAdmin,
+  requirePermission("disputes:resolve"),
   AdminCtrl.resolveServiceBookingDispute,
 );
 
 // Disputes & Refunds
-router.get("/disputes", authenticate, requireAdmin, AdminCtrl.getDisputes);
+router.get(
+  "/disputes",
+  authenticate,
+  requirePermission("disputes:resolve"),
+  AdminCtrl.getDisputes,
+);
 router.patch(
   "/disputes/:id/resolve",
   authenticate,
-  requireAdmin,
+  requirePermission("disputes:resolve"),
   AdminCtrl.resolveDispute,
 );
-router.get("/refunds", authenticate, requireAdmin, AdminCtrl.getAllRefunds);
+router.get(
+  "/refunds",
+  authenticate,
+  requirePermission("refunds:manage"),
+  AdminCtrl.getAllRefunds,
+);
 router.post(
   "/refunds/manual",
   authenticate,
-  requireAdmin,
+  requirePermission("refunds:manage"),
   AdminCtrl.manualRefund,
 );
 router.get(
   "/refund-failures",
   authenticate,
-  requireAdmin,
+  requirePermission("refunds:manage"),
   AdminCtrl.getFailedRefunds,
 );
 router.get(
   "/refunds/:id/failure-reason",
   authenticate,
-  requireAdmin,
+  requirePermission("refunds:manage"),
   AdminCtrl.getRefundFailureReason,
 );
 router.post(
   "/refunds/:id/retry",
   authenticate,
-  requireAdmin,
+  requirePermission("refunds:manage"),
   AdminCtrl.retryRefund,
 );
 router.post(
   "/refunds/:id/resolve-manual",
   authenticate,
-  requireAdmin,
+  requirePermission("refunds:manage"),
   AdminCtrl.resolveManualRefund,
 );
 

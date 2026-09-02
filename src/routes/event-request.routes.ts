@@ -1,6 +1,6 @@
 import express from "express";
 import EventRequestCtrl from "../controllers/event-request.controller";
-import { authenticate, requireAdmin } from "../middleware/auth.middleware";
+import { authenticate, requirePermission } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -18,19 +18,19 @@ router.get("/:id", authenticate, EventRequestCtrl.getById);
 router.patch(
   "/:id/approve",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   EventRequestCtrl.approve,
 );
 router.patch(
   "/:id/reject",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   EventRequestCtrl.reject,
 );
 router.patch(
   "/:id/complete",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   EventRequestCtrl.complete,
 );
 

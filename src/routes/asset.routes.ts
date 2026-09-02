@@ -1,10 +1,6 @@
 import express from "express";
 import AssetCtrl from "../controllers/asset.controller";
-import {
-  authenticate,
-  requireRole,
-  requireAdmin,
-} from "../middleware/auth.middleware";
+import { authenticate, requirePermission } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -17,19 +13,19 @@ router.get("/:id", AssetCtrl.getAssetById);
 router.post(
   "/create",
   authenticate,
-  requireRole(["gearFoxer"]),
+  requirePermission("asset:manage"),
   AssetCtrl.createAsset,
 );
 router.put(
   "/:id",
   authenticate,
-  requireRole(["gearFoxer"]),
+  requirePermission("asset:manage"),
   AssetCtrl.updateAsset,
 );
 router.delete(
   "/:id",
   authenticate,
-  requireRole(["gearFoxer"]),
+  requirePermission("asset:manage"),
   AssetCtrl.deleteAsset,
 );
 
@@ -37,8 +33,13 @@ router.delete(
 router.patch(
   "/:id/approve",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AssetCtrl.approveAsset,
 );
-router.patch("/:id/reject", authenticate, requireAdmin, AssetCtrl.rejectAsset);
+router.patch(
+  "/:id/reject",
+  authenticate,
+  requirePermission("queue:decide"),
+  AssetCtrl.rejectAsset,
+);
 export default router;

@@ -1,6 +1,6 @@
 import express from "express";
 import UsersCtrl from "../controllers/users.controller";
-import { authenticate, requireAdmin } from "../middleware/auth.middleware";
+import { authenticate, requirePermission } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -22,9 +22,29 @@ router.post("/become-host", authenticate, UsersCtrl.becomeHost);
 router.get("/:id", authenticate, UsersCtrl.getUserById);
 
 // Admin only
-router.get("/", authenticate, requireAdmin, UsersCtrl.getAllUsers);
-router.post("/", authenticate, requireAdmin, UsersCtrl.createUser);
-router.put("/:id", authenticate, requireAdmin, UsersCtrl.updateUserById);
-router.delete("/:id", authenticate, requireAdmin, UsersCtrl.deleteUserById);
+router.get(
+  "/",
+  authenticate,
+  requirePermission("users:read"),
+  UsersCtrl.getAllUsers,
+);
+router.post(
+  "/",
+  authenticate,
+  requirePermission("users:manage"),
+  UsersCtrl.createUser,
+);
+router.put(
+  "/:id",
+  authenticate,
+  requirePermission("users:manage"),
+  UsersCtrl.updateUserById,
+);
+router.delete(
+  "/:id",
+  authenticate,
+  requirePermission("users:manage"),
+  UsersCtrl.deleteUserById,
+);
 
 export default router;

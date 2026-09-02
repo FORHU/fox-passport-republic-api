@@ -1,10 +1,6 @@
 import express from "express";
 import ServiceCtrl from "../controllers/service.controller";
-import {
-  authenticate,
-  requireRole,
-  requireAdmin,
-} from "../middleware/auth.middleware";
+import { authenticate, requirePermission } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -17,19 +13,19 @@ router.get("/:id", ServiceCtrl.getServiceById);
 router.post(
   "/create",
   authenticate,
-  requireRole(["serviceFoxer"]),
+  requirePermission("service:manage"),
   ServiceCtrl.createService,
 );
 router.put(
   "/:id",
   authenticate,
-  requireRole(["serviceFoxer"]),
+  requirePermission("service:manage"),
   ServiceCtrl.updateService,
 );
 router.delete(
   "/:id",
   authenticate,
-  requireRole(["serviceFoxer"]),
+  requirePermission("service:manage"),
   ServiceCtrl.deleteService,
 );
 
@@ -37,13 +33,13 @@ router.delete(
 router.patch(
   "/:id/approve",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   ServiceCtrl.approveService,
 );
 router.patch(
   "/:id/reject",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   ServiceCtrl.rejectService,
 );
 
