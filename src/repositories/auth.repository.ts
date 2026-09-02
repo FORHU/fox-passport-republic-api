@@ -32,11 +32,52 @@ export default class AuthRepo {
     });
   }
 
+  /**
+   * Loads the user WITH the password hash. The client omits it globally (see
+   * utils/prisma.ts), so login has to ask for it explicitly — which is the
+   * point: leaking it now takes a deliberate act, not a forgotten `select`.
+   */
   static async findUserByEmail(email: string) {
     return prisma.user.findUnique({
       where: {
         email,
       },
+      omit: { password: false },
+    });
+  }
+
+  static async findUserByGoogleId(googleId: string) {
+    return prisma.user.findUnique({
+      where: {
+        googleId,
+      },
+    });
+  }
+
+  static async createGoogleUser(data: {
+    email: string;
+    name: string;
+    username: string;
+    password: string;
+    googleId: string;
+  }) {
+    return prisma.user.create({
+      data: {
+        email: data.email,
+        name: data.name,
+        username: data.username,
+        password: data.password,
+        googleId: data.googleId,
+        isEmailVerified: true,
+        updatedAt: new Date(),
+      },
+    });
+  }
+
+  static async linkGoogleId(userId: string, googleId: string) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { googleId },
     });
   }
 

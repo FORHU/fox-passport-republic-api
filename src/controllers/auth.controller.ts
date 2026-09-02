@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { Request, Response } from "express";
 import Joi from "joi";
 import AuthSvc from "../services/auth.service";
@@ -6,7 +7,49 @@ import {
   RefreshTokenError,
   RefreshTokenReuseError,
 } from "../services/refresh-token.service";
-import { FRONTEND_URL } from "../config";
+import { FRONTEND_URL, isDev } from "../config";
+
+/**
+ * The `state` cookie is scoped to the Google routes and lives for the length of
+ * one round trip to Google's consent screen. `SameSite=Lax` is deliberate and
+ * load-bearing: the callback arrives as a top-level cross-site navigation from
+ * accounts.google.com, which `Strict` would strip, taking the protection with
+ * it.
+ */
+const GOOGLE_STATE_COOKIE = "g_oauth_state";
+const GOOGLE_STATE_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: !isDev,
+  sameSite: "lax",
+  path: "/api/v1/auth/google",
+  maxAge: 10 * 60 * 1000,
+} as const;
+
+/**
+ * Reads one cookie off the raw header. The API mounts no cookie parser - this
+ * is the only cookie it has ever needed - so pulling in middleware app-wide to
+ * read a single short-lived value would be the larger change.
+ */
+function readCookie(req: Request, name: string): string | undefined {
+  const header = req.headers.cookie;
+  if (!header) return undefined;
+
+  for (const part of header.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    if (part.slice(0, eq).trim() === name) {
+      return decodeURIComponent(part.slice(eq + 1).trim());
+    }
+  }
+  return undefined;
+}
+
+/** Constant-time compare that tolerates differing lengths. */
+function statesMatch(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+}
 
 /**
  * The service throws the bare string "Invalid credentials" for a bad email or
@@ -226,32 +269,82 @@ export default class AuthCtrl {
   }
 
   static googleRedirect(req: Request, res: Response) {
-    return res.redirect(GoogleAuthSvc.getAuthUrl());
+    const state = GoogleAuthSvc.createState();
+    res.cookie(GOOGLE_STATE_COOKIE, state, GOOGLE_STATE_COOKIE_OPTIONS);
+    return res.redirect(GoogleAuthSvc.getAuthUrl(state));
   }
 
   static async googleCallback(req: Request, res: Response) {
-    const { code, error: googleError } = req.query;
+    const { code, state, error: googleError } = req.query;
+
+    // One round trip, one use - cleared before anything can go wrong with it,
+    // so a replayed callback cannot ride the same cookie twice.
+    const expectedState = readCookie(req, GOOGLE_STATE_COOKIE);
+    res.clearCookie(GOOGLE_STATE_COOKIE, {
+      httpOnly: true,
+      secure: !isDev,
+      sameSite: "lax",
+      path: "/api/v1/auth/google",
+    });
 
     if (googleError || typeof code !== "string") {
       return res.redirect(`${FRONTEND_URL}/?googleAuthError=1`);
     }
 
+    // Without this the callback is not tied to the browser that started the
+    // flow, and an attacker can hand a victim a callback URL bearing the
+    // attacker's own code - signing the victim silently into the attacker's
+    // account.
+    if (
+      typeof state !== "string" ||
+      !expectedState ||
+      !statesMatch(state, expectedState)
+    ) {
+      console.warn("Google sign-in rejected: state mismatch");
+      return res.redirect(`${FRONTEND_URL}/?googleAuthError=1`);
+    }
+  }
+
     try {
       const result = await GoogleAuthSvc.handleCallback(code);
 
-      const params = new URLSearchParams({
+      // Only a reference travels in the URL. The tokens stay server-side until
+      // the app collects them over POST and puts them straight into httpOnly
+      // cookies, so neither one is ever written to history or a log.
+      const exchangeCode = await GoogleAuthSvc.stashSession({
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
-        isNewUser: String(result.isNewUser),
+        isNewUser: result.isNewUser,
       });
 
       return res.redirect(
-        `${FRONTEND_URL}/auth/google/callback?${params.toString()}`,
+        `${FRONTEND_URL}/auth/google/callback?xc=${exchangeCode}`,
       );
     } catch (e: unknown) {
       console.error("Google sign-in error:", e);
       return res.redirect(`${FRONTEND_URL}/?googleAuthError=1`);
     }
+  }
+
+  /**
+   * Redeems the reference minted by `googleCallback`. Called once, server-side,
+   * by the app's own callback route - never from the browser.
+   */
+  static async googleExchange(req: Request, res: Response) {
+    const { code } = req.body ?? {};
+
+    if (typeof code !== "string" || code.length === 0) {
+      return res.status(400).json({ message: "Invalid exchange code" });
+    }
+
+    const session = await GoogleAuthSvc.redeemSession(code);
+    if (!session) {
+      // Expired, already redeemed, or never existed - all the same to the
+      // caller, and worth keeping indistinguishable.
+      return res.status(400).json({ message: "Invalid exchange code" });
+    }
+
+    return res.status(200).json({ data: session });
   }
 
   static async logout(req: Request, res: Response) {
