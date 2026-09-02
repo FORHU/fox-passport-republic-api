@@ -2,12 +2,21 @@ import { Server } from "socket.io";
 import { NotificationPayload, InvalidateTopic } from "./socket.types";
 import { ADMIN_ROOM, SOCKET_EVENTS, userRoom } from "./socket.constants";
 
+/**
+ * `io` is assigned only by `initSocketServer`, which only `server.ts` calls, so
+ * any entry point that imports `app` on its own has none. Callers pass it in
+ * from a module-level `let`, which TypeScript types as always present and which
+ * is `undefined` in exactly that case - so the guard is a runtime one the type
+ * cannot express. Not being able to announce something is never a reason to
+ * fail the write that already happened.
+ */
 export const emitToUser = (
-  io: Server,
+  io: Server | undefined,
   userId: string,
   event: string,
   payload: NotificationPayload,
 ) => {
+  if (!io) return;
   io.to(userRoom(userId)).emit(event, payload);
 };
 
