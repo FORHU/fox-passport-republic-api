@@ -4,6 +4,30 @@ import { ItemBookingStatus } from "@prisma/client";
 import { calculateItemsTotal } from "../utils/pricing";
 import { PLATFORM_FEE_PERCENT } from "../config";
 import PayoutSvc from "./payout.service";
+import {
+  announceToAdmins,
+  announceToUser,
+} from "../infrastructure/socket/invalidate";
+
+/**
+ * Both sides of an asset booking are looking at it: the person who booked, and
+ * the owner whose gear it is. Announcing from the service rather than the
+ * controller covers every caller - `cancel` reaches `updateStatus` without
+ * passing through a controller of its own - and costs nothing, because every
+ * handler here has already loaded the booking and its asset to authorise the
+ * request.
+ */
+function announceBookingChanged(
+  bookerId: string | null | undefined,
+  ownerId: string | null | undefined,
+) {
+  announceToUser(bookerId, "bookings");
+  if (ownerId && ownerId !== bookerId) announceToUser(ownerId, "bookings");
+  // The admin Bookings tab lists all three booking kinds. `bookings` rather
+  // than `admin:pending`: both invalidate ["admin-data"], but only one of them
+  // says what actually happened.
+  announceToAdmins("bookings");
+}
 
 export default class AssetBookingSvc {
   static async getAvailability(assetId: string) {
@@ -55,7 +79,7 @@ export default class AssetBookingSvc {
     const platformFeeAmount = itemsTotal * (effectiveFeePercent / 100);
     const totalAmount = itemsTotal + platformFeeAmount;
 
-    return AssetBookingRepo.create({
+    const booking = await AssetBookingRepo.create({
       assetId: data.assetId,
       userId: data.userId,
       startDate,
@@ -67,6 +91,9 @@ export default class AssetBookingSvc {
       totalAmount,
       platformFeeAmount,
     });
+
+    announceBookingChanged(data.userId, asset.ownerId);
+    return booking;
   }
 
   static async getAll(filters?: {
@@ -99,7 +126,13 @@ export default class AssetBookingSvc {
     if (booking.status === ItemBookingStatus.cancelled)
       throw new Error("Booking is cancelled");
 
-    return AssetBookingRepo.confirmPayment(id, transactionId, method);
+    const confirmed = await AssetBookingRepo.confirmPayment(
+      id,
+      transactionId,
+      method,
+    );
+    announceBookingChanged(booking.userId, booking.asset?.ownerId);
+    return confirmed;
   }
 
   static async updateStatus(id: string, status: string, requesterId: string) {
@@ -142,6 +175,7 @@ export default class AssetBookingSvc {
         .catch(() => {});
     }
 
+    announceBookingChanged(booking.userId, booking.asset?.ownerId);
     return updated;
   }
 
@@ -156,7 +190,9 @@ export default class AssetBookingSvc {
       throw new Error("Only the client can confirm arrival");
     if (!["confirmed", "pending"].includes(booking.status))
       throw new Error("Booking cannot be confirmed at this stage");
-    return AssetBookingRepo.confirmArrival(id);
+    const confirmed = await AssetBookingRepo.confirmArrival(id);
+    announceBookingChanged(booking.userId, booking.asset?.ownerId);
+    return confirmed;
   }
 
   static async dispute(id: string, requesterId: string, reason?: string) {
@@ -166,6 +202,10 @@ export default class AssetBookingSvc {
       throw new Error("Only the client can report a dispute");
     if (["completed", "cancelled", "disputed"].includes(booking.status))
       throw new Error("Booking cannot be disputed at this stage");
-    return AssetBookingRepo.dispute(id, reason);
+    const disputed = await AssetBookingRepo.dispute(id, reason);
+    announceBookingChanged(booking.userId, booking.asset?.ownerId);
+    // This is the only way a row reaches /admin/asset-bookings/disputes.
+    announceToAdmins("disputes");
+    return disputed;
   }
 }

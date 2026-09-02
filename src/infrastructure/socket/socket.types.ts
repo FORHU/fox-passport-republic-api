@@ -14,7 +14,15 @@ export interface NotificationPayload {
  * for - the failure would otherwise look exactly like "the socket is down".
  */
 export type InvalidateTopic =
-  "admin:pending" | "venues" | "events" | "bookings" | "waitlist" | "roles";
+  | "admin:pending"
+  | "venues"
+  | "events"
+  | "bookings"
+  // The admin disputes and refunds tables. Separate from `bookings` because
+  // they read `/admin/disputes`, which no booking invalidation touches.
+  | "disputes"
+  | "waitlist"
+  | "roles";
 
 export interface InvalidatePayload {
   topic: InvalidateTopic;

@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import {
   announceAdminQueueChanged,
+  announceToAdmins,
   announceToUser,
 } from "../infrastructure/socket/invalidate";
 
@@ -23,6 +24,29 @@ import RefundSvc from "../services/refund.service";
 import Joi from "joi";
 import { notifyDecision } from "../modules/notifications/decision-notification";
 import { sendDecisionEmail } from "../modules/notifications/decision-email";
+
+/**
+ * A refund row changed: every admin's Disputes and Refunds tables are stale,
+ * and so is the citizen's own booking.
+ *
+ * The refund carries only `bookingId`, so the owner costs one extra query. That
+ * is deliberately preferred to widening what `RefundSvc` returns - these rows
+ * are sent straight back to the client as `data`, and the screens parse them.
+ */
+async function announceRefundChanged(bookingId: string | null | undefined) {
+  announceToAdmins("disputes");
+  if (!bookingId) return;
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { userId: true },
+    });
+    announceToUser(booking?.userId, "bookings");
+  } catch (e) {
+    // Best-effort, like every other announcement: the decision is committed.
+    console.error("Failed to announce a refund change:", e);
+  }
+}
 
 export default class AdminCtrl {
   // ─── DISPUTES ────────────────────────────────────────────────────────────
@@ -130,6 +154,7 @@ export default class AdminCtrl {
           req.params.id,
           req.user!.userId,
         );
+        await announceRefundChanged(updated.bookingId);
         return res.status(200).json({ success: true, data: updated });
       }
 
@@ -143,6 +168,7 @@ export default class AdminCtrl {
           adminNotes: value.adminNotes || "Rejected by admin",
         },
       });
+      await announceRefundChanged(updated.bookingId);
       return res.status(200).json({ success: true, data: updated });
     } catch (e: unknown) {
       const error = e as Error;
@@ -181,7 +207,12 @@ export default class AdminCtrl {
       const booking = await prisma.assetBooking.update({
         where: { id: req.params.id },
         data: { status: value.resolution },
+        include: { asset: { select: { ownerId: true } } },
       });
+
+      announceToAdmins("disputes");
+      announceToUser(booking.userId, "bookings");
+      announceToUser(booking.asset?.ownerId, "bookings");
       return res.status(200).json({ success: true, data: booking });
     } catch (e: unknown) {
       const error = e as Error;
@@ -218,7 +249,12 @@ export default class AdminCtrl {
       const booking = await prisma.serviceBooking.update({
         where: { id: req.params.id },
         data: { status: value.resolution },
+        include: { service: { select: { ownerId: true } } },
       });
+
+      announceToAdmins("disputes");
+      announceToUser(booking.userId, "bookings");
+      announceToUser(booking.service?.ownerId, "bookings");
       return res.status(200).json({ success: true, data: booking });
     } catch (e: unknown) {
       const error = e as Error;
@@ -249,6 +285,7 @@ export default class AdminCtrl {
           resolvedAt: new Date(),
         },
       });
+      await announceRefundChanged(refund.bookingId);
       return res.status(201).json({ success: true, data: refund });
     } catch (e: unknown) {
       const error = e as Error;
@@ -821,6 +858,7 @@ export default class AdminCtrl {
         req.params.id,
         req.user!.userId,
       );
+      await announceRefundChanged(result.bookingId);
       return res.status(200).json({ success: true, data: result });
     } catch (e: unknown) {
       const error = e as Error;
@@ -841,6 +879,7 @@ export default class AdminCtrl {
         req.user!.userId,
         value.notes,
       );
+      await announceRefundChanged(result.bookingId);
       return res.status(200).json({ success: true, data: result });
     } catch (e: unknown) {
       const error = e as Error;
