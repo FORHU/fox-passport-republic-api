@@ -24,6 +24,9 @@ import RefundSvc from "../services/refund.service";
 import Joi from "joi";
 import { notifyDecision } from "../modules/notifications/decision-notification";
 import { sendDecisionEmail } from "../modules/notifications/decision-email";
+import RoleAssignmentSvc, {
+  RoleAssignmentError,
+} from "../services/role-assignment.service";
 
 /**
  * A refund row changed: every admin's Disputes and Refunds tables are stale,
@@ -49,6 +52,68 @@ async function announceRefundChanged(bookingId: string | null | undefined) {
 }
 
 export default class AdminCtrl {
+  // ─── ROLE ASSIGNMENT ─────────────────────────────────────────────────────
+
+  /**
+   * The only endpoints that hand out capability directly. Both announce `roles`
+   * to the target, which maps to the shared `["me"]` profile key — the person's
+   * own screen updates without waiting for the poll, and since their sessions
+   * were just revoked they will be re-authenticating shortly anyway.
+   */
+  static async changeSystemRole(req: Request, res: Response) {
+    const schema = Joi.object({ systemRole: Joi.string().required() });
+    const { error, value } = schema.validate(req.body);
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
+
+    try {
+      const result = await RoleAssignmentSvc.changeSystemRole(
+        { userId: req.user!.userId, email: req.user!.email },
+        req.params.id,
+        value.systemRole,
+      );
+      announceToUser(result.target.id, "roles");
+      announceAdminQueueChanged();
+      return res.status(200).json({ success: true, data: result.target });
+    } catch (e: unknown) {
+      if (e instanceof RoleAssignmentError) {
+        return res
+          .status(e.status)
+          .json({ success: false, message: e.message, reason: e.reason });
+      }
+      const err = e as Error;
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  static async changeRoleTypes(req: Request, res: Response) {
+    const schema = Joi.object({
+      roleType: Joi.array().items(Joi.string()).required(),
+    });
+    const { error, value } = schema.validate(req.body);
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
+
+    try {
+      const result = await RoleAssignmentSvc.changeRoleTypes(
+        { userId: req.user!.userId, email: req.user!.email },
+        req.params.id,
+        value.roleType,
+      );
+      announceToUser(result.target.id, "roles");
+      announceAdminQueueChanged();
+      return res.status(200).json({ success: true, data: result.target });
+    } catch (e: unknown) {
+      if (e instanceof RoleAssignmentError) {
+        return res
+          .status(e.status)
+          .json({ success: false, message: e.message, reason: e.reason });
+      }
+      const err = e as Error;
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
   // ─── DISPUTES ────────────────────────────────────────────────────────────
 
   static async getDisputes(req: Request, res: Response) {

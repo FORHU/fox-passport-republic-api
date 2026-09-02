@@ -22,8 +22,17 @@ export const PERMISSIONS = [
   "users:read",
   /** May create, edit or delete a user. */
   "users:manage",
-  /** May review role applications and change what a user is. */
+  /** May review role applications. */
   "roles:manage",
+  /**
+   * May change what a person *is* — their `SystemRole`, and their `RoleType`s
+   * as an admin override of the application flow.
+   *
+   * Separate from `roles:manage`, which reviews applications people submit.
+   * This one hands out capability directly, so it is the narrowest grant in the
+   * table: `admin` only. A role that can promote itself is not constrained.
+   */
+  "roles:assign",
   /** May create, edit or delete categories. */
   "categories:manage",
   /** May create, edit or delete cancellation policies. */
@@ -77,6 +86,7 @@ const GRANTS: Record<SystemRole, readonly Permission[]> = {
     "users:read",
     "users:manage",
     "roles:manage",
+    "roles:assign",
     "categories:manage",
     "policies:manage",
     "bookings:read:all",
