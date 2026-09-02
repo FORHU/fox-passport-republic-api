@@ -5,7 +5,7 @@ import AuthRepo from "../repositories/auth.repository";
 import redisUtil from "../utils/redis.util";
 import { issueRefreshToken } from "./refresh-token.service";
 import { hashPassword } from "../utils/password";
-import { permissionsFor } from "../types/permissions";
+import { permissionsForUser } from "../types/permissions";
 import {
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
@@ -143,7 +143,7 @@ export default class GoogleAuthSvc {
         // Carried in the token so the app's edge middleware can gate /admin
         // without a round trip. The API never trusts this - `can()` always
         // re-derives from the role - it is a convenience for the client.
-        permissions: permissionsFor(user.systemRole),
+        permissions: permissionsForUser(user),
       },
       ACCESS_TOKEN_SECRET,
       { expiresIn: ACCESS_TOKEN_EXPIRY },
@@ -162,6 +162,10 @@ export default class GoogleAuthSvc {
         name: user.name,
         systemRole: user.systemRole || "user",
         roleType: user.roleType || [],
+        // The client is told its capabilities rather than deriving them: the
+        // app holds no grant table, so this is the only place it can learn
+        // what to render. Never read back by the API - `can()` re-derives.
+        permissions: permissionsForUser(user),
       },
     };
   }
