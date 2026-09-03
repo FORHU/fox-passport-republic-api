@@ -5,6 +5,21 @@ import { authenticate, requirePermission } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
+// Role assignment — the only routes that hand out capability directly, so they
+// are gated on the narrowest permission in the table.
+router.patch(
+  "/users/:id/system-role",
+  authenticate,
+  requirePermission("roles:assign"),
+  AdminCtrl.changeSystemRole,
+);
+router.patch(
+  "/users/:id/role-types",
+  authenticate,
+  requirePermission("roles:assign"),
+  AdminCtrl.changeRoleTypes,
+);
+
 // Stats
 router.get(
   "/stats",
