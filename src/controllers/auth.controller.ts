@@ -303,7 +303,6 @@ export default class AuthCtrl {
       console.warn("Google sign-in rejected: state mismatch");
       return res.redirect(`${FRONTEND_URL}/?googleAuthError=1`);
     }
-  }
 
     try {
       const result = await GoogleAuthSvc.handleCallback(code);

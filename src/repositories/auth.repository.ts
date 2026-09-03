@@ -81,41 +81,6 @@ export default class AuthRepo {
     });
   }
 
-  static async findUserByGoogleId(googleId: string) {
-    return prisma.user.findUnique({
-      where: {
-        googleId,
-      },
-    });
-  }
-
-  static async createGoogleUser(data: {
-    email: string;
-    name: string;
-    username: string;
-    password: string;
-    googleId: string;
-  }) {
-    return prisma.user.create({
-      data: {
-        email: data.email,
-        name: data.name,
-        username: data.username,
-        password: data.password,
-        googleId: data.googleId,
-        isEmailVerified: true,
-        updatedAt: new Date(),
-      },
-    });
-  }
-
-  static async linkGoogleId(userId: string, googleId: string) {
-    return prisma.user.update({
-      where: { id: userId },
-      data: { googleId },
-    });
-  }
-
   static async updateUserLoginStatus(userId: string) {
     return prisma.user.update({
       where: {

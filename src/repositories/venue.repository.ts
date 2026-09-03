@@ -1,5 +1,18 @@
 import { prisma } from "../utils/prisma";
-import { VenueStatus, BillingRate, VenueCategory } from "@prisma/client";
+import {
+  VenueStatus,
+  BillingRate,
+  VenueCategory,
+  Prisma,
+} from "@prisma/client";
+
+// Venues in these statuses hold their service area; drafts haven't committed
+// to a boundary yet and archived/rejected ones are dead, so neither blocks
+// an overlap check or shows up in a "near me" search.
+const LIVE_STATUSES: VenueStatus[] = [
+  VenueStatus.pending,
+  VenueStatus.available,
+];
 
 const mayorSelect = {
   select: { id: true, name: true, email: true, imgId: true },
@@ -16,6 +29,9 @@ export default class VenueRepo {
     city: string;
     state?: string;
     country: string;
+    lat?: number;
+    lng?: number;
+    boundary?: Prisma.InputJsonValue;
     imgIds: string[];
     spaceType: string[];
     amenities: string[];
@@ -137,6 +153,9 @@ export default class VenueRepo {
       city: string;
       state?: string;
       country: string;
+      lat: number;
+      lng: number;
+      boundary: Prisma.InputJsonValue;
       imgIds: string[];
       spaceType: string[];
       amenities: string[];
@@ -164,6 +183,60 @@ export default class VenueRepo {
     return prisma.venue.update({
       where: { id: String(id) },
       data: { status: VenueStatus.archived },
+    });
+  }
+
+  // Every live (pending or available) venue with a boundary — candidates for
+  // an overlap check. `excludeId` skips the venue being updated so it
+  // doesn't conflict with itself. No SQL prefilter: a polygon's extent isn't
+  // a single indexable point, so this fetches all live venues and leaves the
+  // exact intersection test to the caller. Fine at today's venue counts;
+  // revisit (e.g. a stored bounding box, or PostGIS) if that stops being true.
+  static async findLiveVenuesWithBoundary(excludeId?: string) {
+    return prisma.venue.findMany({
+      where: {
+        status: { in: LIVE_STATUSES },
+        boundary: { not: Prisma.JsonNull },
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+      select: { id: true, name: true, boundary: true },
+    });
+  }
+
+  // Every live venue with a location, boundary or pin-only — for display as
+  // a reference layer (e.g. "here's everywhere else already claimed" while
+  // drawing a new one). Broader than findLiveVenuesWithBoundary, which is
+  // boundary-only because it feeds the overlap *check* — a bare pin can't
+  // geometrically overlap anything, but a host still benefits from seeing it.
+  static async findLiveVenuesForReference(excludeId?: string) {
+    return prisma.venue.findMany({
+      where: {
+        status: { in: LIVE_STATUSES },
+        lat: { not: null },
+        lng: { not: null },
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        lat: true,
+        lng: true,
+        boundary: true,
+        category: true,
+        images: { take: 1, select: { url: true } },
+      },
+    });
+  }
+
+  // Available venues with a boundary — candidates for "which venues cover
+  // this point" search. Same full-fetch-then-filter approach as above.
+  static async findAvailableVenuesWithBoundary() {
+    return prisma.venue.findMany({
+      where: {
+        status: VenueStatus.available,
+        boundary: { not: Prisma.JsonNull },
+      },
+      include: { mayor: mayorSelect, images: true },
     });
   }
 }
