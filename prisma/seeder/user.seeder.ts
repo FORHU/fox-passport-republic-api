@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import crypto from "crypto";
+import { hashPassword } from "../../src/utils/password";
 
 // ── Name pools for bulk foxer generation ─────────────────────────────────────
 const FIRST_NAMES = [
@@ -78,6 +78,8 @@ const CITIES: { city: string; state: string }[] = [
   { city: "Davao City", state: "Davao del Sur" },
 ];
 
+const SEED_PASSWORD = "Password123!";
+
 function generateBulkFoxers(prefix: string, roleType: string[], count: number) {
   return Array.from({ length: count }, (_, i) => {
     const idx = i + 1;
@@ -86,7 +88,7 @@ function generateBulkFoxers(prefix: string, roleType: string[], count: number) {
     const last = LAST_NAMES[idx % LAST_NAMES.length];
     return {
       email: `${prefix}-${String(idx).padStart(2, "0")}@foxers.ph`,
-      password: "SeedFoxer1234567890!",
+      password: SEED_PASSWORD,
       name: `${first} ${last}`,
       username: `${prefix}_${String(idx).padStart(2, "0")}`,
       systemRole: "user",
@@ -105,20 +107,15 @@ export async function seedUsers(prisma: PrismaClient) {
     const users = [
       {
         email: "admin@example.com",
-        password: "Adminjun1234567890!",
+        password: SEED_PASSWORD,
         name: "Admin User",
         username: "admin",
         systemRole: "admin",
         roleType: [],
       },
       {
-        // The only holder of `admin_secretary`. The role has existed since the
-        // permission model landed and nothing could assign it, so the one thing
-        // it is for - working the approval queues without seeing who anyone is -
-        // could not be checked in a browser. Kept here until there is a screen
-        // for assigning system roles; see RBAC-PLAN.md Phase 6.
         email: "secretary@example.com",
-        password: "Secretary1234567890!",
+        password: SEED_PASSWORD,
         name: "Queue Secretary",
         username: "secretary",
         systemRole: "admin_secretary",
@@ -126,7 +123,7 @@ export async function seedUsers(prisma: PrismaClient) {
       },
       {
         email: "mayor@example.com",
-        password: "Mayormamamo1234567890!",
+        password: SEED_PASSWORD,
         name: "Mayor Santos",
         username: "mayor_santos",
         systemRole: "user",
@@ -137,7 +134,7 @@ export async function seedUsers(prisma: PrismaClient) {
       },
       {
         email: "host@example.com",
-        password: "Hostpangani1234567890!",
+        password: SEED_PASSWORD,
         name: "Host Reyes",
         username: "host_reyes",
         systemRole: "user",
@@ -148,7 +145,7 @@ export async function seedUsers(prisma: PrismaClient) {
       },
       {
         email: "servicefoxer@example.com",
-        password: "Service1234567890!",
+        password: SEED_PASSWORD,
         name: "Service Foxer Cruz",
         username: "foxer_service",
         systemRole: "user",
@@ -159,7 +156,7 @@ export async function seedUsers(prisma: PrismaClient) {
       },
       {
         email: "gearfoxer@example.com",
-        password: "GearFoxer1234567890!",
+        password: SEED_PASSWORD,
         name: "Gear Foxer Dela Rosa",
         username: "foxer_gear",
         systemRole: "user",
@@ -170,7 +167,7 @@ export async function seedUsers(prisma: PrismaClient) {
       },
       {
         email: "multirole@example.com",
-        password: "Multijungkwan1234567890!",
+        password: SEED_PASSWORD,
         name: "Multi Role Villanueva",
         username: "multirole",
         systemRole: "user",
@@ -181,7 +178,7 @@ export async function seedUsers(prisma: PrismaClient) {
       },
       {
         email: "user@example.com",
-        password: "Usernanaymo@1234567890!",
+        password: SEED_PASSWORD,
         name: "Regular User",
         username: "regular",
         systemRole: "user",
@@ -193,7 +190,7 @@ export async function seedUsers(prisma: PrismaClient) {
       // ── Foxer Personas (replacing hardcoded data/foxers.ts) ───────────────
       {
         email: "jasmine.reyes@foxers.ph",
-        password: "Foxerkupals1234567890!",
+        password: SEED_PASSWORD,
         name: "Jasmine Reyes",
         username: "jasmine_reyes",
         systemRole: "user",
@@ -204,7 +201,7 @@ export async function seedUsers(prisma: PrismaClient) {
       },
       {
         email: "marco.santos@foxers.ph",
-        password: "Foxerkupalska@123456789!",
+        password: SEED_PASSWORD,
         name: "Marco Santos",
         username: "marco_santos",
         systemRole: "user",
@@ -215,7 +212,7 @@ export async function seedUsers(prisma: PrismaClient) {
       },
       {
         email: "sarah.lim@foxers.ph",
-        password: "Foxerkupalskanga1234567890@!",
+        password: SEED_PASSWORD,
         name: "Sarah Lim",
         username: "sarah_lim",
         systemRole: "user",
@@ -233,17 +230,14 @@ export async function seedUsers(prisma: PrismaClient) {
     const seededUsers = [];
 
     for (const u of users) {
-      const salt = crypto.randomBytes(16).toString("hex");
-      const hash = crypto
-        .pbkdf2Sync(u.password, salt, 1000, 64, "sha512")
-        .toString("hex");
-      const hashed = `${salt}:${hash}`;
+      const hashed = await hashPassword(u.password);
 
       const created = await prisma.user.upsert({
         where: { email: u.email },
         update: {
           name: u.name,
           username: u.username,
+          password: hashed,
           systemRole: u.systemRole as any,
           roleType: u.roleType as any,
           city: (u as any).city,

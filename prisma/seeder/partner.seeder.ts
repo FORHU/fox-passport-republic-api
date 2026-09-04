@@ -7,28 +7,16 @@ import {
   AssetCategory,
   AssetCondition,
 } from "@prisma/client";
-import crypto from "crypto";
+import { CITY_COORDS } from "./city-coords";
+import { hashPassword } from "../../src/utils/password";
 
-function hashPassword(password: string): string {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto
-    .pbkdf2Sync(password, salt, 1000, 64, "sha512")
-    .toString("hex");
-  return `${salt}:${hash}`;
-}
-
-const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
-  Makati: { lat: 14.5547, lng: 121.0244 },
-  Taguig: { lat: 14.5176, lng: 121.0509 },
-  "Quezon City": { lat: 14.676, lng: 121.0437 },
-  Manila: { lat: 14.5995, lng: 120.9842 },
-  Pasig: { lat: 14.5764, lng: 121.0851 },
-  Tagaytay: { lat: 14.1152, lng: 120.9624 },
-};
+const SEED_PASSWORD = "Password123!";
 
 export async function seedPartners(prisma: PrismaClient) {
   try {
     console.log("Starting partner seed...");
+
+    const hashedPassword = await hashPassword(SEED_PASSWORD);
 
     // ── Partner User (all four foxer roles) ──────────────────────────────────
     const partner = await prisma.user.upsert({
@@ -36,6 +24,7 @@ export async function seedPartners(prisma: PrismaClient) {
       update: {
         name: "Fox Partner",
         username: "fox_partner",
+        password: hashedPassword,
         systemRole: "user" as any,
         roleType: [
           "venueFoxer",
@@ -49,7 +38,7 @@ export async function seedPartners(prisma: PrismaClient) {
       },
       create: {
         email: "partner@example.com",
-        password: hashPassword("Partner1234567890!"),
+        password: hashedPassword,
         name: "Fox Partner",
         username: "fox_partner",
         systemRole: "user" as any,
