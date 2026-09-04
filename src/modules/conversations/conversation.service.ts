@@ -38,17 +38,41 @@ export default class ConversationService {
             {
               ownerId: a,
               OR: [
-                { templateAssets: { some: { matched: true, asset: { ownerId: b } } } },
-                { templateServices: { some: { matched: true, service: { ownerId: b } } } },
-                { templateVenues: { some: { matched: true, venue: { mayorId: b } } } },
+                {
+                  templateAssets: {
+                    some: { matched: true, asset: { ownerId: b } },
+                  },
+                },
+                {
+                  templateServices: {
+                    some: { matched: true, service: { ownerId: b } },
+                  },
+                },
+                {
+                  templateVenues: {
+                    some: { matched: true, venue: { mayorId: b } },
+                  },
+                },
               ],
             },
             {
               ownerId: b,
               OR: [
-                { templateAssets: { some: { matched: true, asset: { ownerId: a } } } },
-                { templateServices: { some: { matched: true, service: { ownerId: a } } } },
-                { templateVenues: { some: { matched: true, venue: { mayorId: a } } } },
+                {
+                  templateAssets: {
+                    some: { matched: true, asset: { ownerId: a } },
+                  },
+                },
+                {
+                  templateServices: {
+                    some: { matched: true, service: { ownerId: a } },
+                  },
+                },
+                {
+                  templateVenues: {
+                    some: { matched: true, venue: { mayorId: a } },
+                  },
+                },
               ],
             },
           ],
@@ -143,7 +167,10 @@ export default class ConversationService {
     });
   }
 
-  private static async assertParticipant(conversationId: string, userId: string) {
+  private static async assertParticipant(
+    conversationId: string,
+    userId: string,
+  ) {
     const conversation = await ConversationRepository.findById(conversationId);
     if (!conversation) throw new Error("Conversation not found");
     if (conversation.userAId !== userId && conversation.userBId !== userId) {
@@ -164,7 +191,11 @@ export default class ConversationService {
     });
   }
 
-  static async sendMessage({ conversationId, senderId, content }: SendMessageInput) {
+  static async sendMessage({
+    conversationId,
+    senderId,
+    content,
+  }: SendMessageInput) {
     const trimmed = content.trim();
     if (!trimmed) throw new Error("Message cannot be empty");
 
@@ -182,7 +213,9 @@ export default class ConversationService {
     await ConversationRepository.touchLastMessage(conversationId, now);
 
     const recipientId =
-      conversation.userAId === senderId ? conversation.userBId : conversation.userAId;
+      conversation.userAId === senderId
+        ? conversation.userBId
+        : conversation.userAId;
     emitToUser(io, recipientId, SOCKET_EVENTS.NEW_MESSAGE, message);
     emitToUser(io, senderId, SOCKET_EVENTS.NEW_MESSAGE, message);
 

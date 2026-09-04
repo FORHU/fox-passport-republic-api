@@ -119,6 +119,27 @@ header says controllers may "NEVER import repositories directly", but its Rule 3
 only checks `routes`. The comment and the code disagree. The rule implemented
 here is the comment.
 
+### Owed back to the template — **decided 4 Sep, not yet done**
+
+This repository now carries two improvements the template does not, and the
+decision was to push both back rather than let the ecosystem drift:
+
+- [ ] **Port Rule 3b and suffix-based layer detection** into
+      `rm-template/node-postg-backend-template/tools/validate-architecture.mjs`.
+      Rule 3b makes it enforce what its own header already claims — that
+      controllers may never import repositories directly, which its code does
+      not currently check. Suffix detection makes the same validator work
+      against a layered *or* a modular tree, so the template does not have to
+      choose.
+- [ ] **Adopt `src/modules/<domain>/` in the template itself**, so new backends
+      start where this one had to arrive. Note the cost: projects already built
+      on the template would then differ from it, which is the reason this is
+      recorded as a decision rather than done in passing.
+- [ ] **Consider the template's wider lint scope.** It runs `eslint .` and
+      covers `prisma/**/*.ts`; this repository lints `src` only. Widening is
+      cheap but will surface findings in seed and config files that nobody has
+      looked at.
+
 ### Costs
 
 - **Two shapes in the ecosystem** until the template is updated. Anyone moving
