@@ -385,8 +385,16 @@ model Venue {
   city                 String
   state                String?
   country              String
+  // Centroid of `boundary`, derived and stored server-side — never written
+  // directly by a client. Kept for display/marker use (venue detail map,
+  // simple sorting) where a single point is enough.
   lat                  Float?
   lng                  Float?
+  // Service-area polygon: a closed ring of [lng, lat] vertex pairs, e.g.
+  // [[121.05,14.55],[121.06,14.55],[121.06,14.56],[121.05,14.55]]. Nullable
+  // at the column level for existing rows, but required by the create
+  // endpoint going forward — see VenueCtrl.createVenue's Joi schema.
+  boundary             Json?
   status               VenueStatus             @default(draft)
   rejectionReason      String?
   spaceType            String[]
