@@ -1,10 +1,29 @@
 import { describe, it, expect } from "vitest";
+import { SystemRole } from "@prisma/client";
 import {
   can,
   permissionsFor,
   permissionsForUser,
   PERMISSIONS,
 } from "../src/types/permissions";
+
+/**
+ * `EventRequestSvc.approveRequest` re-checks `queue:read` (with an
+ * organizer-ownership override), not `queue:decide`, even though the
+ * `/admin/events/:id/approve` route gates on `queue:decide` — see
+ * docs/adr/0004-source-tree-by-domain.md. That is only safe because every
+ * role holding `queue:decide` also holds `queue:read`. This test is what
+ * makes that an enforced invariant instead of an incidental one: a role
+ * granted `queue:decide` without `queue:read` would let it clear the route
+ * but fail inside the service.
+ */
+describe("queue:decide implies queue:read", () => {
+  it.each(Object.values(SystemRole))("holds both, or neither, for %s", (role) => {
+    if (can(role, "queue:decide")) {
+      expect(can(role, "queue:read")).toBe(true);
+    }
+  });
+});
 
 /**
  * `admin_secretary` exists to work the approval queues without seeing who
