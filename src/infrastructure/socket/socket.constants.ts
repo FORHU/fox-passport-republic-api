@@ -37,6 +37,14 @@ export const SOCKET_EVENTS = {
    * did, so the socket payload and the REST response can never disagree.
    */
   DATA_INVALIDATE: "data:invalidate",
+  /**
+   * A direct message. Carries the message itself, unlike DATA_INVALIDATE —
+   * there is no "refetch just the new one" endpoint for a chat, so the
+   * payload has to travel with the event. Not yet folded into the topic
+   * system; do that only if a REST fetch keyed on conversation id exists to
+   * refetch from.
+   */
+  NEW_MESSAGE: "new_message",
 } as const;
 
 export type SocketEvent = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];
