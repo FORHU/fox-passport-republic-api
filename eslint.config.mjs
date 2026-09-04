@@ -5,7 +5,7 @@ import prettierConfig from "eslint-config-prettier";
 
 export default [
   {
-    files: ["src/**/*.ts"],
+    files: ["src/**/*.ts", "prisma/**/*.ts", "tests/**/*.ts"],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
@@ -37,6 +37,25 @@ export default [
       ],
     },
   },
+  // Seeders and preflight print to the console on purpose -- that output is the
+  // whole point of a seed run. Mirrors the same relaxation in
+  // node-postg-backend-template.
+  {
+    files: ["prisma/**/*.ts"],
+    rules: {
+      "no-console": "off",
+    },
+  },
+
+  // Tests reach into shapes deliberately: a mock does not have to satisfy the
+  // real type to prove the thing under test behaves.
+  {
+    files: ["tests/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
+
   {
     ignores: ["dist/**", "node_modules/**"],
   },
