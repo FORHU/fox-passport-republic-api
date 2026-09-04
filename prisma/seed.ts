@@ -2,6 +2,7 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { assertSchemaIsMigrated } from "./preflight";
 import { seedUsers, seedVenues, seedAssets, seedServices, seedEvents, seedBookings, seedReviews, seedItemBookings, seedBadges, seedPassports, seedSpecializations, seedCancellationPolicies, seedPartners } from "./seeder";
 
 /**
@@ -77,6 +78,11 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  // Before anything is written. `assertSafeToSeed` above checks we are allowed
+  // to write here; this checks the database can actually hold what we are about
+  // to write. Both refuse rather than half-succeed.
+  await assertSchemaIsMigrated(pool);
+
   console.log("Starting database seed...");
 
   // 1. Seed Users (and get them for references)
