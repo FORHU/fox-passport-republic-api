@@ -4,8 +4,9 @@ Date: 2026-09-04
 
 ## Status
 
-Accepted. The split is done. The table renames described in **Consequences** are
-deliberately *not* done — see "The trap".
+Accepted. The split is done, and so are the table renames — but **not** the way
+Prisma would have generated them. Read "The trap" before touching migrations
+here; it is the reason this ADR exists.
 
 ## Context
 
@@ -78,14 +79,22 @@ table absent and another present, so it drops and recreates. Applying that
 migration would have emptied `User`, `Booking`, `Payment`, `Review`, `Event` and
 21 other tables.
 
-The `@@map` additions were reverted. Table names stay mixed for now: 16
-snake_case, 26 PascalCase.
+The `@@map` additions were reverted at that point, and the renames were done
+afterwards **by hand** instead:
 
-If the renames are done later they need a **hand-written** migration of 26
-`ALTER TABLE "X" RENAME TO "y"` statements, applied with
-`prisma migrate resolve --applied`, and tested against a throwaway database
-first. Note that Postgres keeps the old constraint and index names through a
-table rename, so those need renaming too or later diffs will show noise.
+`20260904140000_rename_tables_to_snake_case` is 26 `ALTER TABLE … RENAME TO`
+statements plus **124** constraint and index renames, generated from the live
+catalogue. Postgres keeps the old constraint and index names through a table
+rename, so renaming only the tables would leave every future `migrate diff`
+showing noise.
+
+It was verified on two throwaway databases before going near a real one: the
+renamed database matched the schema with no drift, and a row inserted into
+`"User"` before the rename was still readable from `users` after it. All 42
+tables are now snake_case plural.
+
+**Never regenerate this migration.** `prisma migrate diff` will offer to write
+it for you and the answer will be 26 `DROP TABLE` statements.
 
 ## A second trap, found and fixed
 
@@ -155,6 +164,10 @@ Costs and things to watch:
   because they are user-facing engagement rather than catalogue data; that is
   arguable. Moving a model between files is free and changes no SQL, so treat
   the layout as adjustable.
-- **Table names remain inconsistent** until the rename migration is written.
+- **The rename migration is order-dependent.** A fresh database replays all 58
+  in sequence and lands correctly — verified. A database that took the rename
+  *early*, before main's older migrations, hits `ALTER TABLE "Booking"` after
+  Booking became `bookings`. `migrate reset` is the fix, and only local
+  databases can be in that state.
 - **`prisma.config.js` now has two paths that must stay right** — `schema` and
   `migrations.path`. Getting either wrong fails quietly rather than loudly.
