@@ -153,10 +153,8 @@ export default class EventRequestSvc {
    * Pass-through. It exists so controllers reach the data layer through a
    * service, which `tools/validate-architecture.mjs` enforces.
    */
-  static async findAllAdmin(
-    ...args: Parameters<typeof EventRequestRepo.findAllAdmin>
-  ): Promise<ReturnType<typeof EventRequestRepo.findAllAdmin>> {
-    return EventRequestRepo.findAllAdmin(...args);
+  static async findAllAdmin(filters?: { requestStatus?: string }) {
+    return EventRequestRepo.findAllAdmin(filters);
   }
 
   /**
@@ -165,9 +163,7 @@ export default class EventRequestSvc {
    * Pass-through. It exists so controllers reach the data layer through a
    * service, which `tools/validate-architecture.mjs` enforces.
    */
-  static async findAllApproved(
-    ...args: Parameters<typeof EventRequestRepo.findAllApproved>
-  ): Promise<ReturnType<typeof EventRequestRepo.findAllApproved>> {
-    return EventRequestRepo.findAllApproved(...args);
+  static async findAllApproved() {
+    return EventRequestRepo.findAllApproved();
   }
 }

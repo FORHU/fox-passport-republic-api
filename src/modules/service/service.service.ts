@@ -140,9 +140,11 @@ export default class ServiceSvc {
    * Pass-through. It exists so controllers reach the data layer through a
    * service, which `tools/validate-architecture.mjs` enforces.
    */
-  static async getAllServicesAdmin(
-    ...args: Parameters<typeof ServiceRepo.getAllServicesAdmin>
-  ): Promise<ReturnType<typeof ServiceRepo.getAllServicesAdmin>> {
-    return ServiceRepo.getAllServicesAdmin(...args);
+  static async getAllServicesAdmin(filters?: {
+    ownerId?: string;
+    category?: ServiceCategory;
+    status?: ServiceStatus;
+  }) {
+    return ServiceRepo.getAllServicesAdmin(filters);
   }
 }

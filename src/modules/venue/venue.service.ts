@@ -407,9 +407,11 @@ export default class VenueSvc {
    * Pass-through. It exists so controllers reach the data layer through a
    * service, which `tools/validate-architecture.mjs` enforces.
    */
-  static async findAllVenuesAdmin(
-    ...args: Parameters<typeof VenueRepo.findAllVenuesAdmin>
-  ): Promise<ReturnType<typeof VenueRepo.findAllVenuesAdmin>> {
-    return VenueRepo.findAllVenuesAdmin(...args);
+  static async findAllVenuesAdmin(filters?: {
+    mayorId?: string;
+    hostId?: string;
+    status?: VenueStatus;
+  }) {
+    return VenueRepo.findAllVenuesAdmin(filters);
   }
 }

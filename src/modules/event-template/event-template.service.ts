@@ -923,9 +923,7 @@ export default class EventTemplateSvc {
    * Pass-through. It exists so controllers reach the data layer through a
    * service, which `tools/validate-architecture.mjs` enforces.
    */
-  static async findTrendingByCategory(
-    ...args: Parameters<typeof EventTemplateRepo.findTrendingByCategory>
-  ): Promise<ReturnType<typeof EventTemplateRepo.findTrendingByCategory>> {
-    return EventTemplateRepo.findTrendingByCategory(...args);
+  static async findTrendingByCategory(category: string, limit = 4) {
+    return EventTemplateRepo.findTrendingByCategory(category, limit);
   }
 }

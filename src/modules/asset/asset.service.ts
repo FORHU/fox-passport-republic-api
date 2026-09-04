@@ -141,9 +141,11 @@ export default class AssetSvc {
    * Pass-through. It exists so controllers reach the data layer through a
    * service, which `tools/validate-architecture.mjs` enforces.
    */
-  static async findAllAssetsAdmin(
-    ...args: Parameters<typeof AssetRepo.findAllAssetsAdmin>
-  ): Promise<ReturnType<typeof AssetRepo.findAllAssetsAdmin>> {
-    return AssetRepo.findAllAssetsAdmin(...args);
+  static async findAllAssetsAdmin(filters?: {
+    ownerId?: string;
+    category?: string;
+    status?: AssetStatus;
+  }) {
+    return AssetRepo.findAllAssetsAdmin(filters);
   }
 }
