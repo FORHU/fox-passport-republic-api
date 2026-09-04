@@ -6,17 +6,15 @@ import { sendApprovedEmail } from "../utils/emails/approved";
 import { sendRejectedEmail } from "../utils/emails/rejected";
 import { VenueStatus, VenueCategory, BillingRate } from "@prisma/client";
 import {
-<<<<<<< HEAD
   MIN_POLYGON_VERTICES,
   MAX_POLYGON_VERTICES,
   LngLat,
 } from "../utils/geo";
-=======
+import {
   announceAdminQueueChanged,
   announceToUser,
 } from "../infrastructure/socket/invalidate";
 import { can } from "../types/permissions";
->>>>>>> e388a6fa746737189e0697fbef0143399641ce1b
 
 interface CreateVenuePayload {
   name: string;
