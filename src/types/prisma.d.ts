@@ -14,7 +14,7 @@ export type BookingWithRelations = Prisma.BookingGetPayload<{
   include: {
     event: {
       include: {
-        host: { select: { id: true; name: true } };
+        host: { select: { id: true; name: true; imgId: true } };
       };
     };
     user: { select: { id: true; name: true; email: true } };

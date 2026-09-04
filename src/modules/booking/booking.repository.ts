@@ -37,7 +37,7 @@ export default class BookingRepo {
       include: {
         event: {
           include: {
-            host: { select: { id: true, name: true } },
+            host: { select: { id: true, name: true, imgId: true } },
           },
         },
         user: { select: { id: true, name: true, email: true } },
@@ -147,6 +147,52 @@ export default class BookingRepo {
       },
       include: { event: true },
       orderBy: { startAt: "asc" },
+    });
+  }
+
+  /** Non-terminal bookings starting within the window that still need a reminder and/or payment nudge. */
+  static async findUpcomingNeedingReminder(windowStart: Date, windowEnd: Date) {
+    return prisma.booking.findMany({
+      where: {
+        startAt: { gte: windowStart, lte: windowEnd },
+        status: { notIn: [BookingStatus.cancelled, BookingStatus.completed] },
+        OR: [
+          { reminderSentAt: null },
+          { status: BookingStatus.pending, paymentReminderSentAt: null },
+        ],
+      },
+      include: {
+        event: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+  }
+
+  static async markReminderSent(
+    id: string,
+    flags: { reminder?: boolean; paymentReminder?: boolean },
+  ) {
+    const now = new Date();
+    return prisma.booking.update({
+      where: { id },
+      data: {
+        ...(flags.reminder ? { reminderSentAt: now } : {}),
+        ...(flags.paymentReminder ? { paymentReminderSentAt: now } : {}),
+      },
+    });
+  }
+
+  /** Still-pending (unpaid) bookings whose event has already started. */
+  static async findOverdueUnpaid(before: Date) {
+    return prisma.booking.findMany({
+      where: {
+        status: BookingStatus.pending,
+        startAt: { lt: before },
+      },
+      include: {
+        event: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, email: true } },
+      },
     });
   }
 

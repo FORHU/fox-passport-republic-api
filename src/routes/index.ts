@@ -28,6 +28,7 @@ import locationsRoutes from "../modules/locations/locations.routes";
 import passportRoutes from "../modules/passport/passport.routes";
 import analyticsRoutes from "../modules/analytics/analytics.routes";
 import searchRoutes from "../modules/search/search.routes";
+import conversationRoutes from "../modules/conversations/conversation.routes";
 
 const router = express.Router();
 
@@ -50,6 +51,7 @@ router.use("/v1/categories", categoryRoutes);
 router.use("/v1/venues", venueRoutes);
 router.use("/v1/payments", paymentRoutes);
 router.use("/v1/notifications", notificationRoutes);
+router.use("/v1/conversations", conversationRoutes);
 // Booking sub-routes must be registered BEFORE the generic /:id routes
 router.use("/v1/service/bookings", serviceBookingRoutes);
 router.use("/v1/asset/bookings", assetBookingRoutes);

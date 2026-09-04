@@ -19,6 +19,8 @@ model Booking {
   hasReview           Boolean                   @default(false)
   ticketCode          String?                   @unique
   checkedIn           Boolean                   @default(false)
+  reminderSentAt      DateTime?
+  paymentReminderSentAt DateTime?
   event               Event                     @relation(fields: [eventId], references: [id])
   user                User                      @relation(fields: [userId], references: [id])
   attendees           BookingAttendee[]

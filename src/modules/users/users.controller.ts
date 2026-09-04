@@ -26,14 +26,33 @@ export default class UsersCtrl {
     }
   }
 
-  // READ ALL
+  // READ ALL (paginated)
   static async getAllUsers(req: Request, res: Response) {
     const roleTypeParam = req.query.roleType as string | undefined;
     const roleTypes = roleTypeParam
       ? roleTypeParam.split(",").map((r) => r.trim())
       : undefined;
-    const users = await UsersSvc.getAllUsers(roleTypes);
-    return res.json(users);
+    const limit = Math.min(Number(req.query.limit) || 20, 100);
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const search = (req.query.search as string | undefined)?.trim();
+
+    const { users, total } = await UsersSvc.getAllUsers(
+      roleTypes,
+      page,
+      limit,
+      search,
+    );
+
+    return res.json({
+      success: true,
+      data: users,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(Math.ceil(total / limit), 1),
+      },
+    });
   }
 
   // READ FOXERS — public listing for landing page

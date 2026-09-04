@@ -122,7 +122,7 @@ export default class MatchSvc {
   }
 
   static async getFoxerClientInbox(foxerId: string, limit = 10, offset = 0) {
-    const [data, total] = await Promise.all([
+    const [events, total] = await Promise.all([
       prisma.event.findMany({
         where: { organizerId: foxerId },
         select: {
@@ -137,6 +137,7 @@ export default class MatchSvc {
           createdAt: true,
           client: { select: { id: true, name: true, imgId: true } },
           template: { select: { id: true, name: true, category: true } },
+          bookings: { select: { id: true, status: true }, take: 1 },
         },
         orderBy: { createdAt: "desc" },
         take: limit,
@@ -144,6 +145,11 @@ export default class MatchSvc {
       }),
       prisma.event.count({ where: { organizerId: foxerId } }),
     ]);
+    const data = events.map(({ bookings, ...event }) => ({
+      ...event,
+      bookingId: bookings[0]?.id ?? null,
+      bookingStatus: bookings[0]?.status ?? null,
+    }));
     return { data, total, hasMore: offset + limit < total };
   }
 

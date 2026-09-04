@@ -3,9 +3,19 @@ import { RoleType, SystemRole } from "@prisma/client";
 import { hashPassword } from "../../utils/password";
 
 export default class UsersSvc {
-  // GET ALL USERS (optionally filtered by roleType)
-  static async getAllUsers(roleTypes?: string[]) {
-    return UsersRepo.getAllUsers(roleTypes as RoleType[] | undefined);
+  // GET ALL USERS (optionally filtered by roleType, paginated, optionally searched)
+  static async getAllUsers(
+    roleTypes?: string[],
+    page = 1,
+    limit = 20,
+    search?: string,
+  ) {
+    return UsersRepo.getAllUsers(
+      roleTypes as RoleType[] | undefined,
+      page,
+      limit,
+      search,
+    );
   }
 
   // GET FOXERS (public listing, optionally filtered by roleType, specialization, city)

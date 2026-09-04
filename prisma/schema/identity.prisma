@@ -49,6 +49,9 @@ model User {
   stripeOnboardingComplete Boolean                   @default(false)
   foxerSpecializations     FoxerSpecialization[]
   refreshTokens            RefreshToken[]
+  conversationsAsA         Conversation[]            @relation("ConversationUserA")
+  conversationsAsB         Conversation[]            @relation("ConversationUserB")
+  messagesSent             Message[]
 
   @@map("users")
 }
