@@ -155,6 +155,8 @@ Access tokens are stateless JWTs. Refresh tokens are recorded in the
 reads the table. Consequences worth knowing before you debug something:
 
 - `POST /auth/logout` genuinely revokes; a logged-out refresh token returns 401.
+- Login calls `revokeAllForUser` first, so **one account can hold one session**.
+  Signing in on a second device ends the first.
 - Password login calls `revokeAllForUser` first, so **one account can hold one
   session**. Signing in on a second device ends the first. **Google sign-in does
   not do this** — `GoogleAuthSvc.handleCallback` issues a refresh token without

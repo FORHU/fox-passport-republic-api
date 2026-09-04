@@ -4,7 +4,15 @@ import {
   BillingRate,
   VenueCategory,
   SystemRole,
+  Prisma,
 } from "@prisma/client";
+import {
+  LngLat,
+  validatePolygon,
+  polygonCentroid,
+  polygonsOverlap,
+  pointInPolygon,
+} from "../utils/geo";
 
 export default class VenueSvc {
   /**
@@ -17,6 +25,23 @@ export default class VenueSvc {
    */
   private static isAdminRole(role?: SystemRole) {
     return role === "admin";
+  }
+
+  // Throws if the given service-area polygon overlaps a live (pending or
+  // available) venue's polygon. `excludeId` lets an update check against
+  // every venue but itself.
+  private static async assertNoOverlap(boundary: LngLat[], excludeId?: string) {
+    const candidates = await VenueRepo.findLiveVenuesWithBoundary(excludeId);
+
+    for (const other of candidates) {
+      if (!other.boundary) continue;
+      const otherRing = other.boundary as unknown as LngLat[];
+      if (polygonsOverlap(boundary, otherRing)) {
+        throw new Error(
+          `This venue's service area overlaps an existing venue: "${other.name}". Adjust the shape so they don't intersect.`,
+        );
+      }
+    }
   }
 
   // ───────────────────────────────────────────────────────────
@@ -33,6 +58,7 @@ export default class VenueSvc {
     city: string;
     state?: string;
     country: string;
+    boundary?: LngLat[];
     imgIds: string[];
     spaceType?: string[];
     amenities?: string[];
@@ -57,25 +83,48 @@ export default class VenueSvc {
       throw new Error("A maximum of 5 images is allowed");
     }
 
-    // venue_authority perk: skip the review queue and auto-approve
-    const { default: PassportSvc } = await import("./passport.service");
-    const hasVenueAuthority = await PassportSvc.hasPerk(
-      data.mayorId,
-      "venue_authority",
-    );
+    // Every venue goes through admin review before it's live. `available`,
+    // `rejected`, and `archived` are review-controlled states — only the
+    // admin approve/reject endpoints may set them, so a create request can
+    // only ever land on `draft` or `pending`, never anything the caller
+    // claims beyond that. (This used to also let the venue_authority perk
+    // skip straight to `available`, but that perk is granted at passport
+    // level 1 — nearly every venueFoxer had it, so the review queue was
+    // being bypassed by default rather than as an exception.)
+    const finalStatus =
+      data.status === VenueStatus.draft
+        ? VenueStatus.draft
+        : VenueStatus.pending;
 
+    let centroid: { lat: number; lng: number } | undefined;
+
+    if (finalStatus !== VenueStatus.draft) {
+      if (!data.boundary) {
+        throw new Error(
+          "A service-area boundary is required to publish a venue",
+        );
+      }
+      const validationError = validatePolygon(data.boundary);
+      if (validationError) throw new Error(validationError);
+
+      await this.assertNoOverlap(data.boundary);
+      centroid = polygonCentroid(data.boundary);
+    }
+
+    const { boundary, ...rest } = data;
     const venue = await VenueRepo.createVenue({
-      ...data,
+      ...rest,
       state: data.state ?? undefined,
+      lat: centroid?.lat,
+      lng: centroid?.lng,
+      boundary: boundary as unknown as Prisma.InputJsonValue | undefined,
       imgIds: data.imgIds,
       spaceType: data.spaceType ?? [],
       amenities: data.amenities ?? [],
       techAv: data.techAv ?? [],
       staffing: data.staffing ?? [],
       policies: data.policies ?? [],
-      status: hasVenueAuthority
-        ? VenueStatus.available
-        : (data.status ?? VenueStatus.pending),
+      status: finalStatus,
       price: data.price ?? 0,
       billingRate: (data.billingRate as BillingRate) ?? BillingRate.daily,
     });
@@ -201,6 +250,34 @@ export default class VenueSvc {
     return items;
   }
 
+  // Venues whose service-area polygon covers `point`.
+  static async getVenuesCoveringPoint(point: { lat: number; lng: number }) {
+    const candidates = await VenueRepo.findAvailableVenuesWithBoundary();
+    const asLngLat: LngLat = [point.lng, point.lat];
+
+    return candidates.filter((venue) => {
+      if (!venue.boundary) return false;
+      return pointInPolygon(asLngLat, venue.boundary as unknown as LngLat[]);
+    });
+  }
+
+  // Lightweight location of every other live venue (boundary or pin-only) —
+  // used as a read-only reference layer so a host can see what they'd
+  // overlap while drawing, instead of only finding out from the
+  // assertNoOverlap rejection on submit, and see other venues generally.
+  static async getReferenceBoundaries(excludeId?: string) {
+    const venues = await VenueRepo.findLiveVenuesForReference(excludeId);
+    return venues.map((v) => ({
+      id: v.id,
+      name: v.name,
+      lat: v.lat,
+      lng: v.lng,
+      boundary: v.boundary,
+      category: v.category,
+      image: v.images[0]?.url ?? null,
+    }));
+  }
+
   static async getVenueByIdForMayor(id: string, mayorId: string) {
     // Mayor can see their own venues regardless of status
     const venue = await VenueRepo.findVenueByIdAndOwner(id, mayorId);
@@ -224,6 +301,7 @@ export default class VenueSvc {
       city: string;
       state?: string;
       country: string;
+      boundary: LngLat[];
       imgIds: string[];
       spaceType: string[];
       amenities: string[];
@@ -254,7 +332,53 @@ export default class VenueSvc {
       throw new Error("A maximum of 5 images is allowed");
     }
 
-    return VenueRepo.updateVenue(id, data);
+    // Same rule as create: `available`/`rejected`/`archived` are
+    // review-controlled and only reachable through the admin approve/reject
+    // endpoints (or archiveVenue). A generic update can only move a venue
+    // between `draft` and `pending` — a client-supplied `available` here
+    // would otherwise let a host self-approve their own venue outright.
+    const finalStatus =
+      data.status === VenueStatus.draft || data.status === VenueStatus.pending
+        ? data.status
+        : venue.status;
+    const resolvedBoundary =
+      data.boundary ??
+      (venue.boundary as unknown as LngLat[] | null) ??
+      undefined;
+    const boundaryChanged = data.boundary !== undefined;
+
+    let centroid: { lat: number; lng: number } | undefined;
+
+    if (finalStatus !== VenueStatus.draft) {
+      if (!resolvedBoundary) {
+        throw new Error(
+          "A service-area boundary is required to publish a venue",
+        );
+      }
+      const validationError = validatePolygon(resolvedBoundary);
+      if (validationError) throw new Error(validationError);
+
+      // Only worth re-checking when the shape itself moved, or when a draft
+      // with no prior overlap check is being published for the first time.
+      if (boundaryChanged || venue.status === VenueStatus.draft) {
+        await this.assertNoOverlap(resolvedBoundary, id);
+      }
+      if (boundaryChanged) centroid = polygonCentroid(resolvedBoundary);
+    }
+
+    const { boundary, status: _rawStatus, ...rest } = data;
+    return VenueRepo.updateVenue(id, {
+      ...rest,
+      // Never the raw `data.status` — always the clamped value, so a
+      // client-requested `available`/`rejected`/`archived` can't slip
+      // through this spread even though it was validated out above.
+      ...(data.status !== undefined && { status: finalStatus }),
+      ...(boundary !== undefined && {
+        boundary: boundary as unknown as Prisma.InputJsonValue,
+        lat: centroid?.lat,
+        lng: centroid?.lng,
+      }),
+    });
   }
 
   static async deleteVenue(params: {

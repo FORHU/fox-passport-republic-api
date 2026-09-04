@@ -6,6 +6,11 @@ import { sendApprovedEmail } from "../utils/emails/approved";
 import { sendRejectedEmail } from "../utils/emails/rejected";
 import { VenueStatus, VenueCategory, BillingRate } from "@prisma/client";
 import {
+  MIN_POLYGON_VERTICES,
+  MAX_POLYGON_VERTICES,
+  LngLat,
+} from "../utils/geo";
+import {
   announceAdminQueueChanged,
   announceToUser,
 } from "../infrastructure/socket/invalidate";
@@ -20,8 +25,7 @@ interface CreateVenuePayload {
   city: string;
   state?: string;
   country: string;
-  lat?: number;
-  lng?: number;
+  boundary?: LngLat[];
   imgIds: string[];
   spaceType?: string[];
   amenities?: string[];
@@ -48,8 +52,18 @@ export default class VenueCtrl {
       city: Joi.string().required(),
       state: Joi.string().optional(),
       country: Joi.string().required(),
-      lat: Joi.number().optional(),
-      lng: Joi.number().optional(),
+      // A draft doesn't need a boundary yet; anything else does — see
+      // VenueSvc.createVenue for the matching runtime check (which also
+      // accounts for the venue_authority perk forcing status to available).
+      boundary: Joi.array()
+        .items(
+          Joi.array()
+            .length(2)
+            .items(Joi.number().min(-180).max(180), Joi.number().min(-90).max(90)),
+        )
+        .min(MIN_POLYGON_VERTICES)
+        .max(MAX_POLYGON_VERTICES)
+        .when("status", { is: "draft", then: Joi.optional(), otherwise: Joi.required() }),
       imgIds: Joi.array().items(Joi.string()).min(1).max(5).required(),
       spaceType: Joi.array().items(Joi.string()).optional(),
       amenities: Joi.array().items(Joi.string()).optional(),
@@ -86,7 +100,10 @@ export default class VenueCtrl {
         .json({ message: "Venue created successfully", venue });
     } catch (e: unknown) {
       const error = e as Error;
-      return res.status(400).json({ message: error.message || error });
+      const status = error.message?.includes("overlaps an existing venue")
+        ? 409
+        : 400;
+      return res.status(status).json({ message: error.message || error });
     }
   }
 
@@ -135,8 +152,15 @@ export default class VenueCtrl {
       city: Joi.string().optional(),
       state: Joi.string().optional(),
       country: Joi.string().optional(),
-      lat: Joi.number().optional(),
-      lng: Joi.number().optional(),
+      boundary: Joi.array()
+        .items(
+          Joi.array()
+            .length(2)
+            .items(Joi.number().min(-180).max(180), Joi.number().min(-90).max(90)),
+        )
+        .min(MIN_POLYGON_VERTICES)
+        .max(MAX_POLYGON_VERTICES)
+        .optional(),
       imgIds: Joi.array().items(Joi.string()).max(5).optional(),
       spaceType: Joi.array().items(Joi.string()).optional(),
       amenities: Joi.array().items(Joi.string()).optional(),
@@ -180,7 +204,9 @@ export default class VenueCtrl {
           ? 403
           : err.message === "Venue not found"
             ? 404
-            : 400;
+            : err.message?.includes("overlaps an existing venue")
+              ? 409
+              : 400;
       return res.status(status).json({ message: err.message || err });
     }
   }
@@ -295,6 +321,53 @@ export default class VenueCtrl {
     } catch (e: unknown) {
       const error = e as Error;
       return res.status(404).json({ message: error.message || error });
+    }
+  }
+
+  // Public — venues whose service-area polygon covers a given point. Used by
+  // "which venues can serve this location" search.
+  static async getVenuesNear(req: Request, res: Response) {
+    const schema = Joi.object({
+      lat: Joi.number().min(-90).max(90).required(),
+      lng: Joi.number().min(-180).max(180).required(),
+    });
+
+    const { error, value } = schema.validate(req.query);
+    if (error) {
+      return res.status(400).json({ message: error.message });
+    }
+
+    try {
+      const venues = await VenueSvc.getVenuesCoveringPoint(value);
+      return res.status(200).json({ venues });
+    } catch (e: unknown) {
+      const error = e as Error;
+      return res.status(500).json({ message: error.message || error });
+    }
+  }
+
+  // Public — id/name/boundary of every other live venue, as a read-only
+  // reference layer for the map picker (so a host can see what they'd
+  // overlap while drawing, not just find out after submitting).
+  // `excludeId` omits the venue currently being edited.
+  static async getBoundaries(req: Request, res: Response) {
+    const schema = Joi.object({
+      excludeId: Joi.string().optional(),
+    });
+
+    const { error, value } = schema.validate(req.query);
+    if (error) {
+      return res.status(400).json({ message: error.message });
+    }
+
+    try {
+      const boundaries = await VenueSvc.getReferenceBoundaries(
+        value.excludeId,
+      );
+      return res.status(200).json({ boundaries });
+    } catch (e: unknown) {
+      const error = e as Error;
+      return res.status(500).json({ message: error.message || error });
     }
   }
 
