@@ -64,6 +64,9 @@ export default class GoogleAuthSvc {
   }
 
   static getAuthUrl(state: string): string {
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      throw new Error("Google OAuth is not configured on this server");
+    }
     return client.generateAuthUrl({
       access_type: "online",
       scope: ["openid", "email", "profile"],
@@ -78,6 +81,9 @@ export default class GoogleAuthSvc {
    * the two flows are interchangeable to the rest of the app.
    */
   static async handleCallback(code: string) {
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      throw new Error("Google OAuth is not configured on this server");
+    }
     const { tokens } = await client.getToken(code);
     if (!tokens.id_token) {
       throw new Error("Google did not return an ID token");
