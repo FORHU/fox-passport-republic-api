@@ -6,7 +6,8 @@
   "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev": "pnpm dlx kill-port 6002 && nodemon --watch src --ext ts --exec ts-node --files ./src/server.ts",
-    "lint": "eslint src --fix",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
     "validate": "node tools/validate-architecture.mjs",
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "vitest run",
