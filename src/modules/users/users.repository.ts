@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { SystemRole, RoleType } from "@prisma/client";
+import { totalPages } from "../../utils/pagination";
 
 export default class UsersRepo {
   // READ ALL (optionally filtered by roleType)
@@ -258,7 +259,7 @@ export default class UsersRepo {
       }),
       prisma.user.count({ where }),
     ]);
-    return { foxers, total, totalPages: Math.max(1, Math.ceil(total / limit)) };
+    return { foxers, total, totalPages: totalPages(total, limit) };
   }
 
   // READ SINGLE FOXER with services + event templates (public profile)

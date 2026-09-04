@@ -8,6 +8,8 @@ import { PaymentStatus, RefundStatus, type Refund } from "@prisma/client";
 import EventTemplateSvc from "../event-template/event-template.service";
 import RefundSvc from "../refund/refund.service";
 import { STRIPE_SECRET_KEY } from "../../config";
+import { toStripeCents, formatCurrency } from "../../utils/pricing";
+import { totalPages } from "../../utils/pagination";
 import Stripe from "stripe";
 import { sendBookingCancelledEmail } from "../../utils/emails/cancellation";
 import { sendBookingConfirmationEmail } from "../../utils/emails/confirmation";
@@ -483,7 +485,7 @@ export default class BookingCtrl {
           try {
             const refund = await stripe.refunds.create({
               payment_intent: payment.transactionId,
-              amount: Math.round(estimatedRefund.toNumber() * 100),
+              amount: toStripeCents(estimatedRefund.toNumber()),
             });
             stripeRefundId = refund.id;
             refundStatus =
@@ -546,8 +548,8 @@ export default class BookingCtrl {
           eventName,
           bookingId: value.id,
           startDate: booking.startAt?.toISOString() ?? "N/A",
-          totalPaid: `PHP ${totalPaid.toFixed(2)}`,
-          refundAmount: `PHP ${totalRefunded.toFixed(2)}`,
+          totalPaid: formatCurrency(totalPaid),
+          refundAmount: formatCurrency(totalRefunded),
           refundStatus: refunds.some((r) => r.status === RefundStatus.failed)
             ? "Some refunds failed — contact support"
             : "Processed successfully",
@@ -603,7 +605,7 @@ export default class BookingCtrl {
           page,
           limit,
           total,
-          totalPages: Math.ceil(total / limit),
+          totalPages: totalPages(total, limit),
         },
       });
     } catch (e: unknown) {
@@ -665,7 +667,7 @@ export default class BookingCtrl {
           page,
           limit,
           total,
-          totalPages: Math.ceil(total / limit),
+          totalPages: totalPages(total, limit),
         },
       });
     } catch (e: unknown) {
@@ -801,7 +803,7 @@ export default class BookingCtrl {
             eventName,
             bookingId,
             startDate: booking.startAt?.toISOString() ?? "N/A",
-            totalPaid: `PHP ${value.amount.toFixed(2)}`,
+            totalPaid: formatCurrency(value.amount),
             venueName,
           });
         }

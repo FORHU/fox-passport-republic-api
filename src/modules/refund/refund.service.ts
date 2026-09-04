@@ -7,6 +7,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { STRIPE_SECRET_KEY } from "../../config";
+import { toStripeCents, formatCurrency } from "../../utils/pricing";
 import { sendBookingCancelledEmail } from "../../utils/emails/cancellation";
 import { sendRefundUpdateEmail } from "../../utils/emails/refund";
 import NotificationService from "../notifications/user-notification.service";
@@ -292,7 +293,7 @@ export default class RefundSvc {
         try {
           const refund = await stripe.refunds.create({
             payment_intent: payment.transactionId,
-            amount: Math.round(estimatedRefund.toNumber() * 100),
+            amount: toStripeCents(estimatedRefund.toNumber()),
           });
           stripeRefundId = refund.id;
           refundStatus =
@@ -354,8 +355,8 @@ export default class RefundSvc {
         eventName,
         bookingId,
         startDate: booking.startAt?.toISOString() ?? "N/A",
-        totalPaid: `PHP ${totalPaid.toFixed(2)}`,
-        refundAmount: `PHP ${totalRefunded.toFixed(2)}`,
+        totalPaid: formatCurrency(totalPaid),
+        refundAmount: formatCurrency(totalRefunded),
         refundStatus: refunds.some((r) => r.status === RefundStatus.failed)
           ? "Some refunds failed — contact support"
           : "Processed successfully",
@@ -445,7 +446,7 @@ export default class RefundSvc {
     try {
       const sr = await stripe.refunds.create({
         payment_intent: refund.payment.transactionId,
-        amount: Math.round(refund.amount.toNumber() * 100),
+        amount: toStripeCents(refund.amount.toNumber()),
       });
 
       const newRefundStatus =
@@ -547,7 +548,7 @@ export default class RefundSvc {
         to: existing.booking.user.email,
         eventName: existing.booking.event?.name ?? "Unknown Event",
         bookingId: existing.bookingId,
-        refundAmount: `PHP ${existing.amount.toFixed(2)}`,
+        refundAmount: formatCurrency(existing.amount),
         status: "failed",
         failureReason: refund.failure_reason ?? undefined,
       });
@@ -558,7 +559,7 @@ export default class RefundSvc {
         userId: existing.booking.user.id,
         type: "PAYOUT",
         title: "Refund failed",
-        message: `Your refund of PHP ${existing.amount.toFixed(2)} for ${
+        message: `Your refund of ${formatCurrency(existing.amount)} for ${
           existing.booking.event?.name ?? "your booking"
         } failed.`,
         metadata: { link: `/bookings/${existing.bookingId}` },
@@ -601,7 +602,7 @@ export default class RefundSvc {
         to: existing.booking.user.email,
         eventName: existing.booking.event?.name ?? "Unknown Event",
         bookingId: existing.bookingId,
-        refundAmount: `PHP ${existing.amount.toFixed(2)}`,
+        refundAmount: formatCurrency(existing.amount),
         status: "succeeded",
       });
     }
@@ -611,7 +612,7 @@ export default class RefundSvc {
         userId: existing.booking.user.id,
         type: "PAYOUT",
         title: "Refund succeeded",
-        message: `Your refund of PHP ${existing.amount.toFixed(2)} for ${
+        message: `Your refund of ${formatCurrency(existing.amount)} for ${
           existing.booking.event?.name ?? "your booking"
         } has been processed.`,
         metadata: { link: `/bookings/${existing.bookingId}` },

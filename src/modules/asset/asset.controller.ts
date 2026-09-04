@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import { prisma } from "../../utils/prisma";
+import { totalPages } from "../../utils/pagination";
 import AssetSvc from "./asset.service";
 import { sendApprovedEmail } from "../../utils/emails/approved";
 import { sendRejectedEmail } from "../../utils/emails/rejected";
@@ -142,7 +143,7 @@ export default class AssetCtrl {
           page: parsedPage,
           limit: parsedLimit,
           total,
-          totalPages: Math.max(1, Math.ceil(total / parsedLimit)),
+          totalPages: totalPages(total, parsedLimit),
         },
       });
     } catch (e: unknown) {

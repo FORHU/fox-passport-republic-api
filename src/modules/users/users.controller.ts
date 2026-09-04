@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import UsersSvc from "./users.service";
+import { totalPages } from "../../utils/pagination";
 
 export default class UsersCtrl {
   // CREATE
@@ -50,7 +51,7 @@ export default class UsersCtrl {
         page,
         limit,
         total,
-        totalPages: Math.max(Math.ceil(total / limit), 1),
+        totalPages: totalPages(total, limit),
       },
     });
   }

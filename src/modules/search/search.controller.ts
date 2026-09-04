@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import SearchSvc from "./search.service";
+import { totalPages } from "../../utils/pagination";
 
 export default class SearchCtrl {
   // GET /v1/search?location=<city>&category=<cat>
@@ -32,11 +33,12 @@ export default class SearchCtrl {
           totalEventTemplates: result.totalEventTemplates,
           totalGearFoxers: result.totalGearFoxers,
           totalServiceFoxers: result.totalServiceFoxers,
-          totalPagesEventTemplates: Math.ceil(
-            result.totalEventTemplates / limit,
+          totalPagesEventTemplates: totalPages(
+            result.totalEventTemplates,
+            limit,
           ),
-          totalPagesGearFoxers: Math.ceil(result.totalGearFoxers / limit),
-          totalPagesServiceFoxers: Math.ceil(result.totalServiceFoxers / limit),
+          totalPagesGearFoxers: totalPages(result.totalGearFoxers, limit),
+          totalPagesServiceFoxers: totalPages(result.totalServiceFoxers, limit),
           eventTemplates: result.eventTemplates,
           gearFoxers: result.gearFoxers,
           serviceFoxers: result.serviceFoxers,

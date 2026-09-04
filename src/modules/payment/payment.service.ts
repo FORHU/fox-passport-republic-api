@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { PaymentStatus, TransactionStatus } from "@prisma/client";
 import Stripe from "stripe";
 import { prisma } from "../../utils/prisma";
+import { toStripeCents } from "../../utils/pricing";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-08-27.basil",
@@ -23,7 +24,7 @@ export default class PaymentSvc {
     description?: string;
   }) {
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(data.amount * 100), // Stripe expects cents
+      amount: toStripeCents(data.amount),
       currency: (data.currency || "PHP").toLowerCase(),
       metadata: {
         bookingId: data.bookingId,

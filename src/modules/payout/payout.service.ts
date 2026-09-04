@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { prisma } from "../../utils/prisma";
 import { RoleType, PayoutStatus } from "@prisma/client";
 import { STRIPE_SECRET_KEY } from "../../config";
+import { toStripeCents } from "../../utils/pricing";
 
 const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-08-27.basil",
@@ -75,7 +76,7 @@ export default class PayoutSvc {
 
     try {
       const transfer = await stripe.transfers.create({
-        amount: Math.round(payout.amount.toNumber() * 100),
+        amount: toStripeCents(payout.amount.toNumber()),
         currency: payout.currency.toLowerCase(),
         destination: recipient.stripeAccountId,
         transfer_group: payout.sourceId,

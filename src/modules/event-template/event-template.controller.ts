@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import { prisma } from "../../utils/prisma";
+import { totalPages } from "../../utils/pagination";
 import EventTemplateSvc from "./event-template.service";
 import { sendApprovedEmail } from "../../utils/emails/approved";
 import { sendRejectedEmail } from "../../utils/emails/rejected";
@@ -157,7 +158,7 @@ export default class EventTemplateCtrl {
           page: pageNum,
           limit: limitNum,
           total: result.total,
-          totalPages: Math.ceil(result.total / limitNum),
+          totalPages: totalPages(result.total, limitNum),
         },
       });
     } catch (e: unknown) {
