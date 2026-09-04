@@ -50,13 +50,13 @@ function middlewareFor(
 
 describe("endpoints that used to be public", () => {
   it("GET /users/:id requires authentication", () => {
-    const chain = middlewareFor("routes/users.routes.ts", "get", "/:id");
+    const chain = middlewareFor("modules/users/users.routes.ts", "get", "/:id");
     expect(chain, "route not found").not.toBeNull();
     expect(chain).toContain("authenticate");
   });
 
   it("GET /bookings requires authentication", () => {
-    const chain = middlewareFor("routes/booking.routes.ts", "get", "/");
+    const chain = middlewareFor("modules/booking/booking.routes.ts", "get", "/");
     expect(chain, "route not found").not.toBeNull();
     expect(chain).toContain("authenticate");
   });
@@ -73,8 +73,8 @@ describe("the password hash cannot leave by accident", () => {
     // { password: false }` or an explicit `select`. Both are greppable, and
     // this pins how many places do it so a fourth has to be deliberate.
     const files = [
-      "repositories/auth.repository.ts",
-      "repositories/profile.repository.ts",
+      "modules/auth/auth.repository.ts",
+      "modules/profile/profile.repository.ts",
     ];
     const optIns = files.flatMap((f) => {
       const text = src(f);
@@ -87,7 +87,7 @@ describe("the password hash cannot leave by accident", () => {
   });
 
   it("findUserById returns an explicit field list, not the whole row", () => {
-    const repo = src("repositories/users.repository.ts");
+    const repo = src("modules/users/users.repository.ts");
     const fn = repo.slice(repo.indexOf("static async findUserById"));
     const body = fn.slice(0, fn.indexOf("\n  }"));
     expect(body).toMatch(/select:\s*\{/);

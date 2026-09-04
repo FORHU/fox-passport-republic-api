@@ -1,0 +1,249 @@
+// Identity, roles and the applications that grant them.
+
+model User {
+  id                       String                    @id @default(uuid())
+  email                    String                    @unique
+  password                 String
+  name                     String
+  address                  String?
+  city                     String?
+  state                    String?
+  country                  String?                   @default("Philippines")
+  username                 String?                   @unique
+  googleId                 String?                   @unique
+  phone                    String?
+  imgId                    String?
+  systemRole               SystemRole                @default(user)
+  roleType                 RoleType[]
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  bookings                 Booking[]
+  serviceBookings          ServiceBooking[]
+  assetBookings            AssetBooking[]
+  assetTransactions        EventAssetTransaction[]   @relation("AssetProvider")
+  clientEvents             Event[]                   @relation("EventClient")
+  organizedEvents          Event[]                   @relation("EventOrganizer")
+  serviceTransactions      EventServiceTransaction[] @relation("ServiceProvider")
+  eventTemplates           EventTemplate[]
+  venueTransactions        EventVenueTransaction[]   @relation("VenueProvider")
+  favorites                Favorite[]
+  files                    File[]
+  passport                 Passport?
+  reviews                  Review[]
+  reviewReplies            ReviewReply[]
+  assets                   Asset[]
+  reviewsGiven             RoleRequest[]             @relation("Reviewer")
+  roleRequests             RoleRequest[]             @relation("Applicant")
+  services                 Service[]
+  venues                   Venue[]
+  bookingAttendees         BookingAttendee[]
+  invitedAttendees         BookingAttendee[]         @relation("Inviter")
+  notifications            Notification[]
+  waitlistEntries          Waitlist[]
+  stripeCustomerId         String?                   @unique
+  stripeChargesEnabled     Boolean                   @default(false)
+  stripePayoutsEnabled     Boolean                   @default(false)
+  isEmailVerified          Boolean                   @default(false)
+  payouts                  Payout[]
+  stripeAccountId          String?                   @unique
+  stripeOnboardingComplete Boolean                   @default(false)
+  foxerSpecializations     FoxerSpecialization[]
+  refreshTokens            RefreshToken[]
+
+  @@map("users")
+}
+
+model RoleRequest {
+  id                      String                   @id @default(uuid())
+  userId                  String
+  roleType                RoleType
+  status                  RequestStatus            @default(pending)
+  reviewedBy              String?
+  reviewedAt              DateTime?
+  rejectionReason         String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  gearFoxerApplication    GearFoxerApplication?
+  serviceFoxerApplication ServiceFoxerApplication?
+  eventFoxerApplication   EventFoxerApplication?
+  investorApplication     InvestorApplication?
+  venueFoxerApplication   VenueFoxerApplication?
+  reviewer                User?                    @relation("Reviewer", fields: [reviewedBy], references: [id])
+  user                    User                     @relation("Applicant", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, roleType])
+  @@map("role_requests")
+}
+
+model FoxerSpecialization {
+  id        String   @id @default(uuid())
+  userId    String
+  roleType  RoleType
+  category  String
+  source    String // "declared" | "earned"
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleType, category])
+  @@index([roleType, category])
+
+  @@map("foxer_specializations")
+}
+
+model VenueFoxerApplication {
+  id              String      @id @default(uuid())
+  requestId       String      @unique
+  businessName    String
+  contactNumber   String
+  address         String
+  tinNumber       String
+  description     String?
+  specializations String[]
+  validId1FileId  String?
+  nbiFileId       String?
+  tinIdFileId     String?
+  birPermitFileId String?
+  selfieFileId    String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  birPermitFile   File?       @relation("VenueFoxerBirPermit", fields: [birPermitFileId], references: [id])
+  nbiFile         File?       @relation("VenueFoxerNBI", fields: [nbiFileId], references: [id])
+  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  selfieFile      File?       @relation("VenueFoxerSelfie", fields: [selfieFileId], references: [id])
+  tinIdFile       File?       @relation("VenueFoxerTinId", fields: [tinIdFileId], references: [id])
+  validId1        File?       @relation("VenueFoxerValidId1", fields: [validId1FileId], references: [id])
+
+  @@map("venue_foxer_applications")
+}
+
+model GearFoxerApplication {
+  id              String      @id @default(uuid())
+  requestId       String      @unique
+  businessName    String
+  assetTypes      String[]
+  specializations String[]
+  tinNumber       String
+  validId1FileId  String?
+  nbiFileId       String?
+  tinIdFileId     String?
+  birPermitFileId String?
+  selfieFileId    String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  birPermitFile   File?       @relation("GearFoxerBirPermit", fields: [birPermitFileId], references: [id])
+  nbiFile         File?       @relation("GearFoxerNBI", fields: [nbiFileId], references: [id])
+  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  selfieFile      File?       @relation("GearFoxerSelfie", fields: [selfieFileId], references: [id])
+  tinIdFile       File?       @relation("GearFoxerTinId", fields: [tinIdFileId], references: [id])
+  validId1        File?       @relation("GearFoxerValidId1", fields: [validId1FileId], references: [id])
+
+  @@map("gear_foxer_applications")
+}
+
+model ServiceFoxerApplication {
+  id                   String      @id @default(uuid())
+  requestId            String      @unique
+  serviceTypes         String[]
+  specializations      String[]
+  portfolioUrls        String[]
+  experience           Int
+  nbiClearanceIdNumber String
+  tinNumber            String?
+  validId1FileId       String?
+  nbiFileId            String?
+  tinIdFileId          String?
+  birPermitFileId      String?
+  selfieFileId         String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  birPermitFile        File?       @relation("ServiceFoxerBirPermit", fields: [birPermitFileId], references: [id])
+  nbiFile              File?       @relation("ServiceFoxerNBI", fields: [nbiFileId], references: [id])
+  request              RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  selfieFile           File?       @relation("ServiceFoxerSelfie", fields: [selfieFileId], references: [id])
+  tinIdFile            File?       @relation("ServiceFoxerTinId", fields: [tinIdFileId], references: [id])
+  validId1             File?       @relation("ServiceFoxerValidId1", fields: [validId1FileId], references: [id])
+
+  @@map("service_foxer_applications")
+}
+
+model InvestorApplication {
+  id              String      @id @default(uuid())
+  requestId       String      @unique
+  companyName     String?
+  investmentRange Decimal     @db.Decimal(12, 2)
+  interests       String[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  proofFileId     String?
+  proofOfFunds    File?       @relation("InvestorProof", fields: [proofFileId], references: [id])
+  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("investor_applications")
+}
+
+model EventFoxerApplication {
+  id              String      @id @default(uuid())
+  requestId       String      @unique
+  bio             String?
+  experience      String?
+  location        String?
+  specializations String[]
+  validId1FileId  String?
+  nbiFileId       String?
+  tinIdFileId     String?
+  birPermitFileId String?
+  selfieFileId    String?
+  portfolioFileId String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  birPermitFile   File?       @relation("EventFoxerBirPermit", fields: [birPermitFileId], references: [id])
+  nbiFile         File?       @relation("EventFoxerNBI", fields: [nbiFileId], references: [id])
+  portfolioFile   File?       @relation("EventFoxerPortfolio", fields: [portfolioFileId], references: [id])
+  request         RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  selfieFile      File?       @relation("EventFoxerSelfie", fields: [selfieFileId], references: [id])
+  tinIdFile       File?       @relation("EventFoxerTinId", fields: [tinIdFileId], references: [id])
+  validId1        File?       @relation("EventFoxerValidId1", fields: [validId1FileId], references: [id])
+  files           File[]      @relation("EventFoxerPortfolioMany")
+
+  @@map("event_foxer_applications")
+}
+
+/// An issued refresh token, so a session can actually be ended.
+///
+/// Refresh was previously a stateless `jwt.verify`: nothing was stored, so
+/// `POST /auth/logout` could only return 200 and hope the client discarded the
+/// token. A refresh token that leaked stayed valid for its full 30 days with no
+/// way to revoke it. Recording the jti makes logout real and gives us a lever
+/// if a token is ever suspected stolen.
+///
+/// The token itself is never stored - only its jti, which is enough to check
+/// revocation and useless to an attacker who reads the table.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  jti       String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  userAgent String?
+  ip        String?
+
+  // Rotation. `rotatedAt` is set only when this token was exchanged for a
+  // successor; `revokedAt` alone means logout or a password change. Reuse
+  // detection has to tell those apart: presenting a logged-out token is
+  // ordinary, presenting a rotated one is evidence of a copy.
+  rotatedAt     DateTime?
+  replacedByJti String?
+
+  @@index([userId])
+  @@index([expiresAt])
+
+  @@map("refresh_tokens")
+}
+
+enum SystemRole {
+  user
+  admin_secretary
+  admin
+}

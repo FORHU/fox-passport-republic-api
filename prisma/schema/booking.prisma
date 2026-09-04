@@ -1,0 +1,149 @@
+// Bookings across every resource type, and the waitlist.
+
+model Booking {
+  id                  String                    @id @default(uuid())
+  eventId             String
+  userId              String
+  guestCount          Int
+  totalAmount         Decimal                   @db.Decimal(12, 2)
+  hostMarkup          Decimal                   @default(0) @db.Decimal(12, 2)
+  platformFee         Decimal                   @default(0) @db.Decimal(12, 2)
+  stripePaymentId     String?                   @unique
+  status              BookingStatus             @default(pending)
+  startAt             DateTime
+  endAt               DateTime
+  expiresAt           DateTime?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  isGuestListLocked   Boolean                   @default(false)
+  hasReview           Boolean                   @default(false)
+  ticketCode          String?                   @unique
+  checkedIn           Boolean                   @default(false)
+  event               Event                     @relation(fields: [eventId], references: [id])
+  user                User                      @relation(fields: [userId], references: [id])
+  attendees           BookingAttendee[]
+  payments            Payment[]
+  assetTransactions   EventAssetTransaction[]
+  serviceTransactions EventServiceTransaction[]
+  venueTransactions   EventVenueTransaction[]
+  reviews             Review[]
+  refunds             Refund[]
+  stamp               PassportStamp?
+
+  @@map("bookings")
+}
+
+model BookingAttendee {
+  id                 String       @id @default(uuid())
+  bookingId          String
+  userId             String?
+  invitedById        String?
+  firstName          String
+  lastName           String
+  email              String?
+  phone              String?
+  inviteStatus       InviteStatus @default(pending)
+  isDraft            Boolean      @default(true)
+  reasonForRejection String?
+  ticketCode         String?      @unique
+  checkedIn          Boolean      @default(false)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  booking            Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user               User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy          User?        @relation("Inviter", fields: [invitedById], references: [id])
+
+  @@map("booking_attendees")
+}
+
+model ServiceBooking {
+  id                   String            @id @default(uuid())
+  serviceId            String
+  userId               String
+  scheduledDate        DateTime
+  endDate              DateTime?
+  guestCount           Int               @default(1)
+  location             String
+  notes                String?
+  totalAmount          Decimal           @db.Decimal(12, 2)
+  platformFee          Decimal           @default(0) @db.Decimal(12, 2)
+  platformFeeAmount    Decimal           @default(0) @db.Decimal(12, 2)
+  status               ItemBookingStatus @default(pending)
+  paymentStatus        PaymentStatus     @default(pending)
+  paymentTransactionId String?
+  stripePaymentId      String?           @unique
+  paymentMethod        String?
+  disputeReason        String?
+  disputeAt            DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  service              Service           @relation(fields: [serviceId], references: [id])
+  user                 User              @relation(fields: [userId], references: [id])
+
+  @@map("service_bookings")
+}
+
+model AssetBooking {
+  id                   String            @id @default(uuid())
+  assetId              String
+  userId               String
+  startDate            DateTime
+  endDate              DateTime
+  quantity             Int               @default(1)
+  fulfillmentType      String            @default("pickup")
+  deliveryAddress      String?
+  notes                String?
+  totalAmount          Decimal           @db.Decimal(12, 2)
+  platformFee          Decimal           @default(0) @db.Decimal(12, 2)
+  platformFeeAmount    Decimal           @default(0) @db.Decimal(12, 2)
+  status               ItemBookingStatus @default(pending)
+  paymentStatus        PaymentStatus     @default(pending)
+  paymentTransactionId String?
+  stripePaymentId      String?           @unique
+  paymentMethod        String?
+  disputeReason        String?
+  disputeAt            DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  asset                Asset             @relation(fields: [assetId], references: [id])
+  user                 User              @relation(fields: [userId], references: [id])
+
+  @@map("asset_bookings")
+}
+
+model Waitlist {
+  id         String   @id @default(uuid())
+  templateId String
+  userId     String
+  createdAt  DateTime @default(now())
+
+  template EventTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, userId])
+  @@map("waitlist")
+}
+
+enum BookingStatus {
+  pending
+  confirmed
+  active
+  cancelled
+  completed
+  disputed
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  declined
+}
+
+enum ItemBookingStatus {
+  pending
+  confirmed
+  active
+  completed
+  cancelled
+  disputed
+}

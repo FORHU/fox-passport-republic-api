@@ -40,13 +40,13 @@ vi.mock("../src/utils/prisma", () => ({
   },
 }));
 
-vi.mock("../src/services/refresh-token.service", () => ({
+vi.mock("../src/modules/auth/refresh-token.service", () => ({
   revokeAllForUser: vi.fn(async (id: string) => { db.revoked.push(id); return 2; }),
 }));
 
 import RoleAssignmentSvc, {
   RoleAssignmentError,
-} from "../src/services/role-assignment.service";
+} from "../src/modules/admin/role-assignment.service";
 
 const admin = { userId: "admin-1", email: "admin@example.com" };
 

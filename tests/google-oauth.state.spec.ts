@@ -36,10 +36,10 @@ vi.mock("../src/config", () => ({
 }));
 
 vi.mock("../src/utils/prisma", () => ({ prisma: {} }));
-vi.mock("../src/services/auth.service", () => ({ default: {} }));
-vi.mock("../src/services/google-auth.service", () => ({ default: svc }));
+vi.mock("../src/modules/auth/auth.service", () => ({ default: {} }));
+vi.mock("../src/modules/auth/google-auth.service", () => ({ default: svc }));
 
-import AuthCtrl from "../src/controllers/auth.controller";
+import AuthCtrl from "../src/modules/auth/auth.controller";
 
 interface Recorded {
   redirect: string | null;

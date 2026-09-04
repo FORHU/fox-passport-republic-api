@@ -22,7 +22,19 @@ export default [
       ...prettierConfig.rules,
       "prettier/prettier": "error",
       "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unused-vars": "warn",
+      // Matching node-postg-backend-template: an error rather than a warning,
+      // with `^_` treated as a deliberate discard. `const { status: _rawStatus,
+      // ...rest } = data` is the pattern this exists for -- naming a binding
+      // only to drop it is correct code, and warning about it teaches people to
+      // scroll past warnings, which is how the real ones get missed.
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
     },
   },
   {

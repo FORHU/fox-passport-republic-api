@@ -1,0 +1,138 @@
+// Passport progression, badges, favourites and reviews.
+
+model Passport {
+  id         String          @id @default(uuid())
+  userId     String          @unique
+  perks      String[]        @default([])
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paths      PassportPath[]
+  stamps     PassportStamp[]
+  userBadges UserBadge[]
+
+  @@map("passports")
+}
+
+model PassportPath {
+  id         String   @id @default(uuid())
+  passportId String
+  path       UserPath
+  level      Int      @default(1)
+  currentXP  Int      @default(0)
+  totalXP    Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  passport   Passport @relation(fields: [passportId], references: [id], onDelete: Cascade)
+
+  @@unique([passportId, path])
+
+  @@map("passport_paths")
+}
+
+model Badge {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  description String
+  icon        String
+  color       String?
+  rarity      BadgeRarity
+  path        UserPath?
+  criteria    String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  userBadges  UserBadge[]
+
+  @@map("badges")
+}
+
+model UserBadge {
+  id         String   @id @default(uuid())
+  passportId String
+  badgeId    String
+  earnedAt   DateTime @default(now())
+  passport   Passport @relation(fields: [passportId], references: [id], onDelete: Cascade)
+  badge      Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([passportId, badgeId])
+
+  @@map("user_badges")
+}
+
+model PassportStamp {
+  id         String   @id @default(uuid())
+  passportId String
+  bookingId  String   @unique
+  eventName  String
+  eventDate  DateTime
+  location   String?
+  xpEarned   Int
+  imageUrl   String?
+  createdAt  DateTime @default(now())
+  passport   Passport @relation(fields: [passportId], references: [id], onDelete: Cascade)
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("passport_stamps")
+}
+
+model Favorite {
+  id         String   @id @default(uuid())
+  userId     String
+  entityId   String
+  entityType String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("favorites")
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  userId     String
+  bookingId  String?
+  entityId   String
+  entityType String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking    Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  reviewReplies ReviewReply[]
+
+  @@unique([bookingId])
+  @@index([userId, entityId, entityType])
+
+  @@map("reviews")
+}
+
+model ReviewReply {
+  id        String   @id @default(uuid())
+  reviewId  String
+  userId    String
+  text      String
+  createdAt DateTime @default(now())
+
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("review_replies")
+}
+
+enum UserPath {
+  user
+  gearFoxer
+  serviceFoxer
+  eventFoxer
+  venueFoxer
+  investor
+}
+
+enum BadgeRarity {
+  Common
+  Uncommon
+  Rare
+  Epic
+  Legendary
+}

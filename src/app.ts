@@ -6,7 +6,7 @@ import router from "./routes";
 import { isDev, CORS_ORIGINS } from "./config";
 import cors from "cors";
 import setup from "./setup";
-import stripeConnectRoutes from "./routes/stripe-connect.routes";
+import stripeConnectRoutes from "./modules/stripe-connect/stripe-connect.routes";
 
 const app = express();
 
