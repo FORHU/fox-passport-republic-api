@@ -6,7 +6,6 @@ import router from "./routes";
 import { isDev, CORS_ORIGINS } from "./config";
 import cors from "cors";
 import setup from "./setup";
-import stripeConnectRoutes from "./modules/stripe-connect/stripe-connect.routes";
 
 const app = express();
 
@@ -79,8 +78,6 @@ setup();
 
 app.use("/api", router);
 console.log("✅ Main router mounted");
-
-app.use("/api/v1/stripe-connect", stripeConnectRoutes);
 
 // 404 Handler for /api
 app.use("/api", (req, res) => {
