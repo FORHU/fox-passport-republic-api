@@ -105,6 +105,39 @@ have believed there was nothing to apply.
 `prisma.config.js` now pins `migrations.path` explicitly, with a comment saying
 why. **Do not remove it.**
 
+## Squashing the migration history — deferred, 4 Sep
+
+Raised and deliberately not done. Recorded because the reason matters more than
+the decision.
+
+`Dockerfile` ends with `prisma migrate deploy && pnpm start`, so **every
+container runs migrations at boot**, and CI does the same. Prisma matches
+migrations by folder name against `_prisma_migrations`. Collapse 58 folders into
+one baseline and any environment still holding the old 58 names sees a migration
+it has never applied, tries to run it, and fails because every table already
+exists — at container *startup*, not at a moment anyone is watching.
+
+Two signals this is not hypothetical: both repositories have a `staging` branch,
+and `TOMORROW.md` records that staging and prod still owe a `migrate deploy` for
+`add_audit_log`. At least one environment is already behind, which is exactly
+the case that breaks.
+
+If it is ever done, it is a coordinated release rather than a refactor:
+
+1. Generate a baseline from the current schema.
+2. Delete the 58 folders.
+3. **On every existing environment**, `prisma migrate resolve --applied
+   <baseline>` so Prisma records it without executing it.
+4. Only then deploy.
+
+Step 3 is the whole risk — miss one environment and its next boot fails.
+
+- [ ] **Answer first: what are staging and prod actually running?** If neither
+      is deployed, this is trivial. If either is live, the history stays.
+- [ ] Note the history is also the only record of *why* the schema looks as it
+      does — including the table rename above, which is the thing a future
+      reader is most likely to need explained.
+
 ## Consequences
 
 Good:
