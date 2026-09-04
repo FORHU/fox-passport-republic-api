@@ -1,4 +1,9 @@
 import { Request, Response } from "express";
+import {
+  announceAdminQueueChanged,
+  announceToAdmins,
+  announceToUser,
+} from "../infrastructure/socket/invalidate";
 
 import { prisma } from "../utils/prisma";
 import {
@@ -17,8 +22,98 @@ import AssetRepo from "../repositories/asset.repository";
 import ServiceRepo from "../repositories/service.repository";
 import RefundSvc from "../services/refund.service";
 import Joi from "joi";
+import { notifyDecision } from "../modules/notifications/decision-notification";
+import { sendDecisionEmail } from "../modules/notifications/decision-email";
+import RoleAssignmentSvc, {
+  RoleAssignmentError,
+} from "../services/role-assignment.service";
+
+/**
+ * A refund row changed: every admin's Disputes and Refunds tables are stale,
+ * and so is the citizen's own booking.
+ *
+ * The refund carries only `bookingId`, so the owner costs one extra query. That
+ * is deliberately preferred to widening what `RefundSvc` returns - these rows
+ * are sent straight back to the client as `data`, and the screens parse them.
+ */
+async function announceRefundChanged(bookingId: string | null | undefined) {
+  announceToAdmins("disputes");
+  if (!bookingId) return;
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { userId: true },
+    });
+    announceToUser(booking?.userId, "bookings");
+  } catch (e) {
+    // Best-effort, like every other announcement: the decision is committed.
+    console.error("Failed to announce a refund change:", e);
+  }
+}
 
 export default class AdminCtrl {
+  // ─── ROLE ASSIGNMENT ─────────────────────────────────────────────────────
+
+  /**
+   * The only endpoints that hand out capability directly. Both announce `roles`
+   * to the target, which maps to the shared `["me"]` profile key — the person's
+   * own screen updates without waiting for the poll, and since their sessions
+   * were just revoked they will be re-authenticating shortly anyway.
+   */
+  static async changeSystemRole(req: Request, res: Response) {
+    const schema = Joi.object({ systemRole: Joi.string().required() });
+    const { error, value } = schema.validate(req.body);
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
+
+    try {
+      const result = await RoleAssignmentSvc.changeSystemRole(
+        { userId: req.user!.userId, email: req.user!.email },
+        req.params.id,
+        value.systemRole,
+      );
+      announceToUser(result.target.id, "roles");
+      announceAdminQueueChanged();
+      return res.status(200).json({ success: true, data: result.target });
+    } catch (e: unknown) {
+      if (e instanceof RoleAssignmentError) {
+        return res
+          .status(e.status)
+          .json({ success: false, message: e.message, reason: e.reason });
+      }
+      const err = e as Error;
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  static async changeRoleTypes(req: Request, res: Response) {
+    const schema = Joi.object({
+      roleType: Joi.array().items(Joi.string()).required(),
+    });
+    const { error, value } = schema.validate(req.body);
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
+
+    try {
+      const result = await RoleAssignmentSvc.changeRoleTypes(
+        { userId: req.user!.userId, email: req.user!.email },
+        req.params.id,
+        value.roleType,
+      );
+      announceToUser(result.target.id, "roles");
+      announceAdminQueueChanged();
+      return res.status(200).json({ success: true, data: result.target });
+    } catch (e: unknown) {
+      if (e instanceof RoleAssignmentError) {
+        return res
+          .status(e.status)
+          .json({ success: false, message: e.message, reason: e.reason });
+      }
+      const err = e as Error;
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
   // ─── DISPUTES ────────────────────────────────────────────────────────────
 
   static async getDisputes(req: Request, res: Response) {
@@ -124,6 +219,7 @@ export default class AdminCtrl {
           req.params.id,
           req.user!.userId,
         );
+        await announceRefundChanged(updated.bookingId);
         return res.status(200).json({ success: true, data: updated });
       }
 
@@ -137,6 +233,7 @@ export default class AdminCtrl {
           adminNotes: value.adminNotes || "Rejected by admin",
         },
       });
+      await announceRefundChanged(updated.bookingId);
       return res.status(200).json({ success: true, data: updated });
     } catch (e: unknown) {
       const error = e as Error;
@@ -175,7 +272,12 @@ export default class AdminCtrl {
       const booking = await prisma.assetBooking.update({
         where: { id: req.params.id },
         data: { status: value.resolution },
+        include: { asset: { select: { ownerId: true } } },
       });
+
+      announceToAdmins("disputes");
+      announceToUser(booking.userId, "bookings");
+      announceToUser(booking.asset?.ownerId, "bookings");
       return res.status(200).json({ success: true, data: booking });
     } catch (e: unknown) {
       const error = e as Error;
@@ -212,7 +314,12 @@ export default class AdminCtrl {
       const booking = await prisma.serviceBooking.update({
         where: { id: req.params.id },
         data: { status: value.resolution },
+        include: { service: { select: { ownerId: true } } },
       });
+
+      announceToAdmins("disputes");
+      announceToUser(booking.userId, "bookings");
+      announceToUser(booking.service?.ownerId, "bookings");
       return res.status(200).json({ success: true, data: booking });
     } catch (e: unknown) {
       const error = e as Error;
@@ -243,6 +350,7 @@ export default class AdminCtrl {
           resolvedAt: new Date(),
         },
       });
+      await announceRefundChanged(refund.bookingId);
       return res.status(201).json({ success: true, data: refund });
     } catch (e: unknown) {
       const error = e as Error;
@@ -373,6 +481,14 @@ export default class AdminCtrl {
         })
         .catch(() => {});
 
+      announceAdminQueueChanged();
+      announceToUser(venue.mayorId, "venues");
+      notifyDecision({
+        userId: venue.mayorId,
+        entity: "venue",
+        approved: true,
+      });
+      sendDecisionEmail({ entity: "venue", id: venue.id, approved: true });
       return res.status(200).json({ success: true, data: venue });
     } catch (e: unknown) {
       const error = e as Error;
@@ -385,6 +501,20 @@ export default class AdminCtrl {
       const venue = await prisma.venue.update({
         where: { id: req.params.id },
         data: { status: VenueStatus.archived },
+      });
+      announceAdminQueueChanged();
+      announceToUser(venue.mayorId, "venues");
+      notifyDecision({
+        userId: venue.mayorId,
+        entity: "venue",
+        approved: false,
+        reason: req.body?.reason,
+      });
+      sendDecisionEmail({
+        entity: "venue",
+        id: venue.id,
+        approved: false,
+        reason: req.body?.reason,
       });
       return res.status(200).json({ success: true, data: venue });
     } catch (e: unknown) {
@@ -425,6 +555,10 @@ export default class AdminCtrl {
         )
         .catch(() => {});
 
+      announceAdminQueueChanged();
+      announceToUser(asset.ownerId, "venues");
+      notifyDecision({ userId: asset.ownerId, entity: "item", approved: true });
+      sendDecisionEmail({ entity: "asset", id: asset.id, approved: true });
       return res.status(200).json({ success: true, data: asset });
     } catch (e: unknown) {
       const error = e as Error;
@@ -437,6 +571,20 @@ export default class AdminCtrl {
       const asset = await prisma.asset.update({
         where: { id: req.params.id },
         data: { status: AssetStatus.rejected },
+      });
+      announceAdminQueueChanged();
+      announceToUser(asset.ownerId, "venues");
+      notifyDecision({
+        userId: asset.ownerId,
+        entity: "item",
+        approved: false,
+        reason: req.body?.reason,
+      });
+      sendDecisionEmail({
+        entity: "asset",
+        id: asset.id,
+        approved: false,
+        reason: req.body?.reason,
       });
       return res.status(200).json({ success: true, data: asset });
     } catch (e: unknown) {
@@ -487,6 +635,14 @@ export default class AdminCtrl {
         )
         .catch(() => {});
 
+      announceAdminQueueChanged();
+      announceToUser(service.ownerId, "venues");
+      notifyDecision({
+        userId: service.ownerId,
+        entity: "service",
+        approved: true,
+      });
+      sendDecisionEmail({ entity: "service", id: service.id, approved: true });
       return res.status(200).json({ success: true, data: service });
     } catch (e: unknown) {
       const error = e as Error;
@@ -499,6 +655,20 @@ export default class AdminCtrl {
       const service = await prisma.service.update({
         where: { id: req.params.id },
         data: { status: ServiceStatus.rejected },
+      });
+      announceAdminQueueChanged();
+      announceToUser(service.ownerId, "venues");
+      notifyDecision({
+        userId: service.ownerId,
+        entity: "service",
+        approved: false,
+        reason: req.body?.reason,
+      });
+      sendDecisionEmail({
+        entity: "service",
+        id: service.id,
+        approved: false,
+        reason: req.body?.reason,
       });
       return res.status(200).json({ success: true, data: service });
     } catch (e: unknown) {
@@ -561,6 +731,18 @@ export default class AdminCtrl {
         where: { id: req.params.id },
         data: { status: EventTemplateStatus.published, isPublic: true },
       });
+      announceAdminQueueChanged();
+      announceToUser(template.ownerId, "events");
+      notifyDecision({
+        userId: template.ownerId,
+        entity: "event template",
+        approved: true,
+      });
+      sendDecisionEmail({
+        entity: "eventTemplate",
+        id: template.id,
+        approved: true,
+      });
       return res.status(200).json({ success: true, data: template });
     } catch (e: unknown) {
       const error = e as Error;
@@ -591,6 +773,20 @@ export default class AdminCtrl {
           isPublic: false,
           rejectionReason: reason,
         },
+      });
+      announceAdminQueueChanged();
+      announceToUser(template.ownerId, "events");
+      notifyDecision({
+        userId: template.ownerId,
+        entity: "event template",
+        approved: false,
+        reason: req.body?.reason,
+      });
+      sendDecisionEmail({
+        entity: "eventTemplate",
+        id: template.id,
+        approved: false,
+        reason: req.body?.reason,
       });
       return res.status(200).json({ success: true, data: template });
     } catch (e: unknown) {
@@ -647,6 +843,14 @@ export default class AdminCtrl {
           data: { isPublic: true },
         });
       }
+      announceAdminQueueChanged();
+      announceToUser(event.clientId, "events");
+      notifyDecision({
+        userId: event.clientId,
+        entity: "event",
+        approved: true,
+      });
+      sendDecisionEmail({ entity: "event", id: event.id, approved: true });
       return res.status(200).json({ success: true, data: event });
     } catch (e: unknown) {
       const error = e as Error;
@@ -670,6 +874,20 @@ export default class AdminCtrl {
           });
         }
       }
+      announceAdminQueueChanged();
+      announceToUser(event.clientId, "events");
+      notifyDecision({
+        userId: event.clientId,
+        entity: "event",
+        approved: false,
+        reason: req.body?.reason,
+      });
+      sendDecisionEmail({
+        entity: "event",
+        id: event.id,
+        approved: false,
+        reason: req.body?.reason,
+      });
       return res.status(200).json({ success: true, data: event });
     } catch (e: unknown) {
       const error = e as Error;
@@ -705,6 +923,7 @@ export default class AdminCtrl {
         req.params.id,
         req.user!.userId,
       );
+      await announceRefundChanged(result.bookingId);
       return res.status(200).json({ success: true, data: result });
     } catch (e: unknown) {
       const error = e as Error;
@@ -725,6 +944,7 @@ export default class AdminCtrl {
         req.user!.userId,
         value.notes,
       );
+      await announceRefundChanged(result.bookingId);
       return res.status(200).json({ success: true, data: result });
     } catch (e: unknown) {
       const error = e as Error;

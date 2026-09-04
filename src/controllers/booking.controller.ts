@@ -15,6 +15,11 @@ import { sendBookingConfirmationEmail } from "../utils/emails/confirmation";
 import { sendRefundUpdateEmail } from "../utils/emails/refund";
 import WaitlistSvc from "../services/waitlist.service";
 import NotificationService from "../modules/notifications/user-notification.service";
+import {
+  announceAdminQueueChanged,
+  announceToAdmins,
+  announceToUser,
+} from "../infrastructure/socket/invalidate";
 
 export default class BookingCtrl {
   // BOOK FROM TEMPLATE — creates an Event + Booking in one shot for a logged-in client
@@ -201,6 +206,8 @@ export default class BookingCtrl {
         ...value,
       });
 
+      announceAdminQueueChanged();
+      announceToUser(req.user!.userId, "bookings");
       return res.status(201).json({ success: true, data: booking });
     } catch (e: unknown) {
       const error = e as Error;
@@ -424,6 +431,12 @@ export default class BookingCtrl {
 
         notifyBookingCancelled(booking, eventName, value.id);
 
+        // Moves the guest's bookings, the host's, and the admin Bookings tab.
+        // No `disputes` emit: nothing was paid, so no refund row was written.
+        announceToUser(booking.userId, "bookings");
+        announceToUser(booking.event?.organizerId, "bookings");
+        announceToAdmins("bookings");
+
         // Notify first person on waitlist if template has capacity
         try {
           const templateId = booking.event?.templateId;
@@ -542,6 +555,13 @@ export default class BookingCtrl {
       }
 
       notifyBookingCancelled(booking, eventName, value.id);
+
+      // As above, plus the refund rows this branch just wrote, which are what
+      // the admin Disputes and Refunds tables are listing.
+      announceToUser(booking.userId, "bookings");
+      announceToUser(booking.event?.organizerId, "bookings");
+      announceToAdmins("bookings");
+      if (refunds.length > 0) announceToAdmins("disputes");
 
       // Notify first person on waitlist if template has capacity
       try {
@@ -814,6 +834,15 @@ export default class BookingCtrl {
         console.error("Failed to send booking confirmation email:", emailErr);
       }
 
+      // Outside the try above on purpose: a mail provider having a bad minute
+      // must not also cost the guest and host their invalidation.
+      const bookerId = req.user!.userId;
+      const eventHostId = booking.event?.host?.id as string | undefined;
+      announceToUser(bookerId, "bookings");
+      if (eventHostId && eventHostId !== bookerId)
+        announceToUser(eventHostId, "bookings");
+      announceToAdmins("bookings");
+
       return res
         .status(200)
         .json({ success: true, data: { booking, payment } });
@@ -962,6 +991,11 @@ export default class BookingCtrl {
         where: { id: attendee.id },
         data: { checkedIn: true },
       });
+
+      // The host's door list and the guest's own booking both show this. No
+      // admin emit: the admin Bookings tab lists bookings, not attendees.
+      announceToUser(req.user!.userId, "bookings");
+      announceToUser(attendee.booking.userId, "bookings");
 
       return res.status(200).json({ success: true, data: updated });
     } catch (e: unknown) {

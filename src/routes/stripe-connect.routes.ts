@@ -1,6 +1,6 @@
 import express from "express";
 import StripeConnectCtrl from "../controllers/stripe-connect.controller";
-import { authenticate, requireRole } from "../middleware/auth.middleware";
+import { authenticate, requirePermission } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -9,7 +9,7 @@ const router = express.Router();
 router.post(
   "/onboard",
   authenticate,
-  requireRole(["venueFoxer", "eventFoxer", "gearFoxer", "serviceFoxer"]),
+  requirePermission("payouts:onboard"),
   StripeConnectCtrl.createOnboardingLink,
 );
 router.get("/status", authenticate, StripeConnectCtrl.getStatus);

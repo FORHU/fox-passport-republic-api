@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import WaitlistSvc from "../services/waitlist.service";
+import { announceToUser } from "../infrastructure/socket/invalidate";
 
 export default class WaitlistCtrl {
   // POST /waitlist
@@ -18,6 +19,7 @@ export default class WaitlistCtrl {
         value.templateId,
         req.user!.userId,
       );
+      announceToUser(req.user!.userId, "waitlist");
       return res.status(201).json({ success: true, data: result });
     } catch (e: unknown) {
       const err = e as Error;
@@ -37,6 +39,7 @@ export default class WaitlistCtrl {
         return res.status(400).json({ success: false, message: error.message });
 
       await WaitlistSvc.leaveWaitlist(value.id, req.user!.userId);
+      announceToUser(req.user!.userId, "waitlist");
       return res
         .status(200)
         .json({ success: true, message: "Removed from waitlist" });

@@ -1,73 +1,108 @@
 import express from "express";
 import AdminCtrl from "../controllers/admin.controller";
 import BookingCtrl from "../controllers/booking.controller";
-import { authenticate, requireAdmin } from "../middleware/auth.middleware";
+import { authenticate, requirePermission } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
+// Role assignment — the only routes that hand out capability directly, so they
+// are gated on the narrowest permission in the table.
+router.patch(
+  "/users/:id/system-role",
+  authenticate,
+  requirePermission("roles:assign"),
+  AdminCtrl.changeSystemRole,
+);
+router.patch(
+  "/users/:id/role-types",
+  authenticate,
+  requirePermission("roles:assign"),
+  AdminCtrl.changeRoleTypes,
+);
+
 // Stats
-router.get("/stats", authenticate, requireAdmin, AdminCtrl.getStats);
+router.get(
+  "/stats",
+  authenticate,
+  requirePermission("admin:access"),
+  AdminCtrl.getStats,
+);
 
 // Venues
-router.get("/venues", authenticate, requireAdmin, AdminCtrl.getAllVenues);
+router.get(
+  "/venues",
+  authenticate,
+  requirePermission("queue:read"),
+  AdminCtrl.getAllVenues,
+);
 router.get(
   "/venues/pending",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:read"),
   AdminCtrl.getPendingVenues,
 );
 router.patch(
   "/venues/:id/approve",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.approveVenue,
 );
 router.patch(
   "/venues/:id/reject",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.rejectVenue,
 );
 
 // Assets (equipment)
-router.get("/assets", authenticate, requireAdmin, AdminCtrl.getAllAssets);
+router.get(
+  "/assets",
+  authenticate,
+  requirePermission("queue:read"),
+  AdminCtrl.getAllAssets,
+);
 router.get(
   "/assets/pending",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:read"),
   AdminCtrl.getPendingAssets,
 );
 router.patch(
   "/assets/:id/approve",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.approveAsset,
 );
 router.patch(
   "/assets/:id/reject",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.rejectAsset,
 );
 
 // Services
-router.get("/services", authenticate, requireAdmin, AdminCtrl.getAllServices);
+router.get(
+  "/services",
+  authenticate,
+  requirePermission("queue:read"),
+  AdminCtrl.getAllServices,
+);
 router.get(
   "/services/pending",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:read"),
   AdminCtrl.getPendingServices,
 );
 router.patch(
   "/services/:id/approve",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.approveService,
 );
 router.patch(
   "/services/:id/reject",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.rejectService,
 );
 
@@ -75,42 +110,47 @@ router.patch(
 router.get(
   "/event-templates",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:read"),
   AdminCtrl.getAllEventTemplates,
 );
 router.get(
   "/event-templates/pending",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:read"),
   AdminCtrl.getPendingEventTemplates,
 );
 router.patch(
   "/event-templates/:id/approve",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.approveEventTemplate,
 );
 router.patch(
   "/event-templates/:id/reject",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.rejectEventTemplate,
 );
 
 // Bookings
-router.get("/bookings", authenticate, requireAdmin, BookingCtrl.getAllBookings);
+router.get(
+  "/bookings",
+  authenticate,
+  requirePermission("bookings:read:all"),
+  BookingCtrl.getAllBookings,
+);
 
 // Asset Booking Disputes
 router.get(
   "/asset-bookings/disputes",
   authenticate,
-  requireAdmin,
+  requirePermission("disputes:resolve"),
   AdminCtrl.getAssetBookingDisputes,
 );
 router.patch(
   "/asset-bookings/:id/resolve",
   authenticate,
-  requireAdmin,
+  requirePermission("disputes:resolve"),
   AdminCtrl.resolveAssetBookingDispute,
 );
 
@@ -118,74 +158,89 @@ router.patch(
 router.get(
   "/service-bookings/disputes",
   authenticate,
-  requireAdmin,
+  requirePermission("disputes:resolve"),
   AdminCtrl.getServiceBookingDisputes,
 );
 router.patch(
   "/service-bookings/:id/resolve",
   authenticate,
-  requireAdmin,
+  requirePermission("disputes:resolve"),
   AdminCtrl.resolveServiceBookingDispute,
 );
 
 // Disputes & Refunds
-router.get("/disputes", authenticate, requireAdmin, AdminCtrl.getDisputes);
+router.get(
+  "/disputes",
+  authenticate,
+  requirePermission("disputes:resolve"),
+  AdminCtrl.getDisputes,
+);
 router.patch(
   "/disputes/:id/resolve",
   authenticate,
-  requireAdmin,
+  requirePermission("disputes:resolve"),
   AdminCtrl.resolveDispute,
 );
-router.get("/refunds", authenticate, requireAdmin, AdminCtrl.getAllRefunds);
+router.get(
+  "/refunds",
+  authenticate,
+  requirePermission("refunds:manage"),
+  AdminCtrl.getAllRefunds,
+);
 router.post(
   "/refunds/manual",
   authenticate,
-  requireAdmin,
+  requirePermission("refunds:manage"),
   AdminCtrl.manualRefund,
 );
 router.get(
   "/refund-failures",
   authenticate,
-  requireAdmin,
+  requirePermission("refunds:manage"),
   AdminCtrl.getFailedRefunds,
 );
 router.get(
   "/refunds/:id/failure-reason",
   authenticate,
-  requireAdmin,
+  requirePermission("refunds:manage"),
   AdminCtrl.getRefundFailureReason,
 );
 router.post(
   "/refunds/:id/retry",
   authenticate,
-  requireAdmin,
+  requirePermission("refunds:manage"),
   AdminCtrl.retryRefund,
 );
 router.post(
   "/refunds/:id/resolve-manual",
   authenticate,
-  requireAdmin,
+  requirePermission("refunds:manage"),
   AdminCtrl.resolveManualRefund,
 );
 
 // Events (booking requests)
-router.get("/events", authenticate, requireAdmin, AdminCtrl.getAllEvents);
+router.get(
+  "/events",
+  authenticate,
+  requirePermission("queue:read"),
+  AdminCtrl.getAllEvents,
+);
 router.get(
   "/events/pending",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:read"),
   AdminCtrl.getPendingEvents,
 );
 router.patch(
   "/events/:id/approve",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.approveEvent,
 );
 router.patch(
   "/events/:id/reject",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   AdminCtrl.rejectEvent,
 );
 

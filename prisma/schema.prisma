@@ -776,6 +776,36 @@ model AssetBooking {
   @@map("asset_bookings")
 }
 
+/// A record of a security-sensitive change, kept because "who gave this person
+/// admin?" is a question with no answer otherwise.
+///
+/// Refusals are recorded as well as successes: a log of what worked shows the
+/// changes, but only a log of what was *attempted* shows an escalation attempt.
+model AuditLog {
+  id          String   @id @default(uuid())
+  /// Who acted. Not a relation to `User` on purpose - the record must survive
+  /// the actor's account being deleted, which is exactly when it matters most.
+  actorId     String
+  actorEmail  String
+  /// What was acted on, and of what kind. `action` is a verb the reader can
+  /// scan: "systemRole.change", "roleType.change".
+  action      String
+  targetId    String
+  targetEmail String?
+  /// Whatever the action needs to be understood later - previous and new role,
+  /// the reason a refusal was refused. JSON so a new action does not need a
+  /// migration to say something new.
+  metadata    Json?
+  /// "allowed" or "refused". Stored rather than inferred, so a query for
+  /// refusals does not depend on interpreting the metadata.
+  outcome     String
+  createdAt   DateTime @default(now())
+
+  @@index([targetId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+}
+
 model Notification {
   id        String   @id @default(uuid())
   userId    String
@@ -920,6 +950,7 @@ enum ComponentType {
 
 enum SystemRole {
   user
+  admin_secretary
   admin
 }
 

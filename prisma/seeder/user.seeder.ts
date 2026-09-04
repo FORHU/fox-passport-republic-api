@@ -64,6 +64,19 @@ export async function seedUsers(prisma: PrismaClient) {
         roleType: [],
       },
       {
+        // The only holder of `admin_secretary`. The role has existed since the
+        // permission model landed and nothing could assign it, so the one thing
+        // it is for - working the approval queues without seeing who anyone is -
+        // could not be checked in a browser. Kept here until there is a screen
+        // for assigning system roles; see RBAC-PLAN.md Phase 6.
+        email: "secretary@example.com",
+        password: "Secretary1234567890!",
+        name: "Queue Secretary",
+        username: "secretary",
+        systemRole: "admin_secretary",
+        roleType: [],
+      },
+      {
         email: "mayor@example.com",
         password: "Mayormamamo1234567890!",
         name: "Mayor Santos",

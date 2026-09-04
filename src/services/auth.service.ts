@@ -11,6 +11,7 @@ import {
 import { generateOTP, saveOTP, verifyOTP, deleteOTP } from "../utils/otp.utils";
 import { sendTemplatedEmail } from "../utils/helpers";
 import { hashPassword, verifyPassword, needsRehash } from "../utils/password";
+import { permissionsForUser } from "../types/permissions";
 
 import {
   ACCESS_TOKEN_SECRET,
@@ -82,6 +83,10 @@ export default class AuthSvc {
         systemRole: user.systemRole || "user",
         roleType: user.roleType || [],
         email: user.email,
+        // Carried in the token so the app's edge middleware can gate /admin
+        // without a round trip. The API never trusts this - `can()` always
+        // re-derives from the role - it is a convenience for the client.
+        permissions: permissionsForUser(user),
       },
       ACCESS_TOKEN_SECRET,
       {
@@ -161,6 +166,10 @@ export default class AuthSvc {
         systemRole: user.systemRole || "user",
         roleType: user.roleType || [],
         email: user.email,
+        // Carried in the token so the app's edge middleware can gate /admin
+        // without a round trip. The API never trusts this - `can()` always
+        // re-derives from the role - it is a convenience for the client.
+        permissions: permissionsForUser(user),
       },
       ACCESS_TOKEN_SECRET,
       {
@@ -198,6 +207,10 @@ export default class AuthSvc {
         name: user.name,
         systemRole: user.systemRole || "user",
         roleType: user.roleType || [],
+        // The client is told its capabilities rather than deriving them: the
+        // app holds no grant table, so this is the only place it can learn
+        // what to render. Never read back by the API - `can()` re-derives.
+        permissions: permissionsForUser(user),
       },
     };
   }
@@ -258,6 +271,10 @@ export default class AuthSvc {
         systemRole: user.systemRole || "user",
         roleType: user.roleType || [],
         email: user.email,
+        // Carried in the token so the app's edge middleware can gate /admin
+        // without a round trip. The API never trusts this - `can()` always
+        // re-derives from the role - it is a convenience for the client.
+        permissions: permissionsForUser(user),
       },
       ACCESS_TOKEN_SECRET,
       { expiresIn: ACCESS_TOKEN_EXPIRY },
@@ -271,6 +288,11 @@ export default class AuthSvc {
         email: user.email,
         username: user.username,
         name: user.name,
+        // Carried here too, so a refresh can never hand the client a thinner
+        // user than login did. The app derives nothing itself now.
+        systemRole: user.systemRole || "user",
+        roleType: user.roleType || [],
+        permissions: permissionsForUser(user),
       },
     };
   }

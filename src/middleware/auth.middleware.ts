@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { ACCESS_TOKEN_SECRET } from "../config";
 import { AuthorizableRole, toAuthenticatedUser } from "../types/auth";
+import { can, Permission } from "../types/permissions";
 
 /**
  * Authentication Middleware
@@ -117,6 +118,39 @@ export const requireRole = (allowedRoles: AuthorizableRole[]) => {
  * A previous `requireSuperAdmin` guarded against a role no user could hold,
  * so every request it protected was rejected.
  */
+/**
+ * Gate on a capability rather than on who the caller is.
+ *
+ * `requireAdmin` answers "are you the admin role?", which stopped being the
+ * right question when `admin_secretary` arrived: it works the approval queues
+ * but must not reach the citizens list. Guarding the capability means adding a
+ * role is a change to one grant table, not an audit of every call site.
+ */
+export const requirePermission = (permission: Permission) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Not authenticated" });
+    }
+    // The whole user, not `req.user.systemRole`: a bare role string is answered
+    // from the SystemRole table alone, so passing one here would deny every
+    // supply-side capability to the people who actually hold it.
+    if (!can(req.user, permission)) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to do that",
+      });
+    }
+    next();
+  };
+};
+
+/**
+ * @deprecated Prefer `requirePermission`. Kept for routes not yet converted;
+ * note that it excludes `admin_secretary` by design, so a queue route guarded
+ * with this will lock the secretary out.
+ */
 export const requireAdmin = requireRole(["admin"]);
 
 /**
@@ -146,7 +180,7 @@ export const requireOwnerOrAdmin = (
 
     const ownerId = getUserIdFromRequest(req);
     const isOwner = req.user.userId === ownerId;
-    const isAdmin = req.user.systemRole === "admin";
+    const isAdmin = can(req.user.systemRole, "users:read");
 
     if (!isOwner && !isAdmin) {
       return res.status(403).json({

@@ -1,10 +1,6 @@
 import express from "express";
 import VenueCtrl from "../controllers/venue.controller";
-import {
-  authenticate,
-  requireRole,
-  requireAdmin,
-} from "../middleware/auth.middleware";
+import { authenticate, requirePermission } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -19,19 +15,19 @@ router.get("/:id", VenueCtrl.getVenueById);
 router.post(
   "/create",
   authenticate,
-  requireRole(["venueFoxer"]),
+  requirePermission("venue:manage"),
   VenueCtrl.createVenue,
 );
 router.put(
   "/:id",
   authenticate,
-  requireRole(["venueFoxer"]),
+  requirePermission("venue:manage"),
   VenueCtrl.updateVenue,
 );
 router.delete(
   "/:id",
   authenticate,
-  requireRole(["venueFoxer"]),
+  requirePermission("venue:manage"),
   VenueCtrl.deleteVenue,
 );
 
@@ -39,9 +35,14 @@ router.delete(
 router.patch(
   "/:id/approve",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   VenueCtrl.approveVenue,
 );
-router.patch("/:id/reject", authenticate, requireAdmin, VenueCtrl.rejectVenue);
+router.patch(
+  "/:id/reject",
+  authenticate,
+  requirePermission("queue:decide"),
+  VenueCtrl.rejectVenue,
+);
 
 export default router;

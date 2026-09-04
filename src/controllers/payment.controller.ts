@@ -6,6 +6,10 @@ import Stripe from "stripe";
 import { prisma } from "../utils/prisma";
 import { BookingStatus, PaymentStatus } from "@prisma/client";
 import RefundSvc from "../services/refund.service";
+import {
+  announceToAdmins,
+  announceToUser,
+} from "../infrastructure/socket/invalidate";
 
 export default class PaymentController {
   // GET ALL PAYMENTS
@@ -306,9 +310,19 @@ export default class PaymentController {
 
         try {
           // Load the booking so we know its current state before mutating it.
+          // `userId` and the organizer are selected for the announcement
+          // below: this is the one handler with nobody in the room, and the
+          // browser that started the payment is sitting on a page waiting for
+          // exactly this.
           const booking = await prisma.booking.findUnique({
             where: { id: bookingId },
-            select: { id: true, status: true, stripePaymentId: true },
+            select: {
+              id: true,
+              status: true,
+              stripePaymentId: true,
+              userId: true,
+              event: { select: { organizerId: true } },
+            },
           });
 
           // Find the pending payment for this booking
@@ -363,6 +377,13 @@ export default class PaymentController {
                 where: { id: bookingId },
                 data: { status: BookingStatus.confirmed },
               });
+
+              // Inside the status check on purpose: Stripe retries deliveries,
+              // and a redelivery for an already-confirmed intent has changed
+              // nothing worth telling anyone about.
+              announceToUser(booking.userId, "bookings");
+              announceToUser(booking.event?.organizerId, "bookings");
+              announceToAdmins("bookings");
             } catch (err) {
               console.error(
                 "Failed to set booking.status to confirmed in webhook:",

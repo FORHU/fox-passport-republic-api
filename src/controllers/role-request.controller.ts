@@ -3,6 +3,10 @@ import RoleRequestService from "../services/role-request.service";
 import S3Svc from "../services/s3.service";
 import FileSvc from "../services/file.service";
 import { RequestStatus, RoleType } from "@prisma/client";
+import {
+  announceAdminQueueChanged,
+  announceToUser,
+} from "../infrastructure/socket/invalidate";
 
 // Maps multer field names → application DB column names
 const FILE_FIELD_TO_DB_COLUMN: Record<string, string> = {
@@ -46,8 +50,7 @@ export default class RoleRequestController {
 
       // Process each uploaded file through the 4-step pipeline
       const files = req.files as
-        | Record<string, Express.Multer.File[]>
-        | undefined;
+        Record<string, Express.Multer.File[]> | undefined;
 
       if (files) {
         for (const [fieldName, fileArray] of Object.entries(files)) {
@@ -92,7 +95,11 @@ export default class RoleRequestController {
 
       if (roleType === RoleType.serviceFoxer) {
         const experience = Number(data.experience);
-        if (!Number.isInteger(experience) || experience < 0 || experience > 100) {
+        if (
+          !Number.isInteger(experience) ||
+          experience < 0 ||
+          experience > 100
+        ) {
           return res.status(400).json({
             success: false,
             message: "Years of experience must be between 0 and 100",
@@ -110,9 +117,11 @@ export default class RoleRequestController {
       }
 
       if (
-        [RoleType.serviceFoxer, RoleType.gearFoxer, RoleType.venueFoxer].includes(
-          roleType,
-        ) &&
+        [
+          RoleType.serviceFoxer,
+          RoleType.gearFoxer,
+          RoleType.venueFoxer,
+        ].includes(roleType) &&
         typeof data.tinNumber === "string" &&
         data.tinNumber.length > 0 &&
         !/^\d{1,9}$/.test(data.tinNumber)
@@ -206,6 +215,8 @@ export default class RoleRequestController {
         rejectionReason,
       );
 
+      announceAdminQueueChanged();
+      announceToUser(updatedRequest.userId, "roles");
       return res.status(200).json({
         success: true,
         message: `Application ${status} successfully`,

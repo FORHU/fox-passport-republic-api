@@ -100,7 +100,13 @@ export default class VenueRepo {
         : { status: filters?.status ?? VenueStatus.available }),
     };
 
-    const [venues, total] = await prisma.$transaction([
+    // `Promise.all`, not `$transaction`: a list and its count need no
+    // transactional isolation, and demanding one means waiting for a free
+    // connection to *start* a transaction — which is what times out under a
+    // burst with "Unable to start a transaction in the given time". The count
+    // can now shift by one against a concurrent insert; a 500 on a browse page
+    // is the worse trade.
+    const [venues, total] = await Promise.all([
       prisma.venue.findMany({
         where,
         orderBy: { createdAt: "desc" },

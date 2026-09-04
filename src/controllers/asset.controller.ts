@@ -11,6 +11,11 @@ import {
   AssetCategory,
 } from "@prisma/client";
 import { toEnum } from "../utils/enums";
+import {
+  announceAdminQueueChanged,
+  announceToUser,
+} from "../infrastructure/socket/invalidate";
+import { can } from "../types/permissions";
 
 interface CreateAssetPayload {
   category: AssetCategory;
@@ -79,6 +84,7 @@ export default class AssetCtrl {
         ownerId: String(ownerId),
         ...value,
       });
+      announceAdminQueueChanged();
       return res
         .status(201)
         .json({ message: "Asset created successfully", asset });
@@ -212,6 +218,7 @@ export default class AssetCtrl {
         String(ownerId),
         value,
       );
+      announceAdminQueueChanged();
       return res
         .status(200)
         .json({ message: "Asset updated successfully", asset });
@@ -235,6 +242,7 @@ export default class AssetCtrl {
         String(id),
         String(requesterId),
       );
+      announceAdminQueueChanged();
       return res.status(200).json(result);
     } catch (e: unknown) {
       const error = e as Error;
@@ -246,7 +254,7 @@ export default class AssetCtrl {
   static async approveAsset(req: Request, res: Response) {
     try {
       const user = req.user;
-      if (!user || user.systemRole !== "admin") {
+      if (!user || !can(user.systemRole, "queue:decide")) {
         return res
           .status(403)
           .json({ message: "Forbidden: Admin access required" });
@@ -272,6 +280,8 @@ export default class AssetCtrl {
         console.error("Failed to send approval email:", emailErr);
       }
 
+      announceAdminQueueChanged();
+      announceToUser(asset.ownerId, "venues");
       return res
         .status(200)
         .json({ message: "Asset approved successfully", asset });
@@ -284,7 +294,7 @@ export default class AssetCtrl {
   static async rejectAsset(req: Request, res: Response) {
     try {
       const user = req.user;
-      if (!user || user.systemRole !== "admin") {
+      if (!user || !can(user.systemRole, "queue:decide")) {
         return res
           .status(403)
           .json({ message: "Forbidden: Admin access required" });
@@ -317,6 +327,8 @@ export default class AssetCtrl {
         console.error("Failed to send rejection email:", emailErr);
       }
 
+      announceAdminQueueChanged();
+      announceToUser(asset.ownerId, "venues");
       return res
         .status(200)
         .json({ message: "Asset rejected successfully", asset });

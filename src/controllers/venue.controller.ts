@@ -6,10 +6,17 @@ import { sendApprovedEmail } from "../utils/emails/approved";
 import { sendRejectedEmail } from "../utils/emails/rejected";
 import { VenueStatus, VenueCategory, BillingRate } from "@prisma/client";
 import {
+<<<<<<< HEAD
   MIN_POLYGON_VERTICES,
   MAX_POLYGON_VERTICES,
   LngLat,
 } from "../utils/geo";
+=======
+  announceAdminQueueChanged,
+  announceToUser,
+} from "../infrastructure/socket/invalidate";
+import { can } from "../types/permissions";
+>>>>>>> e388a6fa746737189e0697fbef0143399641ce1b
 
 interface CreateVenuePayload {
   name: string;
@@ -89,6 +96,7 @@ export default class VenueCtrl {
 
       const venueData = { ...value, mayorId };
       const venue = await VenueSvc.createVenue(venueData);
+      announceAdminQueueChanged();
       return res
         .status(201)
         .json({ message: "Venue created successfully", venue });
@@ -187,6 +195,7 @@ export default class VenueCtrl {
         requesterRole,
         data: value,
       });
+      announceAdminQueueChanged();
       return res
         .status(200)
         .json({ message: "Venue updated successfully", venue });
@@ -216,6 +225,7 @@ export default class VenueCtrl {
         requesterId,
         requesterRole,
       });
+      announceAdminQueueChanged();
       return res.status(200).json({ message: "Venue deleted successfully" });
     } catch (e: unknown) {
       const err = e as Error;
@@ -232,7 +242,7 @@ export default class VenueCtrl {
   static async approveVenue(req: Request, res: Response) {
     try {
       const user = req.user;
-      if (!user || user.systemRole !== "admin") {
+      if (!user || !can(user.systemRole, "queue:decide")) {
         return res
           .status(403)
           .json({ message: "Forbidden: Admin access required" });
@@ -258,6 +268,8 @@ export default class VenueCtrl {
         console.error("Failed to send approval email:", emailErr);
       }
 
+      announceAdminQueueChanged();
+      announceToUser(venue.mayorId, "venues");
       return res
         .status(200)
         .json({ message: "Venue approved successfully", venue });
@@ -270,7 +282,7 @@ export default class VenueCtrl {
   static async rejectVenue(req: Request, res: Response) {
     try {
       const user = req.user;
-      if (!user || user.systemRole !== "admin") {
+      if (!user || !can(user.systemRole, "queue:decide")) {
         return res
           .status(403)
           .json({ message: "Forbidden: Admin access required" });
@@ -303,6 +315,8 @@ export default class VenueCtrl {
         console.error("Failed to send rejection email:", emailErr);
       }
 
+      announceAdminQueueChanged();
+      announceToUser(venue.mayorId, "venues");
       return res
         .status(200)
         .json({ message: "Venue rejected successfully", venue });

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import RoleRequestController from "../controllers/role-request.controller";
-import { authenticate, requireAdmin } from "../middleware/auth.middleware";
+import { authenticate, requirePermission } from "../middleware/auth.middleware";
 import multer from "multer";
 
 const upload = multer({
@@ -30,11 +30,16 @@ router.post(
 );
 
 // Admin routes
-router.get("/list", authenticate, requireAdmin, RoleRequestController.list);
+router.get(
+  "/list",
+  authenticate,
+  requirePermission("roles:manage"),
+  RoleRequestController.list,
+);
 router.patch(
   "/review/:id",
   authenticate,
-  requireAdmin,
+  requirePermission("roles:manage"),
   RoleRequestController.review,
 );
 

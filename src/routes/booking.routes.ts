@@ -4,7 +4,7 @@ import AttendeeCtrl from "../controllers/attendee.controller";
 import {
   authenticate,
   optionalAuth,
-  requireHost,
+  requirePermission,
 } from "../middleware/auth.middleware";
 
 const router = express.Router();
@@ -26,13 +26,13 @@ router.delete("/attendees/:id", authenticate, AttendeeCtrl.removeGuest);
 router.patch(
   "/check-in",
   authenticate,
-  requireHost,
+  requirePermission("booking:check-in"),
   BookingCtrl.checkInBooking,
 );
 router.patch(
   "/attendees/check-in",
   authenticate,
-  requireHost,
+  requirePermission("booking:check-in"),
   BookingCtrl.checkInAttendee,
 );
 router.patch(

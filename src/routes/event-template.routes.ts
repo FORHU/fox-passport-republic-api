@@ -1,10 +1,6 @@
 import express from "express";
 import EventTemplateCtrl from "../controllers/event-template.controller";
-import {
-  authenticate,
-  requireRole,
-  requireAdmin,
-} from "../middleware/auth.middleware";
+import { authenticate, requirePermission } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -24,25 +20,25 @@ router.get("/:id", authenticate, EventTemplateCtrl.getTemplateById);
 router.post(
   "/",
   authenticate,
-  requireRole(["eventFoxer"]),
+  requirePermission("template:manage"),
   EventTemplateCtrl.createTemplate,
 );
 router.post(
   "/:id/submit",
   authenticate,
-  requireRole(["eventFoxer"]),
+  requirePermission("template:manage"),
   EventTemplateCtrl.submitTemplate,
 );
 router.put(
   "/:id",
   authenticate,
-  requireRole(["eventFoxer"]),
+  requirePermission("template:manage"),
   EventTemplateCtrl.updateTemplate,
 );
 router.delete(
   "/:id",
   authenticate,
-  requireRole(["eventFoxer"]),
+  requirePermission("template:manage"),
   EventTemplateCtrl.deleteTemplate,
 );
 
@@ -50,13 +46,13 @@ router.delete(
 router.post(
   "/:id/assets",
   authenticate,
-  requireRole(["eventFoxer"]),
+  requirePermission("template:manage"),
   EventTemplateCtrl.attachAsset,
 );
 router.delete(
   "/:id/assets/:assetId",
   authenticate,
-  requireRole(["eventFoxer"]),
+  requirePermission("template:manage"),
   EventTemplateCtrl.removeAsset,
 );
 
@@ -64,13 +60,13 @@ router.delete(
 router.post(
   "/:id/services",
   authenticate,
-  requireRole(["eventFoxer"]),
+  requirePermission("template:manage"),
   EventTemplateCtrl.attachService,
 );
 router.delete(
   "/:id/services/:serviceId",
   authenticate,
-  requireRole(["eventFoxer"]),
+  requirePermission("template:manage"),
   EventTemplateCtrl.removeService,
 );
 
@@ -78,13 +74,13 @@ router.delete(
 router.post(
   "/:id/venues",
   authenticate,
-  requireRole(["eventFoxer"]),
+  requirePermission("template:manage"),
   EventTemplateCtrl.attachVenue,
 );
 router.delete(
   "/:id/venues/:venueId",
   authenticate,
-  requireRole(["eventFoxer"]),
+  requirePermission("template:manage"),
   EventTemplateCtrl.removeVenue,
 );
 
@@ -92,13 +88,13 @@ router.delete(
 router.get(
   "/matching/search",
   authenticate,
-  requireRole(["eventFoxer"]),
+  requirePermission("template:manage"),
   EventTemplateCtrl.matchSearch,
 );
 router.post(
   "/:id/match",
   authenticate,
-  requireRole(["eventFoxer"]),
+  requirePermission("template:manage"),
   EventTemplateCtrl.matchItem,
 );
 
@@ -106,7 +102,7 @@ router.post(
 router.get(
   "/matches/outgoing",
   authenticate,
-  requireRole(["eventFoxer"]),
+  requirePermission("template:manage"),
   EventTemplateCtrl.getOutgoingMatchRequests,
 );
 router.get(
@@ -124,13 +120,13 @@ router.patch(
 router.patch(
   "/:id/approve",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   EventTemplateCtrl.approveEventTemplate,
 );
 router.patch(
   "/:id/reject",
   authenticate,
-  requireAdmin,
+  requirePermission("queue:decide"),
   EventTemplateCtrl.rejectEventTemplate,
 );
 
