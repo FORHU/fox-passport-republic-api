@@ -3,17 +3,69 @@ import crypto from "crypto";
 
 // ── Name pools for bulk foxer generation ─────────────────────────────────────
 const FIRST_NAMES = [
-  "Ana", "Bea", "Carlos", "Diana", "Enrique", "Faith", "Gabriel", "Hannah",
-  "Ivan", "Joy", "Kevin", "Liza", "Miguel", "Nina", "Oscar", "Patricia",
-  "Rafael", "Sofia", "Tristan", "Uma", "Victor", "Wendy", "Xavier", "Ysa",
-  "Zeke", "Alyssa", "Bryan", "Carla", "Derek", "Elena",
+  "Ana",
+  "Bea",
+  "Carlos",
+  "Diana",
+  "Enrique",
+  "Faith",
+  "Gabriel",
+  "Hannah",
+  "Ivan",
+  "Joy",
+  "Kevin",
+  "Liza",
+  "Miguel",
+  "Nina",
+  "Oscar",
+  "Patricia",
+  "Rafael",
+  "Sofia",
+  "Tristan",
+  "Uma",
+  "Victor",
+  "Wendy",
+  "Xavier",
+  "Ysa",
+  "Zeke",
+  "Alyssa",
+  "Bryan",
+  "Carla",
+  "Derek",
+  "Elena",
 ];
 
 const LAST_NAMES = [
-  "Reyes", "Santos", "Cruz", "Garcia", "Mendoza", "Torres", "Ramos", "Flores",
-  "Dela Cruz", "Villanueva", "Bautista", "Aquino", "Fernandez", "Lopez", "Castillo",
-  "Rivera", "Gonzales", "Hernandez", "Soriano", "Dizon", "Pascual", "Tan",
-  "Lim", "Ong", "Chua", "Aguilar", "Mercado", "Navarro", "Perez", "Rosales",
+  "Reyes",
+  "Santos",
+  "Cruz",
+  "Garcia",
+  "Mendoza",
+  "Torres",
+  "Ramos",
+  "Flores",
+  "Dela Cruz",
+  "Villanueva",
+  "Bautista",
+  "Aquino",
+  "Fernandez",
+  "Lopez",
+  "Castillo",
+  "Rivera",
+  "Gonzales",
+  "Hernandez",
+  "Soriano",
+  "Dizon",
+  "Pascual",
+  "Tan",
+  "Lim",
+  "Ong",
+  "Chua",
+  "Aguilar",
+  "Mercado",
+  "Navarro",
+  "Perez",
+  "Rosales",
 ];
 
 const CITIES: { city: string; state: string }[] = [
@@ -26,11 +78,7 @@ const CITIES: { city: string; state: string }[] = [
   { city: "Davao City", state: "Davao del Sur" },
 ];
 
-function generateBulkFoxers(
-  prefix: string,
-  roleType: string[],
-  count: number
-) {
+function generateBulkFoxers(prefix: string, roleType: string[], count: number) {
   return Array.from({ length: count }, (_, i) => {
     const idx = i + 1;
     const loc = CITIES[idx % CITIES.length];
@@ -182,12 +230,13 @@ export async function seedUsers(prisma: PrismaClient) {
       ...generateBulkFoxers("sf", ["serviceFoxer"], 60),
     ];
 
-
     const seededUsers = [];
 
     for (const u of users) {
       const salt = crypto.randomBytes(16).toString("hex");
-      const hash = crypto.pbkdf2Sync(u.password, salt, 1000, 64, "sha512").toString("hex");
+      const hash = crypto
+        .pbkdf2Sync(u.password, salt, 1000, 64, "sha512")
+        .toString("hex");
       const hashed = `${salt}:${hash}`;
 
       const created = await prisma.user.upsert({
@@ -214,7 +263,9 @@ export async function seedUsers(prisma: PrismaClient) {
         },
       });
 
-      console.log(`✓ ${created.email} — roles: [${u.roleType.join(", ") || u.systemRole}]`);
+      console.log(
+        `✓ ${created.email} — roles: [${u.roleType.join(", ") || u.systemRole}]`,
+      );
       seededUsers.push(created);
     }
 

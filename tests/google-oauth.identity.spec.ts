@@ -97,11 +97,13 @@ beforeEach(() => {
   repo.findUserByGoogleId.mockResolvedValue(null);
   repo.findUserByEmail.mockResolvedValue(null);
   repo.findUserByUsername.mockResolvedValue(null);
-  repo.createGoogleUser.mockImplementation(async (data: Record<string, unknown>) => ({
-    ...VICTIM,
-    ...data,
-    id: "new-id",
-  }));
+  repo.createGoogleUser.mockImplementation(
+    async (data: Record<string, unknown>) => ({
+      ...VICTIM,
+      ...data,
+      id: "new-id",
+    }),
+  );
   repo.linkGoogleId.mockResolvedValue(VICTIM);
 });
 

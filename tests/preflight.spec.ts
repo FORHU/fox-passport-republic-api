@@ -35,7 +35,9 @@ let errors: string[];
 
 beforeEach(() => {
   errors = [];
-  vi.spyOn(console, "error").mockImplementation((m) => void errors.push(String(m)));
+  vi.spyOn(console, "error").mockImplementation(
+    (m) => void errors.push(String(m)),
+  );
   // The real one ends the process, which would take the test runner with it.
   // Throwing preserves the thing under test: nothing after the refusal runs.
   exit = vi.spyOn(process, "exit").mockImplementation(((): never => {

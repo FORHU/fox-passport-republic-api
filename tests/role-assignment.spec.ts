@@ -22,26 +22,42 @@ const db = vi.hoisted(() => ({
 vi.mock("../src/utils/prisma", () => ({
   prisma: {
     user: {
-      findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
-        db.users.find((u) => u.id === where.id) ?? null,
+      findUnique: vi.fn(
+        async ({ where }: { where: { id: string } }) =>
+          db.users.find((u) => u.id === where.id) ?? null,
       ),
-      count: vi.fn(async ({ where }: { where: { systemRole: string } }) =>
-        db.users.filter((u) => u.systemRole === where.systemRole).length,
+      count: vi.fn(
+        async ({ where }: { where: { systemRole: string } }) =>
+          db.users.filter((u) => u.systemRole === where.systemRole).length,
       ),
       update: vi.fn(
-        async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+        async ({
+          where,
+          data,
+        }: {
+          where: { id: string };
+          data: Record<string, unknown>;
+        }) => {
           const u = db.users.find((x) => x.id === where.id)!;
           Object.assign(u, data);
           return u;
         },
       ),
     },
-    auditLog: { create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => { db.audits.push(data); return data; }) },
+    auditLog: {
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+        db.audits.push(data);
+        return data;
+      }),
+    },
   },
 }));
 
 vi.mock("../src/modules/auth/refresh-token.service", () => ({
-  revokeAllForUser: vi.fn(async (id: string) => { db.revoked.push(id); return 2; }),
+  revokeAllForUser: vi.fn(async (id: string) => {
+    db.revoked.push(id);
+    return 2;
+  }),
 }));
 
 import RoleAssignmentSvc, {
@@ -52,9 +68,24 @@ const admin = { userId: "admin-1", email: "admin@example.com" };
 
 beforeEach(() => {
   db.users = [
-    { id: "admin-1", email: "admin@example.com", systemRole: "admin", roleType: [] },
-    { id: "admin-2", email: "admin2@example.com", systemRole: "admin", roleType: [] },
-    { id: "user-1", email: "user@example.com", systemRole: "user", roleType: [] },
+    {
+      id: "admin-1",
+      email: "admin@example.com",
+      systemRole: "admin",
+      roleType: [],
+    },
+    {
+      id: "admin-2",
+      email: "admin2@example.com",
+      systemRole: "admin",
+      roleType: [],
+    },
+    {
+      id: "user-1",
+      email: "user@example.com",
+      systemRole: "user",
+      roleType: [],
+    },
   ];
   db.audits = [];
   db.revoked = [];
@@ -64,7 +95,11 @@ const lastAudit = () => db.audits[db.audits.length - 1];
 
 describe("changing a system role", () => {
   it("promotes, revokes the target's sessions, and records it", async () => {
-    const r = await RoleAssignmentSvc.changeSystemRole(admin, "user-1", "admin_secretary");
+    const r = await RoleAssignmentSvc.changeSystemRole(
+      admin,
+      "user-1",
+      "admin_secretary",
+    );
 
     expect(r.target.systemRole).toBe("admin_secretary");
     expect(r.previous).toBe("user");
@@ -104,7 +139,11 @@ describe("changing a system role", () => {
   });
 
   it("demotes an admin while another remains", async () => {
-    const r = await RoleAssignmentSvc.changeSystemRole(admin, "admin-2", "user");
+    const r = await RoleAssignmentSvc.changeSystemRole(
+      admin,
+      "admin-2",
+      "user",
+    );
     expect(r.target.systemRole).toBe("user");
   });
 
@@ -116,7 +155,11 @@ describe("changing a system role", () => {
   });
 
   it("is a no-op when the role already matches", async () => {
-    const r = await RoleAssignmentSvc.changeSystemRole(admin, "admin-2", "admin");
+    const r = await RoleAssignmentSvc.changeSystemRole(
+      admin,
+      "admin-2",
+      "admin",
+    );
     expect(r.changed).toBe(false);
     expect(db.revoked).toHaveLength(0);
   });
@@ -132,7 +175,10 @@ describe("changing role types", () => {
 
     expect(r.target.roleType).toEqual(["venueFoxer", "eventFoxer"]);
     expect(db.revoked).toContain("user-1");
-    expect(lastAudit()).toMatchObject({ action: "roleType.change", outcome: "allowed" });
+    expect(lastAudit()).toMatchObject({
+      action: "roleType.change",
+      outcome: "allowed",
+    });
   });
 
   it("refuses self-assignment — granting yourself template:manage is escalation", async () => {
@@ -144,7 +190,10 @@ describe("changing role types", () => {
 
   it("rejects an unknown role type", async () => {
     await expect(
-      RoleAssignmentSvc.changeRoleTypes(admin, "user-1", ["venueFoxer", "wizard"]),
+      RoleAssignmentSvc.changeRoleTypes(admin, "user-1", [
+        "venueFoxer",
+        "wizard",
+      ]),
     ).rejects.toThrow(/not a role type/i);
     expect(lastAudit().metadata).toMatchObject({ reason: "unknown_role_type" });
   });

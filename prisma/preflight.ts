@@ -43,7 +43,9 @@ interface EnumGap {
  * than `public`, a preflight that silently found nothing would be worse than
  * one that looked slightly too widely.
  */
-async function readDatabaseEnums(pool: Pool): Promise<Map<string, Set<string>>> {
+async function readDatabaseEnums(
+  pool: Pool,
+): Promise<Map<string, Set<string>>> {
   const { rows } = await pool.query<{ enum_name: string; value: string }>(`
     SELECT t.typname AS enum_name, e.enumlabel AS value
     FROM pg_type t

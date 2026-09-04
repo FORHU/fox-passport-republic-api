@@ -56,7 +56,11 @@ describe("endpoints that used to be public", () => {
   });
 
   it("GET /bookings requires authentication", () => {
-    const chain = middlewareFor("modules/booking/booking.routes.ts", "get", "/");
+    const chain = middlewareFor(
+      "modules/booking/booking.routes.ts",
+      "get",
+      "/",
+    );
     expect(chain, "route not found").not.toBeNull();
     expect(chain).toContain("authenticate");
   });

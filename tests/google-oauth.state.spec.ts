@@ -15,7 +15,9 @@ import type { Request, Response } from "express";
 
 const svc = vi.hoisted(() => ({
   createState: vi.fn(() => "state-from-service"),
-  getAuthUrl: vi.fn((state: string) => `https://accounts.google.com/?state=${state}`),
+  getAuthUrl: vi.fn(
+    (state: string) => `https://accounts.google.com/?state=${state}`,
+  ),
   handleCallback: vi.fn(async () => ({
     accessToken: "access-token",
     refreshToken: "refresh-token",
@@ -43,7 +45,11 @@ import AuthCtrl from "../src/modules/auth/auth.controller";
 
 interface Recorded {
   redirect: string | null;
-  cookies: Array<{ name: string; value: string; options: Record<string, unknown> }>;
+  cookies: Array<{
+    name: string;
+    value: string;
+    options: Record<string, unknown>;
+  }>;
   cleared: string[];
 }
 
@@ -54,10 +60,12 @@ function fakeRes() {
       recorded.redirect = url;
       return res;
     }),
-    cookie: vi.fn((name: string, value: string, options: Record<string, unknown>) => {
-      recorded.cookies.push({ name, value, options });
-      return res;
-    }),
+    cookie: vi.fn(
+      (name: string, value: string, options: Record<string, unknown>) => {
+        recorded.cookies.push({ name, value, options });
+        return res;
+      },
+    ),
     clearCookie: vi.fn((name: string) => {
       recorded.cleared.push(name);
       return res;
@@ -116,7 +124,10 @@ describe("googleCallback state validation", () => {
   it("refuses a callback whose state does not match the cookie", async () => {
     const { res, recorded } = fakeRes();
     await AuthCtrl.googleCallback(
-      fakeReq({ code: "abc", state: "attacker-state" }, "g_oauth_state=victim-state"),
+      fakeReq(
+        { code: "abc", state: "attacker-state" },
+        "g_oauth_state=victim-state",
+      ),
       res,
     );
 

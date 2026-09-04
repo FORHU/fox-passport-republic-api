@@ -84,7 +84,9 @@ describe("unknown and missing roles", () => {
     "denies %s",
     (role) => {
       expect(can(role as string | null | undefined, "queue:read")).toBe(false);
-      expect(can(role as string | null | undefined, "admin:access")).toBe(false);
+      expect(can(role as string | null | undefined, "admin:access")).toBe(
+        false,
+      );
     },
   );
 });
@@ -145,7 +147,10 @@ describe("the supply side", () => {
   });
 
   it("holds a multi-role user's union", () => {
-    const multi = { systemRole: "user", roleType: ["eventFoxer", "venueFoxer"] };
+    const multi = {
+      systemRole: "user",
+      roleType: ["eventFoxer", "venueFoxer"],
+    };
     expect(can(multi, "template:manage")).toBe(true);
     expect(can(multi, "venue:manage")).toBe(true);
     expect(can(multi, "asset:manage")).toBe(false);
@@ -156,21 +161,30 @@ describe("a bare string is SystemRole-only", () => {
   // The mechanism that keeps `admin` out of the supply side. If a role name
   // ever consults ROLE_TYPE_GRANTS, every admin silently gains every foxer
   // capability — the privilege widening this conversion exists to avoid.
-  it.each(["venue:manage", "asset:manage", "service:manage", "template:manage"] as const)(
-    'can("admin", "%s") stays false',
-    (permission) => {
-      expect(can("admin", permission)).toBe(false);
-    },
-  );
+  it.each([
+    "venue:manage",
+    "asset:manage",
+    "service:manage",
+    "template:manage",
+  ] as const)('can("admin", "%s") stays false', (permission) => {
+    expect(can("admin", permission)).toBe(false);
+  });
 
   it("but a complete subject carrying the role type is answered", () => {
-    expect(can({ systemRole: "admin", roleType: ["eventFoxer"] }, "template:manage")).toBe(true);
+    expect(
+      can({ systemRole: "admin", roleType: ["eventFoxer"] }, "template:manage"),
+    ).toBe(true);
   });
 });
 
 describe("unknown role types fail closed", () => {
   it("denies a roleType the schema has never heard of", () => {
-    expect(can({ systemRole: "user", roleType: ["notARealRole"] }, "template:manage")).toBe(false);
+    expect(
+      can(
+        { systemRole: "user", roleType: ["notARealRole"] },
+        "template:manage",
+      ),
+    ).toBe(false);
     expect(permissionsForUser({ roleType: ["notARealRole"] })).toEqual([]);
   });
 
@@ -191,8 +205,8 @@ describe("permissionsForUser", () => {
   });
 
   it("agrees with permissionsFor when there is no supply role", () => {
-    expect(permissionsForUser({ systemRole: "admin_secretary" }).sort()).toEqual(
-      permissionsFor("admin_secretary").sort(),
-    );
+    expect(
+      permissionsForUser({ systemRole: "admin_secretary" }).sort(),
+    ).toEqual(permissionsFor("admin_secretary").sort());
   });
 });

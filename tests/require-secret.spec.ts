@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  requireSecret,
-  MIN_SECRET_LENGTH,
-} from "../src/utils/require-secret";
+import { requireSecret, MIN_SECRET_LENGTH } from "../src/utils/require-secret";
 
 /**
  * `ACCESS_TOKEN_SECRET` was a bare `as string` cast. A deployment without it
@@ -37,7 +34,9 @@ describe("presence", () => {
   });
 
   it("enforces presence in development too", () => {
-    expect(() => requireSecret("ACCESS_TOKEN_SECRET", undefined, dev)).toThrow();
+    expect(() =>
+      requireSecret("ACCESS_TOKEN_SECRET", undefined, dev),
+    ).toThrow();
   });
 });
 
@@ -61,9 +60,7 @@ describe("strength, in production only", () => {
 
   it("rejects bare placeholder words however they are cased", () => {
     for (const value of ["changeme", "CHANGE_ME", "placeholder", "secret"]) {
-      expect(() =>
-        requireSecret("ACCESS_TOKEN_SECRET", value, prod),
-      ).toThrow();
+      expect(() => requireSecret("ACCESS_TOKEN_SECRET", value, prod)).toThrow();
     }
   });
 
