@@ -109,10 +109,15 @@ pre-dated this work.
 Six thin pass-through service methods were added, typed as
 `Parameters<typeof Repo.method>` so the two signatures cannot drift. Two call
 sites got more than a pass-through: `approveEvent` and `rejectEvent` now go
-through `EventRequestSvc.approveRequest` / `rejectRequest`, which re-check
-`queue:decide`. The `/admin/*` routes were already gated on that permission, so
-this changes no behaviour — it adds a second layer, which is what the service
-methods were written for.
+through `EventRequestSvc.approveRequest` / `rejectRequest`. `rejectRequest`
+re-checks `queue:decide`; `approveRequest` re-checks `queue:read` (or
+organizer ownership). The `/admin/*` routes are already gated on
+`queue:decide`, and `GRANTS` (`src/types/permissions.ts`) currently grants
+`queue:read` to every role that holds `queue:decide`, so this changes no
+behaviour today — it adds a second layer, which is what the service methods
+were written for. That pairing is incidental, not enforced: a future role
+granted `queue:decide` without `queue:read` would fail `approveEvent` at the
+service layer despite clearing the route.
 
 **This repository is stricter than the template.** The template's validator
 header says controllers may "NEVER import repositories directly", but its Rule 3

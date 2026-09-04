@@ -104,7 +104,8 @@ role request, gone. `migrate dev` detects drift and offers a reset; `db:setup` i
 every auto-fixable error stops failing CI — the check still runs, still passes,
 and enforces less than you think.
 
-The `lint` script deliberately does not have it. `format` is the separate thing.
+The `lint` script deliberately does not have it. `lint:fix` is the separate
+thing for local use; `format` handles Prettier.
 
 ## 9. Lint scope is not what it looks like
 
