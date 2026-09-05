@@ -227,5 +227,4 @@ export default class ServiceCtrl {
       return res.status(status).json({ message: err.message || err });
     }
   }
-
 }

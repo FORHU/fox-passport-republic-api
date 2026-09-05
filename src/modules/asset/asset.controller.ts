@@ -244,5 +244,4 @@ export default class AssetCtrl {
       return res.status(status).json({ message: error.message || error });
     }
   }
-
 }
