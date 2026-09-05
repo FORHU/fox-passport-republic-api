@@ -51,6 +51,13 @@ export default class UsersSvc {
     return foxer;
   }
 
+  // GET PUBLIC PROFILE (Citizen profile with passport, badges, stamps, listings, and posts)
+  static async getPublicProfile(idOrUsername: string) {
+    const profile = await UsersRepo.findPublicCitizenProfile(idOrUsername);
+    if (!profile) throw new Error("Citizen profile not found");
+    return profile;
+  }
+
   // GET USER BY ID
   static async getUserById(id: string) {
     const user = await UsersRepo.findUserById(id);

@@ -29,6 +29,9 @@ import passportRoutes from "../modules/passport/passport.routes";
 import analyticsRoutes from "../modules/analytics/analytics.routes";
 import searchRoutes from "../modules/search/search.routes";
 import conversationRoutes from "../modules/conversations/conversation.routes";
+import feedRoutes from "../modules/feed/feed.routes";
+import investmentRoutes from "../modules/investment/investment.routes";
+import eventRoutes from "../modules/event/event.routes";
 
 const router = express.Router();
 
@@ -73,6 +76,9 @@ router.use("/v1/passport", passportRoutes);
 router.use("/v1/analytics", analyticsRoutes);
 router.use("/v1/search", searchRoutes);
 router.use("/v1/stripe-connect", stripeConnectRoutes);
+router.use("/v1/feed", feedRoutes);
+router.use("/v1/investments", investmentRoutes);
+router.use("/v1/events", eventRoutes);
 
 // Admin Routes
 router.use("/v1/admin", adminRoutes);

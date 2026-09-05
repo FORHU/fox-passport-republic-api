@@ -17,6 +17,7 @@ import {
   seedSpecializations,
   seedCancellationPolicies,
   seedPartners,
+  seedFeed,
 } from "./seeder";
 
 /**
@@ -137,6 +138,9 @@ async function main() {
 
   // 12. Seed Partners (multi-role partner user with owned venues, assets, and gear)
   await seedPartners(prisma);
+
+  // 13. Seed Republic Foxer Feed (posts, spotlights, reviews, partner announcements)
+  await seedFeed(prisma);
 
   console.log("Seeding completed successfully!");
 }

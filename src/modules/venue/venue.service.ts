@@ -152,6 +152,11 @@ export default class VenueSvc {
     hostId?: string;
     page?: number;
     limit?: number;
+    north?: number;
+    south?: number;
+    east?: number;
+    west?: number;
+    category?: VenueCategory;
   }) {
     const { venues, total } = await VenueRepo.findAllVenues(filters);
     const { default: PassportSvc } =

@@ -528,4 +528,179 @@ export default class UsersRepo {
       where: { id: String(id) },
     });
   }
+
+  // READ PUBLIC CITIZEN PROFILE (for /user/:id or author popovers)
+  static async findPublicCitizenProfile(idOrUsername: string) {
+    return prisma.user.findFirst({
+      where: {
+        OR: [{ id: idOrUsername }, { username: idOrUsername }],
+      },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        imgId: true,
+        city: true,
+        state: true,
+        country: true,
+        roleType: true,
+        systemRole: true,
+        createdAt: true,
+        foxerSpecializations: {
+          select: {
+            id: true,
+            roleType: true,
+            category: true,
+            source: true,
+          },
+        },
+        passport: {
+          select: {
+            id: true,
+            perks: true,
+            paths: {
+              select: {
+                path: true,
+                level: true,
+                currentXP: true,
+                totalXP: true,
+              },
+            },
+            stamps: {
+              orderBy: { createdAt: "desc" },
+              select: {
+                id: true,
+                eventName: true,
+                eventDate: true,
+                location: true,
+                venueId: true,
+                xpEarned: true,
+                imageUrl: true,
+                createdAt: true,
+                venue: {
+                  select: {
+                    id: true,
+                    name: true,
+                    city: true,
+                    stampIconUrl: true,
+                    images: { take: 1, select: { url: true } },
+                  },
+                },
+              },
+            },
+            userBadges: {
+              orderBy: { earnedAt: "desc" },
+              select: {
+                id: true,
+                earnedAt: true,
+                badge: {
+                  select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    icon: true,
+                    color: true,
+                    rarity: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        venues: {
+          where: { status: "available" },
+          take: 6,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            price: true,
+            billingRate: true,
+            city: true,
+            stampIconUrl: true,
+            images: { take: 1, select: { url: true } },
+          },
+        },
+        assets: {
+          where: { status: "available", deletedAt: null },
+          take: 6,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            price: true,
+            billingRate: true,
+            images: { take: 1, select: { url: true } },
+          },
+        },
+        services: {
+          where: { status: "available", deletedAt: null },
+          take: 6,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            price: true,
+            billingRate: true,
+            images: { take: 1, select: { url: true } },
+          },
+        },
+        posts: {
+          where: { isArchived: false },
+          take: 10,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            type: true,
+            tab: true,
+            content: true,
+            mediaUrls: true,
+            createdAt: true,
+            likesCount: true,
+            commentsCount: true,
+            sharesCount: true,
+            venue: {
+              select: {
+                id: true,
+                name: true,
+                city: true,
+                stampIconUrl: true,
+              },
+            },
+            asset: {
+              select: {
+                id: true,
+                name: true,
+                category: true,
+              },
+            },
+            service: {
+              select: {
+                id: true,
+                name: true,
+                category: true,
+              },
+            },
+            stamp: {
+              select: {
+                id: true,
+                eventName: true,
+                xpEarned: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            posts: { where: { isArchived: false } },
+            organizedEvents: true,
+            bookings: true,
+          },
+        },
+      },
+    });
+  }
 }

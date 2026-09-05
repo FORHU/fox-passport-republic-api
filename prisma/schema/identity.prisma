@@ -52,6 +52,10 @@ model User {
   conversationsAsA         Conversation[]            @relation("ConversationUserA")
   conversationsAsB         Conversation[]            @relation("ConversationUserB")
   messagesSent             Message[]
+  posts                    Post[]
+  postComments             PostComment[]
+  postLikes                PostLike[]
+  partnerInvestments       PartnerInvestment[]
 
   @@map("users")
 }

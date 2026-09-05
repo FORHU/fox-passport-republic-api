@@ -102,6 +102,17 @@ export default class UsersCtrl {
     }
   }
 
+  // READ PUBLIC CITIZEN PROFILE
+  static async getPublicProfile(req: Request, res: Response) {
+    try {
+      const profile = await UsersSvc.getPublicProfile(req.params.id);
+      return res.status(200).json({ success: true, data: profile });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res.status(404).json({ success: false, message: err.message });
+    }
+  }
+
   // READ ONE
   static async getUserById(req: Request, res: Response) {
     try {

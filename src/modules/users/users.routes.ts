@@ -11,6 +11,8 @@ const router = express.Router();
 router.get("/foxers", UsersCtrl.getFoxers);
 router.get("/foxers/me/stats", authenticate, UsersCtrl.getFoxerStats);
 router.get("/foxers/:id", UsersCtrl.getFoxerById);
+router.get("/profile/:id", UsersCtrl.getPublicProfile);
+router.get("/:id/public", UsersCtrl.getPublicProfile);
 
 // Authenticated routes
 router.post("/become-host", authenticate, UsersCtrl.becomeHost);

@@ -127,6 +127,8 @@ model Event {
   template            EventTemplate?            @relation(fields: [templateId], references: [id])
   serviceTransactions EventServiceTransaction[]
   venueTransactions   EventVenueTransaction[]
+  posts               Post[]
+  partnerInvestments  PartnerInvestment[]
 
   @@map("events")
 }
