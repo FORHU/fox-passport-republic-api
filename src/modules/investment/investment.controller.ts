@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import Joi from "joi";
+import { InvestmentType, InventoryCategory } from "@prisma/client";
 import InvestmentSvc from "./investment.service";
 
 export default class InvestmentCtrl {
@@ -77,8 +78,8 @@ export default class InvestmentCtrl {
   // GET /v1/investments
   static async getInvestments(req: Request, res: Response) {
     try {
-      const type = req.query.type as any;
-      const category = req.query.category as any;
+      const type = req.query.type as InvestmentType | undefined;
+      const category = req.query.category as InventoryCategory | undefined;
       const partnerId = req.query.partnerId as string | undefined;
       const status = req.query.status as string | undefined;
       const country = req.query.country as string | undefined;
@@ -116,8 +117,8 @@ export default class InvestmentCtrl {
   // GET /v1/investments/map
   static async getInvestmentsOnMap(req: Request, res: Response) {
     try {
-      const type = req.query.type as any;
-      const category = req.query.category as any;
+      const type = req.query.type as InvestmentType | undefined;
+      const category = req.query.category as InventoryCategory | undefined;
       const country = req.query.country as string | undefined;
 
       const minLat = req.query.minLat ? Number(req.query.minLat) : undefined;
@@ -148,7 +149,7 @@ export default class InvestmentCtrl {
   static async getNearbyInventoryForVenue(req: Request, res: Response) {
     try {
       const { venueId } = req.params;
-      const category = req.query.category as any;
+      const category = req.query.category as InventoryCategory | undefined;
       const maxRadiusKm = req.query.radius ? Number(req.query.radius) : 50;
 
       const nearby = await InvestmentSvc.getNearbyInventoryForVenue({

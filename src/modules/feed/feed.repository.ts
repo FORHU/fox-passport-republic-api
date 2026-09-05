@@ -201,7 +201,7 @@ export default class FeedRepo {
 
     const formatted = items.map((p) => {
       const isLikedByMe = viewerId ? (p.likes?.length ?? 0) > 0 : false;
-      const { likes, ...rest } = p as any;
+      const { likes: _likes, ...rest } = p;
       return {
         ...rest,
         isLikedByMe,
@@ -233,10 +233,8 @@ export default class FeedRepo {
 
     if (!post) return null;
 
-    const isLikedByMe = viewerId
-      ? ((post as any).likes?.length ?? 0) > 0
-      : false;
-    const { likes, ...rest } = post as any;
+    const isLikedByMe = viewerId ? (post.likes?.length ?? 0) > 0 : false;
+    const { likes: _likes, ...rest } = post;
     return {
       ...rest,
       isLikedByMe,
