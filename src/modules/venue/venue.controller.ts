@@ -1,20 +1,13 @@
 import { Request, Response } from "express";
 import Joi from "joi";
-import { prisma } from "../../utils/prisma";
 import VenueSvc from "./venue.service";
-import { sendApprovedEmail } from "../../utils/emails/approved";
-import { sendRejectedEmail } from "../../utils/emails/rejected";
 import { VenueStatus, VenueCategory, BillingRate } from "@prisma/client";
 import {
   MIN_POLYGON_VERTICES,
   MAX_POLYGON_VERTICES,
   LngLat,
 } from "../../utils/geo";
-import {
-  announceAdminQueueChanged,
-  announceToUser,
-} from "../../infrastructure/socket/invalidate";
-import { can } from "../../types/permissions";
+import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
 
 interface CreateVenuePayload {
   name: string;
@@ -244,93 +237,6 @@ export default class VenueCtrl {
             ? 404
             : 400;
       return res.status(status).json({ message: err.message || err });
-    }
-  }
-
-  static async approveVenue(req: Request, res: Response) {
-    try {
-      const user = req.user;
-      if (!user || !can(user.systemRole, "queue:decide")) {
-        return res
-          .status(403)
-          .json({ message: "Forbidden: Admin access required" });
-      }
-      const venue = await prisma.venue.update({
-        where: { id: req.params.id },
-        data: { status: VenueStatus.available },
-      });
-
-      try {
-        const full = await prisma.venue.findUnique({
-          where: { id: venue.id },
-          include: { mayor: { select: { email: true, name: true } } },
-        });
-        if (full?.mayor?.email) {
-          sendApprovedEmail({
-            to: full.mayor.email,
-            entityName: full.name,
-            entityType: "Venue",
-          });
-        }
-      } catch (emailErr) {
-        console.error("Failed to send approval email:", emailErr);
-      }
-
-      announceAdminQueueChanged();
-      announceToUser(venue.mayorId, "venues");
-      return res
-        .status(200)
-        .json({ message: "Venue approved successfully", venue });
-    } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(404).json({ message: error.message || error });
-    }
-  }
-
-  static async rejectVenue(req: Request, res: Response) {
-    try {
-      const user = req.user;
-      if (!user || !can(user.systemRole, "queue:decide")) {
-        return res
-          .status(403)
-          .json({ message: "Forbidden: Admin access required" });
-      }
-      const { reason } = req.body;
-      if (!reason) {
-        return res
-          .status(400)
-          .json({ message: "Rejection reason is required" });
-      }
-      const venue = await prisma.venue.update({
-        where: { id: req.params.id },
-        data: { status: VenueStatus.rejected, rejectionReason: reason },
-      });
-
-      try {
-        const full = await prisma.venue.findUnique({
-          where: { id: venue.id },
-          include: { mayor: { select: { email: true, name: true } } },
-        });
-        if (full?.mayor?.email) {
-          sendRejectedEmail({
-            to: full.mayor.email,
-            entityName: full.name,
-            entityType: "Venue",
-            reason,
-          });
-        }
-      } catch (emailErr) {
-        console.error("Failed to send rejection email:", emailErr);
-      }
-
-      announceAdminQueueChanged();
-      announceToUser(venue.mayorId, "venues");
-      return res
-        .status(200)
-        .json({ message: "Venue rejected successfully", venue });
-    } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(404).json({ message: error.message || error });
     }
   }
 

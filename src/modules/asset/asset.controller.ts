@@ -1,10 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
-import { prisma } from "../../utils/prisma";
 import { totalPages } from "../../utils/pagination";
 import AssetSvc from "./asset.service";
-import { sendApprovedEmail } from "../../utils/emails/approved";
-import { sendRejectedEmail } from "../../utils/emails/rejected";
 import {
   AssetCondition,
   AssetStatus,
@@ -12,11 +9,7 @@ import {
   AssetCategory,
 } from "@prisma/client";
 import { toEnum } from "../../utils/enums";
-import {
-  announceAdminQueueChanged,
-  announceToUser,
-} from "../../infrastructure/socket/invalidate";
-import { can } from "../../types/permissions";
+import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
 
 interface CreateAssetPayload {
   category: AssetCategory;
@@ -252,90 +245,4 @@ export default class AssetCtrl {
     }
   }
 
-  static async approveAsset(req: Request, res: Response) {
-    try {
-      const user = req.user;
-      if (!user || !can(user.systemRole, "queue:decide")) {
-        return res
-          .status(403)
-          .json({ message: "Forbidden: Admin access required" });
-      }
-      const asset = await prisma.asset.update({
-        where: { id: req.params.id },
-        data: { status: AssetStatus.available },
-      });
-
-      try {
-        const full = await prisma.asset.findUnique({
-          where: { id: asset.id },
-          include: { owner: { select: { email: true, name: true } } },
-        });
-        if (full?.owner?.email) {
-          sendApprovedEmail({
-            to: full.owner.email,
-            entityName: full.name,
-            entityType: "Asset",
-          });
-        }
-      } catch (emailErr) {
-        console.error("Failed to send approval email:", emailErr);
-      }
-
-      announceAdminQueueChanged();
-      announceToUser(asset.ownerId, "venues");
-      return res
-        .status(200)
-        .json({ message: "Asset approved successfully", asset });
-    } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(404).json({ message: error.message || error });
-    }
-  }
-
-  static async rejectAsset(req: Request, res: Response) {
-    try {
-      const user = req.user;
-      if (!user || !can(user.systemRole, "queue:decide")) {
-        return res
-          .status(403)
-          .json({ message: "Forbidden: Admin access required" });
-      }
-      const { reason } = req.body;
-      if (!reason) {
-        return res
-          .status(400)
-          .json({ message: "Rejection reason is required" });
-      }
-      const asset = await prisma.asset.update({
-        where: { id: req.params.id },
-        data: { status: AssetStatus.rejected, rejectionReason: reason },
-      });
-
-      try {
-        const full = await prisma.asset.findUnique({
-          where: { id: asset.id },
-          include: { owner: { select: { email: true, name: true } } },
-        });
-        if (full?.owner?.email) {
-          sendRejectedEmail({
-            to: full.owner.email,
-            entityName: full.name,
-            entityType: "Asset",
-            reason,
-          });
-        }
-      } catch (emailErr) {
-        console.error("Failed to send rejection email:", emailErr);
-      }
-
-      announceAdminQueueChanged();
-      announceToUser(asset.ownerId, "venues");
-      return res
-        .status(200)
-        .json({ message: "Asset rejected successfully", asset });
-    } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(404).json({ message: error.message || error });
-    }
-  }
 }

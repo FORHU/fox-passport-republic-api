@@ -32,18 +32,8 @@ router.delete(
   ServiceCtrl.deleteService,
 );
 
-// Admin routes
-router.patch(
-  "/:id/approve",
-  authenticate,
-  requirePermission("queue:decide"),
-  ServiceCtrl.approveService,
-);
-router.patch(
-  "/:id/reject",
-  authenticate,
-  requirePermission("queue:decide"),
-  ServiceCtrl.rejectService,
-);
+// Approve/reject moved to admin.routes.ts (AdminCtrl) — this pair had
+// diverged from it (no XP award, no socket announce) and this app only ever
+// called the admin path. See docs/TOMORROW.md.
 
 export default router;

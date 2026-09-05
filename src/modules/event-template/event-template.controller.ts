@@ -3,14 +3,8 @@ import Joi from "joi";
 import { prisma } from "../../utils/prisma";
 import { totalPages } from "../../utils/pagination";
 import EventTemplateSvc from "./event-template.service";
-import { sendApprovedEmail } from "../../utils/emails/approved";
-import { sendRejectedEmail } from "../../utils/emails/rejected";
 import { EventCategory, EventTemplateStatus } from "@prisma/client";
-import {
-  announceAdminQueueChanged,
-  announceToUser,
-} from "../../infrastructure/socket/invalidate";
-import { can } from "../../types/permissions";
+import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
 
 export default class EventTemplateCtrl {
   static async createTemplate(req: Request, res: Response) {
@@ -491,46 +485,6 @@ export default class EventTemplateCtrl {
     }
   }
 
-  static async approveEventTemplate(req: Request, res: Response) {
-    try {
-      const user = req.user;
-      if (!user || !can(user.systemRole, "queue:decide")) {
-        return res
-          .status(403)
-          .json({ message: "Forbidden: Admin access required" });
-      }
-      const template = await prisma.eventTemplate.update({
-        where: { id: req.params.id },
-        data: { status: EventTemplateStatus.published },
-      });
-
-      try {
-        const full = await prisma.eventTemplate.findUnique({
-          where: { id: template.id },
-          include: { owner: { select: { email: true, name: true } } },
-        });
-        if (full?.owner?.email) {
-          sendApprovedEmail({
-            to: full.owner.email,
-            entityName: full.name,
-            entityType: "Event Template",
-          });
-        }
-      } catch (emailErr) {
-        console.error("Failed to send approval email:", emailErr);
-      }
-
-      announceAdminQueueChanged();
-      announceToUser(template.ownerId, "events");
-      return res
-        .status(200)
-        .json({ message: "Event template approved successfully", template });
-    } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(404).json({ message: error.message || error });
-    }
-  }
-
   static async getRecommendations(req: Request, res: Response) {
     try {
       const templates = await prisma.eventTemplate.findMany({
@@ -557,50 +511,4 @@ export default class EventTemplateCtrl {
     }
   }
 
-  static async rejectEventTemplate(req: Request, res: Response) {
-    try {
-      const user = req.user;
-      if (!user || !can(user.systemRole, "queue:decide")) {
-        return res
-          .status(403)
-          .json({ message: "Forbidden: Admin access required" });
-      }
-      const { reason } = req.body;
-      if (!reason) {
-        return res
-          .status(400)
-          .json({ message: "Rejection reason is required" });
-      }
-      const template = await prisma.eventTemplate.update({
-        where: { id: req.params.id },
-        data: { status: EventTemplateStatus.rejected, rejectionReason: reason },
-      });
-
-      try {
-        const full = await prisma.eventTemplate.findUnique({
-          where: { id: template.id },
-          include: { owner: { select: { email: true, name: true } } },
-        });
-        if (full?.owner?.email) {
-          sendRejectedEmail({
-            to: full.owner.email,
-            entityName: full.name,
-            entityType: "Event Template",
-            reason,
-          });
-        }
-      } catch (emailErr) {
-        console.error("Failed to send rejection email:", emailErr);
-      }
-
-      announceAdminQueueChanged();
-      announceToUser(template.ownerId, "events");
-      return res
-        .status(200)
-        .json({ message: "Event template rejected successfully", template });
-    } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(404).json({ message: error.message || error });
-    }
-  }
 }

@@ -34,18 +34,8 @@ router.delete(
   VenueCtrl.deleteVenue,
 );
 
-// Admin routes
-router.patch(
-  "/:id/approve",
-  authenticate,
-  requirePermission("queue:decide"),
-  VenueCtrl.approveVenue,
-);
-router.patch(
-  "/:id/reject",
-  authenticate,
-  requirePermission("queue:decide"),
-  VenueCtrl.rejectVenue,
-);
+// Approve/reject moved to admin.routes.ts (AdminCtrl) — this pair had
+// diverged from it (no XP/badge award, no socket announce) and this app only
+// ever called the admin path. See docs/TOMORROW.md.
 
 export default router;

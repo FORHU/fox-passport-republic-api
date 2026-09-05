@@ -119,18 +119,8 @@ router.patch(
   EventTemplateCtrl.respondToMatch,
 );
 
-// Admin routes
-router.patch(
-  "/:id/approve",
-  authenticate,
-  requirePermission("queue:decide"),
-  EventTemplateCtrl.approveEventTemplate,
-);
-router.patch(
-  "/:id/reject",
-  authenticate,
-  requirePermission("queue:decide"),
-  EventTemplateCtrl.rejectEventTemplate,
-);
+// Approve/reject moved to admin.routes.ts (AdminCtrl) — this pair had
+// diverged from it (no socket announce) and this app only ever called the
+// admin path. See docs/TOMORROW.md.
 
 export default router;
