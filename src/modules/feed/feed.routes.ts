@@ -16,6 +16,10 @@ router.post("/:id/like", authenticate, FeedController.toggleLike);
 // Comments
 router.get("/:id/comments", optionalAuth, FeedController.getComments);
 router.post("/:id/comments", authenticate, FeedController.addComment);
-router.delete("/:id/comments/:commentId", authenticate, FeedController.deleteComment);
+router.delete(
+  "/:id/comments/:commentId",
+  authenticate,
+  FeedController.deleteComment,
+);
 
 export default router;

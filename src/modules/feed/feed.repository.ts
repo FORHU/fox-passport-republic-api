@@ -233,7 +233,9 @@ export default class FeedRepo {
 
     if (!post) return null;
 
-    const isLikedByMe = viewerId ? ((post as any).likes?.length ?? 0) > 0 : false;
+    const isLikedByMe = viewerId
+      ? ((post as any).likes?.length ?? 0) > 0
+      : false;
     const { likes, ...rest } = post as any;
     return {
       ...rest,
@@ -352,7 +354,11 @@ export default class FeedRepo {
     });
   }
 
-  static async createComment(postId: string, authorId: string, content: string) {
+  static async createComment(
+    postId: string,
+    authorId: string,
+    content: string,
+  ) {
     return prisma.$transaction(async (tx) => {
       const comment = await tx.postComment.create({
         data: {

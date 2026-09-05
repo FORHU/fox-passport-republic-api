@@ -53,13 +53,17 @@ export default class InvestmentCtrl {
 
     const { error, value } = schema.validate(req.body);
     if (error) {
-      return res.status(400).json({ success: false, message: error.details[0].message });
+      return res
+        .status(400)
+        .json({ success: false, message: error.details[0].message });
     }
 
     try {
       const partnerId = req.user?.userId;
       if (!partnerId) {
-        return res.status(401).json({ success: false, message: "Unauthorized" });
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
       }
 
       const investment = await InvestmentSvc.createInvestment(partnerId, value);

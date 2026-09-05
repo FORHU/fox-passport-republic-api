@@ -66,8 +66,12 @@ export default class InvestmentRepo {
       ...(params.category ? { inventoryCategory: params.category } : {}),
       ...(params.partnerId ? { partnerId: params.partnerId } : {}),
       ...(params.status ? { status: params.status } : { status: "active" }),
-      ...(params.country ? { country: { equals: params.country, mode: "insensitive" } } : {}),
-      ...(params.city ? { city: { contains: params.city, mode: "insensitive" } } : {}),
+      ...(params.country
+        ? { country: { equals: params.country, mode: "insensitive" } }
+        : {}),
+      ...(params.city
+        ? { city: { contains: params.city, mode: "insensitive" } }
+        : {}),
     };
 
     const [investments, total] = await Promise.all([
@@ -117,7 +121,9 @@ export default class InvestmentRepo {
       lng: { not: null },
       ...(params.type ? { type: params.type } : {}),
       ...(params.category ? { inventoryCategory: params.category } : {}),
-      ...(params.country ? { country: { equals: params.country, mode: "insensitive" } } : {}),
+      ...(params.country
+        ? { country: { equals: params.country, mode: "insensitive" } }
+        : {}),
       ...(params.bounds
         ? {
             lat: { gte: params.bounds.minLat, lte: params.bounds.maxLat },

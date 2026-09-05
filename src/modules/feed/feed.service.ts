@@ -140,7 +140,9 @@ export default class FeedService {
           user.roleType.includes("serviceFoxer") ||
           user.roleType.includes("investor");
         if (!isAuthorized) {
-          throw new Error("Unauthorized: Service Foxer or Partner role required");
+          throw new Error(
+            "Unauthorized: Service Foxer or Partner role required",
+          );
         }
         const service = await prisma.service.findUnique({
           where: { id: serviceId },
@@ -182,8 +184,7 @@ export default class FeedService {
       case PostType.partner_announcement: {
         tab = FeedTab.partners;
         const isPartner =
-          user.systemRole === "admin" ||
-          user.roleType.includes("investor");
+          user.systemRole === "admin" || user.roleType.includes("investor");
         if (!isPartner) {
           throw new Error("Unauthorized: Partner Foxer role required");
         }
@@ -292,7 +293,10 @@ export default class FeedService {
           likerId: user.userId,
         },
       }).catch((err) =>
-        console.warn("[FeedService] Best-effort like notification failed:", err),
+        console.warn(
+          "[FeedService] Best-effort like notification failed:",
+          err,
+        ),
       );
     }
 

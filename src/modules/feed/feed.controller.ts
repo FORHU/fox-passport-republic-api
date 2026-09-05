@@ -4,7 +4,11 @@ import FeedService from "./feed.service";
 import { PostType, FeedTab } from "@prisma/client";
 
 function statusForError(message: string): number {
-  if (message.includes("Unauthorized") || message.includes("does not belong to you")) return 403;
+  if (
+    message.includes("Unauthorized") ||
+    message.includes("does not belong to you")
+  )
+    return 403;
   if (message.includes("not found")) return 404;
   return 400;
 }
@@ -138,7 +142,11 @@ export default class FeedController {
 
     try {
       const { id } = req.params;
-      const comment = await FeedService.addComment(id, req.user!, value.content);
+      const comment = await FeedService.addComment(
+        id,
+        req.user!,
+        value.content,
+      );
       return res.status(201).json({ success: true, data: comment });
     } catch (e: unknown) {
       const err = e as Error;
@@ -152,7 +160,9 @@ export default class FeedController {
     try {
       const { commentId } = req.params;
       await FeedService.deleteComment(commentId, req.user!);
-      return res.status(200).json({ success: true, message: "Comment deleted" });
+      return res
+        .status(200)
+        .json({ success: true, message: "Comment deleted" });
     } catch (e: unknown) {
       const error = e as Error;
       return res
