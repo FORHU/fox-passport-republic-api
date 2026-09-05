@@ -1,0 +1,157 @@
+// The supply side: what venue, gear and service Foxers own and list.
+
+model Asset {
+  id                   String                  @id @default(uuid())
+  ownerId              String
+  category             String
+  name                 String
+  description          String
+  quantity             Int                     @default(1)
+  price                Decimal                 @db.Decimal(12, 2)
+  currency             String                  @default("USD")
+  billingRate          BillingRate
+  condition            AssetCondition          @default(good)
+  status               AssetStatus             @default(available)
+  rejectionReason      String?
+  city                 String?
+  state                String?
+  country              String?                 @default("Philippines")
+  lat                  Float?
+  lng                  Float?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  deletedAt            DateTime?
+  transactions         EventAssetTransaction[]
+  images               File[]
+  bookings             AssetBooking[]
+  owner                User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  templateAssets       EventTemplateAsset[]
+  cancellationPolicyId String?
+  cancellationPolicy   CancellationPolicy?     @relation(fields: [cancellationPolicyId], references: [id])
+
+  @@map("assets")
+}
+
+model Service {
+  id                   String                    @id @default(uuid())
+  ownerId              String
+  category             ServiceCategory
+  name                 String
+  description          String
+  city                 String                    @default("Unknown City")
+  state                String?
+  country              String                    @default("Unknown Country")
+  lat                  Float?
+  lng                  Float?
+  isWillingToTravel    Boolean                   @default(false)
+  tags                 String[]
+  price                Decimal                   @db.Decimal(12, 2)
+  currency             String                    @default("USD")
+  billingRate          BillingRate
+  status               ServiceStatus             @default(draft)
+  rejectionReason      String?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  deletedAt            DateTime?
+  transactions         EventServiceTransaction[]
+  images               File[]
+  templateServices     EventTemplateService[]
+  bookings             ServiceBooking[]
+  owner                User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  cancellationPolicyId String?
+  cancellationPolicy   CancellationPolicy?       @relation(fields: [cancellationPolicyId], references: [id])
+
+  @@map("services")
+}
+
+model Venue {
+  id                   String                  @id @default(uuid())
+  mayorId              String
+  category             String
+  name                 String
+  description          String
+  capacity             Int
+  price                Decimal                 @db.Decimal(12, 2)
+  billingRate          BillingRate
+  address              String
+  city                 String
+  state                String?
+  country              String
+  // Centroid of `boundary`, derived and stored server-side — never written
+  // directly by a client. Kept for display/marker use (venue detail map,
+  // simple sorting) where a single point is enough.
+  lat                  Float?
+  lng                  Float?
+  // Service-area polygon: a closed ring of [lng, lat] vertex pairs, e.g.
+  // [[121.05,14.55],[121.06,14.55],[121.06,14.56],[121.05,14.55]]. Nullable
+  // at the column level for existing rows, but required by the create
+  // endpoint going forward — see VenueCtrl.createVenue's Joi schema.
+  boundary             Json?
+  status               VenueStatus             @default(draft)
+  rejectionReason      String?
+  spaceType            String[]
+  amenities            String[]
+  techAv               String[]
+  staffing             String[]
+  policies             String[]
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  transactions         EventVenueTransaction[]
+  images               File[]
+  templateVenues       EventTemplateVenue[]
+  mayor                User                    @relation(fields: [mayorId], references: [id], onDelete: Cascade)
+  cancellationPolicyId String?
+  cancellationPolicy   CancellationPolicy?     @relation(fields: [cancellationPolicyId], references: [id])
+
+  @@map("venues")
+}
+
+enum ServiceCategory {
+  design
+  catering
+  entertainment
+  service_staff
+  other
+}
+
+enum AssetCondition {
+  new
+  good
+  fair
+  refurbished
+}
+
+enum AssetStatus {
+  draft
+  pending
+  available
+  reserved
+  archived
+  rejected
+}
+
+enum ServiceStatus {
+  draft
+  pending
+  available
+  paused
+  archived
+  rejected
+}
+
+enum VenueStatus {
+  draft
+  pending
+  available
+  archived
+  rejected
+}
+
+enum BillingRate {
+  hourly
+  daily
+  weekly
+  monthly
+  yearly
+  one_time
+}

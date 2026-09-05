@@ -33,14 +33,14 @@ const updateReview = vi.fn(async (id: string, data: unknown) => ({
 }));
 const deleteReview = vi.fn(async (id: string) => ({ id }));
 
-vi.mock("../src/repositories/review.repository", () => ({
+vi.mock("../src/modules/review/review.repository", () => ({
   default: {
     updateReview: (...args: [string, unknown]) => updateReview(...args),
     deleteReview: (...args: [string]) => deleteReview(...args),
   },
 }));
 
-import ReviewSvc from "../src/services/review.service";
+import ReviewSvc from "../src/modules/review/review.service";
 
 beforeEach(() => {
   vi.clearAllMocks();

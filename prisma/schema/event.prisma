@@ -1,0 +1,253 @@
+// Event templates, the events built from them, and their transactions.
+
+model EventTemplate {
+  id                   String                 @id @default(uuid())
+  ownerId              String
+  name                 String
+  description          String
+  category             EventCategory
+  status               EventTemplateStatus    @default(draft)
+  rejectionReason      String?
+  isPublic             Boolean                @default(false)
+  targetCity           String?
+  targetState          String?
+  targetCountry        String?                @default("Philippines")
+  lat                  Float?
+  lng                  Float?
+  hostMarkupPct        Float                  @default(0)
+  platformFeePct       Float                  @default(0.05) //might change later on
+  maxAttendees         Int?
+  publicOpenAt         DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  events               Event[]
+  images               File[]
+  owner                User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  cancellationPolicyId String?
+  cancellationPolicy   CancellationPolicy?    @relation(fields: [cancellationPolicyId], references: [id])
+  templateAssets       EventTemplateAsset[]
+  templateServices     EventTemplateService[]
+  templateVenues       EventTemplateVenue[]
+  waitlist             Waitlist[]
+
+  @@map("event_templates")
+}
+
+model EventTemplateAsset {
+  id                 String             @id @default(uuid())
+  templateId         String
+  assetId            String?
+  description        String?
+  quantity           Int                @default(1)
+  currency           String             @default("PHP")
+  agreedPrice        Decimal            @default(0) @db.Decimal(12, 2)
+  isOptional         Boolean            @default(false)
+  date               DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  matched            Boolean            @default(false)
+  matchedAt          DateTime?
+  matchConstraint    MatchConstraint    @default(NONE)
+  matchRequestStatus MatchRequestStatus @default(pending)
+  asset              Asset?             @relation(fields: [assetId], references: [id])
+  template           EventTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@map("event_template_assets")
+}
+
+model EventTemplateService {
+  id                 String             @id @default(uuid())
+  templateId         String
+  serviceId          String?
+  description        String?
+  currency           String             @default("PHP")
+  agreedPrice        Decimal            @default(0) @db.Decimal(12, 2)
+  isOptional         Boolean            @default(false)
+  date               DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  matched            Boolean            @default(false)
+  matchedAt          DateTime?
+  matchConstraint    MatchConstraint    @default(NONE)
+  matchRequestStatus MatchRequestStatus @default(pending)
+  service            Service?           @relation(fields: [serviceId], references: [id])
+  template           EventTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@map("event_template_services")
+}
+
+model EventTemplateVenue {
+  id                 String             @id @default(uuid())
+  templateId         String
+  venueId            String?
+  description        String?
+  currency           String             @default("PHP")
+  agreedPrice        Decimal            @default(0) @db.Decimal(12, 2)
+  isOptional         Boolean            @default(false)
+  date               DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  matched            Boolean            @default(false)
+  matchedAt          DateTime?
+  matchConstraint    MatchConstraint    @default(NONE)
+  matchRequestStatus MatchRequestStatus @default(pending)
+  template           EventTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  venue              Venue?             @relation(fields: [venueId], references: [id])
+
+  @@map("event_template_venues")
+}
+
+model Event {
+  id                  String                    @id @default(uuid())
+  clientId            String
+  organizerId         String
+  templateId          String?
+  name                String
+  description         String
+  eventCategory       EventCategory
+  startAt             DateTime
+  endAt               DateTime
+  guestCount          Int
+  totalAmount         Decimal                   @db.Decimal(12, 2)
+  itemsTotal          Decimal                   @default(0) @db.Decimal(12, 2)
+  hostMarkupAmount    Decimal                   @default(0) @db.Decimal(12, 2)
+  platformFeeAmount   Decimal                   @default(0) @db.Decimal(12, 2)
+  eventStatus         EventStatus               @default(pending)
+  requestStatus       RequestStatus             @default(pending)
+  rejectionReason     String?
+  targetCity          String?
+  targetState         String?
+  targetCountry       String?                   @default("Philippines")
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  bookings            Booking[]
+  assetTransactions   EventAssetTransaction[]
+  client              User                      @relation("EventClient", fields: [clientId], references: [id])
+  host                User                      @relation("EventOrganizer", fields: [organizerId], references: [id])
+  template            EventTemplate?            @relation(fields: [templateId], references: [id])
+  serviceTransactions EventServiceTransaction[]
+  venueTransactions   EventVenueTransaction[]
+
+  @@map("events")
+}
+
+model EventAssetTransaction {
+  id               String            @id @default(uuid())
+  eventId          String
+  bookingId        String?
+  assetId          String
+  providerId       String
+  quantity         Int               @default(1)
+  status           TransactionStatus @default(pending)
+  agreedPrice      Decimal           @db.Decimal(12, 2)
+  included         Boolean           @default(true)
+  currency         String            @default("PHP")
+  stripeTransferId String?           @unique
+  disputeReason    String?
+  disputeAt        DateTime?
+  lockedAt         DateTime?
+  releasedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  asset            Asset             @relation(fields: [assetId], references: [id])
+  event            Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  booking          Booking?          @relation(fields: [bookingId], references: [id])
+  provider         User              @relation("AssetProvider", fields: [providerId], references: [id])
+
+  @@map("event_asset_transactions")
+}
+
+model EventServiceTransaction {
+  id               String            @id @default(uuid())
+  eventId          String
+  bookingId        String?
+  serviceId        String
+  providerId       String
+  status           TransactionStatus @default(pending)
+  agreedPrice      Decimal           @db.Decimal(12, 2)
+  included         Boolean           @default(true)
+  currency         String            @default("PHP")
+  stripeTransferId String?           @unique
+  disputeReason    String?
+  disputeAt        DateTime?
+  lockedAt         DateTime?
+  releasedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  event            Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  booking          Booking?          @relation(fields: [bookingId], references: [id])
+  provider         User              @relation("ServiceProvider", fields: [providerId], references: [id])
+  service          Service           @relation(fields: [serviceId], references: [id])
+
+  @@map("event_service_transactions")
+}
+
+model EventVenueTransaction {
+  id               String            @id @default(uuid())
+  eventId          String
+  bookingId        String?
+  venueId          String
+  providerId       String
+  status           TransactionStatus @default(pending)
+  agreedPrice      Decimal           @db.Decimal(12, 2)
+  included         Boolean           @default(true)
+  currency         String            @default("PHP")
+  stripeTransferId String?           @unique
+  disputeReason    String?
+  disputeAt        DateTime?
+  lockedAt         DateTime?
+  releasedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  event            Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  booking          Booking?          @relation(fields: [bookingId], references: [id])
+  provider         User              @relation("VenueProvider", fields: [providerId], references: [id])
+  venue            Venue             @relation(fields: [venueId], references: [id])
+
+  @@map("event_venue_transactions")
+}
+
+enum MatchRequestStatus {
+  pending
+  accepted
+  declined
+  secured
+}
+
+enum MatchConstraint {
+  SAME_STATE
+  BROADER
+  MANUAL_OVERRIDE
+  NONE
+}
+
+enum EventStatus {
+  draft
+  pending
+  ongoing
+  completed
+  cancelled
+}
+
+enum TransactionStatus {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+enum EventTemplateStatus {
+  draft
+  pending
+  published
+  rejected
+  archived
+}
+
+enum EventCategory {
+  corporate
+  birthday
+  wedding
+  social
+  other
+}

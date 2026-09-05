@@ -58,8 +58,8 @@ vi.mock("google-auth-library", () => ({
   },
 }));
 
-vi.mock("../src/repositories/auth.repository", () => ({ default: repo }));
-vi.mock("../src/services/refresh-token.service", () => ({
+vi.mock("../src/modules/auth/auth.repository", () => ({ default: repo }));
+vi.mock("../src/modules/auth/refresh-token.service", () => ({
   issueRefreshToken: vi.fn(async () => "refresh-token"),
 }));
 vi.mock("../src/utils/password", () => ({
@@ -73,7 +73,7 @@ vi.mock("../src/config", () => ({
   ACCESS_TOKEN_EXPIRY: "15m",
 }));
 
-import GoogleAuthSvc from "../src/services/google-auth.service";
+import GoogleAuthSvc from "../src/modules/auth/google-auth.service";
 
 /** Google's response for one sign-in, with the verification claim controllable. */
 function googleReturns(payload: Record<string, unknown>) {
@@ -97,11 +97,13 @@ beforeEach(() => {
   repo.findUserByGoogleId.mockResolvedValue(null);
   repo.findUserByEmail.mockResolvedValue(null);
   repo.findUserByUsername.mockResolvedValue(null);
-  repo.createGoogleUser.mockImplementation(async (data: Record<string, unknown>) => ({
-    ...VICTIM,
-    ...data,
-    id: "new-id",
-  }));
+  repo.createGoogleUser.mockImplementation(
+    async (data: Record<string, unknown>) => ({
+      ...VICTIM,
+      ...data,
+      id: "new-id",
+    }),
+  );
   repo.linkGoogleId.mockResolvedValue(VICTIM);
 });
 

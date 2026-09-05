@@ -42,9 +42,8 @@ async function loadServiceWith(io: unknown) {
     "../src/modules/notifications/user-notification.repository",
     () => ({ default: repo }),
   );
-  const mod = await import(
-    "../src/modules/notifications/user-notification.service"
-  );
+  const mod =
+    await import("../src/modules/notifications/user-notification.service");
   return mod.default;
 }
 

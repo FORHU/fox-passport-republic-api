@@ -1,69 +1,277 @@
-import { PrismaClient, AssetStatus, BillingRate, AssetCondition, AssetCategory } from "@prisma/client";
+import {
+  PrismaClient,
+  AssetStatus,
+  BillingRate,
+  AssetCondition,
+  AssetCategory,
+} from "@prisma/client";
+import { CITY_COORDS } from "./city-coords";
 
-const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
-  "Manila":        { lat: 14.5995, lng: 120.9842 },
-  "Taguig":        { lat: 14.5176, lng: 121.0509 },
-  "Quezon City":   { lat: 14.6760, lng: 121.0437 },
-  "Makati":        { lat: 14.5547, lng: 121.0244 },
-  "Baguio City":   { lat: 16.4023, lng: 120.5960 },
-  "Pasig":         { lat: 14.5764, lng: 121.0851 },
-  "Cebu City":     { lat: 10.3157, lng: 123.8854 },
-  "Mandaluyong":   { lat: 14.5794, lng: 121.0359 },
-  "Pasay":         { lat: 14.5378, lng: 121.0014 },
-  "Davao City":    { lat: 7.1907,  lng: 125.4553 },
-};
-
-const BULK_ASSET_NAMES: Partial<Record<AssetCategory, { name: string; desc: string; price: number; billingRate: BillingRate; condition: AssetCondition }[]>> = {
+const BULK_ASSET_NAMES: Partial<
+  Record<
+    AssetCategory,
+    {
+      name: string;
+      desc: string;
+      price: number;
+      billingRate: BillingRate;
+      condition: AssetCondition;
+    }[]
+  >
+> = {
   [AssetCategory.sound_system]: [
-    { name: "Portable PA Speaker", desc: "Compact 12-inch powered speaker for small to mid-size gatherings.", price: 15000, billingRate: BillingRate.daily, condition: AssetCondition.good },
-    { name: "Wireless Microphone Duo", desc: "Dual-channel UHF wireless mic set with clear range up to 80m.", price: 9500, billingRate: BillingRate.daily, condition: AssetCondition.new },
-    { name: "Subwoofer 15-Inch", desc: "High-output active subwoofer for deep bass reinforcement.", price: 22000, billingRate: BillingRate.daily, condition: AssetCondition.good },
-    { name: "Mixing Console 12-Channel", desc: "Analogue mixer with EQ and reverb for live sound.", price: 13000, billingRate: BillingRate.daily, condition: AssetCondition.good },
-    { name: "Stage Monitor Pair", desc: "Active floor monitors for on-stage foldback.", price: 18000, billingRate: BillingRate.daily, condition: AssetCondition.good },
-    { name: "Speaker Stand Set", desc: "Pair of steel tripod speaker stands with safety pins.", price: 5500, billingRate: BillingRate.daily, condition: AssetCondition.good },
-    { name: "CDJ Player Set", desc: "Professional twin CDJ player setup with mixer.", price: 40000, billingRate: BillingRate.daily, condition: AssetCondition.new },
-    { name: "Portable Sound Bar", desc: "All-in-one Bluetooth soundbar for cocktail events.", price: 8000, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    {
+      name: "Portable PA Speaker",
+      desc: "Compact 12-inch powered speaker for small to mid-size gatherings.",
+      price: 15000,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Wireless Microphone Duo",
+      desc: "Dual-channel UHF wireless mic set with clear range up to 80m.",
+      price: 9500,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.new,
+    },
+    {
+      name: "Subwoofer 15-Inch",
+      desc: "High-output active subwoofer for deep bass reinforcement.",
+      price: 22000,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Mixing Console 12-Channel",
+      desc: "Analogue mixer with EQ and reverb for live sound.",
+      price: 13000,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Stage Monitor Pair",
+      desc: "Active floor monitors for on-stage foldback.",
+      price: 18000,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Speaker Stand Set",
+      desc: "Pair of steel tripod speaker stands with safety pins.",
+      price: 5500,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "CDJ Player Set",
+      desc: "Professional twin CDJ player setup with mixer.",
+      price: 40000,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.new,
+    },
+    {
+      name: "Portable Sound Bar",
+      desc: "All-in-one Bluetooth soundbar for cocktail events.",
+      price: 8000,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
   ],
   [AssetCategory.decorations]: [
-    { name: "Backdrop Pipe and Drape", desc: "Adjustable pipe-and-drape system for stage or entrance backdrops.", price: 12000, billingRate: BillingRate.one_time, condition: AssetCondition.good },
-    { name: "Centrepiece Candle Holders", desc: "Set of 20 mixed-height glass candle holders.", price: 6500, billingRate: BillingRate.one_time, condition: AssetCondition.good },
-    { name: "Organza Table Overlay", desc: "Sheer organza runners for banquet table styling.", price: 4500, billingRate: BillingRate.one_time, condition: AssetCondition.new },
-    { name: "Balloon Garland Kit", desc: "DIY balloon arch kit with 120 latex balloons and strip.", price: 3500, billingRate: BillingRate.one_time, condition: AssetCondition.new },
-    { name: "Fabric Draping Panels", desc: "Set of 6 ceiling-to-floor tulle draping panels.", price: 8000, billingRate: BillingRate.one_time, condition: AssetCondition.good },
-    { name: "Garden Arch Trellis", desc: "White metal arch for outdoor ceremony or photo area.", price: 10000, billingRate: BillingRate.one_time, condition: AssetCondition.good },
-    { name: "Acrylic Welcome Sign", desc: "Customizable frosted acrylic welcome easel sign.", price: 4000, billingRate: BillingRate.one_time, condition: AssetCondition.new },
-    { name: "Gold Charger Plates (Set of 50)", desc: "Gold-rimmed charger plates for elegant table settings.", price: 7500, billingRate: BillingRate.one_time, condition: AssetCondition.good },
+    {
+      name: "Backdrop Pipe and Drape",
+      desc: "Adjustable pipe-and-drape system for stage or entrance backdrops.",
+      price: 12000,
+      billingRate: BillingRate.one_time,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Centrepiece Candle Holders",
+      desc: "Set of 20 mixed-height glass candle holders.",
+      price: 6500,
+      billingRate: BillingRate.one_time,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Organza Table Overlay",
+      desc: "Sheer organza runners for banquet table styling.",
+      price: 4500,
+      billingRate: BillingRate.one_time,
+      condition: AssetCondition.new,
+    },
+    {
+      name: "Balloon Garland Kit",
+      desc: "DIY balloon arch kit with 120 latex balloons and strip.",
+      price: 3500,
+      billingRate: BillingRate.one_time,
+      condition: AssetCondition.new,
+    },
+    {
+      name: "Fabric Draping Panels",
+      desc: "Set of 6 ceiling-to-floor tulle draping panels.",
+      price: 8000,
+      billingRate: BillingRate.one_time,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Garden Arch Trellis",
+      desc: "White metal arch for outdoor ceremony or photo area.",
+      price: 10000,
+      billingRate: BillingRate.one_time,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Acrylic Welcome Sign",
+      desc: "Customizable frosted acrylic welcome easel sign.",
+      price: 4000,
+      billingRate: BillingRate.one_time,
+      condition: AssetCondition.new,
+    },
+    {
+      name: "Gold Charger Plates (Set of 50)",
+      desc: "Gold-rimmed charger plates for elegant table settings.",
+      price: 7500,
+      billingRate: BillingRate.one_time,
+      condition: AssetCondition.good,
+    },
   ],
   [AssetCategory.furnitures]: [
-    { name: "Cocktail Hi-Top Table", desc: "32-inch round cocktail table for standing receptions.", price: 1500, billingRate: BillingRate.daily, condition: AssetCondition.good },
-    { name: "Chiavari Chair Gold", desc: "Gold-finish chiavari chairs for upscale events.", price: 200, billingRate: BillingRate.daily, condition: AssetCondition.good },
-    { name: "Banquet Table 6-Foot", desc: "Heavy-duty 6-foot folding banquet table.", price: 1200, billingRate: BillingRate.daily, condition: AssetCondition.good },
-    { name: "Outdoor Folding Canopy", desc: "10x10 ft pop-up canopy tent for outdoor setups.", price: 6000, billingRate: BillingRate.daily, condition: AssetCondition.good },
-    { name: "Bar Counter Portable", desc: "Foldable 6-foot portable bar counter with shelf.", price: 8000, billingRate: BillingRate.daily, condition: AssetCondition.new },
-    { name: "Bench Seating Set", desc: "Set of 4 wooden garden benches for outdoor seating.", price: 9000, billingRate: BillingRate.daily, condition: AssetCondition.good },
-    { name: "Linen Chair Covers (Set of 20)", desc: "Stretchable polyester chair covers for banquet seating.", price: 5000, billingRate: BillingRate.daily, condition: AssetCondition.good },
-    { name: "Rectangular Trestle Table", desc: "8-foot trestle table for buffets and displays.", price: 2500, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    {
+      name: "Cocktail Hi-Top Table",
+      desc: "32-inch round cocktail table for standing receptions.",
+      price: 1500,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Chiavari Chair Gold",
+      desc: "Gold-finish chiavari chairs for upscale events.",
+      price: 200,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Banquet Table 6-Foot",
+      desc: "Heavy-duty 6-foot folding banquet table.",
+      price: 1200,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Outdoor Folding Canopy",
+      desc: "10x10 ft pop-up canopy tent for outdoor setups.",
+      price: 6000,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Bar Counter Portable",
+      desc: "Foldable 6-foot portable bar counter with shelf.",
+      price: 8000,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.new,
+    },
+    {
+      name: "Bench Seating Set",
+      desc: "Set of 4 wooden garden benches for outdoor seating.",
+      price: 9000,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Linen Chair Covers (Set of 20)",
+      desc: "Stretchable polyester chair covers for banquet seating.",
+      price: 5000,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Rectangular Trestle Table",
+      desc: "8-foot trestle table for buffets and displays.",
+      price: 2500,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
   ],
   [AssetCategory.other]: [
-    { name: "LED Uplight Set (8 units)", desc: "Wireless battery-powered LED uplights with remote.", price: 12000, billingRate: BillingRate.daily, condition: AssetCondition.new },
-    { name: "Portable Projector and Screen", desc: "HD projector with 100-inch retractable screen.", price: 15000, billingRate: BillingRate.daily, condition: AssetCondition.good },
-    { name: "Power Extension Reel (50m)", desc: "Heavy-duty 50m extension cable on a reel for outdoor events.", price: 4000, billingRate: BillingRate.daily, condition: AssetCondition.good },
-    { name: "Chafing Dish Set (Full-Size)", desc: "Set of 4 full-size stainless steel chafing dishes.", price: 8000, billingRate: BillingRate.daily, condition: AssetCondition.good },
-    { name: "Instant Photo Camera", desc: "Polaroid-style instant camera with 20 film packs.", price: 7000, billingRate: BillingRate.one_time, condition: AssetCondition.new },
-    { name: "Crowd Control Barrier Set", desc: "Set of 6 interlocking metal crowd barriers.", price: 9000, billingRate: BillingRate.daily, condition: AssetCondition.good },
-    { name: "Signage Stand (A-Frame)", desc: "Lightweight A-frame sidewalk sign for event directions.", price: 3000, billingRate: BillingRate.one_time, condition: AssetCondition.good },
-    { name: "Ice Chest Cooler (Large)", desc: "100-quart insulated cooler for outdoor beverage stations.", price: 2500, billingRate: BillingRate.daily, condition: AssetCondition.good },
+    {
+      name: "LED Uplight Set (8 units)",
+      desc: "Wireless battery-powered LED uplights with remote.",
+      price: 12000,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.new,
+    },
+    {
+      name: "Portable Projector and Screen",
+      desc: "HD projector with 100-inch retractable screen.",
+      price: 15000,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Power Extension Reel (50m)",
+      desc: "Heavy-duty 50m extension cable on a reel for outdoor events.",
+      price: 4000,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Chafing Dish Set (Full-Size)",
+      desc: "Set of 4 full-size stainless steel chafing dishes.",
+      price: 8000,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Instant Photo Camera",
+      desc: "Polaroid-style instant camera with 20 film packs.",
+      price: 7000,
+      billingRate: BillingRate.one_time,
+      condition: AssetCondition.new,
+    },
+    {
+      name: "Crowd Control Barrier Set",
+      desc: "Set of 6 interlocking metal crowd barriers.",
+      price: 9000,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Signage Stand (A-Frame)",
+      desc: "Lightweight A-frame sidewalk sign for event directions.",
+      price: 3000,
+      billingRate: BillingRate.one_time,
+      condition: AssetCondition.good,
+    },
+    {
+      name: "Ice Chest Cooler (Large)",
+      desc: "100-quart insulated cooler for outdoor beverage stations.",
+      price: 2500,
+      billingRate: BillingRate.daily,
+      condition: AssetCondition.good,
+    },
   ],
 };
 
-const ASSET_CATEGORIES = [AssetCategory.sound_system, AssetCategory.decorations, AssetCategory.furnitures, AssetCategory.equipment, AssetCategory.other] as const;
+const ASSET_CATEGORIES = [
+  AssetCategory.sound_system,
+  AssetCategory.decorations,
+  AssetCategory.furnitures,
+  AssetCategory.equipment,
+  AssetCategory.other,
+] as const;
 
 const COVER_URLS: Partial<Record<AssetCategory, string>> = {
-  [AssetCategory.sound_system]:  "https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&auto=format&fit=crop",
-  [AssetCategory.decorations]:   "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=800&auto=format&fit=crop",
-  [AssetCategory.furnitures]:    "https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=800&auto=format&fit=crop",
-  [AssetCategory.equipment]:     "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=800&auto=format&fit=crop",
-  [AssetCategory.other]:         "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop",
+  [AssetCategory.sound_system]:
+    "https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&auto=format&fit=crop",
+  [AssetCategory.decorations]:
+    "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=800&auto=format&fit=crop",
+  [AssetCategory.furnitures]:
+    "https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=800&auto=format&fit=crop",
+  [AssetCategory.equipment]:
+    "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=800&auto=format&fit=crop",
+  [AssetCategory.other]:
+    "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop",
 };
 
 const CITIES: { city: string; state: string }[] = [
@@ -80,15 +288,17 @@ const CITIES: { city: string; state: string }[] = [
 export async function seedAssets(prisma: PrismaClient, users: any[]) {
   try {
     console.log("Starting asset seed...");
-    const gearFoxer = users.find(u => u.email === "gearfoxer@example.com");
-    if (!gearFoxer) throw new Error("Gear foxer user not found for asset seeding");
+    const gearFoxer = users.find((u) => u.email === "gearfoxer@example.com");
+    if (!gearFoxer)
+      throw new Error("Gear foxer user not found for asset seeding");
 
     const assets = [
       {
         ownerId: gearFoxer.id,
         category: AssetCategory.sound_system,
         name: "Stage Speakers XL",
-        description: "Professional high-output line array speakers, ideal for 200+ person events.",
+        description:
+          "Professional high-output line array speakers, ideal for 200+ person events.",
         quantity: 4,
         price: 25000,
         currency: "PHP",
@@ -103,7 +313,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.sound_system,
         name: "LED Flood Lights RGB",
-        description: "DMX-controllable RGB flood lights for stage and ambient lighting.",
+        description:
+          "DMX-controllable RGB flood lights for stage and ambient lighting.",
         quantity: 10,
         price: 12000,
         currency: "PHP",
@@ -118,7 +329,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.sound_system,
         name: "Dual Wireless Handheld Microphones",
-        description: "UHF dual-channel wireless microphone system with clear reception up to 100m.",
+        description:
+          "UHF dual-channel wireless microphone system with clear reception up to 100m.",
         quantity: 6,
         price: 10500,
         currency: "PHP",
@@ -133,7 +345,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.sound_system,
         name: "Powered Subwoofer 18-Inch",
-        description: "High-performance active subwoofer providing deep, chest-thumping low frequencies.",
+        description:
+          "High-performance active subwoofer providing deep, chest-thumping low frequencies.",
         quantity: 2,
         price: 18000,
         currency: "PHP",
@@ -148,7 +361,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.sound_system,
         name: "Compact 8-Channel Audio Mixer",
-        description: "Portable analogue mixer with premium preamps and built-in studio effects.",
+        description:
+          "Portable analogue mixer with premium preamps and built-in studio effects.",
         quantity: 2,
         price: 11000,
         currency: "PHP",
@@ -163,7 +377,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.sound_system,
         name: "Stage Monitor Wedges",
-        description: "Active floor monitors designed for clear on-stage vocal and instrument foldback.",
+        description:
+          "Active floor monitors designed for clear on-stage vocal and instrument foldback.",
         quantity: 4,
         price: 14000,
         currency: "PHP",
@@ -178,7 +393,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.sound_system,
         name: "Heavy-Duty Speaker Stands",
-        description: "Steel tripod stands with safety pin locks, supporting up to 50kg each.",
+        description:
+          "Steel tripod stands with safety pin locks, supporting up to 50kg each.",
         quantity: 8,
         price: 10000,
         currency: "PHP",
@@ -193,7 +409,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.sound_system,
         name: "DJ Controller Setup",
-        description: "4-channel performance DJ controller with large jog wheels and layout optimized for club mixing.",
+        description:
+          "4-channel performance DJ controller with large jog wheels and layout optimized for club mixing.",
         quantity: 1,
         price: 35000,
         currency: "PHP",
@@ -208,7 +425,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.sound_system,
         name: "Studio Headphones Pro",
-        description: "Over-ear monitoring headphones with balanced sound profile for engineering and live monitoring.",
+        description:
+          "Over-ear monitoring headphones with balanced sound profile for engineering and live monitoring.",
         quantity: 5,
         price: 11500,
         currency: "PHP",
@@ -223,7 +441,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.sound_system,
         name: "Snake Cable 16-Channel (30m)",
-        description: "Heavy-duty audio stage snake cable with durable XLR breakouts for clean stage management.",
+        description:
+          "Heavy-duty audio stage snake cable with durable XLR breakouts for clean stage management.",
         quantity: 2,
         price: 12500,
         currency: "PHP",
@@ -238,7 +457,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.sound_system,
         name: "Wireless Lavalier Mic Set",
-        description: "Professional 4-channel wireless lavalier microphone system.",
+        description:
+          "Professional 4-channel wireless lavalier microphone system.",
         quantity: 4,
         price: 12000,
         currency: "PHP",
@@ -253,7 +473,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.sound_system,
         name: "Audio Mixing Console 16-Channel",
-        description: "Digital mixing desk with built-in FX processor for live performances.",
+        description:
+          "Digital mixing desk with built-in FX processor for live performances.",
         quantity: 1,
         price: 30000,
         currency: "PHP",
@@ -268,7 +489,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.decorations,
         name: "Floral Arch Setup",
-        description: "Elegant floral arch with customizable color arrangements.",
+        description:
+          "Elegant floral arch with customizable color arrangements.",
         quantity: 2,
         price: 35000,
         currency: "PHP",
@@ -283,7 +505,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.decorations,
         name: "Fairy Lights Backdrop Curtain",
-        description: "Warm white LED string lights weaving behind sheer tulle fabric panels.",
+        description:
+          "Warm white LED string lights weaving behind sheer tulle fabric panels.",
         quantity: 5,
         price: 15000,
         currency: "PHP",
@@ -298,7 +521,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.decorations,
         name: "Geometric Gold Centerpieces",
-        description: "Set of minimalist metal geometric stands for modern floral displays or candles.",
+        description:
+          "Set of minimalist metal geometric stands for modern floral displays or candles.",
         quantity: 25,
         price: 11000,
         currency: "PHP",
@@ -313,7 +537,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.decorations,
         name: "Vintage Wooden Easel",
-        description: "Sturdy dark mahogany wooden easel stand for holding entry welcome signs.",
+        description:
+          "Sturdy dark mahogany wooden easel stand for holding entry welcome signs.",
         quantity: 4,
         price: 10000,
         currency: "PHP",
@@ -328,7 +553,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.decorations,
         name: "Crystal Bead Candelabras",
-        description: "Tall 5-arm table candelabras draped in glittering acrylic crystal strands.",
+        description:
+          "Tall 5-arm table candelabras draped in glittering acrylic crystal strands.",
         quantity: 15,
         price: 16500,
         currency: "PHP",
@@ -343,7 +569,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.decorations,
         name: "Boho Pampas Grass Accents",
-        description: "Fluffy, dried natural pampas grass bundles in tall ceramic floor vases.",
+        description:
+          "Fluffy, dried natural pampas grass bundles in tall ceramic floor vases.",
         quantity: 8,
         price: 13000,
         currency: "PHP",
@@ -358,7 +585,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.decorations,
         name: "Silk Red Rose Petals Bag",
-        description: "Reusable high-quality artificial silk petals for aisle scatters and flower girls.",
+        description:
+          "Reusable high-quality artificial silk petals for aisle scatters and flower girls.",
         quantity: 10,
         price: 10000,
         currency: "PHP",
@@ -373,7 +601,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.decorations,
         name: "White Table Linens (Standard)",
-        description: "Seamless premium polyester round tablecloths tailored for 8-seater catering tables.",
+        description:
+          "Seamless premium polyester round tablecloths tailored for 8-seater catering tables.",
         quantity: 30,
         price: 14000,
         currency: "PHP",
@@ -388,7 +617,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.decorations,
         name: "Sequin Seating Table Runners",
-        description: "Glittering rose gold sequin accent runners to enrich guest table layouts.",
+        description:
+          "Glittering rose gold sequin accent runners to enrich guest table layouts.",
         quantity: 20,
         price: 11200,
         currency: "PHP",
@@ -403,7 +633,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.decorations,
         name: "Grass Wall Photo Booth Panel",
-        description: "Faux boxwood hedge backdrop panels perfect for mounting signs or framing photo setups.",
+        description:
+          "Faux boxwood hedge backdrop panels perfect for mounting signs or framing photo setups.",
         quantity: 3,
         price: 22000,
         currency: "PHP",
@@ -418,7 +649,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.decorations,
         name: "Neon Sign - Custom Text",
-        description: "Custom LED neon signs for photo walls and event branding.",
+        description:
+          "Custom LED neon signs for photo walls and event branding.",
         quantity: 3,
         price: 25000,
         currency: "PHP",
@@ -433,7 +665,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.decorations,
         name: "Red Carpet Runner (10m)",
-        description: "Premium plush red carpet runner for grand entrances and VIP walkways.",
+        description:
+          "Premium plush red carpet runner for grand entrances and VIP walkways.",
         quantity: 1,
         price: 18000,
         currency: "PHP",
@@ -448,7 +681,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.furnitures,
         name: "Tiffany Chairs (Set of 50)",
-        description: "Classic Tiffany chiavari chairs, perfect for banquets and weddings.",
+        description:
+          "Classic Tiffany chiavari chairs, perfect for banquets and weddings.",
         quantity: 50,
         price: 45000,
         currency: "PHP",
@@ -463,7 +697,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.furnitures,
         name: "Rustic Wooden Cocktail Tables",
-        description: "High-top wooden bar tables, excellent for networking areas and receptions.",
+        description:
+          "High-top wooden bar tables, excellent for networking areas and receptions.",
         quantity: 8,
         price: 12000,
         currency: "PHP",
@@ -478,7 +713,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.furnitures,
         name: "Velvet Lounge Sofa Set",
-        description: "Luxurious emerald green velvet sofas and matching gold accent chairs for VIP lounge areas.",
+        description:
+          "Luxurious emerald green velvet sofas and matching gold accent chairs for VIP lounge areas.",
         quantity: 3,
         price: 40000,
         currency: "PHP",
@@ -493,7 +729,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.furnitures,
         name: "Round Catering Tables (10-Seater)",
-        description: "Heavy-duty folding wooden round tables designed for banquet hall setups.",
+        description:
+          "Heavy-duty folding wooden round tables designed for banquet hall setups.",
         quantity: 15,
         price: 15000,
         currency: "PHP",
@@ -508,7 +745,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.furnitures,
         name: "White Resin Folding Chairs",
-        description: "Lightweight and elegant folding event chairs with padded vinyl seats for outdoor events.",
+        description:
+          "Lightweight and elegant folding event chairs with padded vinyl seats for outdoor events.",
         quantity: 100,
         price: 35000,
         currency: "PHP",
@@ -523,7 +761,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.furnitures,
         name: "Industrial Bar Stools",
-        description: "Matte black iron bar stools with distressed wood tops, perfect for cocktail setups.",
+        description:
+          "Matte black iron bar stools with distressed wood tops, perfect for cocktail setups.",
         quantity: 24,
         price: 11000,
         currency: "PHP",
@@ -538,7 +777,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.furnitures,
         name: "LED Glowing Cube Seats",
-        description: "Waterproof cordless illuminated cube furniture with programmable color modes.",
+        description:
+          "Waterproof cordless illuminated cube furniture with programmable color modes.",
         quantity: 12,
         price: 16000,
         currency: "PHP",
@@ -553,7 +793,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.furnitures,
         name: "Classic Lecture Stage Podium",
-        description: "Polished acrylic crystal-clear presentation lectern with microphone holder.",
+        description:
+          "Polished acrylic crystal-clear presentation lectern with microphone holder.",
         quantity: 2,
         price: 12000,
         currency: "PHP",
@@ -568,7 +809,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.furnitures,
         name: "Pallet Low-Seating Picnic Tables",
-        description: "Charming low-profile varnished wood tables ideal for outdoor boho gatherings and picnics.",
+        description:
+          "Charming low-profile varnished wood tables ideal for outdoor boho gatherings and picnics.",
         quantity: 6,
         price: 14000,
         currency: "PHP",
@@ -583,7 +825,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.furnitures,
         name: "Gold Trim Cake Table",
-        description: "Elegant cylindrical glass dessert display table fortified with mirror glass tops and gold framework.",
+        description:
+          "Elegant cylindrical glass dessert display table fortified with mirror glass tops and gold framework.",
         quantity: 1,
         price: 10000,
         currency: "PHP",
@@ -598,7 +841,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.other,
         name: "Heavy Duty Fog Machine 1500W",
-        description: "High-density smoke machine with wired and wireless remote controls.",
+        description:
+          "High-density smoke machine with wired and wireless remote controls.",
         quantity: 2,
         price: 18000,
         currency: "PHP",
@@ -613,7 +857,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.other,
         name: "Industrial Air Cooler 150W",
-        description: "High-velocity evaporative air coolers with large water tank capacity for outdoor or tent setups.",
+        description:
+          "High-velocity evaporative air coolers with large water tank capacity for outdoor or tent setups.",
         quantity: 6,
         price: 12000,
         currency: "PHP",
@@ -628,7 +873,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.other,
         name: "Laser Stage FX Projector",
-        description: "Multi-pattern RGB strobe laser light system syncable to sound rhythms.",
+        description:
+          "Multi-pattern RGB strobe laser light system syncable to sound rhythms.",
         quantity: 2,
         price: 15000,
         currency: "PHP",
@@ -643,7 +889,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.other,
         name: "Outdoor Pop-Up Gazebo Tent",
-        description: "3x3m waterproof collapsible canopy tent tailored for outdoor vendors and tech booths.",
+        description:
+          "3x3m waterproof collapsible canopy tent tailored for outdoor vendors and tech booths.",
         quantity: 4,
         price: 17000,
         currency: "PHP",
@@ -658,7 +905,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.other,
         name: "Professional Sparkular Cold Spark Machine",
-        description: "Indoor-safe pyrotechnic cold spark dynamic fountain machine (Requires granular powder fill).",
+        description:
+          "Indoor-safe pyrotechnic cold spark dynamic fountain machine (Requires granular powder fill).",
         quantity: 2,
         price: 85000,
         currency: "PHP",
@@ -673,7 +921,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.other,
         name: "Heavy-Duty Cable Protector Ramp",
-        description: "Dual-channel rubber floor wire cover bumps to safeguard critical audio/power pathways from foot traffic.",
+        description:
+          "Dual-channel rubber floor wire cover bumps to safeguard critical audio/power pathways from foot traffic.",
         quantity: 10,
         price: 10500,
         currency: "PHP",
@@ -688,7 +937,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.other,
         name: "Silent Portable Inverter Generator",
-        description: "Compact 2000W clean sine-wave electricity backup generator for power-sensitive outdoor systems.",
+        description:
+          "Compact 2000W clean sine-wave electricity backup generator for power-sensitive outdoor systems.",
         quantity: 1,
         price: 52000,
         currency: "PHP",
@@ -703,7 +953,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.other,
         name: "Red Velvet Queue Stanchions",
-        description: "Pair of premium gold crowd control poles connected with elegant 1.5m crimson ropes.",
+        description:
+          "Pair of premium gold crowd control poles connected with elegant 1.5m crimson ropes.",
         quantity: 6,
         price: 14000,
         currency: "PHP",
@@ -718,7 +969,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.other,
         name: "Bubble Stream FX Machine",
-        description: "High-output automatic bubble machine producing thousands of bubbles per minute for stage closures.",
+        description:
+          "High-output automatic bubble machine producing thousands of bubbles per minute for stage closures.",
         quantity: 2,
         price: 10500,
         currency: "PHP",
@@ -733,7 +985,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.other,
         name: "Walkie-Talkie Communication Set",
-        description: "Pack of 4 long-range multi-channel handheld two-way radios with clear acoustic tube headsets.",
+        description:
+          "Pack of 4 long-range multi-channel handheld two-way radios with clear acoustic tube headsets.",
         quantity: 1,
         price: 12000,
         currency: "PHP",
@@ -749,7 +1002,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.equipment,
         name: "4K LED Projector (5000 Lumens)",
-        description: "Ultra-bright 4K event projector ideal for large screens and presentations in any lighting condition.",
+        description:
+          "Ultra-bright 4K event projector ideal for large screens and presentations in any lighting condition.",
         quantity: 2,
         price: 22000,
         currency: "PHP",
@@ -764,7 +1018,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.equipment,
         name: "120-Inch Foldable Projection Screen",
-        description: "Wrinkle-free 16:9 tripod projection screen for presentations and cinematic events.",
+        description:
+          "Wrinkle-free 16:9 tripod projection screen for presentations and cinematic events.",
         quantity: 3,
         price: 8500,
         currency: "PHP",
@@ -779,7 +1034,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.equipment,
         name: "LED Video Wall (3x3 Panel)",
-        description: "Modular P3 full-colour indoor LED display wall, ideal for concerts and large stage backdrops.",
+        description:
+          "Modular P3 full-colour indoor LED display wall, ideal for concerts and large stage backdrops.",
         quantity: 1,
         price: 95000,
         currency: "PHP",
@@ -794,7 +1050,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.equipment,
         name: "Moving Head Spot Lights (Set of 8)",
-        description: "DMX-controlled 150W sharpy beam moving head lights with color wheel and gobo rotation.",
+        description:
+          "DMX-controlled 150W sharpy beam moving head lights with color wheel and gobo rotation.",
         quantity: 1,
         price: 45000,
         currency: "PHP",
@@ -809,7 +1066,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.equipment,
         name: "Portable Event Stage (6x4m)",
-        description: "Modular aluminum stage riser system with anti-slip carpet surface, adjustable heights 40–80cm.",
+        description:
+          "Modular aluminum stage riser system with anti-slip carpet surface, adjustable heights 40–80cm.",
         quantity: 1,
         price: 55000,
         currency: "PHP",
@@ -824,7 +1082,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.equipment,
         name: "Photo Booth Setup (Enclosed)",
-        description: "Full enclosed open-air photo booth with ring light, DSLR, touchscreen, and instant print capability.",
+        description:
+          "Full enclosed open-air photo booth with ring light, DSLR, touchscreen, and instant print capability.",
         quantity: 1,
         price: 18000,
         currency: "PHP",
@@ -839,7 +1098,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.equipment,
         name: "65-Inch Interactive LED Display",
-        description: "Commercial-grade touchscreen LED panel for sponsor slides, digital signage, and wayfinding.",
+        description:
+          "Commercial-grade touchscreen LED panel for sponsor slides, digital signage, and wayfinding.",
         quantity: 2,
         price: 16000,
         currency: "PHP",
@@ -854,7 +1114,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.equipment,
         name: "Streaming & Live Production Kit",
-        description: "Complete live-stream rig: capture card, PTZ camera, switcher, and encoding PC for hybrid events.",
+        description:
+          "Complete live-stream rig: capture card, PTZ camera, switcher, and encoding PC for hybrid events.",
         quantity: 1,
         price: 35000,
         currency: "PHP",
@@ -869,7 +1130,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.equipment,
         name: "Follow-Spot Lighting Kit",
-        description: "High-intensity manual follow-spot with iris and dimmer control for stage performer tracking.",
+        description:
+          "High-intensity manual follow-spot with iris and dimmer control for stage performer tracking.",
         quantity: 2,
         price: 12000,
         currency: "PHP",
@@ -884,7 +1146,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         ownerId: gearFoxer.id,
         category: AssetCategory.equipment,
         name: "Confetti Cannon Set (4 units)",
-        description: "Compressed-air confetti cannons loaded with biodegradable metallic streamers for finale bursts.",
+        description:
+          "Compressed-air confetti cannons loaded with biodegradable metallic streamers for finale bursts.",
         quantity: 2,
         price: 14000,
         currency: "PHP",
@@ -894,18 +1157,26 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         city: "Quezon City",
         state: "Metro Manila",
         country: "Philippines",
-      }
+      },
     ];
 
     // ── Bulk assets for pagination-testing foxers ─────────────────────────────
     for (let i = 1; i <= 60; i++) {
-      const foxer = users.find((u: any) => u.email === `gf-${String(i).padStart(2, "0")}@foxers.ph`);
+      const foxer = users.find(
+        (u: any) => u.email === `gf-${String(i).padStart(2, "0")}@foxers.ph`,
+      );
       if (!foxer) continue;
       const cat = ASSET_CATEGORIES[i % ASSET_CATEGORIES.length];
       const catalog = BULK_ASSET_NAMES[cat] ?? [];
       const pick = catalog.length
         ? catalog[i % catalog.length]
-        : { name: `GF ${i} Event Asset`, desc: "Event asset for rent.", price: 5000, billingRate: BillingRate.daily, condition: AssetCondition.good };
+        : {
+            name: `GF ${i} Event Asset`,
+            desc: "Event asset for rent.",
+            price: 5000,
+            billingRate: BillingRate.daily,
+            condition: AssetCondition.good,
+          };
       const loc = CITIES[i % CITIES.length];
       assets.push({
         id: `seed-asset-gf-${i}-${cat}`,
@@ -927,7 +1198,8 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
 
     for (const a of assets) {
       const { id, ...rest } = a as any;
-      const assetId = id || `seed-asset-${a.name.trim().toLowerCase().replace(/\s+/g, '-')}`;
+      const assetId =
+        id || `seed-asset-${a.name.trim().toLowerCase().replace(/\s+/g, "-")}`;
       const coords = CITY_COORDS[(a as any).city] ?? {};
       await prisma.asset.upsert({
         where: { id: assetId },
@@ -943,65 +1215,391 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
 
     // ── Asset Images Mapping ──────────────────────────────────────────────────
     const assetImages = [
-      { id: "img-asset-speakers-xl", name: "speakers.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&auto=format&fit=crop", assetName: "Stage Speakers XL" },
-      { id: "img-asset-flood-lights", name: "lights.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&auto=format&fit=crop", assetName: "LED Flood Lights RGB" },
-      { id: "img-asset-mics", name: "mics.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=800&auto=format&fit=crop", assetName: "Dual Wireless Handheld Microphones" },
-      { id: "img-asset-subwoofer", name: "subwoofer.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1616788494707-ec28f08d05a1?w=800&auto=format&fit=crop", assetName: "Powered Subwoofer 18-Inch" },
-      { id: "img-asset-mixer-8ch", name: "mixer.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&auto=format&fit=crop", assetName: "Compact 8-Channel Audio Mixer" },
-      { id: "img-asset-monitors", name: "monitors.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&auto=format&fit=crop", assetName: "Stage Monitor Wedges" },
-      { id: "img-asset-stands", name: "stands.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop", assetName: "Heavy-Duty Speaker Stands" },
-      { id: "img-asset-dj-controller", name: "dj.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=800&auto=format&fit=crop", assetName: "DJ Controller Setup" },
-      { id: "img-asset-headphones", name: "headphones.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop", assetName: "Studio Headphones Pro" },
-      { id: "img-asset-snake-cable", name: "cables.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1557853197-aefb550b6fdc?w=800&auto=format&fit=crop", assetName: "Snake Cable 16-Channel (30m)" },
-      { id: "img-asset-lavalier", name: "lav.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1567168539593-59673ababaae?w=800&auto=format&fit=crop", assetName: "Wireless Lavalier Mic Set" },
-      { id: "img-asset-mixer-16ch", name: "digital-desk.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=800&auto=format&fit=crop", assetName: "Audio Mixing Console 16-Channel" },
-      { id: "img-asset-floral-arch", name: "arch.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=800&auto=format&fit=crop", assetName: "Floral Arch Setup" },
-      { id: "img-asset-fairy-lights", name: "fairylights.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=800&auto=format&fit=crop", assetName: "Fairy Lights Backdrop Curtain" },
-      { id: "img-asset-centerpieces", name: "centerpiece.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1533142266415-ac591a4deae9?w=800&auto=format&fit=crop", assetName: "Geometric Gold Centerpieces" },
-      { id: "img-asset-easel", name: "easel.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop", assetName: "Vintage Wooden Easel" },
-      { id: "img-asset-candelabras", name: "candelabra.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1549417229-aa67d3263c09?w=800&auto=format&fit=crop", assetName: "Crystal Bead Candelabras" },
-      { id: "img-asset-pampas", name: "pampas.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1596436889106-be35e843f974?w=800&auto=format&fit=crop", assetName: "Boho Pampas Grass Accents" },
-      { id: "img-asset-petals", name: "petals.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1561181286-d3fee7d55364?w=800&auto=format&fit=crop", assetName: "Silk Red Rose Petals Bag" },
-      { id: "img-asset-linens", name: "linens.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=800&auto=format&fit=crop", assetName: "White Table Linens (Standard)" },
-      { id: "img-asset-runners", name: "runners.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=800&auto=format&fit=crop", assetName: "Sequin Seating Table Runners" },
-      { id: "img-asset-grasswall", name: "grasswall.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1533105079780-92b9be482077?w=800&auto=format&fit=crop", assetName: "Grass Wall Photo Booth Panel" },
-      { id: "img-asset-neonsign", name: "neon.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1563245372-f21724e3856d?w=800&auto=format&fit=crop", assetName: "Neon Sign - Custom Text" },
-      { id: "img-asset-redcarpet", name: "carpet.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&auto=format&fit=crop", assetName: "Red Carpet Runner (10m)" },
-      { id: "img-asset-tiffanychairs", name: "tiffany.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&auto=format&fit=crop", assetName: "Tiffany Chairs (Set of 50)" },
-      { id: "img-asset-cocktailtables", name: "cocktail.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&auto=format&fit=crop", assetName: "Rustic Wooden Cocktail Tables" },
-      { id: "img-asset-velvetsofa", name: "sofa.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&auto=format&fit=crop", assetName: "Velvet Lounge Sofa Set" },
-      { id: "img-asset-roundtables", name: "tables.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=800&auto=format&fit=crop", assetName: "Round Catering Tables (10-Seater)" },
-      { id: "img-asset-foldingchairs", name: "folding.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1517263904008-797480d25147?w=800&auto=format&fit=crop", assetName: "White Resin Folding Chairs" },
-      { id: "img-asset-barstools", name: "stools.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1505275350441-83dcda8eeef5?w=800&auto=format&fit=crop", assetName: "Industrial Bar Stools" },
-      { id: "img-asset-cubeseats", name: "ledcube.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1565008447742-97f6f38c985c?w=800&auto=format&fit=crop", assetName: "LED Glowing Cube Seats" },
-      { id: "img-asset-podium", name: "podium.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1416339306562-f3d12fefd36f?w=800&auto=format&fit=crop", assetName: "Classic Lecture Stage Podium" },
-      { id: "img-asset-picnictables", name: "picnic.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1533777857889-4be7c70b33f7?w=800&auto=format&fit=crop", assetName: "Pallet Low-Seating Picnic Tables" },
-      { id: "img-asset-caketable", name: "caketable.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1535141192574-5d4897c13636?w=800&auto=format&fit=crop", assetName: "Gold Trim Cake Table" },
-      { id: "img-asset-fogmachine", name: "fog.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop", assetName: "Heavy Duty Fog Machine 1500W" },
-      { id: "img-asset-cooler", name: "cooler.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1585338107529-13afc5f02586?w=800&auto=format&fit=crop", assetName: "Industrial Air Cooler 150W" },
-      { id: "img-asset-laserfx", name: "laser.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop", assetName: "Laser Stage FX Projector" },
-      { id: "img-asset-gazebo", name: "gazebo.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&auto=format&fit=crop", assetName: "Outdoor Pop-Up Gazebo Tent" },
-      { id: "img-asset-sparkular", name: "sparks.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1516873240891-4bf014598ab4?w=800&auto=format&fit=crop", assetName: "Professional Sparkular Cold Spark Machine" },
-      { id: "img-asset-ramp", name: "ramp.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=800&auto=format&fit=crop", assetName: "Heavy-Duty Cable Protector Ramp" },
-      { id: "img-asset-generator", name: "generator.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1504805572947-34fad45aed93?w=800&auto=format&fit=crop", assetName: "Silent Portable Inverter Generator" },
-      { id: "img-asset-stanchions", name: "stanchions.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop", assetName: "Red Velvet Queue Stanchions" },
-      { id: "img-asset-bubble", name: "bubble.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1518895949257-7621c3c786d7?w=800&auto=format&fit=crop", assetName: "Bubble Stream FX Machine" },
-      { id: "img-asset-walkietalkie", name: "radio.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1615811361523-6bd03d7748e7?w=800&auto=format&fit=crop", assetName: "Walkie-Talkie Communication Set" },
-      { id: "img-asset-projector", name: "projector.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=800&auto=format&fit=crop", assetName: "4K LED Projector (5000 Lumens)" },
-      { id: "img-asset-screen", name: "screen.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=800&auto=format&fit=crop", assetName: "120-Inch Foldable Projection Screen" },
-      { id: "img-asset-ledwall", name: "ledwall.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&auto=format&fit=crop", assetName: "LED Video Wall (3x3 Panel)" },
-      { id: "img-asset-movingheads", name: "movinglights.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&auto=format&fit=crop", assetName: "Moving Head Spot Lights (Set of 8)" },
-      { id: "img-asset-stage", name: "stage.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&auto=format&fit=crop", assetName: "Portable Event Stage (6x4m)" },
-      { id: "img-asset-photobooth", name: "photobooth.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1589156280159-27698a70f29e?w=800&auto=format&fit=crop", assetName: "Photo Booth Setup (Enclosed)" },
-      { id: "img-asset-ledpanel", name: "ledpanel.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop", assetName: "65-Inch Interactive LED Display" },
-      { id: "img-asset-livestream", name: "livestream.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1505236858219-8359eb29e329?w=800&auto=format&fit=crop", assetName: "Streaming & Live Production Kit" },
-      { id: "img-asset-followspot", name: "followspot.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop", assetName: "Follow-Spot Lighting Kit" },
-      { id: "img-asset-confetti", name: "confetti.jpg", type: "image/jpeg", url: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&auto=format&fit=crop", assetName: "Confetti Cannon Set (4 units)" }
+      {
+        id: "img-asset-speakers-xl",
+        name: "speakers.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&auto=format&fit=crop",
+        assetName: "Stage Speakers XL",
+      },
+      {
+        id: "img-asset-flood-lights",
+        name: "lights.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&auto=format&fit=crop",
+        assetName: "LED Flood Lights RGB",
+      },
+      {
+        id: "img-asset-mics",
+        name: "mics.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=800&auto=format&fit=crop",
+        assetName: "Dual Wireless Handheld Microphones",
+      },
+      {
+        id: "img-asset-subwoofer",
+        name: "subwoofer.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1616788494707-ec28f08d05a1?w=800&auto=format&fit=crop",
+        assetName: "Powered Subwoofer 18-Inch",
+      },
+      {
+        id: "img-asset-mixer-8ch",
+        name: "mixer.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&auto=format&fit=crop",
+        assetName: "Compact 8-Channel Audio Mixer",
+      },
+      {
+        id: "img-asset-monitors",
+        name: "monitors.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&auto=format&fit=crop",
+        assetName: "Stage Monitor Wedges",
+      },
+      {
+        id: "img-asset-stands",
+        name: "stands.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop",
+        assetName: "Heavy-Duty Speaker Stands",
+      },
+      {
+        id: "img-asset-dj-controller",
+        name: "dj.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=800&auto=format&fit=crop",
+        assetName: "DJ Controller Setup",
+      },
+      {
+        id: "img-asset-headphones",
+        name: "headphones.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop",
+        assetName: "Studio Headphones Pro",
+      },
+      {
+        id: "img-asset-snake-cable",
+        name: "cables.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1557853197-aefb550b6fdc?w=800&auto=format&fit=crop",
+        assetName: "Snake Cable 16-Channel (30m)",
+      },
+      {
+        id: "img-asset-lavalier",
+        name: "lav.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1567168539593-59673ababaae?w=800&auto=format&fit=crop",
+        assetName: "Wireless Lavalier Mic Set",
+      },
+      {
+        id: "img-asset-mixer-16ch",
+        name: "digital-desk.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=800&auto=format&fit=crop",
+        assetName: "Audio Mixing Console 16-Channel",
+      },
+      {
+        id: "img-asset-floral-arch",
+        name: "arch.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=800&auto=format&fit=crop",
+        assetName: "Floral Arch Setup",
+      },
+      {
+        id: "img-asset-fairy-lights",
+        name: "fairylights.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=800&auto=format&fit=crop",
+        assetName: "Fairy Lights Backdrop Curtain",
+      },
+      {
+        id: "img-asset-centerpieces",
+        name: "centerpiece.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1533142266415-ac591a4deae9?w=800&auto=format&fit=crop",
+        assetName: "Geometric Gold Centerpieces",
+      },
+      {
+        id: "img-asset-easel",
+        name: "easel.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop",
+        assetName: "Vintage Wooden Easel",
+      },
+      {
+        id: "img-asset-candelabras",
+        name: "candelabra.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1549417229-aa67d3263c09?w=800&auto=format&fit=crop",
+        assetName: "Crystal Bead Candelabras",
+      },
+      {
+        id: "img-asset-pampas",
+        name: "pampas.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1596436889106-be35e843f974?w=800&auto=format&fit=crop",
+        assetName: "Boho Pampas Grass Accents",
+      },
+      {
+        id: "img-asset-petals",
+        name: "petals.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1561181286-d3fee7d55364?w=800&auto=format&fit=crop",
+        assetName: "Silk Red Rose Petals Bag",
+      },
+      {
+        id: "img-asset-linens",
+        name: "linens.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=800&auto=format&fit=crop",
+        assetName: "White Table Linens (Standard)",
+      },
+      {
+        id: "img-asset-runners",
+        name: "runners.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=800&auto=format&fit=crop",
+        assetName: "Sequin Seating Table Runners",
+      },
+      {
+        id: "img-asset-grasswall",
+        name: "grasswall.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1533105079780-92b9be482077?w=800&auto=format&fit=crop",
+        assetName: "Grass Wall Photo Booth Panel",
+      },
+      {
+        id: "img-asset-neonsign",
+        name: "neon.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1563245372-f21724e3856d?w=800&auto=format&fit=crop",
+        assetName: "Neon Sign - Custom Text",
+      },
+      {
+        id: "img-asset-redcarpet",
+        name: "carpet.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&auto=format&fit=crop",
+        assetName: "Red Carpet Runner (10m)",
+      },
+      {
+        id: "img-asset-tiffanychairs",
+        name: "tiffany.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&auto=format&fit=crop",
+        assetName: "Tiffany Chairs (Set of 50)",
+      },
+      {
+        id: "img-asset-cocktailtables",
+        name: "cocktail.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&auto=format&fit=crop",
+        assetName: "Rustic Wooden Cocktail Tables",
+      },
+      {
+        id: "img-asset-velvetsofa",
+        name: "sofa.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&auto=format&fit=crop",
+        assetName: "Velvet Lounge Sofa Set",
+      },
+      {
+        id: "img-asset-roundtables",
+        name: "tables.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=800&auto=format&fit=crop",
+        assetName: "Round Catering Tables (10-Seater)",
+      },
+      {
+        id: "img-asset-foldingchairs",
+        name: "folding.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1517263904008-797480d25147?w=800&auto=format&fit=crop",
+        assetName: "White Resin Folding Chairs",
+      },
+      {
+        id: "img-asset-barstools",
+        name: "stools.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1505275350441-83dcda8eeef5?w=800&auto=format&fit=crop",
+        assetName: "Industrial Bar Stools",
+      },
+      {
+        id: "img-asset-cubeseats",
+        name: "ledcube.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1565008447742-97f6f38c985c?w=800&auto=format&fit=crop",
+        assetName: "LED Glowing Cube Seats",
+      },
+      {
+        id: "img-asset-podium",
+        name: "podium.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1416339306562-f3d12fefd36f?w=800&auto=format&fit=crop",
+        assetName: "Classic Lecture Stage Podium",
+      },
+      {
+        id: "img-asset-picnictables",
+        name: "picnic.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1533777857889-4be7c70b33f7?w=800&auto=format&fit=crop",
+        assetName: "Pallet Low-Seating Picnic Tables",
+      },
+      {
+        id: "img-asset-caketable",
+        name: "caketable.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1535141192574-5d4897c13636?w=800&auto=format&fit=crop",
+        assetName: "Gold Trim Cake Table",
+      },
+      {
+        id: "img-asset-fogmachine",
+        name: "fog.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop",
+        assetName: "Heavy Duty Fog Machine 1500W",
+      },
+      {
+        id: "img-asset-cooler",
+        name: "cooler.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1585338107529-13afc5f02586?w=800&auto=format&fit=crop",
+        assetName: "Industrial Air Cooler 150W",
+      },
+      {
+        id: "img-asset-laserfx",
+        name: "laser.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop",
+        assetName: "Laser Stage FX Projector",
+      },
+      {
+        id: "img-asset-gazebo",
+        name: "gazebo.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&auto=format&fit=crop",
+        assetName: "Outdoor Pop-Up Gazebo Tent",
+      },
+      {
+        id: "img-asset-sparkular",
+        name: "sparks.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1516873240891-4bf014598ab4?w=800&auto=format&fit=crop",
+        assetName: "Professional Sparkular Cold Spark Machine",
+      },
+      {
+        id: "img-asset-ramp",
+        name: "ramp.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=800&auto=format&fit=crop",
+        assetName: "Heavy-Duty Cable Protector Ramp",
+      },
+      {
+        id: "img-asset-generator",
+        name: "generator.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1504805572947-34fad45aed93?w=800&auto=format&fit=crop",
+        assetName: "Silent Portable Inverter Generator",
+      },
+      {
+        id: "img-asset-stanchions",
+        name: "stanchions.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop",
+        assetName: "Red Velvet Queue Stanchions",
+      },
+      {
+        id: "img-asset-bubble",
+        name: "bubble.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1518895949257-7621c3c786d7?w=800&auto=format&fit=crop",
+        assetName: "Bubble Stream FX Machine",
+      },
+      {
+        id: "img-asset-walkietalkie",
+        name: "radio.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1615811361523-6bd03d7748e7?w=800&auto=format&fit=crop",
+        assetName: "Walkie-Talkie Communication Set",
+      },
+      {
+        id: "img-asset-projector",
+        name: "projector.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=800&auto=format&fit=crop",
+        assetName: "4K LED Projector (5000 Lumens)",
+      },
+      {
+        id: "img-asset-screen",
+        name: "screen.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=800&auto=format&fit=crop",
+        assetName: "120-Inch Foldable Projection Screen",
+      },
+      {
+        id: "img-asset-ledwall",
+        name: "ledwall.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&auto=format&fit=crop",
+        assetName: "LED Video Wall (3x3 Panel)",
+      },
+      {
+        id: "img-asset-movingheads",
+        name: "movinglights.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&auto=format&fit=crop",
+        assetName: "Moving Head Spot Lights (Set of 8)",
+      },
+      {
+        id: "img-asset-stage",
+        name: "stage.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&auto=format&fit=crop",
+        assetName: "Portable Event Stage (6x4m)",
+      },
+      {
+        id: "img-asset-photobooth",
+        name: "photobooth.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1589156280159-27698a70f29e?w=800&auto=format&fit=crop",
+        assetName: "Photo Booth Setup (Enclosed)",
+      },
+      {
+        id: "img-asset-ledpanel",
+        name: "ledpanel.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop",
+        assetName: "65-Inch Interactive LED Display",
+      },
+      {
+        id: "img-asset-livestream",
+        name: "livestream.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1505236858219-8359eb29e329?w=800&auto=format&fit=crop",
+        assetName: "Streaming & Live Production Kit",
+      },
+      {
+        id: "img-asset-followspot",
+        name: "followspot.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop",
+        assetName: "Follow-Spot Lighting Kit",
+      },
+      {
+        id: "img-asset-confetti",
+        name: "confetti.jpg",
+        type: "image/jpeg",
+        url: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&auto=format&fit=crop",
+        assetName: "Confetti Cannon Set (4 units)",
+      },
     ];
 
     // ── Bulk asset images for pagination-testing foxers ──────────────────────
     for (let i = 1; i <= 60; i++) {
-      const foxer = users.find((u: any) => u.email === `gf-${String(i).padStart(2, "0")}@foxers.ph`);
+      const foxer = users.find(
+        (u: any) => u.email === `gf-${String(i).padStart(2, "0")}@foxers.ph`,
+      );
       if (!foxer) continue;
       const cat = ASSET_CATEGORIES[i % ASSET_CATEGORIES.length];
       const assetId = `seed-asset-gf-${i}-${cat}`;
@@ -1009,7 +1607,9 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
         id: `seed-img-asset-gf-${i}`,
         name: `gf-${i}-asset.jpg`,
         type: "image/jpeg",
-        url: COVER_URLS[cat] ?? "https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&auto=format&fit=crop",
+        url:
+          COVER_URLS[cat] ??
+          "https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&auto=format&fit=crop",
         assetName: `__bulk__${assetId}`,
       });
     }
@@ -1017,7 +1617,7 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
     for (const img of assetImages) {
       const associatedAssetId = img.assetName.startsWith("__bulk__")
         ? img.assetName.replace("__bulk__", "")
-        : `seed-asset-${img.assetName.trim().toLowerCase().replace(/\s+/g, '-')}`;
+        : `seed-asset-${img.assetName.trim().toLowerCase().replace(/\s+/g, "-")}`;
 
       await prisma.file.upsert({
         where: { id: img.id },

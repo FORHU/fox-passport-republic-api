@@ -1,5 +1,5 @@
 import cron from "node-cron";
-import BookingReminderService from "../services/booking-reminder.service";
+import BookingReminderService from "../modules/booking/booking-reminder.service";
 
 /**
  * Every 15 minutes: notify users about bookings starting within 24h (plus a

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Prisma } from "@prisma/client";
-import EventTemplateSvc from "../src/services/event-template.service";
+import EventTemplateSvc from "../src/modules/event-template/event-template.service";
 
 /**
  * Guards the server-computed price breakdown described in

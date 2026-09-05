@@ -99,7 +99,7 @@ import {
   revokeRefreshToken,
   RefreshTokenError,
   RefreshTokenReuseError,
-} from "../src/services/refresh-token.service";
+} from "../src/modules/auth/refresh-token.service";
 
 const USER = "user-1";
 

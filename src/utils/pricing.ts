@@ -1,4 +1,4 @@
-import { BillingRate } from "@prisma/client";
+import { BillingRate, Prisma } from "@prisma/client";
 
 const MS_PER_HOUR = 1000 * 60 * 60;
 const MS_PER_DAY = MS_PER_HOUR * 24;
@@ -34,6 +34,16 @@ export function calculateBillingPeriods(
     default:
       return 1;
   }
+}
+
+/** A peso amount as the integer minor-unit value the Stripe API expects. */
+export function toStripeCents(amount: number): number {
+  return Math.round(amount * 100);
+}
+
+/** A peso amount for display, e.g. "PHP 1234.50". No thousands separator. */
+export function formatCurrency(amount: number | Prisma.Decimal): string {
+  return `PHP ${amount.toFixed(2)}`;
 }
 
 /** itemsTotal for a direct Asset/Service booking: price * quantity * periods spanned. */

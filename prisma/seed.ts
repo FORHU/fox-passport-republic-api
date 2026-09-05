@@ -3,7 +3,21 @@ import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { assertSchemaIsMigrated } from "./preflight";
-import { seedUsers, seedVenues, seedAssets, seedServices, seedEvents, seedBookings, seedReviews, seedItemBookings, seedBadges, seedPassports, seedSpecializations, seedCancellationPolicies, seedPartners } from "./seeder";
+import {
+  seedUsers,
+  seedVenues,
+  seedAssets,
+  seedServices,
+  seedEvents,
+  seedBookings,
+  seedReviews,
+  seedItemBookings,
+  seedBadges,
+  seedPassports,
+  seedSpecializations,
+  seedCancellationPolicies,
+  seedPartners,
+} from "./seeder";
 
 /**
  * Hosts the seed is willing to write to.

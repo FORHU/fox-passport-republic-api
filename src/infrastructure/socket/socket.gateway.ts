@@ -1,7 +1,7 @@
 import { Server, Socket } from "socket.io";
 import jwt from "jsonwebtoken";
 import { ACCESS_TOKEN_SECRET } from "../../config";
-import { redeemSocketTicket } from "../../services/socket-ticket.service";
+import { redeemSocketTicket } from "../../modules/auth/socket-ticket.service";
 import { ADMIN_ROOM, userRoom } from "./socket.constants";
 import type { SystemRole } from "@prisma/client";
 import { can } from "../../types/permissions";

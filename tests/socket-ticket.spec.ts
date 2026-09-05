@@ -37,7 +37,7 @@ vi.mock("../src/utils/redis.util", () => ({
 import {
   issueSocketTicket,
   redeemSocketTicket,
-} from "../src/services/socket-ticket.service";
+} from "../src/modules/auth/socket-ticket.service";
 
 const identity = { userId: "user-1", systemRole: "admin" as const };
 
