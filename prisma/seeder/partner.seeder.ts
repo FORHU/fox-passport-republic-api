@@ -31,6 +31,7 @@ export async function seedPartners(prisma: PrismaClient) {
           "eventFoxer",
           "gearFoxer",
           "serviceFoxer",
+          "investor",
         ] as any,
         city: "Makati",
         state: "Metro Manila",
@@ -47,6 +48,7 @@ export async function seedPartners(prisma: PrismaClient) {
           "eventFoxer",
           "gearFoxer",
           "serviceFoxer",
+          "investor",
         ] as any,
         city: "Makati",
         state: "Metro Manila",
@@ -54,7 +56,7 @@ export async function seedPartners(prisma: PrismaClient) {
       },
     });
     console.log(
-      `✓ Partner user: ${partner.email} — roles: [venueFoxer, eventFoxer, gearFoxer, serviceFoxer]`,
+      `✓ Partner user: ${partner.email} — roles: [venueFoxer, eventFoxer, gearFoxer, serviceFoxer, investor]`,
     );
 
     // Also promote multirole user to include gearFoxer
@@ -95,6 +97,7 @@ export async function seedPartners(prisma: PrismaClient) {
         techAv: ["4K projector", "PA system", "wireless mics", "streaming kit"],
         staffing: ["security"],
         policies: ["no smoking", "venue hours 8am-11pm"],
+        stampIconUrl: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=300&auto=format&fit=crop",
         ...CITY_COORDS["Makati"],
       },
       {
@@ -121,6 +124,7 @@ export async function seedPartners(prisma: PrismaClient) {
         techAv: ["outdoor PA", "ambient lighting"],
         staffing: ["security", "groundskeeper"],
         policies: ["no confetti", "venue hours 8am-10pm"],
+        stampIconUrl: "https://images.unsplash.com/photo-1544816155-12df9643f363?w=300&auto=format&fit=crop",
         ...CITY_COORDS["Taguig"],
       },
       {
@@ -147,6 +151,7 @@ export async function seedPartners(prisma: PrismaClient) {
         techAv: ["club sound system", "LED wash lighting", "wireless mics"],
         staffing: ["security", "mixologist"],
         policies: ["no outside catering", "dress code enforced after 8pm"],
+        stampIconUrl: "https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300&auto=format&fit=crop",
         ...CITY_COORDS["Pasig"],
       },
       {
@@ -173,6 +178,7 @@ export async function seedPartners(prisma: PrismaClient) {
         ],
         staffing: ["security", "janitor"],
         policies: ["no outside food", "venue hours 7am-12am"],
+        stampIconUrl: "https://images.unsplash.com/photo-1519741497674-611481863552?w=300&auto=format&fit=crop",
         ...CITY_COORDS["Quezon City"],
       },
       {
@@ -194,6 +200,7 @@ export async function seedPartners(prisma: PrismaClient) {
         techAv: ["sound system", "projector", "ambient lighting"],
         staffing: ["security", "event coordinator"],
         policies: ["no confetti", "venue hours 8am-10pm"],
+        stampIconUrl: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=300&auto=format&fit=crop",
         ...CITY_COORDS["Tagaytay"],
       },
     ];
@@ -614,6 +621,101 @@ export async function seedPartners(prisma: PrismaClient) {
       });
     }
     console.log(`✓ Seeded ${assetImages.length} partner asset images`);
+
+    // ── Seed Partner Equipment Inventory Hubs ──────────────────────────────
+    const sampleInvestments = [
+      {
+        id: "seed-inv-chiavari-chairs",
+        partnerId: partner.id,
+        type: "physical_inventory" as const,
+        title: "500 Gold Chiavari Banquet Chairs",
+        description:
+          "High-grade stackable Chiavari chairs with white cushions. Stored in central Makati logistics warehouse ready for rapid dispatch to partner venues.",
+        inventoryCategory: "furniture_seating" as const,
+        quantityTotal: 500,
+        quantityAvailable: 500,
+        itemCondition: "mint",
+        monetaryValue: 250000,
+        usageTerms: "Free for verified partner venues",
+        dailyRentalRate: 50,
+        address: "Buendia Logistics Park, Sen. Gil Puyat Ave",
+        city: "Makati",
+        state: "Metro Manila",
+        country: "Philippines",
+        lat: 14.5547,
+        lng: 121.0244,
+        deliveryRadiusKm: 30,
+        transportPolicy: "partner_delivers_free" as const,
+        mediaUrls: [
+          "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=800&auto=format&fit=crop",
+        ],
+      },
+      {
+        id: "seed-inv-stage-lighting",
+        partnerId: partner.id,
+        type: "physical_inventory" as const,
+        title: "Concert Truss & Beam Moving Head Spotlights",
+        description:
+          "Professional 12m modular stage truss with 16x DMX moving heads and atmospheric haze machine. Perfect for live performances and brand launches.",
+        inventoryCategory: "lighting_rigging" as const,
+        quantityTotal: 16,
+        quantityAvailable: 16,
+        itemCondition: "mint",
+        monetaryValue: 350000,
+        usageTerms: "Subsidized partner venue rate with AV technician",
+        dailyRentalRate: 8000,
+        address: "BGC Depot, 32nd St, Taguig",
+        city: "Taguig",
+        state: "Metro Manila",
+        country: "Philippines",
+        lat: 14.5492,
+        lng: 121.0504,
+        deliveryRadiusKm: 40,
+        transportPolicy: "partner_delivers_free" as const,
+        mediaUrls: [
+          "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&auto=format&fit=crop",
+        ],
+      },
+      {
+        id: "seed-inv-generator",
+        partnerId: partner.id,
+        type: "physical_inventory" as const,
+        title: "65kVA Silent Diesel Generator Hub",
+        description:
+          "Heavy-duty mobile trailer generator with ultra-silent sound dampening enclosure and power distribution panels for outdoor concerts and festivals.",
+        inventoryCategory: "power_climate" as const,
+        quantityTotal: 4,
+        quantityAvailable: 4,
+        itemCondition: "heavy_duty",
+        monetaryValue: 500000,
+        usageTerms: "Emergency backup power pool for major events",
+        dailyRentalRate: 15000,
+        address: "North Triangle Industrial Depot",
+        city: "Quezon City",
+        state: "Metro Manila",
+        country: "Philippines",
+        lat: 14.6507,
+        lng: 121.0487,
+        deliveryRadiusKm: 50,
+        transportPolicy: "partner_delivers_fee" as const,
+        mediaUrls: [
+          "https://images.unsplash.com/photo-1504805572947-34fad45aed93?w=800&auto=format&fit=crop",
+        ],
+      },
+    ];
+
+    for (const inv of sampleInvestments) {
+      await prisma.partnerInvestment.upsert({
+        where: { id: inv.id },
+        update: {
+          ...inv,
+        },
+        create: {
+          ...inv,
+        },
+      });
+    }
+    console.log(`✓ Seeded ${sampleInvestments.length} partner inventory hubs`);
 
     console.log("✅ Partner seeding completed successfully!");
     return partner;

@@ -1,0 +1,88 @@
+// Republic Foxer community feed, comments, and interactions
+
+enum PostType {
+  citizen_experience
+  review_share
+  venue_spotlight
+  gear_offering
+  service_offering
+  event_announcement
+  partner_announcement
+}
+
+enum FeedTab {
+  community
+  marketplace
+  partners
+}
+
+model Post {
+  id            String         @id @default(uuid())
+  authorId      String
+  type          PostType
+  tab           FeedTab
+  content       String         @db.Text
+  mediaUrls     String[]       @default([])
+
+  // Optional foreign keys to existing entities (validated based on type)
+  venueId       String?
+  assetId       String?
+  serviceId     String?
+  eventId       String?
+  reviewId      String?
+  stampId       String?
+
+  // Counters for performant indexing & sorting
+  likesCount    Int            @default(0)
+  commentsCount Int            @default(0)
+  sharesCount   Int            @default(0)
+
+  isPinned      Boolean        @default(false)
+  isArchived    Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Relations
+  author        User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  venue         Venue?         @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  asset         Asset?         @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  service       Service?       @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  event         Event?         @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  review        Review?        @relation(fields: [reviewId], references: [id], onDelete: SetNull)
+  stamp         PassportStamp? @relation(fields: [stampId], references: [id], onDelete: SetNull)
+
+  comments      PostComment[]
+  likes         PostLike[]
+
+  @@index([tab, createdAt(sort: Desc)])
+  @@index([authorId, createdAt(sort: Desc)])
+  @@index([type])
+  @@map("feed_posts")
+}
+
+model PostComment {
+  id        String   @id @default(uuid())
+  postId    String
+  authorId  String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt(sort: Asc)])
+  @@map("feed_post_comments")
+}
+
+model PostLike {
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@map("feed_post_likes")
+}

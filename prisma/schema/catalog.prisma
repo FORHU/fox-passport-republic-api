@@ -28,6 +28,7 @@ model Asset {
   templateAssets       EventTemplateAsset[]
   cancellationPolicyId String?
   cancellationPolicy   CancellationPolicy?     @relation(fields: [cancellationPolicyId], references: [id])
+  posts                Post[]
 
   @@map("assets")
 }
@@ -60,6 +61,7 @@ model Service {
   owner                User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   cancellationPolicyId String?
   cancellationPolicy   CancellationPolicy?       @relation(fields: [cancellationPolicyId], references: [id])
+  posts                Post[]
 
   @@map("services")
 }
@@ -102,6 +104,10 @@ model Venue {
   mayor                User                    @relation(fields: [mayorId], references: [id], onDelete: Cascade)
   cancellationPolicyId String?
   cancellationPolicy   CancellationPolicy?     @relation(fields: [cancellationPolicyId], references: [id])
+  stampIconUrl         String?
+  passportStamps       PassportStamp[]
+  posts                Post[]
+  partnerInvestments   PartnerInvestment[]
 
   @@map("venues")
 }

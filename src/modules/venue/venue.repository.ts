@@ -83,14 +83,30 @@ export default class VenueRepo {
     status?: VenueStatus;
     page?: number;
     limit?: number;
+    north?: number;
+    south?: number;
+    east?: number;
+    west?: number;
+    category?: VenueCategory;
   }) {
     const mayorId = filters?.mayorId ?? filters?.hostId;
     const page = filters?.page ?? 1;
     const limit = filters?.limit ?? 50;
     const skip = (page - 1) * limit;
 
-    const where = {
+    const hasBounds =
+      filters?.north != null &&
+      filters?.south != null &&
+      filters?.east != null &&
+      filters?.west != null &&
+      !isNaN(filters.north) &&
+      !isNaN(filters.south) &&
+      !isNaN(filters.east) &&
+      !isNaN(filters.west);
+
+    const where: Prisma.VenueWhereInput = {
       ...(mayorId ? { mayorId } : {}),
+      ...(filters?.category ? { category: filters.category } : {}),
       // Public browse (no mayorId) → only available venues by default
       // Mayor viewing own venues (with mayorId) → all statuses unless a specific status is passed
       ...(mayorId
@@ -98,6 +114,12 @@ export default class VenueRepo {
           ? { status: filters.status }
           : {}
         : { status: filters?.status ?? VenueStatus.available }),
+      ...(hasBounds
+        ? {
+            lat: { gte: filters!.south, lte: filters!.north },
+            lng: { gte: filters!.west, lte: filters!.east },
+          }
+        : {}),
     };
 
     // `Promise.all`, not `$transaction`: a list and its count need no

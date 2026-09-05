@@ -163,6 +163,33 @@ const badges = [
     path: UserPath.venueFoxer,
     criteria: null,
   },
+  {
+    name: "Manila Explorer",
+    description: "Visited 5+ distinct venues and earned their passport stamps",
+    icon: "explore",
+    color: "#0284c7",
+    rarity: BadgeRarity.Rare,
+    path: UserPath.user,
+    criteria: "distinct_venues:5",
+  },
+  {
+    name: "Venue Connoisseur",
+    description: "Collected 10+ distinct venue stamps across the Republic",
+    icon: "military_tech",
+    color: "#eab308",
+    rarity: BadgeRarity.Epic,
+    path: UserPath.user,
+    criteria: "distinct_venues:10",
+  },
+  {
+    name: "Republic Voice",
+    description: "Actively shared community experiences in Republic Foxer",
+    icon: "campaign",
+    color: "#10b981",
+    rarity: BadgeRarity.Uncommon,
+    path: UserPath.user,
+    criteria: "community_posts:5",
+  },
 ];
 
 export async function seedBadges(prisma: PrismaClient) {

@@ -1,4 +1,4 @@
-import { UserPath } from "@prisma/client";
+import { UserPath, TransactionStatus } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 
 const XP_PER_LEVEL = 1000;
@@ -49,6 +49,8 @@ const XP_REWARDS = {
   uploadVenue: 75,
   venueBooked: 100,
   mayorVenueApproved: 200,
+  createCommunityPost: 15,
+  shareReviewPost: 20,
 };
 
 function xpRequiredForLevel(level: number): number {
@@ -199,6 +201,7 @@ export default class PassportSvc {
       include: {
         event: {
           select: {
+            id: true,
             name: true,
             startAt: true,
             targetCity: true,
@@ -218,10 +221,43 @@ export default class PassportSvc {
     });
     if (existing) return;
 
+    // The venue on the stamp must be the one actually confirmed for THIS
+    // booking — scoped by bookingId (an event can host many bookings) and
+    // included:true (excludes venue options the guest didn't pick), and
+    // only once the Venue Foxer's transaction has been approved. Without
+    // this, an unscoped/unfiltered lookup can attribute the stamp to a
+    // different booking's venue or one the guest never actually visited.
+    const venueTx = await prisma.eventVenueTransaction.findFirst({
+      where: {
+        bookingId,
+        included: true,
+        status: TransactionStatus.approved,
+      },
+      orderBy: { createdAt: "asc" },
+      select: {
+        venueId: true,
+        venue: {
+          select: { id: true, name: true, city: true, stampIconUrl: true },
+        },
+      },
+    });
+
+    const venue = venueTx?.venue;
+    const venueId = venue?.id ?? null;
+
     const location =
-      [booking.event?.targetCity, booking.event?.targetCountry]
+      [venue?.city ?? booking.event?.targetCity, booking.event?.targetCountry]
         .filter(Boolean)
         .join(", ") || null;
+
+    // Custom venue seal or automatic vintage circular stamp
+    const stampLabel = venue?.name ?? booking.event?.name ?? "Fox Passport";
+    const stampCity = venue?.city ?? booking.event?.targetCity ?? "Republic";
+    const fallbackSeal = `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(
+      `${stampLabel}-${stampCity}`,
+    )}&backgroundColor=b45309,d97706`;
+
+    const imageUrl = venue?.stampIconUrl || fallbackSeal;
 
     await prisma.passportStamp.create({
       data: {
@@ -230,6 +266,8 @@ export default class PassportSvc {
         eventName: booking.event?.name ?? "Event",
         eventDate: booking.startAt,
         location,
+        venueId,
+        imageUrl,
         xpEarned: XP_REWARDS.attendEvent,
       },
     });
@@ -239,6 +277,26 @@ export default class PassportSvc {
       UserPath.user,
       XP_REWARDS.attendEvent,
     );
+
+    // Milestone Badges: Track distinct venue stamps collected
+    try {
+      const distinctVenues = await prisma.passportStamp.groupBy({
+        by: ["venueId"],
+        where: {
+          passportId: passport.id,
+          venueId: { not: null },
+        },
+      });
+
+      if (distinctVenues.length >= 5) {
+        await PassportSvc.awardBadgeByName(booking.userId, "Manila Explorer");
+      }
+      if (distinctVenues.length >= 10) {
+        await PassportSvc.awardBadgeByName(booking.userId, "Venue Connoisseur");
+      }
+    } catch (badgeErr) {
+      console.warn("[PassportSvc] Milestone badge check failed:", badgeErr);
+    }
   }
 
   // Sort a list of items so owners with the given perk appear first.
