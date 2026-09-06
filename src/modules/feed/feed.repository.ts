@@ -180,38 +180,41 @@ export default class FeedRepo {
     const isTopMode = mode === "top";
     const take = isTopMode ? 500 : limit + 1; // candidate window for top mode
 
+    const posts = await prisma.post.findMany({
+      where,
+      take,
+      skip: !isTopMode && cursor ? 1 : 0,
+      cursor: !isTopMode && cursor ? { id: cursor } : undefined,
+      orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
+      include: {
+        author: AUTHOR_SELECT,
+        ...ENTITY_INCLUDE,
+        ...(viewerId
+          ? {
+              likes: {
+                where: { userId: viewerId },
+                select: { userId: true },
+              },
+            }
+          : {}),
+      },
+    });
+
     // Fetched once here (regardless of mode) rather than per-post, so
     // rendering N posts from M distinct authors costs one query instead of
-    // one follow-status lookup per author on the client.
-    const [posts, followingIds] = await Promise.all([
-      prisma.post.findMany({
-        where,
-        take,
-        skip: !isTopMode && cursor ? 1 : 0,
-        cursor: !isTopMode && cursor ? { id: cursor } : undefined,
-        orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
-        include: {
-          author: AUTHOR_SELECT,
-          ...ENTITY_INCLUDE,
-          ...(viewerId
-            ? {
-                likes: {
-                  where: { userId: viewerId },
-                  select: { userId: true },
-                },
-              }
-            : {}),
-        },
-      }),
-      viewerId
-        ? prisma.follow
+    // one follow-status lookup per author on the client. Scoped to this
+    // batch's authors (not the viewer's whole follow list) so the cost
+    // tracks page size, not how many people the viewer follows.
+    const authorIds = [...new Set(posts.map((p) => p.authorId))];
+    const followingIds =
+      viewerId && authorIds.length > 0
+        ? await prisma.follow
             .findMany({
-              where: { followerId: viewerId },
+              where: { followerId: viewerId, followingId: { in: authorIds } },
               select: { followingId: true },
             })
             .then((rows) => new Set(rows.map((f) => f.followingId)))
-        : Promise.resolve(new Set<string>()),
-    ]);
+        : new Set<string>();
 
     let formatted = posts.map((p) => {
       const isLikedByMe = viewerId ? (p.likes?.length ?? 0) > 0 : false;

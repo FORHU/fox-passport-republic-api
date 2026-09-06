@@ -139,7 +139,9 @@ export default class VenueCtrl {
         page: page ? Number(page) : undefined,
         limit: limit
           ? Math.min(Number(limit), isLightweight ? 1000 : 100)
-          : undefined,
+          : isLightweight
+            ? 1000
+            : undefined,
         ...(parsedNorth != null &&
           !isNaN(parsedNorth) && { north: parsedNorth }),
         ...(parsedSouth != null &&
