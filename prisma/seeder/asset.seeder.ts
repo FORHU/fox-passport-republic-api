@@ -5,7 +5,7 @@ import {
   AssetCondition,
   AssetCategory,
 } from "@prisma/client";
-import { getVenueCoords } from "./city-coords";
+import { getVenueCoords, hasKnownLocation } from "./city-coords";
 
 const BULK_ASSET_NAMES: Partial<
   Record<
@@ -1200,7 +1200,12 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
       const { id, ...rest } = a as any;
       const assetId =
         id || `seed-asset-${a.name.trim().toLowerCase().replace(/\s+/g, "-")}`;
-      const coords = getVenueCoords(a.name, (a as any).city);
+      const assetCity = (a as any).city;
+      // An unrecognized city leaves lat/lng unset (a visible data hole)
+      // rather than silently falling back to a plausible-looking Manila pin.
+      const coords = hasKnownLocation(a.name, assetCity)
+        ? getVenueCoords(a.name, assetCity)
+        : {};
       await prisma.asset.upsert({
         where: { id: assetId },
         update: { ...rest, ...coords },

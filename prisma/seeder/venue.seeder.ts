@@ -4,7 +4,13 @@ import {
   BillingRate,
   VenueCategory,
 } from "@prisma/client";
-import { getVenueCoords, generatePolygon, CITY_COORDS } from "./city-coords";
+import {
+  getVenueCoords,
+  generatePolygon,
+  resolveNonOverlappingBoundary,
+  CITY_COORDS,
+} from "./city-coords";
+import type { LngLat } from "../../src/utils/geo";
 
 export async function seedVenues(prisma: PrismaClient, host?: any) {
   try {
@@ -24,7 +30,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         "Could not find a user with email 'host@example.com' or 'mayor@example.com' in the database.",
       );
     }
-    const venues = [
+    const venues: any[] = [
       {
         mayorId: host.id,
         name: "Grand Palace Hall",
@@ -1597,6 +1603,13 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
 
     // Generate bulk venues for map testing (50 venues across various cities)
     const cities = Object.keys(CITY_COORDS);
+    // Two of the bulk venues (deliberately different display names/owners'
+    // eyes) share the "SMX Convention Center Manila" landmark coordinate,
+    // so the venues map has at least one real multi-venue building cluster
+    // to exercise the cluster-pin/spiderfy UI against, instead of the
+    // landmark table sitting unused by every seeded entity.
+    const CLUSTERED_BULK_INDEXES = new Set([3, 17]);
+
     for (let i = 0; i < 50; i++) {
       const city = cities[i % cities.length];
       const name = `Bulk Test Venue ${i} - ${city}`;
@@ -1618,16 +1631,35 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         techAv: ["projector"],
         staffing: ["security"],
         policies: ["test policy"],
+        landmark: CLUSTERED_BULK_INDEXES.has(i)
+          ? "SMX Convention Center Manila"
+          : undefined,
       });
     }
+
+    // Tracks every boundary placed so far in this loop so
+    // resolveNonOverlappingBoundary can nudge a new venue clear of ones
+    // already seeded, using the same overlap check the real API enforces.
+    const placedBoundaries: LngLat[][] = [];
 
     for (const v of venues) {
       const venueId = `seed-venue-${v.name.trim().toLowerCase().replace(/\s+/g, "-")}`;
       // Pulled out to keep it *off* venueData, not to be used -- the `_`
       // prefix is what marks a deliberate discard.
-      const { mayorId: _mayorId, ...venueData } = v as any;
-      const coords = getVenueCoords(venueData.name, venueData.city);
-      const boundary = generatePolygon(coords);
+      const { mayorId: _mayorId, landmark, ...venueData } = v as any;
+      const rawCoords = getVenueCoords(
+        venueData.name,
+        venueData.city,
+        landmark,
+      );
+      // A `landmark` override means this venue is deliberately co-located
+      // with others at the same building (the cluster-pin demo below) — skip
+      // the nudge for those so they keep sharing the exact point instead of
+      // being pushed apart by the very overlap check meant for accidental
+      // collisions among the independently-jittered venues.
+      const { coords, boundary } = landmark
+        ? { coords: rawCoords, boundary: generatePolygon(rawCoords) }
+        : resolveNonOverlappingBoundary(rawCoords, placedBoundaries);
 
       await prisma.venue.upsert({
         where: { id: venueId },
@@ -1675,7 +1707,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
           techAv: ["sound system", "projector"],
           staffing: ["security"],
           policies: ["no smoking", "venue hours 8am-11pm"],
-          ...CITY_COORDS["Taguig"],
+          ...getVenueCoords("Reyes BGC Studio", "Taguig"),
         },
         {
           id: "seed-venue-reyes-manila-hall",
@@ -1696,7 +1728,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
           techAv: ["full AV system", "wireless mics"],
           staffing: ["security", "janitor"],
           policies: ["no outside alcohol", "venue hours 9am-12am"],
-          ...CITY_COORDS["Manila"],
+          ...getVenueCoords("Reyes Manila Hall", "Manila"),
         },
         {
           id: "seed-venue-reyes-rooftop-pasig",
@@ -1717,7 +1749,9 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
           techAv: ["weatherproof sound system", "ambient lighting"],
           staffing: ["security"],
           policies: ["no outside liquor", "event hours 4pm-1am"],
-          ...CITY_COORDS["Pasig"],
+          // Matches a LANDMARK_COORDS entry exactly, so this one resolves
+          // to a fixed landmark coordinate instead of the city centroid.
+          ...getVenueCoords("Reyes Rooftop Pasig", "Pasig"),
         },
       ];
       for (const rv of reyesVenues) {

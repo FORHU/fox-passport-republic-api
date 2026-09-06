@@ -4,7 +4,7 @@ import {
   BillingRate,
   ServiceCategory,
 } from "@prisma/client";
-import { getVenueCoords } from "./city-coords";
+import { getVenueCoords, hasKnownLocation } from "./city-coords";
 
 export async function seedServices(prisma: PrismaClient, users: any[]) {
   try {
@@ -682,7 +682,11 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
       const { id, ...rest } = s as any;
       const serviceId =
         id || `seed-service-${s.name.toLowerCase().replace(/\s+/g, "-")}`;
-      const coords = getVenueCoords(s.name, rest.city);
+      // An unrecognized city leaves lat/lng unset (a visible data hole)
+      // rather than silently falling back to a plausible-looking Manila pin.
+      const coords = hasKnownLocation(s.name, rest.city)
+        ? getVenueCoords(s.name, rest.city)
+        : {};
       await prisma.service.upsert({
         where: { id: serviceId },
         update: { ...rest, ...coords },
