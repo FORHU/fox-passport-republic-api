@@ -56,6 +56,8 @@ model User {
   postComments             PostComment[]
   postLikes                PostLike[]
   partnerInvestments       PartnerInvestment[]
+  followers                Follow[]                  @relation("Following")
+  following                Follow[]                  @relation("Follower")
 
   @@map("users")
 }
@@ -253,4 +255,17 @@ enum SystemRole {
   user
   admin_secretary
   admin
+}
+
+model Follow {
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  
+  @@id([followerId, followingId])
+  @@index([followingId])
+
+  @@map("follows")
 }

@@ -18,11 +18,14 @@ import {
  * but fail inside the service.
  */
 describe("queue:decide implies queue:read", () => {
-  it.each(Object.values(SystemRole))("holds both, or neither, for %s", (role) => {
-    if (can(role, "queue:decide")) {
-      expect(can(role, "queue:read")).toBe(true);
-    }
-  });
+  it.each(Object.values(SystemRole))(
+    "holds both, or neither, for %s",
+    (role) => {
+      if (can(role, "queue:decide")) {
+        expect(can(role, "queue:read")).toBe(true);
+      }
+    },
+  );
 });
 
 /**

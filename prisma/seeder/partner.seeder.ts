@@ -7,7 +7,7 @@ import {
   AssetCategory,
   AssetCondition,
 } from "@prisma/client";
-import { CITY_COORDS } from "./city-coords";
+import { getVenueCoords } from "./city-coords";
 import { hashPassword } from "../../src/utils/password";
 
 const SEED_PASSWORD = "Password123!";
@@ -97,8 +97,9 @@ export async function seedPartners(prisma: PrismaClient) {
         techAv: ["4K projector", "PA system", "wireless mics", "streaming kit"],
         staffing: ["security"],
         policies: ["no smoking", "venue hours 8am-11pm"],
-        stampIconUrl: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=300&auto=format&fit=crop",
-        ...CITY_COORDS["Makati"],
+        stampIconUrl:
+          "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=300&auto=format&fit=crop",
+        ...getVenueCoords("Partner Creative Studio", "Makati"),
       },
       {
         id: "seed-venue-partner-garden-taguig",
@@ -124,8 +125,9 @@ export async function seedPartners(prisma: PrismaClient) {
         techAv: ["outdoor PA", "ambient lighting"],
         staffing: ["security", "groundskeeper"],
         policies: ["no confetti", "venue hours 8am-10pm"],
-        stampIconUrl: "https://images.unsplash.com/photo-1544816155-12df9643f363?w=300&auto=format&fit=crop",
-        ...CITY_COORDS["Taguig"],
+        stampIconUrl:
+          "https://images.unsplash.com/photo-1544816155-12df9643f363?w=300&auto=format&fit=crop",
+        ...getVenueCoords("Partner Garden Terrace", "Taguig"),
       },
       {
         id: "seed-venue-partner-rooftop-pasig",
@@ -151,8 +153,9 @@ export async function seedPartners(prisma: PrismaClient) {
         techAv: ["club sound system", "LED wash lighting", "wireless mics"],
         staffing: ["security", "mixologist"],
         policies: ["no outside catering", "dress code enforced after 8pm"],
-        stampIconUrl: "https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300&auto=format&fit=crop",
-        ...CITY_COORDS["Pasig"],
+        stampIconUrl:
+          "https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300&auto=format&fit=crop",
+        ...getVenueCoords("Partner Sky Lounge", "Pasig"),
       },
       {
         id: "seed-venue-partner-hall-qc",
@@ -178,8 +181,9 @@ export async function seedPartners(prisma: PrismaClient) {
         ],
         staffing: ["security", "janitor"],
         policies: ["no outside food", "venue hours 7am-12am"],
-        stampIconUrl: "https://images.unsplash.com/photo-1519741497674-611481863552?w=300&auto=format&fit=crop",
-        ...CITY_COORDS["Quezon City"],
+        stampIconUrl:
+          "https://images.unsplash.com/photo-1519741497674-611481863552?w=300&auto=format&fit=crop",
+        ...getVenueCoords("Partner Function Hall QC", "Quezon City"),
       },
       {
         id: "seed-venue-partner-villa-tagaytay",
@@ -200,8 +204,9 @@ export async function seedPartners(prisma: PrismaClient) {
         techAv: ["sound system", "projector", "ambient lighting"],
         staffing: ["security", "event coordinator"],
         policies: ["no confetti", "venue hours 8am-10pm"],
-        stampIconUrl: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=300&auto=format&fit=crop",
-        ...CITY_COORDS["Tagaytay"],
+        stampIconUrl:
+          "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=300&auto=format&fit=crop",
+        ...getVenueCoords("Partner Tagaytay Villa", "Tagaytay"),
       },
     ];
 
@@ -281,7 +286,7 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Makati",
         state: "Metro Manila",
         country: "Philippines",
-        ...CITY_COORDS["Makati"],
+        ...getVenueCoords("Partner 4K Event Projector", "Makati"),
       },
       {
         id: "seed-partner-asset-led-screen",
@@ -298,7 +303,7 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Makati",
         state: "Metro Manila",
         country: "Philippines",
-        ...CITY_COORDS["Makati"],
+        ...getVenueCoords("Partner 80-Inch LED Display", "Makati"),
       },
       {
         id: "seed-partner-asset-stage-lighting",
@@ -315,7 +320,7 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Taguig",
         state: "Metro Manila",
         country: "Philippines",
-        ...CITY_COORDS["Taguig"],
+        ...getVenueCoords("Partner Stage Lighting Rig", "Taguig"),
       },
       {
         id: "seed-partner-asset-streaming-rig",
@@ -332,7 +337,7 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Pasig",
         state: "Metro Manila",
         country: "Philippines",
-        ...CITY_COORDS["Pasig"],
+        ...getVenueCoords("Partner Live Streaming Rig", "Pasig"),
       },
       {
         id: "seed-partner-asset-photo-booth",
@@ -349,7 +354,7 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Makati",
         state: "Metro Manila",
         country: "Philippines",
-        ...CITY_COORDS["Makati"],
+        ...getVenueCoords("Partner Selfie Photo Booth", "Makati"),
       },
       // ── Sound System ──────────────────────────────────────────────
       {
@@ -367,7 +372,7 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Makati",
         state: "Metro Manila",
         country: "Philippines",
-        ...CITY_COORDS["Makati"],
+        ...getVenueCoords("Partner Portable PA System", "Makati"),
       },
       {
         id: "seed-partner-asset-wireless-mics",
@@ -384,7 +389,7 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Taguig",
         state: "Metro Manila",
         country: "Philippines",
-        ...CITY_COORDS["Taguig"],
+        ...getVenueCoords("Partner Wireless Mic Set (4-channel)", "Taguig"),
       },
       // ── Furniture / Inventory ─────────────────────────────────────
       {
@@ -402,7 +407,7 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Quezon City",
         state: "Metro Manila",
         country: "Philippines",
-        ...CITY_COORDS["Quezon City"],
+        ...getVenueCoords("Partner Banquet Tables (Set of 10)", "Quezon City"),
       },
       {
         id: "seed-partner-asset-chairs-100",
@@ -419,7 +424,7 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Quezon City",
         state: "Metro Manila",
         country: "Philippines",
-        ...CITY_COORDS["Quezon City"],
+        ...getVenueCoords("Partner Chiavari Chairs (100 pcs)", "Quezon City"),
       },
       {
         id: "seed-partner-asset-cocktail-tables",
@@ -436,7 +441,7 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Taguig",
         state: "Metro Manila",
         country: "Philippines",
-        ...CITY_COORDS["Taguig"],
+        ...getVenueCoords("Partner Cocktail Bar Tables", "Taguig"),
       },
       // ── Decorations / Inventory ───────────────────────────────────
       {
@@ -454,7 +459,7 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Makati",
         state: "Metro Manila",
         country: "Philippines",
-        ...CITY_COORDS["Makati"],
+        ...getVenueCoords("Partner Backdrop Stand Kit", "Makati"),
       },
       {
         id: "seed-partner-asset-fairy-lights",
@@ -471,7 +476,7 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Quezon City",
         state: "Metro Manila",
         country: "Philippines",
-        ...CITY_COORDS["Quezon City"],
+        ...getVenueCoords("Partner Warm Fairy Light Set", "Quezon City"),
       },
       // ── Other ─────────────────────────────────────────────────────
       {
@@ -489,7 +494,7 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Makati",
         state: "Metro Manila",
         country: "Philippines",
-        ...CITY_COORDS["Makati"],
+        ...getVenueCoords("Partner Cold Spark Machine (Pair)", "Makati"),
       },
       {
         id: "seed-partner-asset-generator",
@@ -506,7 +511,7 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Pasig",
         state: "Metro Manila",
         country: "Philippines",
-        ...CITY_COORDS["Pasig"],
+        ...getVenueCoords("Partner Backup Generator 3kVA", "Pasig"),
       },
     ];
 

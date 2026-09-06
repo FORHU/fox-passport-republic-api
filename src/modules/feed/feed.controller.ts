@@ -16,7 +16,7 @@ function statusForError(message: string): number {
 export default class FeedController {
   static async getFeed(req: Request, res: Response) {
     try {
-      const { tab, type, authorId, search, limit, cursor } = req.query;
+      const { tab, type, authorId, search, limit, cursor, mode } = req.query;
       const parsedLimit = limit ? parseInt(limit as string, 10) : NaN;
 
       const result = await FeedService.getFeed({
@@ -29,6 +29,7 @@ export default class FeedController {
           : Math.min(50, Math.max(1, parsedLimit)),
         cursor: cursor as string | undefined,
         viewerId: req.user?.userId,
+        mode: mode as "recent" | "top" | undefined,
       });
 
       return res.status(200).json({

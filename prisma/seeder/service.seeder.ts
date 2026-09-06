@@ -4,7 +4,7 @@ import {
   BillingRate,
   ServiceCategory,
 } from "@prisma/client";
-import { CITY_COORDS } from "./city-coords";
+import { getVenueCoords } from "./city-coords";
 
 export async function seedServices(prisma: PrismaClient, users: any[]) {
   try {
@@ -682,7 +682,7 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
       const { id, ...rest } = s as any;
       const serviceId =
         id || `seed-service-${s.name.toLowerCase().replace(/\s+/g, "-")}`;
-      const coords = CITY_COORDS[rest.city] ?? {};
+      const coords = getVenueCoords(s.name, rest.city);
       await prisma.service.upsert({
         where: { id: serviceId },
         update: { ...rest, ...coords },

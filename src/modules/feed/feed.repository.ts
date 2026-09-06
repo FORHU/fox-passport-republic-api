@@ -144,6 +144,7 @@ export interface QueryFeedOptions {
   limit?: number;
   cursor?: string;
   viewerId?: string;
+  mode?: "recent" | "top";
 }
 
 export default class FeedRepo {
@@ -156,6 +157,7 @@ export default class FeedRepo {
       limit = 20,
       cursor,
       viewerId,
+      mode = "recent",
     } = options;
 
     const where: Prisma.PostWhereInput = {
@@ -175,11 +177,14 @@ export default class FeedRepo {
       ];
     }
 
+    const isTopMode = mode === "top";
+    const take = isTopMode ? 500 : limit + 1; // candidate window for top mode
+
     const posts = await prisma.post.findMany({
       where,
-      take: limit + 1,
-      skip: cursor ? 1 : 0,
-      cursor: cursor ? { id: cursor } : undefined,
+      take,
+      skip: !isTopMode && cursor ? 1 : 0,
+      cursor: !isTopMode && cursor ? { id: cursor } : undefined,
       orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
       include: {
         author: AUTHOR_SELECT,
@@ -195,18 +200,86 @@ export default class FeedRepo {
       },
     });
 
-    const hasNextPage = posts.length > limit;
-    const items = hasNextPage ? posts.slice(0, limit) : posts;
-    const nextCursor = hasNextPage ? items[items.length - 1].id : null;
+    // Fetched once here (regardless of mode) rather than per-post, so
+    // rendering N posts from M distinct authors costs one query instead of
+    // one follow-status lookup per author on the client. Scoped to this
+    // batch's authors (not the viewer's whole follow list) so the cost
+    // tracks page size, not how many people the viewer follows.
+    const authorIds = [...new Set(posts.map((p) => p.authorId))];
+    const followingIds =
+      viewerId && authorIds.length > 0
+        ? await prisma.follow
+            .findMany({
+              where: { followerId: viewerId, followingId: { in: authorIds } },
+              select: { followingId: true },
+            })
+            .then((rows) => new Set(rows.map((f) => f.followingId)))
+        : new Set<string>();
 
-    const formatted = items.map((p) => {
+    let formatted = posts.map((p) => {
       const isLikedByMe = viewerId ? (p.likes?.length ?? 0) > 0 : false;
+      const isFollowingAuthor = viewerId ? followingIds.has(p.authorId) : false;
       const { likes: _likes, ...rest } = p;
       return {
         ...rest,
         isLikedByMe,
+        isFollowingAuthor,
       };
     });
+
+    let nextCursor = null;
+
+    if (isTopMode) {
+      const now = Date.now();
+      formatted.forEach((p: any) => {
+        let score = 0;
+
+        // Affinity
+        if (followingIds.has(p.authorId)) score += 50;
+        if (p.authorId === viewerId) score += 50;
+
+        // Engagement
+        score += (p.likesCount || 0) * 2;
+        score += (p.commentsCount || 0) * 5;
+        score += (p.sharesCount || 0) * 10;
+
+        // Decay (Linear/Exponential proxy)
+        const hoursOld =
+          (now - new Date(p.createdAt).getTime()) / (1000 * 60 * 60);
+        // Reduce score smoothly based on age. Avoid negative infinity for very old posts.
+        const decayPenalty = Math.min(hoursOld * 1.5, 100);
+        score -= decayPenalty;
+
+        p._score = score;
+      });
+
+      // Sort by score
+      formatted.sort((a: any, b: any) => {
+        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+        return b._score - a._score;
+      });
+
+      // Paginate in-memory array
+      const cursorIndex = cursor
+        ? formatted.findIndex((p) => p.id === cursor)
+        : -1;
+      const startIndex = cursorIndex !== -1 ? cursorIndex + 1 : 0;
+
+      const paged = formatted.slice(startIndex, startIndex + limit);
+      nextCursor =
+        startIndex + limit < formatted.length
+          ? formatted[startIndex + limit - 1].id
+          : null;
+      formatted = paged;
+    } else {
+      const hasNextPage = posts.length > limit;
+      const items = hasNextPage ? formatted.slice(0, limit) : formatted;
+      nextCursor = hasNextPage ? items[items.length - 1].id : null;
+      formatted = items;
+    }
+
+    // Clean up temporary score property
+    formatted.forEach((p: any) => delete p._score);
 
     return {
       posts: formatted,
@@ -234,10 +307,23 @@ export default class FeedRepo {
     if (!post) return null;
 
     const isLikedByMe = viewerId ? (post.likes?.length ?? 0) > 0 : false;
+    const isFollowingAuthor = viewerId
+      ? await prisma.follow
+          .findUnique({
+            where: {
+              followerId_followingId: {
+                followerId: viewerId,
+                followingId: post.authorId,
+              },
+            },
+          })
+          .then((f) => !!f)
+      : false;
     const { likes: _likes, ...rest } = post;
     return {
       ...rest,
       isLikedByMe,
+      isFollowingAuthor,
     };
   }
 

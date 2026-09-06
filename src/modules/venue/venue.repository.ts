@@ -88,11 +88,14 @@ export default class VenueRepo {
     east?: number;
     west?: number;
     category?: VenueCategory;
+    lightweight?: boolean;
+    search?: string;
   }) {
     const mayorId = filters?.mayorId ?? filters?.hostId;
     const page = filters?.page ?? 1;
     const limit = filters?.limit ?? 50;
     const skip = (page - 1) * limit;
+    const lightweight = filters?.lightweight ?? false;
 
     const hasBounds =
       filters?.north != null &&
@@ -107,8 +110,17 @@ export default class VenueRepo {
     const where: Prisma.VenueWhereInput = {
       ...(mayorId ? { mayorId } : {}),
       ...(filters?.category ? { category: filters.category } : {}),
-      // Public browse (no mayorId) → only available venues by default
-      // Mayor viewing own venues (with mayorId) → all statuses unless a specific status is passed
+      ...(filters?.search
+        ? {
+            OR: [
+              { name: { contains: filters.search, mode: "insensitive" } },
+              { address: { contains: filters.search, mode: "insensitive" } },
+              { city: { contains: filters.search, mode: "insensitive" } },
+              { state: { contains: filters.search, mode: "insensitive" } },
+              { country: { contains: filters.search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
       ...(mayorId
         ? filters?.status
           ? { status: filters.status }
@@ -122,20 +134,33 @@ export default class VenueRepo {
         : {}),
     };
 
-    // `Promise.all`, not `$transaction`: a list and its count need no
-    // transactional isolation, and demanding one means waiting for a free
-    // connection to *start* a transaction — which is what times out under a
-    // burst with "Unable to start a transaction in the given time". The count
-    // can now shift by one against a concurrent insert; a 500 on a browse page
-    // is the worse trade.
+    const queryArgs: any = {
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    };
+
+    if (lightweight) {
+      queryArgs.select = {
+        id: true,
+        name: true,
+        lat: true,
+        lng: true,
+        boundary: true,
+        category: true,
+        price: true,
+        images: {
+          take: 1,
+          select: { id: true, url: true },
+        },
+      };
+    } else {
+      queryArgs.include = { mayor: mayorSelect, images: true };
+    }
+
     const [venues, total] = await Promise.all([
-      prisma.venue.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        include: { mayor: mayorSelect, images: true },
-        skip,
-        take: limit,
-      }),
+      prisma.venue.findMany(queryArgs),
       prisma.venue.count({ where }),
     ]);
 
