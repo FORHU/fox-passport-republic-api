@@ -1,3 +1,5 @@
+import { polygonsOverlap, type LngLat } from "../../src/utils/geo";
+
 /**
  * Shared lat/lng lookup for seed data with landmark-level micro-coordinates
  * and regional city centroids. Allows realistic geospatial testing without
@@ -88,6 +90,17 @@ export const LANDMARK_COORDS: Record<string, { lat: number; lng: number }> = {
   "General Luna Lagoon Resort": { lat: 9.7895, lng: 126.1528 },
 };
 
+/**
+ * Whether `getVenueCoords(name, city)` would resolve to a real, known
+ * location rather than its Manila fallback. Callers that previously left
+ * lat/lng unset for an unrecognized city (a visible, honest data hole) can
+ * use this to keep doing that, instead of getVenueCoords silently handing
+ * back a plausible-looking Manila-area pin that masks the same bad data.
+ */
+export function hasKnownLocation(name: string, city: string): boolean {
+  return Boolean(LANDMARK_COORDS[name] || CITY_COORDS[city]);
+}
+
 export function getCityOrLandmarkCoords(
   nameOrCity: string,
   fallbackCity = "Manila",
@@ -123,15 +136,20 @@ function jitterCoords(
 
 /**
  * The coordinate a seeded venue/event should actually use: an exact,
- * shared LANDMARK_COORDS entry when `name` names one (so the deliberately
- * clustered multi-event buildings really do share a coordinate), otherwise
- * a deterministic small jitter off the city centroid so distinct venues in
- * the same city spread out on the map instead of stacking on one pin.
+ * shared LANDMARK_COORDS entry when `name` names one, or when an explicit
+ * `landmark` is given (so a venue whose own display name doesn't happen to
+ * match a landmark string can still be deliberately placed at one, letting
+ * several differently-named venues share a coordinate to demo the building
+ * cluster pin) — otherwise a deterministic small jitter off the city
+ * centroid so distinct venues in the same city spread out on the map
+ * instead of stacking on one pin.
  */
 export function getVenueCoords(
   name: string,
   city: string,
+  landmark?: string,
 ): { lat: number; lng: number } {
+  if (landmark && LANDMARK_COORDS[landmark]) return LANDMARK_COORDS[landmark];
   if (LANDMARK_COORDS[name]) return LANDMARK_COORDS[name];
   const base = CITY_COORDS[city] ?? CITY_COORDS.Manila;
   return jitterCoords(base, name);
@@ -155,4 +173,41 @@ export function generatePolygon(
     [center.lng - sizeDegrees, center.lat + sizeDegrees],
     [center.lng - sizeDegrees, center.lat - sizeDegrees], // close the ring
   ];
+}
+
+/**
+ * Places a venue's boundary without overlapping any boundary already seeded
+ * in this run, using the exact same `polygonsOverlap` check the real
+ * `VenueSvc.assertNoOverlap` enforces on every create/update. Without this,
+ * two seeded venues could silently land on jittered coordinates close enough
+ * to overlap (each footprint is only ~44m wide) — invisible until a mayor
+ * later edits one of them through the real app and gets a false-positive
+ * "overlaps an existing venue" rejection unrelated to their edit.
+ *
+ * On a collision, nudges outward along the same jitter angle in fixed
+ * ~50m steps (deterministic, not random) until clear, then records the
+ * final boundary in `placed` so later calls in the same run see it too.
+ */
+export function resolveNonOverlappingBoundary(
+  coords: { lat: number; lng: number },
+  placed: LngLat[][],
+  sizeDegrees = 0.0002,
+): { coords: { lat: number; lng: number }; boundary: LngLat[] } {
+  let candidate = coords;
+  let boundary = generatePolygon(candidate, sizeDegrees) as LngLat[];
+  let attempts = 0;
+
+  while (placed.some((other) => polygonsOverlap(boundary, other))) {
+    attempts += 1;
+    if (attempts > 20) break; // give up rather than loop forever on bad input
+    const stepDeg = 0.00045 * attempts; // ~50m per attempt (111km per degree)
+    candidate = {
+      lat: coords.lat + stepDeg,
+      lng: coords.lng + stepDeg,
+    };
+    boundary = generatePolygon(candidate, sizeDegrees) as LngLat[];
+  }
+
+  placed.push(boundary);
+  return { coords: candidate, boundary };
 }

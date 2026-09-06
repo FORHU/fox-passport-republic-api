@@ -1587,7 +1587,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
 
     // ── 4. Events (approved and pending) ────────────────────────────────────
     const now = new Date();
-    const events = [
+    const events: any[] = [
       {
         id: "seed-event-birthday-01",
         clientId: client.id,
@@ -1734,7 +1734,11 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         guestCount: 50 + i,
         totalAmount: 10000 + i * 100,
         requestStatus: RequestStatus.approved,
-        eventStatus: EventStatus.pending,
+        eventStatus: isPast
+          ? EventStatus.completed
+          : isOngoing
+            ? EventStatus.ongoing
+            : EventStatus.pending,
         targetCity: i % 2 === 0 ? "Manila" : "Taguig",
         targetState: "Metro Manila",
         targetCountry: "Philippines",
