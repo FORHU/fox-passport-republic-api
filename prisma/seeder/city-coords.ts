@@ -136,3 +136,23 @@ export function getVenueCoords(
   const base = CITY_COORDS[city] ?? CITY_COORDS.Manila;
   return jitterCoords(base, name);
 }
+
+/**
+ * Generates a simple rectangular polygon boundary around a center coordinate.
+ * Useful for seeding venue footprints so they can be rendered on the map.
+ * @param center The center lat/lng
+ * @param sizeDegrees The size of the footprint (e.g. 0.0002 for ~20 meters)
+ * @returns An array of coordinates representing a closed GeoJSON ring (LngLat format: [lng, lat])
+ */
+export function generatePolygon(
+  center: { lat: number; lng: number },
+  sizeDegrees = 0.0002,
+): [number, number][] {
+  return [
+    [center.lng - sizeDegrees, center.lat - sizeDegrees],
+    [center.lng + sizeDegrees, center.lat - sizeDegrees],
+    [center.lng + sizeDegrees, center.lat + sizeDegrees],
+    [center.lng - sizeDegrees, center.lat + sizeDegrees],
+    [center.lng - sizeDegrees, center.lat - sizeDegrees], // close the ring
+  ];
+}

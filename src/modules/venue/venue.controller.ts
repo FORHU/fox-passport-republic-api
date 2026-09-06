@@ -121,6 +121,8 @@ export default class VenueCtrl {
         east,
         west,
         category,
+        lightweight,
+        search,
       } = req.query;
       const mayorId = (_mayorId ?? hostId) as string | undefined;
 
@@ -130,11 +132,14 @@ export default class VenueCtrl {
         south != null && south !== "" ? Number(south) : undefined;
       const parsedEast = east != null && east !== "" ? Number(east) : undefined;
       const parsedWest = west != null && west !== "" ? Number(west) : undefined;
+      const isLightweight = lightweight === "true";
 
       const { venues, total } = await VenueSvc.getVenues({
         ...(mayorId && { mayorId }),
         page: page ? Number(page) : undefined,
-        limit: limit ? Math.min(Number(limit), 100) : undefined,
+        limit: limit
+          ? Math.min(Number(limit), isLightweight ? 1000 : 100)
+          : undefined,
         ...(parsedNorth != null &&
           !isNaN(parsedNorth) && { north: parsedNorth }),
         ...(parsedSouth != null &&
@@ -142,6 +147,8 @@ export default class VenueCtrl {
         ...(parsedEast != null && !isNaN(parsedEast) && { east: parsedEast }),
         ...(parsedWest != null && !isNaN(parsedWest) && { west: parsedWest }),
         ...(category && { category: category as VenueCategory }),
+        ...(search && typeof search === "string" && { search }),
+        lightweight: isLightweight,
       });
       return res.status(200).json({ venues, total });
     } catch (e: unknown) {

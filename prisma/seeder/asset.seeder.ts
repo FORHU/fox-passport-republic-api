@@ -5,7 +5,7 @@ import {
   AssetCondition,
   AssetCategory,
 } from "@prisma/client";
-import { CITY_COORDS } from "./city-coords";
+import { getVenueCoords } from "./city-coords";
 
 const BULK_ASSET_NAMES: Partial<
   Record<
@@ -1200,7 +1200,7 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
       const { id, ...rest } = a as any;
       const assetId =
         id || `seed-asset-${a.name.trim().toLowerCase().replace(/\s+/g, "-")}`;
-      const coords = CITY_COORDS[(a as any).city] ?? {};
+      const coords = getVenueCoords(a.name, (a as any).city);
       await prisma.asset.upsert({
         where: { id: assetId },
         update: { ...rest, ...coords },

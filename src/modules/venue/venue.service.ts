@@ -157,8 +157,15 @@ export default class VenueSvc {
     east?: number;
     west?: number;
     category?: VenueCategory;
+    lightweight?: boolean;
+    search?: string;
   }) {
     const { venues, total } = await VenueRepo.findAllVenues(filters);
+
+    if (filters?.lightweight) {
+      return { venues, total };
+    }
+
     const { default: PassportSvc } =
       await import("../passport/passport.service");
     const sorted = await PassportSvc.sortByFeaturedPerk(
