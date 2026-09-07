@@ -4,8 +4,26 @@ import FollowController from "./follow.controller";
 
 const router = Router();
 
-// Toggle follow/unfollow (requires targetId in body)
-router.post("/", authenticate, FollowController.toggleFollow);
+// Send a follow (instant if target is public, pending if private)
+router.post("/", authenticate, FollowController.sendFollow);
+
+// Unfollow, or cancel an outgoing pending request
+router.delete("/:targetId", authenticate, FollowController.removeFollow);
+
+// Accept / decline an incoming pending request
+router.post(
+  "/:requesterId/accept",
+  authenticate,
+  FollowController.acceptRequest,
+);
+router.post(
+  "/:requesterId/decline",
+  authenticate,
+  FollowController.declineRequest,
+);
+
+// Incoming pending requests for the current user
+router.get("/requests", authenticate, FollowController.getRequests);
 
 // Get suggestions for current user
 router.get("/suggestions", authenticate, FollowController.getSuggestions);
@@ -14,12 +32,12 @@ router.get("/suggestions", authenticate, FollowController.getSuggestions);
 router.get("/:userId/status", authenticate, FollowController.getStatus);
 
 // Get counts (followers/following) for a user
-router.get("/:userId/counts", FollowController.getCounts);
+router.get("/:userId/counts", authenticate, FollowController.getCounts);
 
 // Get followers list
-router.get("/:userId/followers", FollowController.getFollowers);
+router.get("/:userId/followers", authenticate, FollowController.getFollowers);
 
 // Get following list
-router.get("/:userId/following", FollowController.getFollowing);
+router.get("/:userId/following", authenticate, FollowController.getFollowing);
 
 export default router;
