@@ -35,6 +35,8 @@ vi.mock("../src/config", () => ({
   ACCESS_TOKEN_EXPIRY: "15m",
   REFRESH_TOKEN_SECRET: "test-refresh-secret",
   REFRESH_TOKEN_EXPIRY: "7d",
+  // Reached through the controller's new import of auth.cookies.
+  refreshTokenTtlMs: () => 7 * 24 * 60 * 60 * 1000,
 }));
 
 vi.mock("../src/utils/prisma", () => ({ prisma: {} }));
@@ -221,6 +223,9 @@ describe("what the redirect carries", () => {
       accessToken: "access-token",
       refreshToken: "refresh-token",
       isNewUser: false,
+      // Parked alongside the tokens so googleExchange can set `fox_user` the
+      // way login does. Still server-side in Redis, still never in the URL.
+      user: { id: "u1" },
     });
   });
 
@@ -239,9 +244,18 @@ describe("what the redirect carries", () => {
 
 describe("googleExchange", () => {
   function exchangeRes() {
-    const captured: { status: number | null; body: unknown } = {
+    const captured: {
+      status: number | null;
+      body: unknown;
+      cookies: {
+        name: string;
+        value: string;
+        options: Record<string, unknown>;
+      }[];
+    } = {
       status: null,
       body: null,
+      cookies: [],
     };
     const res = {
       status: vi.fn((code: number) => {
@@ -252,6 +266,14 @@ describe("googleExchange", () => {
         captured.body = body;
         return res;
       }),
+      // The exchange sets the session cookies now, so this has to look enough
+      // like a real response to receive them.
+      cookie: vi.fn(
+        (name: string, value: string, options: Record<string, unknown>) => {
+          captured.cookies.push({ name, value, options });
+          return res;
+        },
+      ),
     };
     return { res: res as unknown as Response, captured };
   }

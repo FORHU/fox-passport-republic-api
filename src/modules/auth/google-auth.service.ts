@@ -28,6 +28,12 @@ interface PendingSession {
   accessToken: string;
   refreshToken: string;
   isNewUser: boolean;
+  /**
+   * The signed-in user, so the exchange can set the same cookies a password
+   * login does. Held in Redis for sixty seconds and never in the URL - the same
+   * reason the tokens are stashed rather than redirected with.
+   */
+  user?: Record<string, unknown>;
 }
 
 const EXCHANGE_PREFIX = "google:exchange:";

@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { Request, Response } from "express";
 import Joi from "joi";
 import AuthSvc from "./auth.service";
+import { setSessionCookies, clearSessionCookies } from "./auth.cookies";
 import GoogleAuthSvc from "./google-auth.service";
 import { issueSocketTicket } from "./socket-ticket.service";
 import {
@@ -140,6 +141,9 @@ export default class AuthCtrl {
 
     try {
       const result = await AuthSvc.login({ email, password });
+      // Cookies alongside the JSON body, not instead of it: the body is what
+      // non-browser clients and the app's own server-side callers read.
+      setSessionCookies(res, result);
       return res.json(result);
     } catch (e: unknown) {
       console.error("Login error:", e);
@@ -177,7 +181,9 @@ export default class AuthCtrl {
       });
       // `refreshToken` in the response is a NEW token — rotation made the one
       // the caller sent single-use. Clients must store this or their next
-      // refresh fails.
+      // refresh fails. The cookies carry the same rotated pair, so a browser
+      // session is extended without the client having to store anything.
+      setSessionCookies(res, result);
       return res.json(result);
     } catch (e: unknown) {
       if (e instanceof RefreshTokenReuseError) {
@@ -318,6 +324,12 @@ export default class AuthCtrl {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
         isNewUser: result.isNewUser,
+        // Carried through so the exchange can set `fox_user` alongside the
+        // token cookies, exactly as login does. Without it a Google session
+        // would come back missing the profile cookie the app falls back to
+        // when this API is unreachable - and the exchange would have to make a
+        // second call to /profile to find out who had just signed in.
+        user: result.user,
       });
 
       return res.redirect(
@@ -373,6 +385,7 @@ export default class AuthCtrl {
       return res.status(400).json({ message: "Invalid exchange code" });
     }
 
+    setSessionCookies(res, session);
     return res.status(200).json({ data: session });
   }
 
@@ -382,6 +395,10 @@ export default class AuthCtrl {
       // extended. Previously this returned 200 without doing anything, which
       // meant a leaked refresh token stayed usable for its full lifetime.
       await AuthSvc.logout(req.body?.refreshToken);
+
+      // Emitted even when no token was presented. Logout is idempotent, and a
+      // caller with unreadable or already-dead cookies still wants them gone.
+      clearSessionCookies(res);
 
       return res.status(200).json({
         success: true,

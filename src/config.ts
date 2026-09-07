@@ -59,6 +59,31 @@ export const ACCESS_TOKEN_EXPIRY = (process.env.ACCESS_TOKEN_EXPIRY ??
   "15m") as TokenExpiry;
 export const REFRESH_TOKEN_EXPIRY = (process.env.REFRESH_TOKEN_EXPIRY ??
   "7d") as TokenExpiry;
+
+/**
+ * `REFRESH_TOKEN_EXPIRY` in milliseconds.
+ *
+ * Everything that needs to know how long a session lasts derives it from here
+ * rather than restating it: the refresh token's own `expiresIn`, its database
+ * row's `expiresAt`, and the browser cookie's `Max-Age`. Each of those has been
+ * wrong at some point by being written out separately - a hardcoded 30 days
+ * once overrode the configured 7d, and the access cookie once outlived the JWT
+ * inside it by nearly seven days.
+ *
+ * Lives in config rather than beside the refresh-token service because the
+ * cookie module needs it too, and that service reaches for Prisma.
+ */
+export function refreshTokenTtlMs(): number {
+  const raw = String(REFRESH_TOKEN_EXPIRY ?? "7d").trim();
+  const match = /^(\d+)\s*([smhd])$/.exec(raw);
+  if (!match) return 7 * 24 * 60 * 60 * 1000;
+
+  const value = Number(match[1]);
+  const unit = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 }[
+    match[2] as "s" | "m" | "h" | "d"
+  ];
+  return value * unit;
+}
 export const REDIS_HOST = process.env.REDIS_HOST as string;
 export const REDIS_PORT = Number(process.env.REDIS_PORT || 6379);
 export const REDIS_PASSWORD = process.env.REDIS_PASSWORD as string;

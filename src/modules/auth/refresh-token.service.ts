@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { prisma } from "../../utils/prisma";
-import { REFRESH_TOKEN_SECRET, REFRESH_TOKEN_EXPIRY } from "../../config";
+import { REFRESH_TOKEN_SECRET, refreshTokenTtlMs } from "../../config";
 
 /**
  * Refresh-token lifecycle.
@@ -14,23 +14,6 @@ import { REFRESH_TOKEN_SECRET, REFRESH_TOKEN_EXPIRY } from "../../config";
  * Only the jti is stored, never the token: enough to revoke, useless to anyone
  * who reads the table.
  */
-
-/**
- * Honour REFRESH_TOKEN_EXPIRY from config rather than hardcoding. A hardcoded
- * 30 days here silently overrode the configured 7d and handed out tokens four
- * times longer-lived than intended.
- */
-function refreshTokenTtlMs(): number {
-  const raw = String(REFRESH_TOKEN_EXPIRY ?? "7d").trim();
-  const match = /^(\d+)\s*([smhd])$/.exec(raw);
-  if (!match) return 7 * 24 * 60 * 60 * 1000;
-
-  const value = Number(match[1]);
-  const unit = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 }[
-    match[2] as "s" | "m" | "h" | "d"
-  ];
-  return value * unit;
-}
 
 export interface RefreshTokenClaims {
   userId: string;
