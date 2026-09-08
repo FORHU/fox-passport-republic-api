@@ -22,7 +22,7 @@ import {
 } from "../../utils/password";
 import { permissionsForUser } from "../../types/permissions";
 
-import { ACCESS_TOKEN_SECRET, ACCESS_TOKEN_EXPIRY } from "../../config";
+import { ACCESS_TOKEN_SECRET, ACCESS_TOKEN_EXPIRY, isDev } from "../../config";
 
 export default class AuthSvc {
   static async register(data: {
@@ -78,7 +78,14 @@ export default class AuthSvc {
       });
     } catch (error) {
       console.error("Failed to send verification email:", error);
-      console.log(`[DEV] Verification OTP for ${user.email}: ${otp}`);
+      // The code only ever reaches a log in development. In production the
+      // console.error above is the whole record of the failure: a live code
+      // sitting in a shipped log next to the address it belongs to is an
+      // account takeover for anyone who can read it. The [DEV] prefix was a
+      // label, not a guard - this file had no isDev check at all.
+      if (isDev) {
+        console.log(`[DEV] Verification OTP for ${user.email}: ${otp}`);
+      }
     }
 
     // Generate tokens
@@ -331,7 +338,10 @@ export default class AuthSvc {
       });
     } catch (error) {
       console.error("Failed to send password reset email:", error);
-      console.log(`[DEV] Password reset OTP for ${user.email}: ${otp}`);
+      // Development only - see the note on the verification send above.
+      if (isDev) {
+        console.log(`[DEV] Password reset OTP for ${user.email}: ${otp}`);
+      }
     }
 
     return {
@@ -402,7 +412,10 @@ export default class AuthSvc {
       });
     } catch (error) {
       console.error("Failed to resend verification email:", error);
-      console.log(`[DEV] Resend OTP for ${user.email}: ${otp}`);
+      // Development only - see the note on the verification send above.
+      if (isDev) {
+        console.log(`[DEV] Resend OTP for ${user.email}: ${otp}`);
+      }
     }
     return {
       message: "New verification code sent to your email",
