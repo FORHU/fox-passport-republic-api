@@ -33,6 +33,7 @@ import feedRoutes from "../modules/feed/feed.routes";
 import investmentRoutes from "../modules/investment/investment.routes";
 import eventRoutes from "../modules/event/event.routes";
 import followRoutes from "../modules/follow/follow.routes";
+import blockRoutes from "../modules/block/block.routes";
 
 const router = express.Router();
 
@@ -51,6 +52,7 @@ router.use("/v1/profile", profileRoutes);
 router.use("/v1/role-requests", roleRequestRoutes);
 router.use("/v1/categories", categoryRoutes);
 router.use("/v1/follows", followRoutes);
+router.use("/v1/blocks", blockRoutes);
 
 // Feature Routes
 router.use("/v1/venues", venueRoutes);

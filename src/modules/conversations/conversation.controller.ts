@@ -4,6 +4,7 @@ import ConversationService from "./conversation.service";
 
 function statusForError(message: string): number {
   if (message === "Unauthorized") return 403;
+  if (message.startsWith("You can only message")) return 403;
   if (message === "Conversation not found") return 404;
   return 400;
 }
@@ -18,6 +19,18 @@ export default class ConversationController {
     } catch (e: unknown) {
       const error = e as Error;
       res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  static async canMessage(req: Request, res: Response) {
+    try {
+      const userId = req.user!.userId;
+      const { userId: otherId } = req.params;
+      const canMessage = await ConversationService.canMessage(userId, otherId);
+      res.json({ success: true, data: { canMessage } });
+    } catch (e: unknown) {
+      const err = e as Error;
+      res.status(400).json({ success: false, message: err.message });
     }
   }
 

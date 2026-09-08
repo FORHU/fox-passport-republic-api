@@ -13,6 +13,7 @@ export default class ProfileRepo {
         imgId: true,
         systemRole: true,
         roleType: true,
+        isPrivate: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -50,6 +51,7 @@ export default class ProfileRepo {
       phone?: string;
       imgId?: string;
       city?: string;
+      isPrivate?: boolean;
     },
   ) {
     return prisma.user.update({
@@ -65,6 +67,7 @@ export default class ProfileRepo {
         city: true,
         systemRole: true,
         roleType: true,
+        isPrivate: true,
         updatedAt: true,
       },
     });
