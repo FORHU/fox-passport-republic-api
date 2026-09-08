@@ -1,0 +1,47 @@
+// Enums shared by more than one domain.
+
+enum AssetCategory {
+  furnitures
+  sound_system
+  decorations
+  equipment
+  other
+}
+
+enum VenueCategory {
+  indoor
+  outdoor
+  hotel
+  beach_resort
+  garden
+  mix
+  other
+}
+
+enum ComponentType {
+  asset
+  service
+  venue
+}
+
+enum RoleType {
+  venueFoxer
+  eventFoxer
+  gearFoxer
+  serviceFoxer
+  investor
+}
+
+enum RequestStatus {
+  pending
+  approved
+  rejected
+}
+
+enum PaymentStatus {
+  pending
+  completed
+  failed
+  refunded
+  cancelled
+}

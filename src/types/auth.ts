@@ -27,6 +27,29 @@ export interface AuthenticatedUser {
 export type AuthorizableRole = SystemRole | RoleType;
 
 /**
+ * Every value the enum has, as a lookup.
+ *
+ * This is deliberately a `Record<SystemRole, true>` and not a string array: the
+ * day someone adds a fourth role to the schema, this object stops compiling
+ * until it is updated. The previous version of this file narrowed with
+ * `claims.systemRole === "admin" ? "admin" : "user"`, which would have silently
+ * rewritten a valid `admin_secretary` token to `user` — no error, no log, just
+ * a person quietly missing their permissions.
+ */
+const SYSTEM_ROLES: Record<SystemRole, true> = {
+  user: true,
+  admin_secretary: true,
+  admin: true,
+};
+
+/** Unknown or absent roles fall back to the least privileged one. */
+function toSystemRole(value: unknown): SystemRole {
+  return typeof value === "string" && value in SYSTEM_ROLES
+    ? (value as SystemRole)
+    : "user";
+}
+
+/**
  * Narrows an unverified JWT payload to our claim shape. `jwt.verify` returns
  * `string | JwtPayload`, so the payload is validated rather than cast.
  */
@@ -41,8 +64,7 @@ export function toAuthenticatedUser(
   const email = claims.email;
   if (typeof userId !== "string" || typeof email !== "string") return null;
 
-  const systemRole: SystemRole =
-    claims.systemRole === "admin" ? "admin" : "user";
+  const systemRole = toSystemRole(claims.systemRole);
 
   const roleType = Array.isArray(claims.roleType)
     ? claims.roleType.filter((r): r is RoleType => typeof r === "string")

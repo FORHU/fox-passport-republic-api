@@ -1,5 +1,6 @@
 import * as dotenv from "dotenv";
 import type { SignOptions } from "jsonwebtoken";
+import { requireSecret } from "./utils/require-secret";
 dotenv.config();
 
 export const DATABASE_URL = process.env.DATABASE_URL as string;
@@ -36,8 +37,18 @@ export const MAILER_TRANSPORT_SECURE =
   process.env.MAILER_TRANSPORT_SECURE === "true";
 export const MAILER_EMAIL = process.env.MAILER_EMAIL as string;
 export const MAILER_PASSWORD = process.env.MAILER_PASSWORD as string;
-export const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET as string;
-export const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET as string;
+// Validated rather than cast: a missing secret used to 500 every login instead
+// of refusing to start, and a leftover dev value started up silently.
+export const ACCESS_TOKEN_SECRET = requireSecret(
+  "ACCESS_TOKEN_SECRET",
+  process.env.ACCESS_TOKEN_SECRET,
+  { isDev },
+);
+export const REFRESH_TOKEN_SECRET = requireSecret(
+  "REFRESH_TOKEN_SECRET",
+  process.env.REFRESH_TOKEN_SECRET,
+  { isDev },
+);
 
 // `expiresIn` accepts a number of seconds or an ms-style string ("15m", "7d").
 // Env vars are always strings, so narrow to the string half of that union
@@ -48,6 +59,31 @@ export const ACCESS_TOKEN_EXPIRY = (process.env.ACCESS_TOKEN_EXPIRY ??
   "15m") as TokenExpiry;
 export const REFRESH_TOKEN_EXPIRY = (process.env.REFRESH_TOKEN_EXPIRY ??
   "7d") as TokenExpiry;
+
+/**
+ * `REFRESH_TOKEN_EXPIRY` in milliseconds.
+ *
+ * Everything that needs to know how long a session lasts derives it from here
+ * rather than restating it: the refresh token's own `expiresIn`, its database
+ * row's `expiresAt`, and the browser cookie's `Max-Age`. Each of those has been
+ * wrong at some point by being written out separately - a hardcoded 30 days
+ * once overrode the configured 7d, and the access cookie once outlived the JWT
+ * inside it by nearly seven days.
+ *
+ * Lives in config rather than beside the refresh-token service because the
+ * cookie module needs it too, and that service reaches for Prisma.
+ */
+export function refreshTokenTtlMs(): number {
+  const raw = String(REFRESH_TOKEN_EXPIRY ?? "7d").trim();
+  const match = /^(\d+)\s*([smhd])$/.exec(raw);
+  if (!match) return 7 * 24 * 60 * 60 * 1000;
+
+  const value = Number(match[1]);
+  const unit = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 }[
+    match[2] as "s" | "m" | "h" | "d"
+  ];
+  return value * unit;
+}
 export const REDIS_HOST = process.env.REDIS_HOST as string;
 export const REDIS_PORT = Number(process.env.REDIS_PORT || 6379);
 export const REDIS_PASSWORD = process.env.REDIS_PASSWORD as string;
@@ -84,8 +120,17 @@ export const STRIPE_CONNECT_REFRESH_URL =
   `${FRONTEND_URL}/creator-dashboard/stripe-onboard`;
 export const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
 
+// Warned about rather than required: the app runs perfectly well without
+// Google sign-in, so a missing client id should not stop everyone else's
+// deployment. It should not be silent either - the button is rendered
+// unconditionally, so without these it leads somewhere broken.
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID as string;
 export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET as string;
+if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+  console.warn(
+    "⚠️  GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set — Google sign-in will fail.",
+  );
+}
 export const GOOGLE_CALLBACK_URL = (
   process.env.GOOGLE_CALLBACK_URL ||
   `http://localhost:${PORT}/api/v1/auth/google/callback`

@@ -1,4 +1,3 @@
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import crypto from "crypto";
 import redisUtil from "./redis.util";
 
@@ -8,9 +7,20 @@ import redisUtil from "./redis.util";
  * Used for: Email verification, phone verification, password reset
  */
 
+/**
+ * Math.random() is not a cryptographic source: its output is predictable to
+ * anyone who observes enough of it, and an OTP that can be predicted is not a
+ * second factor at all. randomInt draws from the same pool as the rest of the
+ * crypto module.
+ *
+ * The range widens as a side effect. The old expression was
+ * `100000 + random * 900000`, which can never produce a code below 100000 -
+ * the leading digit was never zero, and the padStart below was dead code. Now
+ * the whole 000000-999999 space is reachable and the padding is what makes a
+ * low draw six digits long.
+ */
 export const generateOTP = (): string => {
-  const otp = Math.floor(100000 + Math.random() * 900000);
-  return otp.toString().padStart(6, "0");
+  return crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
 };
 
 export const getOTPExpiry = (): Date => {

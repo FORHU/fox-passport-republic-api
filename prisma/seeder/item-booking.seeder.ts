@@ -4,11 +4,12 @@ export async function seedItemBookings(prisma: PrismaClient, users: any[]) {
   try {
     console.log("Starting item booking seed...");
 
-    const citizen = users.find(u => u.email === "user@example.com");
-    const host    = users.find(u => u.email === "host@example.com");
+    const citizen = users.find((u) => u.email === "user@example.com");
+    const host = users.find((u) => u.email === "host@example.com");
 
-    if (!citizen) throw new Error("Citizen user not found for item booking seeding");
-    if (!host)    throw new Error("Host user not found for item booking seeding");
+    if (!citizen)
+      throw new Error("Citizen user not found for item booking seeding");
+    if (!host) throw new Error("Host user not found for item booking seeding");
 
     // ── Service Bookings — May 2026 (visible on calendar for testing) ─────────
     const mayServiceBookings = [
@@ -75,7 +76,11 @@ export async function seedItemBookings(prisma: PrismaClient, users: any[]) {
     for (const sb of mayServiceBookings) {
       await prisma.serviceBooking.upsert({
         where: { id: sb.id },
-        update: { scheduledDate: sb.scheduledDate, endDate: sb.endDate, status: sb.status },
+        update: {
+          scheduledDate: sb.scheduledDate,
+          endDate: sb.endDate,
+          status: sb.status,
+        },
         create: sb,
       });
       console.log(`✓ Seeded May service booking: ${sb.id}`);
@@ -91,7 +96,8 @@ export async function seedItemBookings(prisma: PrismaClient, users: any[]) {
         endDate: new Date("2026-06-15T20:00:00.000Z"),
         guestCount: 80,
         location: "The Ruins, Batangas",
-        notes: "Boho garden wedding vibe. Would love pampas grass and dried florals.",
+        notes:
+          "Boho garden wedding vibe. Would love pampas grass and dried florals.",
         totalAmount: 35000,
         status: ItemBookingStatus.confirmed,
         paymentStatus: PaymentStatus.completed,
@@ -106,7 +112,8 @@ export async function seedItemBookings(prisma: PrismaClient, users: any[]) {
         endDate: new Date("2026-07-05T02:00:00.000Z"),
         guestCount: 150,
         location: "Azul Beach Club, Batangas",
-        notes: "Beach party. Mix of tropical house and R&B. Start sunset, end midnight.",
+        notes:
+          "Beach party. Mix of tropical house and R&B. Start sunset, end midnight.",
         totalAmount: 20000,
         status: ItemBookingStatus.confirmed,
         paymentStatus: PaymentStatus.completed,
@@ -121,7 +128,8 @@ export async function seedItemBookings(prisma: PrismaClient, users: any[]) {
         endDate: new Date("2026-06-28T17:00:00.000Z"),
         guestCount: 12,
         location: "Mt. Pulag, Benguet",
-        notes: "Corporate offsite team building. 12 participants, mixed fitness levels.",
+        notes:
+          "Corporate offsite team building. 12 participants, mixed fitness levels.",
         totalAmount: 42000,
         status: ItemBookingStatus.pending,
         paymentStatus: PaymentStatus.pending,
@@ -159,7 +167,7 @@ export async function seedItemBookings(prisma: PrismaClient, users: any[]) {
         assetId: "seed-asset-stage-speakers-xl",
         userId: citizen.id,
         startDate: new Date("2026-05-09T08:00:00.000Z"),
-        endDate: new Date("2026-05-11T20:00:00.000Z"),   // May 9–11 blocked
+        endDate: new Date("2026-05-11T20:00:00.000Z"), // May 9–11 blocked
         quantity: 2,
         fulfillmentType: "delivery",
         deliveryAddress: "SM Mall of Asia Arena, Pasay",
@@ -175,7 +183,7 @@ export async function seedItemBookings(prisma: PrismaClient, users: any[]) {
         assetId: "seed-asset-led-flood-lights-rgb",
         userId: host.id,
         startDate: new Date("2026-05-17T10:00:00.000Z"),
-        endDate: new Date("2026-05-19T10:00:00.000Z"),   // May 17–19 blocked
+        endDate: new Date("2026-05-19T10:00:00.000Z"), // May 17–19 blocked
         quantity: 8,
         fulfillmentType: "pickup",
         notes: "Music festival. Full stage wash.",
@@ -190,7 +198,7 @@ export async function seedItemBookings(prisma: PrismaClient, users: any[]) {
         assetId: "seed-asset-wireless-lavalier-mic-set",
         userId: citizen.id,
         startDate: new Date("2026-05-22T09:00:00.000Z"),
-        endDate: new Date("2026-05-22T18:00:00.000Z"),   // May 22 blocked
+        endDate: new Date("2026-05-22T18:00:00.000Z"), // May 22 blocked
         quantity: 4,
         fulfillmentType: "delivery",
         deliveryAddress: "Ateneo de Manila University, Quezon City",
@@ -204,7 +212,11 @@ export async function seedItemBookings(prisma: PrismaClient, users: any[]) {
     for (const ab of mayAssetBookings) {
       await prisma.assetBooking.upsert({
         where: { id: ab.id },
-        update: { startDate: ab.startDate, endDate: ab.endDate, status: ab.status },
+        update: {
+          startDate: ab.startDate,
+          endDate: ab.endDate,
+          status: ab.status,
+        },
         create: ab,
       });
       console.log(`✓ Seeded May asset booking: ${ab.id}`);

@@ -2,23 +2,23 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock the DB-backed repo and the Stripe-backed services so this unit test
 // needs no live database or Stripe credentials.
-vi.mock("../src/repositories/booking.repository", () => ({
+vi.mock("../src/modules/booking/booking.repository", () => ({
   default: {
     findById: vi.fn(),
     update: vi.fn(),
   },
 }));
 
-vi.mock("../src/services/payout.service", () => ({
+vi.mock("../src/modules/payout/payout.service", () => ({
   default: { createPayoutsForEventBooking: vi.fn() },
 }));
 
-vi.mock("../src/services/payment.service", () => ({
+vi.mock("../src/modules/payment/payment.service", () => ({
   default: class {},
 }));
 
-import BookingSvc from "../src/services/booking.service";
-import BookingRepo from "../src/repositories/booking.repository";
+import BookingSvc from "../src/modules/booking/booking.service";
+import BookingRepo from "../src/modules/booking/booking.repository";
 
 describe("BookingSvc.checkInAndSettle", () => {
   beforeEach(() => {

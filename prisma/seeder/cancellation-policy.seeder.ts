@@ -3,36 +3,37 @@ import { PrismaClient } from "@prisma/client";
 const policies = [
   {
     name: "Flexible",
-    description: "Full refund up to 24 hours before the event; 50% refund within 24 hours.",
+    description:
+      "Full refund up to 24 hours before the event; 50% refund within 24 hours.",
     rules: [
       { hoursBeforeEvent: 24, refundPercent: 100 },
-      { hoursBeforeEvent: 0,  refundPercent: 50  },
+      { hoursBeforeEvent: 0, refundPercent: 50 },
     ],
   },
   {
     name: "Moderate",
-    description: "Full refund up to 72 hours before; 50% refund 24–72 hours before; no refund within 24 hours.",
+    description:
+      "Full refund up to 72 hours before; 50% refund 24–72 hours before; no refund within 24 hours.",
     rules: [
       { hoursBeforeEvent: 72, refundPercent: 100 },
-      { hoursBeforeEvent: 24, refundPercent: 50  },
-      { hoursBeforeEvent: 0,  refundPercent: 0   },
+      { hoursBeforeEvent: 24, refundPercent: 50 },
+      { hoursBeforeEvent: 0, refundPercent: 0 },
     ],
   },
   {
     name: "Strict",
-    description: "Full refund up to 7 days before; 50% refund 2–7 days before; no refund within 48 hours.",
+    description:
+      "Full refund up to 7 days before; 50% refund 2–7 days before; no refund within 48 hours.",
     rules: [
       { hoursBeforeEvent: 168, refundPercent: 100 },
-      { hoursBeforeEvent: 48,  refundPercent: 50  },
-      { hoursBeforeEvent: 0,   refundPercent: 0   },
+      { hoursBeforeEvent: 48, refundPercent: 50 },
+      { hoursBeforeEvent: 0, refundPercent: 0 },
     ],
   },
   {
     name: "Non-Refundable",
     description: "No refunds under any circumstances.",
-    rules: [
-      { hoursBeforeEvent: 0, refundPercent: 0 },
-    ],
+    rules: [{ hoursBeforeEvent: 0, refundPercent: 0 }],
   },
 ];
 

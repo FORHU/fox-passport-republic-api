@@ -9,8 +9,12 @@ Node.js + TypeScript, **Express** over **PostgreSQL via Prisma**. Serves the
 Next.js client in `../fox-passport-republic-app`.
 
 > The domain vocabulary is defined in [`CONTEXT.md`](./CONTEXT.md) and mirrors
-> the `RoleType` / `SystemRole` enums in `prisma/schema.prisma`. Architectural
-> decisions live in [`docs/adr/`](./docs/adr/).
+> the `RoleType` / `SystemRole` enums in `prisma/schema/identity.prisma`.
+> Architectural decisions live in [`docs/adr/`](./docs/adr/).
+>
+> **Before touching migrations, the schema, or moving files, read
+> [`docs/GOTCHAS.md`](./docs/GOTCHAS.md).** Everything in it fails *quietly* —
+> including a migration Prisma will happily generate that drops 26 tables.
 
 ---
 
@@ -34,18 +38,24 @@ Next.js client in `../fox-passport-republic-app`.
 
 ```
 prisma/
-  schema.prisma        Single source of truth for the data model and enums
+  schema/              The data model, split by domain across *.prisma files.
+                       Prisma stitches the folder into one schema, so relations
+                       cross files freely. `prisma.config.js` points at it, and
+                       also pins `migrations.path` — see GOTCHAS.
   migrations/          Applied with `prisma migrate`; never edit by hand
-  seed.ts              `pnpm exec prisma db seed`
+  seed.ts              `pnpm exec tsx prisma/seed.ts`
 src/
   server.ts            Process entry — binds the port, starts Socket.io
   app.ts               Express app: CORS, raw Stripe body, JSON, rate limit, helmet, routes, error handler
-  routes/index.ts      Mounts every resource under `/api/v1/*`
-  controllers/         HTTP in, HTTP out. No business logic
-  services/            Business logic. Where the interesting code is
-  repositories/        Prisma queries
-  middleware/          `auth.middleware.ts` — JWT decode, `requireRole`, `requireOwnerOrAdmin`
+  routes/index.ts      Mounts every resource under `/api/v1/*`. The only thing
+                       left in routes/ — it is the composition root, not a domain.
+  modules/<domain>/    One folder per domain, holding its own controller,
+                       service, repository and routes. 31 of them.
+  middleware/          `auth.middleware.ts` — JWT decode and `requirePermission`
   infrastructure/      Socket.io gateway and server
+  types/permissions.ts The permission vocabulary and both grant tables
+tools/
+  validate-architecture.mjs  Layer-boundary scan. `pnpm validate`.
   modules/             Self-contained feature modules (currently `notifications`)
   utils/               prisma client, password, s3, redis, mailer, pricing, otp, enums
   config.ts            Reads and validates environment variables
@@ -157,6 +167,11 @@ reads the table. Consequences worth knowing before you debug something:
 - `POST /auth/logout` genuinely revokes; a logged-out refresh token returns 401.
 - Login calls `revokeAllForUser` first, so **one account can hold one session**.
   Signing in on a second device ends the first.
+- Password login calls `revokeAllForUser` first, so **one account can hold one
+  session**. Signing in on a second device ends the first. **Google sign-in does
+  not do this** — `GoogleAuthSvc.handleCallback` issues a refresh token without
+  revoking, so a Google sign-in leaves existing sessions alive. The two paths
+  disagree; which way it should resolve is an open decision, not a settled one.
 - Password change and password reset both revoke every session, including the
   caller's.
 - A jti that is not in the table is invalid, so tokens minted before the table
@@ -164,15 +179,46 @@ reads the table. Consequences worth knowing before you debug something:
 - An access token already issued survives until it expires (`ACCESS_TOKEN_EXPIRY`);
   nothing consults a revocation list per request. It just cannot renew.
 
+### Google sign-in
+
+A second way to obtain a session, over three requests:
+
+| Step | Route | Notes |
+|---|---|---|
+| 1 | `GET /auth/google` | Redirects to Google. Mints a `state` and stores it in the httpOnly `g_oauth_state` cookie — `SameSite=Lax`, because `Strict` would be stripped on the top-level return from Google. |
+| 2 | `GET /auth/google/callback` | Rejects the callback unless the echoed `state` matches that cookie (constant-time), then requires `email_verified` on Google's ID token before linking or creating anything. Redirects to the app with `?xc=<opaque code>` — **never with tokens**. |
+| 3 | `POST /auth/google/exchange` | Redeems `xc` for the token pair. Called server-side by the app, once: `getDel` makes it atomic and single-use, and the entry lives 60 seconds. |
+
+Two consequences worth knowing before you debug it:
+
+- **Google sign-in requires Redis.** Step 2 parks the session there. Redis is
+  optional elsewhere in this app; here sign-in fails rather than falling back to
+  putting a refresh token in a URL.
+- A Google identity is linked to an existing password account with the same
+  **verified** address, with no confirmation from the account holder.
+
 ---
 
 ## Migrations
 
-`prisma/schema.prisma` is the source of truth; `prisma migrate` writes the SQL.
+`prisma/schema/` is the source of truth — a folder, not a file. `prisma migrate`
+writes the SQL.
 
 - Local: `pnpm exec prisma migrate dev`
 - Deployed: `pnpm exec prisma migrate deploy` — it can never prompt to reset
 - Check for drift: `pnpm exec prisma migrate diff`
+
+**Three things here have already cost someone a day.** All three are in
+[`docs/GOTCHAS.md`](./docs/GOTCHAS.md); the short version:
+
+1. **Never let Prisma generate a table rename.** It cannot see one, and writes
+   `DROP TABLE` + `CREATE TABLE` instead. The existing rename migration is
+   hand-written for that reason — do not regenerate it.
+2. **`migrate dev` can reset the database.** It did on 4 Sep: 148 users and
+   everything else. `db:setup` is one script away from the same thing.
+3. **"No migration found" followed by "Database schema is up to date!" is not
+   success.** It means the history was empty. Usually a broken
+   `migrations.path`.
 
 Schema-dependent code and its migration must land in the same commit. They did
 not once, and because the login controller turned every error into

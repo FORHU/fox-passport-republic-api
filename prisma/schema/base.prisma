@@ -1,0 +1,10 @@
+// Generator and datasource. Prisma stitches every *.prisma file in this
+// folder into one schema, so relations may cross files freely.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}

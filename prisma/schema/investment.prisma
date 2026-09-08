@@ -1,0 +1,73 @@
+// Partner Foxer investments: equipment inventory hubs, venue equity, event sponsorships
+
+enum InvestmentType {
+  physical_inventory
+  financial_capital
+  venue_equity
+  event_sponsorship
+}
+
+enum InventoryCategory {
+  furniture_seating
+  tables_staging
+  audio_visual
+  lighting_rigging
+  power_climate
+  decor_props
+  other
+}
+
+enum TransportPolicy {
+  self_pickup
+  partner_delivers_free
+  partner_delivers_fee
+}
+
+model PartnerInvestment {
+  id                  String             @id @default(uuid())
+  partnerId           String
+  type                InvestmentType
+  title               String
+  description         String             @db.Text
+
+  // Physical Inventory Attributes
+  inventoryCategory   InventoryCategory?
+  quantityTotal       Int?               @default(1)
+  quantityAvailable   Int?               @default(1)
+  itemCondition       String?            // "mint", "good", "heavy_duty"
+
+  // Terms & Valuation
+  monetaryValue       Decimal            @db.Decimal(12, 2)
+  usageTerms          String?            // "free_for_partner_venues", "daily_lease", "rev_share"
+  dailyRentalRate     Decimal?           @db.Decimal(12, 2)
+  revenueSharePercent Float?
+
+  // Depot / Storage Location (for inventory map & logistics)
+  address             String?
+  city                String?
+  state               String?
+  country             String?            @default("Philippines")
+  lat                 Float?
+  lng                 Float?
+  deliveryRadiusKm    Float?             @default(25.0)
+  transportPolicy     TransportPolicy?   @default(self_pickup)
+
+  // Target links (optional if pledged to specific venue/event)
+  targetVenueId       String?
+  targetEventId       String?
+
+  status              String             @default("active") // "active", "allocated", "depleted"
+  mediaUrls           String[]           @default([])
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  // Relations
+  partner             User               @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  targetVenue         Venue?             @relation(fields: [targetVenueId], references: [id], onDelete: SetNull)
+  targetEvent         Event?             @relation(fields: [targetEventId], references: [id], onDelete: SetNull)
+
+  @@index([partnerId])
+  @@index([lat, lng])
+  @@index([type, status])
+  @@map("partner_investments")
+}

@@ -70,6 +70,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Validate architecture boundaries
+        run: pnpm validate
+
       - name: Build
         run: pnpm build
 

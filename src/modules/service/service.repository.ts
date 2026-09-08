@@ -1,0 +1,228 @@
+import { prisma } from "../../utils/prisma";
+import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
+
+export default class ServiceRepo {
+  // READ ALL (public — available only)
+  static async getAllServices(filters?: {
+    ownerId?: string;
+    category?: ServiceCategory;
+    status?: ServiceStatus;
+    city?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = filters?.page ?? 1;
+    const limit = filters?.limit ?? 50;
+    const skip = (page - 1) * limit;
+
+    const where = {
+      ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
+      ...(filters?.category && { category: filters.category }),
+      ...(filters?.status && { status: filters.status }),
+      ...(filters?.city && {
+        city: { contains: filters.city, mode: "insensitive" as const },
+      }),
+      ...(filters?.ownerId ? {} : { status: ServiceStatus.available }),
+      deletedAt: null,
+    };
+
+    // `Promise.all`, not `$transaction`: a list and its count need no
+    // transactional isolation, and demanding one means waiting for a free
+    // connection to *start* a transaction — which is what times out under a
+    // burst with "Unable to start a transaction in the given time". The count
+    // can now shift by one against a concurrent insert; a 500 on a browse page
+    // is the worse trade.
+    const [services, total] = await Promise.all([
+      prisma.service.findMany({
+        where,
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          images: true,
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.service.count({ where }),
+    ]);
+
+    return { services, total };
+  }
+
+  // Public browse for the search page — item-level pagination (not nested under owner)
+  // so a page always holds exactly `limit` items instead of varying with how many
+  // items each owner happens to have.
+  static async findPublicServices(filters: {
+    ownerCity?: string;
+    maxPrice?: number;
+    page?: number;
+    limit: number;
+  }) {
+    const page = filters.page ?? 1;
+    const limit = filters.limit;
+    const skip = (page - 1) * limit;
+
+    const where = {
+      status: ServiceStatus.available,
+      deletedAt: null,
+      ...(filters.maxPrice !== undefined && {
+        price: { lte: filters.maxPrice },
+      }),
+      owner: {
+        roleType: { has: "serviceFoxer" as const },
+        ...(filters.ownerCity && {
+          city: { contains: filters.ownerCity, mode: "insensitive" as const },
+        }),
+      },
+    };
+
+    const [services, total] = await Promise.all([
+      prisma.service.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          category: true,
+          price: true,
+          billingRate: true,
+          images: { take: 1, select: { url: true } },
+          owner: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.service.count({ where }),
+    ]);
+
+    return { services, total };
+  }
+
+  // READ ALL (admin — no status filter)
+  static async getAllServicesAdmin(filters?: {
+    ownerId?: string;
+    category?: ServiceCategory;
+    status?: ServiceStatus;
+  }) {
+    return prisma.service.findMany({
+      where: {
+        ...(filters?.ownerId && { ownerId: String(filters.ownerId) }),
+        ...(filters?.category && { category: filters.category }),
+        ...(filters?.status && { status: filters.status }),
+        deletedAt: null,
+      },
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+        images: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  static async createService(data: {
+    id?: string;
+    ownerId: string;
+    category: ServiceCategory;
+    name: string;
+    description: string;
+    city: string;
+    state?: string;
+    country: string;
+    isWillingToTravel?: boolean;
+    tags: string[];
+    price: number;
+    currency?: string;
+    billingRate: BillingRate;
+    status?: ServiceStatus;
+    imgIds: string[];
+  }) {
+    return prisma.service.create({
+      data: {
+        id: data.id,
+        ownerId: String(data.ownerId),
+        category: data.category,
+        name: data.name,
+        description: data.description,
+        city: data.city,
+        state: data.state,
+        country: data.country,
+        isWillingToTravel: data.isWillingToTravel,
+        tags: data.tags,
+        price: data.price,
+        currency: data.currency,
+        billingRate: data.billingRate,
+        status: data.status,
+        ...(data.imgIds &&
+          data.imgIds.length > 0 && {
+            images: { connect: data.imgIds.map((id) => ({ id })) },
+          }),
+      },
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+        images: true,
+      },
+    });
+  }
+
+  static async getServiceById(id: string) {
+    return prisma.service.findUnique({
+      where: { id: String(id) },
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+        images: true,
+      },
+    });
+  }
+
+  static async updateService(
+    id: string,
+    data: Partial<{
+      category: ServiceCategory;
+      name: string;
+      description: string;
+      city: string;
+      state: string;
+      country: string;
+      isWillingToTravel: boolean;
+      tags: string[];
+      price: number;
+      currency: string;
+      billingRate: BillingRate;
+      status: ServiceStatus;
+      imgIds: string[];
+    }>,
+  ) {
+    return prisma.service.update({
+      where: { id: String(id) },
+      data: {
+        category: data.category ?? undefined,
+        name: data.name ?? undefined,
+        description: data.description ?? undefined,
+        city: data.city ?? undefined,
+        state: data.state ?? undefined,
+        country: data.country ?? undefined,
+        isWillingToTravel: data.isWillingToTravel ?? undefined,
+        tags: data.tags ?? undefined,
+        price: data.price ?? undefined,
+        currency: data.currency ?? undefined,
+        billingRate: data.billingRate ?? undefined,
+        status: data.status ?? undefined,
+        ...(data.imgIds &&
+          data.imgIds.length > 0 && {
+            images: { connect: data.imgIds.map((id) => ({ id })) },
+          }),
+      },
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+        images: true,
+      },
+    });
+  }
+
+  static async deleteService(id: string) {
+    return prisma.service.update({
+      where: { id: String(id) },
+      data: { deletedAt: new Date() },
+    });
+  }
+}
