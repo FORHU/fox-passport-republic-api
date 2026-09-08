@@ -50,6 +50,23 @@ const repo = vi.hoisted(() => ({
   linkGoogleId: vi.fn(),
 }));
 
+// The two session-store calls the callback makes. The order they run in is
+// the point of AUTH-05, so it is recorded rather than just counted.
+const tokens = vi.hoisted(() => {
+  const calls: string[] = [];
+  return {
+    calls,
+    issueRefreshToken: vi.fn(async () => {
+      calls.push("issue");
+      return "refresh-token";
+    }),
+    revokeAllForUser: vi.fn(async () => {
+      calls.push("revoke");
+      return 1;
+    }),
+  };
+});
+
 vi.mock("google-auth-library", () => ({
   OAuth2Client: class {
     getToken = google.getToken;
@@ -60,7 +77,8 @@ vi.mock("google-auth-library", () => ({
 
 vi.mock("../src/modules/auth/auth.repository", () => ({ default: repo }));
 vi.mock("../src/modules/auth/refresh-token.service", () => ({
-  issueRefreshToken: vi.fn(async () => "refresh-token"),
+  issueRefreshToken: tokens.issueRefreshToken,
+  revokeAllForUser: tokens.revokeAllForUser,
 }));
 vi.mock("../src/utils/password", () => ({
   hashPassword: vi.fn(async () => "hashed"),
@@ -92,6 +110,7 @@ const VICTIM = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  tokens.calls.length = 0;
   redis.store.clear();
   redis.available.value = true;
   repo.findUserByGoogleId.mockResolvedValue(null);
@@ -192,6 +211,67 @@ describe("verified Google emails", () => {
     expect(repo.findUserByEmail).not.toHaveBeenCalled();
     expect(repo.linkGoogleId).not.toHaveBeenCalled();
     expect(result.isNewUser).toBe(false);
+  });
+});
+
+/**
+ * AUTH-05. The callback signed an access token and issued a refresh token
+ * without revoking what came before, so Google was the one entry path that
+ * escaped one-session-per-account - signing in with it left the previous
+ * device logged in alongside the new one.
+ */
+describe("one session per account on the Google path", () => {
+  it("revokes the prior sessions of the account signing in", async () => {
+    googleReturns({
+      sub: "google-id",
+      email: VICTIM.email,
+      email_verified: true,
+    });
+    repo.findUserByGoogleId.mockResolvedValue(VICTIM);
+
+    await GoogleAuthSvc.handleCallback("code");
+
+    expect(tokens.revokeAllForUser).toHaveBeenCalledWith(VICTIM.id);
+  });
+
+  it("revokes before issuing, so the new session does not revoke itself", async () => {
+    googleReturns({
+      sub: "google-id",
+      email: VICTIM.email,
+      email_verified: true,
+    });
+    repo.findUserByGoogleId.mockResolvedValue(VICTIM);
+
+    await GoogleAuthSvc.handleCallback("code");
+
+    expect(tokens.calls).toEqual(["revoke", "issue"]);
+  });
+
+  it("revokes for an account reached by email link too", async () => {
+    googleReturns({
+      sub: "google-id",
+      email: VICTIM.email,
+      email_verified: true,
+    });
+    repo.findUserByEmail.mockResolvedValue(VICTIM);
+
+    await GoogleAuthSvc.handleCallback("code");
+
+    expect(tokens.revokeAllForUser).toHaveBeenCalledWith(VICTIM.id);
+  });
+
+  it("revokes nothing when the sign-in is refused", async () => {
+    googleReturns({
+      sub: "attacker-google-id",
+      email: VICTIM.email,
+      email_verified: false,
+    });
+    repo.findUserByEmail.mockResolvedValue(VICTIM);
+
+    await expect(GoogleAuthSvc.handleCallback("code")).rejects.toThrow(
+      /not verified/i,
+    );
+    expect(tokens.revokeAllForUser).not.toHaveBeenCalled();
   });
 });
 
