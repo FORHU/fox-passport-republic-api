@@ -98,6 +98,31 @@ role request, gone. `migrate dev` detects drift and offers a reset; `db:setup` i
 
 `pnpm exec tsx prisma/seed.ts` restores it. Nothing hand-made survives.
 
+## 7b. `pnpm test` deletes rows from the development database
+
+Happened on 8 Sep, the same 148 users. Not `migrate dev` this time - the test
+suite.
+
+There is no separate test database. `vitest` reads the same `DATABASE_URL` as
+`pnpm dev`, and several specs write to it and clean up after themselves with
+`deleteMany`: `tests/waitlist.spec.ts` and `tests/event-template.submit.spec.ts`
+delete the users they seeded, and `tests/setup.ts` creates them.
+
+What made it a surprise is that those specs had been *skipping* for weeks. They
+depend on schema the database did not have, so they failed early in
+`beforeAll` and deleted nothing. Applying the pending migrations made them run
+for the first time - and a suite that had been harmless for as long as anyone
+had been running it emptied the database on the next `pnpm test`.
+
+So: a green suite is not evidence it left your data alone, and neither is
+"nothing changed in the tests". What changed was the schema underneath them.
+Before running the api suite against a database whose contents matter, either
+point `DATABASE_URL` at a throwaway database or accept that
+`pnpm exec tsx prisma/seed.ts` is about to be necessary.
+
+Re-seeding also resets every password to `Password123!` (`user.seeder.ts:81`),
+which is worth knowing before you go looking for why a login stopped working.
+
 ## 8. `eslint --fix` hides failures
 
 `--fix` exits 0 once it has repaired what it can. Put it in the `lint` script and
