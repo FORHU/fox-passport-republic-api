@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import AuthRepo from "./auth.repository";
 import redisUtil from "../../utils/redis.util";
-import { issueRefreshToken } from "./refresh-token.service";
+import { issueRefreshToken, revokeAllForUser } from "./refresh-token.service";
 import { hashPassword } from "../../utils/password";
 import { permissionsForUser } from "../../types/permissions";
 import {
@@ -28,6 +28,12 @@ interface PendingSession {
   accessToken: string;
   refreshToken: string;
   isNewUser: boolean;
+  /**
+   * The signed-in user, so the exchange can set the same cookies a password
+   * login does. Held in Redis for sixty seconds and never in the URL - the same
+   * reason the tokens are stashed rather than redirected with.
+   */
+  user?: Record<string, unknown>;
 }
 
 const EXCHANGE_PREFIX = "google:exchange:";
@@ -154,6 +160,13 @@ export default class GoogleAuthSvc {
       ACCESS_TOKEN_SECRET,
       { expiresIn: ACCESS_TOKEN_EXPIRY },
     );
+
+    // ONE ACTIVE SESSION PER ACCOUNT. Google sign-in was the one entry path
+    // that skipped this, so signing in with Google left the previous session
+    // running alongside the new one while every other path ended it. The
+    // reasoning, and the caveat about the ~15m access token that outlives
+    // revocation, is written out at auth.service.ts:185.
+    await revokeAllForUser(user.id);
 
     const refreshToken = await issueRefreshToken(user.id);
 

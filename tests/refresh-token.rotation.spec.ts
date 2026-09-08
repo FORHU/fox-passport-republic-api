@@ -10,6 +10,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../src/config", () => ({
   REFRESH_TOKEN_SECRET: "test-refresh-secret",
   REFRESH_TOKEN_EXPIRY: "7d",
+  // The TTL derivation moved into config so the cookie module could share it
+  // without pulling Prisma in through the refresh service.
+  refreshTokenTtlMs: () => 7 * 24 * 60 * 60 * 1000,
 }));
 
 interface Row {
