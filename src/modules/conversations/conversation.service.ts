@@ -14,11 +14,10 @@ function canonicalPair(a: string, b: string): [string, string] {
 }
 
 export default class ConversationService {
-  // Gate on *creating* a conversation, not on every message — once a thread
-  // exists both sides can keep using it even if the underlying booking/match
-  // that justified it later changes state (gets cancelled, etc.), same as
-  // any normal chat app.
-  static async assertCanMessage(a: string, b: string) {
+  // Whether a booking/match relationship exists between the two, independent
+  // of any conversation already open between them (see canMessage below for
+  // the version that also accounts for an existing thread).
+  static async hasMessagingRelationship(a: string, b: string) {
     const [rule1, rule2, rule3] = await Promise.all([
       // Rule 1: citizen <-> the event organizer (Event Foxer) on a booking.
       prisma.booking.findFirst({
@@ -125,9 +124,31 @@ export default class ConversationService {
       }),
     ]);
 
-    if (!rule1 && !rule2 && !rule3) {
-      throw new Error("Unauthorized");
+    return !!(rule1 || rule2 || rule3);
+  }
+
+  // Gate on *creating* a conversation, not on every message — once a thread
+  // exists both sides can keep using it even if the underlying booking/match
+  // that justified it later changes state (gets cancelled, etc.), same as
+  // any normal chat app.
+  static async assertCanMessage(a: string, b: string) {
+    const ok = await ConversationService.hasMessagingRelationship(a, b);
+    if (!ok) {
+      throw new Error(
+        "You can only message citizens you have an active booking or event connection with.",
+      );
     }
+  }
+
+  // Used by the UI to decide whether to show a "Message" action before the
+  // person actually tries it — true if a thread already exists (continuing
+  // one is always allowed, see the note above) or the relationship still holds.
+  static async canMessage(a: string, b: string) {
+    if (a === b) return false;
+    const [userAId, userBId] = canonicalPair(a, b);
+    const existing = await ConversationRepository.findByPair(userAId, userBId);
+    if (existing) return true;
+    return ConversationService.hasMessagingRelationship(a, b);
   }
 
   static async startConversation(input: StartConversationInput) {

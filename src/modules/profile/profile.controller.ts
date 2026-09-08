@@ -47,6 +47,7 @@ export default class ProfileCtrl {
         phone: Joi.string().optional(),
         profileImage: Joi.string().uri().optional(),
         city: Joi.string().optional(),
+        isPrivate: Joi.boolean().optional(),
       });
 
       const { error, value } = schema.validate(req.body);
