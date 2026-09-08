@@ -1,14 +1,25 @@
 import { Router } from "express";
 import { authenticate } from "../../middleware/auth.middleware";
 import FollowController from "./follow.controller";
+import { followToggleLimiter } from "./follow.rateLimit";
 
 const router = Router();
 
 // Send a follow (instant if target is public, pending if private)
-router.post("/", authenticate, FollowController.sendFollow);
+router.post(
+  "/",
+  authenticate,
+  followToggleLimiter,
+  FollowController.sendFollow,
+);
 
 // Unfollow, or cancel an outgoing pending request
-router.delete("/:targetId", authenticate, FollowController.removeFollow);
+router.delete(
+  "/:targetId",
+  authenticate,
+  followToggleLimiter,
+  FollowController.removeFollow,
+);
 
 // Accept / decline an incoming pending request
 router.post(
