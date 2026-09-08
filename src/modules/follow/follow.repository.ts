@@ -70,7 +70,9 @@ export default class FollowRepo {
         skip: (page - 1) * take,
         take,
       }),
-      prisma.follow.count({ where: { followingId: userId, status: "pending" } }),
+      prisma.follow.count({
+        where: { followingId: userId, status: "pending" },
+      }),
     ]);
     return { rows: rows.map((r) => r.follower), total };
   }
@@ -88,7 +90,9 @@ export default class FollowRepo {
         skip: (page - 1) * take,
         take,
       }),
-      prisma.follow.count({ where: { followingId: userId, status: "accepted" } }),
+      prisma.follow.count({
+        where: { followingId: userId, status: "accepted" },
+      }),
     ]);
     return { rows: rows.map((r) => r.follower), total };
   }
@@ -106,15 +110,21 @@ export default class FollowRepo {
         skip: (page - 1) * take,
         take,
       }),
-      prisma.follow.count({ where: { followerId: userId, status: "accepted" } }),
+      prisma.follow.count({
+        where: { followerId: userId, status: "accepted" },
+      }),
     ]);
     return { rows: rows.map((r) => r.following), total };
   }
 
   static async getCounts(userId: string) {
     const [followers, following] = await Promise.all([
-      prisma.follow.count({ where: { followingId: userId, status: "accepted" } }),
-      prisma.follow.count({ where: { followerId: userId, status: "accepted" } }),
+      prisma.follow.count({
+        where: { followingId: userId, status: "accepted" },
+      }),
+      prisma.follow.count({
+        where: { followerId: userId, status: "accepted" },
+      }),
     ]);
     return { followers, following };
   }

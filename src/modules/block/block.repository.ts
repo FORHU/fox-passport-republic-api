@@ -18,10 +18,14 @@ export default class BlockRepo {
   static async getStatus(userId: string, otherId: string) {
     const [blockedByMe, blockedMe] = await Promise.all([
       prisma.block.findUnique({
-        where: { blockerId_blockedId: { blockerId: userId, blockedId: otherId } },
+        where: {
+          blockerId_blockedId: { blockerId: userId, blockedId: otherId },
+        },
       }),
       prisma.block.findUnique({
-        where: { blockerId_blockedId: { blockerId: otherId, blockedId: userId } },
+        where: {
+          blockerId_blockedId: { blockerId: otherId, blockedId: userId },
+        },
       }),
     ]);
     return { blockedByMe: !!blockedByMe, blockedMe: !!blockedMe };

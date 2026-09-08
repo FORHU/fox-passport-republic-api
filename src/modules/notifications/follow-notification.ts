@@ -22,7 +22,10 @@ export function notifyFollowRequest(input: {
     type: "follow_request",
     title: "New follow request",
     message: `${input.requesterName} wants to follow you.`,
-    metadata: { link: `/user/${input.requesterId}`, requesterId: input.requesterId },
+    metadata: {
+      link: `/user/${input.requesterId}`,
+      requesterId: input.requesterId,
+    },
   });
 }
 
@@ -36,7 +39,10 @@ export function notifyNewFollower(input: {
     type: "new_follower",
     title: "New follower",
     message: `${input.followerName} started following you.`,
-    metadata: { link: `/user/${input.followerId}`, followerId: input.followerId },
+    metadata: {
+      link: `/user/${input.followerId}`,
+      followerId: input.followerId,
+    },
   });
 }
 
@@ -50,6 +56,9 @@ export function notifyFollowAccepted(input: {
     type: "follow_request_accepted",
     title: "Follow request accepted",
     message: `${input.accepterName} accepted your follow request.`,
-    metadata: { link: `/user/${input.accepterId}`, accepterId: input.accepterId },
+    metadata: {
+      link: `/user/${input.accepterId}`,
+      accepterId: input.accepterId,
+    },
   });
 }

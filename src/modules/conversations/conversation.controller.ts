@@ -26,10 +26,7 @@ export default class ConversationController {
     try {
       const userId = req.user!.userId;
       const { userId: otherId } = req.params;
-      const canMessage = await ConversationService.canMessage(
-        userId,
-        otherId,
-      );
+      const canMessage = await ConversationService.canMessage(userId, otherId);
       res.json({ success: true, data: { canMessage } });
     } catch (e: unknown) {
       const err = e as Error;
