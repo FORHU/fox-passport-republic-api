@@ -79,6 +79,19 @@ unrelated also listens on 6379, which is how a config bug once looked like a
 successful connection — the startup log now names the address it dialled, and
 that line is the only signal, because everything Redis-related is fail-soft.
 
+**`.env.test.local` is only ignored on this branch.** The `.gitignore` line
+that hides it landed with the test database, so on `main` the file is untracked
+and *visible* - and it holds a database connection string. A `git add -A` while
+on `main` commits a password. It disappears again on this branch. The same
+applies to anyone who checks out `main` after having run the tests here.
+
+**Commits reach the remote without anyone pushing.** Both branches were found
+already up to date at the remote on 9 Sep, at exactly the local commits, with no
+push having been run and no hooks in either repository - the IDE is syncing.
+Worth knowing before committing anything exploratory: it is on the remote as
+soon as it is committed. VS Code's `git.postCommitCommand`, or GitLens'
+auto-sync, is where that is turned off.
+
 **`docs/test-suite-wipes-dev-db` should not be merged as it stands.** That branch
 carries GOTCHAS 7b, warning that the test suite deletes from the development
 database. It was true when written and is not any more. Merging it would
