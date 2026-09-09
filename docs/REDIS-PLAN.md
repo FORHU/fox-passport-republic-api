@@ -3,7 +3,7 @@
 Started 8 Sep 2026. Branch: `feat/redis-backed-rate-limiting`, off `main`
 (which now carries the whole auth hardening chain via PR #77).
 
-**Resume at §2b.** Everything in §1 is written and green; §2 is the queue.
+**Resume at §2c.** Everything in §1 is written and green; §2 is the queue.
 
 `TOMORROW.md` is the running order and is shorter than this. Read that first if
 you are picking the work up; this file is the reasoning behind it.
@@ -383,22 +383,44 @@ strip (nothing rendered it - the dashboard reads `recommendations.length`); the
 `REDIS_TTL_SECONDS` knob; and the `Promise.all` behind the escrow rows, which is
 a `$transaction` now.
 
+### Payment reads cached — §2b, 9 Sep
+
+The five `PaymentSvc` reads - all payments, by id, by transaction id, a
+booking's payments, and the remaining balance - are cached at 30 seconds.
+
+**They live in the `booking` namespace rather than one of their own.** Payments
+are the same payload (`BookingRepo.findById` includes them, and the balance is
+computed from a booking) and they are changed by the same writes, both of which
+already retire that namespace at the write. A `payment` namespace would need
+every one of those writes to bump two counters, and the second is the one
+somebody forgets. §2b's rule - payment status must be invalidated at the write,
+never left to a TTL - is satisfied by construction rather than by discipline.
+
+The expiry sweep stays outside the cached block in all five, for the same
+reason it does in the booking reads: it is a write, and on a cache hit it would
+stop running.
+
+**Writing the tests found a stack overflow.** `sweepExpiredPayments` was calling
+itself - a blanket rename earlier that day rewrote the call *inside* the method
+along with its call sites - so every payment read would have died with
+`RangeError: Maximum call stack size exceeded`. It survived 326 passing tests
+because nothing exercised the real `PaymentSvc`: the specs that touch payments
+mock it wholesale. The two sweep tests in `payment.cache.spec.ts` are the
+regression, and they fail loudly against the broken version.
+
 ---
 
 ## 2. Next, in order
 
 ### a. ~~`booking.controller.ts`~~ — done 9 Sep, see §1
 
-### b. Payment reads — **resume here**
-
-The extraction is done (§0b); the caching is not. `PaymentSvc` has five read
-methods and no cached one, and `getBookingPayments` is on the confirmation path.
+### b. ~~Payment reads~~ — done 9 Sep, see §1
 
 **Payment status is the one place to be most careful.** A user who has just paid
 and sees "unpaid" will pay twice. Either leave payment-status reads uncached or
 invalidate them on every webhook and status transition — do not rely on a TTL.
 
-### c. The remaining service reads
+### c. The remaining service reads — **resume here**
 
 **97 `get`/`find`/`list`/`search` methods across the service layer.** Heaviest:
 `review` (8), `venue` (6), `users` (6), `follow` (6), `event-template` (6),
@@ -475,9 +497,9 @@ worth watching for in staging rather than assuming.
 
 As of the end of 9 Sep, on this branch:
 
-- **326 tests / 30 files** pass — the **whole** suite. The two specs that were
-  excluded since 8 Sep run again, against a database of their own; the other
-  three files came from `main` with PR #78.
+- **333 tests / 31 files** pass — the **whole** suite. The two specs that were
+  excluded since 8 Sep run again, against a database of their own; three files
+  came from `main` with PR #78.
 - **0 direct `prisma` calls in all 36 controllers** — the §0b check, and the one
   that will regress first.
   `grep -c "prisma\." src/modules/*/*.controller.ts`

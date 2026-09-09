@@ -16,8 +16,9 @@ being either. This file is the running order; everything else is lookup.
 ## 0. In flight
 
 **Redis across the API**, on `feat/redis-backed-rate-limiting`. Resume at
-**`REDIS-PLAN.md` §2b** — caching the payment reads. §1 of that document is what
-has landed and why; §3 is what is knowingly still wrong.
+**`REDIS-PLAN.md` §2c** — the remaining service reads, heaviest first: `review`,
+`venue`, `users`, `follow`, `event-template`. §1 of that document is what has
+landed and why; §3 is what is knowingly still wrong.
 
 The branch name no longer describes its contents. It started as the rate-limit
 store and now carries the caching layer, the controller extraction, and a test
@@ -43,7 +44,7 @@ pnpm exec prisma generate          # the client is not committed
 pnpm exec prisma migrate deploy
 pnpm exec tsx prisma/seed.ts       # 148 users, 128 venues, both admins
 pnpm validate
-pnpm exec vitest run               # expect: 326 passing, 30 files, 0 errors
+pnpm exec vitest run               # expect: 333 passing, 31 files, 0 errors
 node tools/validate-architecture.mjs   # expect: 184 files, boundaries intact
 ```
 

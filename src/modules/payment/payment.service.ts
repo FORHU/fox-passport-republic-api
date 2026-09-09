@@ -9,6 +9,23 @@ import {
 import Stripe from "stripe";
 import { prisma } from "../../utils/prisma";
 import { bookingCache } from "../../utils/cache-namespaces";
+
+/**
+ * Payments are cached in the **booking** namespace, not one of their own.
+ *
+ * They are the same payload - `BookingRepo.findById` includes `payments`, and
+ * the balance below is computed from a booking - and they are changed by the
+ * same writes. Both repositories already retire that namespace at every write,
+ * so these reads arrive invalidated with no new invalidation point to
+ * remember. A `payment` namespace would need every one of those writes to bump
+ * two counters instead of one, and the second one is the one somebody forgets.
+ *
+ * The TTL is a floor on how wrong a read can be if a bump is ever missed, not
+ * the mechanism keeping it right - §2b of `docs/REDIS-PLAN.md` is explicit that
+ * payment status must not rely on expiry, because a citizen who has just paid
+ * and is shown "unpaid" pays twice.
+ */
+const PAYMENT_TTL = 30;
 import { toStripeCents } from "../../utils/pricing";
 import RefundSvc from "../refund/refund.service";
 import StripeConnectSvc from "../stripe-connect/stripe-connect.service";
@@ -37,7 +54,7 @@ export default class PaymentSvc {
    * being here.
    */
   static async sweepExpiredPayments(): Promise<number> {
-    const cancelled = await this.sweepExpiredPayments();
+    const cancelled = await PaymentRepo.cancelExpiredPayments();
     if (cancelled > 0) await bookingCache.invalidateAll();
     return cancelled;
   }
@@ -82,14 +99,28 @@ export default class PaymentSvc {
     bookingId?: string;
     paymentStatus?: PaymentStatus;
   }) {
+    // Outside the cached block on purpose: the sweep is a write, and skipping
+    // it on a cache hit would leave expired payments pending for as long as the
+    // entry lived.
     await this.sweepExpiredPayments();
-    return PaymentRepo.getAllPayments(filters);
+
+    const key = `payments:all:${filters?.bookingId ?? "*"}:${
+      filters?.paymentStatus ?? "*"
+    }`;
+    return bookingCache.cached(key, PAYMENT_TTL, () =>
+      PaymentRepo.getAllPayments(filters),
+    );
   }
 
   // GET PAYMENT BY ID
   static async getPaymentById(id: string) {
     await this.sweepExpiredPayments();
-    const payment = await PaymentRepo.getPaymentById(id);
+
+    const payment = await bookingCache.cached(
+      `payments:id:${id}`,
+      PAYMENT_TTL,
+      () => PaymentRepo.getPaymentById(id),
+    );
     if (!payment) {
       throw new Error("Payment not found");
     }
@@ -99,7 +130,12 @@ export default class PaymentSvc {
   // GET PAYMENT BY TRANSACTION ID
   static async getPaymentByTransactionId(transactionId: string) {
     await this.sweepExpiredPayments();
-    const payment = await PaymentRepo.getPaymentByTransactionId(transactionId);
+
+    const payment = await bookingCache.cached(
+      `payments:txn:${transactionId}`,
+      PAYMENT_TTL,
+      () => PaymentRepo.getPaymentByTransactionId(transactionId),
+    );
     if (!payment) {
       throw new Error("Payment not found");
     }
@@ -218,8 +254,23 @@ export default class PaymentSvc {
     return updated;
   }
 
-  // CALCULATE REMAINING BALANCE
+  /**
+   * What is still owed on a booking.
+   *
+   * Cached as the computed answer rather than as its inputs: the arithmetic is
+   * the expensive-to-get-right part, not the query, and every write that could
+   * change it - a payment completing, a booking cancelling - retires this
+   * namespace.
+   */
   static async getRemainingBalance(bookingId: string) {
+    return bookingCache.cached(
+      `payments:balance:${bookingId}`,
+      PAYMENT_TTL,
+      () => this.computeRemainingBalance(bookingId),
+    );
+  }
+
+  private static async computeRemainingBalance(bookingId: string) {
     const booking = await BookingRepo.findById(bookingId);
     if (!booking) throw new Error("Booking not found");
 
@@ -243,9 +294,22 @@ export default class PaymentSvc {
     };
   }
 
-  // GET BOOKING PAYMENTS
+  /**
+   * One booking's payments. On the confirmation path, which is why it is the
+   * read this section was most careful about: it decides whether a pending
+   * payment is completed or a fresh one created, so a stale answer here writes
+   * a second payment row rather than merely showing a wrong number.
+   *
+   * It is safe because it is retired at the write, not at the TTL - and because
+   * `confirmPayment` reads it *before* it writes anything, so its own writes
+   * cannot race it.
+   */
   static async getBookingPayments(bookingId: string) {
-    return PaymentRepo.getBookingPayments(bookingId);
+    return bookingCache.cached(
+      `payments:booking:${bookingId}`,
+      PAYMENT_TTL,
+      () => PaymentRepo.getBookingPayments(bookingId),
+    );
   }
 
   /**
