@@ -43,7 +43,7 @@ pnpm exec prisma generate          # the client is not committed
 pnpm exec prisma migrate deploy
 pnpm exec tsx prisma/seed.ts       # 148 users, 128 venues, both admins
 pnpm validate
-pnpm exec vitest run               # expect: 313 passing, 27 files, 0 errors
+pnpm exec vitest run               # expect: 326 passing, 30 files, 0 errors
 node tools/validate-architecture.mjs   # expect: 184 files, boundaries intact
 ```
 
@@ -65,6 +65,12 @@ by `.env.test.local`, which is gitignored — `.env.test.example` is the copy to
 start from. `tests/setup.ts` refuses to seed unless the database name ends in
 `_test`, so a missing test database is a loud error rather than 148 deleted
 users. Run the whole suite; there is no `--exclude` any more.
+
+**Every limiter goes on the shared store, with a prefix.** `MemoryStore`
+isolated the buckets for free by being a fresh instance per limiter; one shared
+Redis does not, so two limiters keying on the same email or user id would spend
+each other's budget. `createRateLimitStore("<name>:account")` is the whole
+requirement, and `tests/rate-limit.store.spec.ts` pins it.
 
 **Redis is on port 6378**, published by `docker-compose.yml` as
 `REDIS_HOST_PORT`; `.env` sets `REDIS_PORT=6378` for the API to dial. Something

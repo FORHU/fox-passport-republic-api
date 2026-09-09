@@ -475,8 +475,9 @@ worth watching for in staging rather than assuming.
 
 As of the end of 9 Sep, on this branch:
 
-- **313 tests / 27 files** pass — the **whole** suite. The two specs that were
-  excluded since 8 Sep run again, against a database of their own.
+- **326 tests / 30 files** pass — the **whole** suite. The two specs that were
+  excluded since 8 Sep run again, against a database of their own; the other
+  three files came from `main` with PR #78.
 - **0 direct `prisma` calls in all 36 controllers** — the §0b check, and the one
   that will regress first.
   `grep -c "prisma\." src/modules/*/*.controller.ts`
