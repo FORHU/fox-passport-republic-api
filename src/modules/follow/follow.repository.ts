@@ -1,4 +1,13 @@
 import { prisma } from "../../utils/prisma";
+import BlockRepo from "../block/block.repository";
+
+const SUGGESTION_SELECT = {
+  id: true,
+  name: true,
+  username: true,
+  imgId: true,
+  _count: { select: { followers: true } },
+} as const;
 
 export default class FollowRepo {
   static async getUserBasic(userId: string) {
@@ -136,35 +145,64 @@ export default class FollowRepo {
     return row?.status === "accepted";
   }
 
-  static async getSuggestions(userId: string) {
-    const following = await prisma.follow.findMany({
-      where: { followerId: userId },
-      select: { followingId: true },
-    });
+  // Ranks "people followed by people you follow" (mutuals) ahead of the
+  // plain "most-followed users" fallback, and never suggests someone blocked
+  // in either direction — `sendFollow` already refuses that follow, so
+  // surfacing them here was just a dead-end click.
+  static async getSuggestions(userId: string, page: number, take: number) {
+    const [following, blockedIds] = await Promise.all([
+      prisma.follow.findMany({
+        where: { followerId: userId },
+        select: { followingId: true },
+      }),
+      BlockRepo.getBlockedEitherWayIds(userId),
+    ]);
     const followingIds = following.map((f) => f.followingId);
-    const excludeIds = [...followingIds, userId];
+    const excludeIds = [...new Set([...followingIds, ...blockedIds, userId])];
 
-    const suggestions = await prisma.user.findMany({
-      where: {
-        id: { notIn: excludeIds },
-      },
-      select: {
-        id: true,
-        name: true,
-        username: true,
-        imgId: true,
-        _count: {
-          select: { followers: true },
-        },
-      },
-      orderBy: {
-        followers: {
-          _count: "desc",
-        },
-      },
-      take: 10,
-    });
+    // Candidate pool sized to cover every page up to and including this one,
+    // since mutual-boosted results and the fallback are ranked as one list.
+    const poolSize = page * take;
 
-    return suggestions;
+    const mutualCounts = followingIds.length
+      ? await prisma.follow.groupBy({
+          by: ["followingId"],
+          where: {
+            followerId: { in: followingIds },
+            status: "accepted",
+            followingId: { notIn: excludeIds },
+          },
+          _count: { followingId: true },
+          orderBy: { _count: { followingId: "desc" } },
+          take: poolSize,
+        })
+      : [];
+    const mutualIds = mutualCounts.map((m) => m.followingId);
+
+    const [mutualUsers, fallbackUsers] = await Promise.all([
+      mutualIds.length
+        ? prisma.user.findMany({
+            where: { id: { in: mutualIds } },
+            select: SUGGESTION_SELECT,
+          })
+        : Promise.resolve([]),
+      prisma.user.findMany({
+        where: { id: { notIn: [...excludeIds, ...mutualIds] } },
+        select: SUGGESTION_SELECT,
+        orderBy: { followers: { _count: "desc" } },
+        take: Math.max(poolSize - mutualIds.length, 0),
+      }),
+    ]);
+
+    // `findMany({ where: { id: { in } } })` doesn't preserve `mutualIds`
+    // order, so re-sort by the mutual-follow count computed above.
+    const mutualUsersById = new Map(mutualUsers.map((u) => [u.id, u]));
+    const ranked = [
+      ...mutualIds.map((id) => mutualUsersById.get(id)).filter(Boolean),
+      ...fallbackUsers,
+    ] as (typeof fallbackUsers)[number][];
+
+    const start = (page - 1) * take;
+    return ranked.slice(start, start + take);
   }
 }

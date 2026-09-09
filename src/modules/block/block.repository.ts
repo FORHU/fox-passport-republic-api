@@ -44,6 +44,19 @@ export default class BlockRepo {
     return !!row;
   }
 
+  /** Every user id blocking or blocked by `userId`, either direction, deduped. */
+  static async getBlockedEitherWayIds(userId: string): Promise<string[]> {
+    const rows = await prisma.block.findMany({
+      where: { OR: [{ blockerId: userId }, { blockedId: userId }] },
+      select: { blockerId: true, blockedId: true },
+    });
+    const ids = new Set<string>();
+    for (const row of rows) {
+      ids.add(row.blockerId === userId ? row.blockedId : row.blockerId);
+    }
+    return [...ids];
+  }
+
   static async getBlockedUsers(userId: string, page: number, take: number) {
     const [rows, total] = await Promise.all([
       prisma.block.findMany({
