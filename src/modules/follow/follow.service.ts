@@ -151,7 +151,7 @@ export default class FollowService {
     return FollowRepo.checkStatus(followerId, followingId);
   }
 
-  static async getSuggestions(userId: string) {
-    return FollowRepo.getSuggestions(userId);
+  static async getSuggestions(userId: string, page: number, limit: number) {
+    return FollowRepo.getSuggestions(userId, page, limit);
   }
 }

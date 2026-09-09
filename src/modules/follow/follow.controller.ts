@@ -1,12 +1,12 @@
 import { Request, Response } from "express";
 import FollowService from "./follow.service";
 
-function parsePage(req: Request) {
+function parsePage(req: Request, defaultLimit = 20) {
   const parsedPage = Number(req.query.page);
   const page = Number.isNaN(parsedPage) ? 1 : Math.max(1, parsedPage);
   const parsedLimit = Number(req.query.limit);
   const limit = Number.isNaN(parsedLimit)
-    ? 20
+    ? defaultLimit
     : Math.min(Math.max(1, parsedLimit), 50);
   return { page, limit };
 }
@@ -234,7 +234,12 @@ export default class FollowController {
           .json({ success: false, message: "Unauthorized" });
       }
 
-      const suggestions = await FollowService.getSuggestions(userId);
+      const { page, limit } = parsePage(req, 10);
+      const suggestions = await FollowService.getSuggestions(
+        userId,
+        page,
+        limit,
+      );
       return res.status(200).json({ success: true, data: suggestions });
     } catch (e: unknown) {
       const err = e as Error;
