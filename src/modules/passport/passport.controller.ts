@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import PassportSvc from "./passport.service";
-import { prisma } from "../../utils/prisma";
 
 export default class PassportCtrl {
   static async getMyPassport(req: Request, res: Response) {
@@ -29,9 +28,7 @@ export default class PassportCtrl {
 
   static async getAllBadges(req: Request, res: Response) {
     try {
-      const badges = await prisma.badge.findMany({
-        orderBy: [{ path: "asc" }, { rarity: "asc" }],
-      });
+      const badges = await PassportSvc.getAllBadges();
       return res.status(200).json({ success: true, data: badges });
     } catch (e: unknown) {
       const err = e as Error;

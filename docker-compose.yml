@@ -48,7 +48,12 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       # 6378 on the host, for the same reason as Postgres above.
-      - "${REDIS_PORT:-6378}:6379"
+      #
+      # REDIS_HOST_PORT, not REDIS_PORT: the API dials REDIS_PORT, and one
+      # variable meaning both "publish here" and "connect there" is how they
+      # silently disagree. Everything Redis-related is fail-soft, so a mismatch
+      # shows up as an API running with no cache rather than as an error.
+      - "${REDIS_HOST_PORT:-6378}:6379"
     volumes:
       - redisdata:/data
     healthcheck:

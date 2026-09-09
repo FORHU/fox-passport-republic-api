@@ -193,6 +193,43 @@ export default class EventTemplateSvc {
     return { templates: filtered, total };
   }
 
+  /**
+   * Used by the book-from-template flow, which needs the item owners to write
+   * its escrow rows. Returns null rather than throwing: the caller answers a
+   * miss with "not found or not approved", which covers both halves of the
+   * lookup without telling an outsider which one it was.
+   */
+  static async getPublicTemplateWithItemOwners(id: string) {
+    return EventTemplateRepo.findPublicTemplateWithItemOwners(id);
+  }
+
+  /**
+   * The recommendation strip: the newest published templates.
+   *
+   * It used to return a `match` percentage - `Math.floor(Math.random() * 20) +
+   * 80`, a number between 80 and 99 with no relationship to the person asking,
+   * presented as a fit score. It is gone rather than replaced. Nothing renders
+   * it (the dashboard reads `recommendations.length` and nothing else), and a
+   * fabricated confidence score is worse than no score: it invites the reader
+   * to trust a ranking that does not exist.
+   *
+   * If a real one is wanted, it needs an input - the citizen's passport path,
+   * their bookings, their saved vibes - and this method takes no user at all.
+   * That is the work, and it is not a one-line change.
+   */
+  static async getRecommendations(take = 6) {
+    const templates = await EventTemplateRepo.findRecommendations(take);
+
+    return templates.map((t) => ({
+      id: t.id,
+      title: t.name,
+      category: t.category,
+      image: t.images?.[0]?.url ?? null,
+      location:
+        [t.targetCity, t.targetCountry].filter(Boolean).join(", ") || null,
+    }));
+  }
+
   static async getTemplateById(id: string) {
     const template = await EventTemplateRepo.findTemplateById(id);
     if (!template) {

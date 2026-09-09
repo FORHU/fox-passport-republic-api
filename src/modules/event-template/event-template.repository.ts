@@ -163,6 +163,45 @@ export default class EventTemplateRepo {
   }
 
   // FIND BY ID
+  /**
+   * The public template a booking is built from, with each item's owner - the
+   * provider ids the per-partner escrow transactions are written against.
+   *
+   * `isPublic` is part of the lookup rather than a check afterwards, so an
+   * unapproved template is a miss and not a leak. Moved out of
+   * `booking.controller.ts` unchanged; it is the only read there that was not
+   * about bookings at all.
+   */
+  static async findPublicTemplateWithItemOwners(id: string) {
+    return prisma.eventTemplate.findUnique({
+      where: { id, isPublic: true },
+      include: {
+        templateAssets: { include: { asset: { include: { owner: true } } } },
+        templateServices: {
+          include: { service: { include: { owner: true } } },
+        },
+        templateVenues: { include: { venue: { include: { mayor: true } } } },
+      },
+    });
+  }
+
+  /**
+   * The newest published templates, for the recommendation strip. One image
+   * each - the strip renders a single thumbnail.
+   *
+   * Moved verbatim out of `event-template.controller.ts`.
+   */
+  static async findRecommendations(take: number) {
+    return prisma.eventTemplate.findMany({
+      where: { isPublic: true, status: EventTemplateStatus.published },
+      orderBy: { createdAt: "desc" },
+      take,
+      include: {
+        images: { take: 1, select: { url: true } },
+      },
+    });
+  }
+
   static async findTemplateById(id: string) {
     return prisma.eventTemplate.findUnique({
       where: { id },

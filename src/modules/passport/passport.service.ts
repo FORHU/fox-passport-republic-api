@@ -81,6 +81,19 @@ function calculateLevel(totalXP: number): {
 }
 
 export default class PassportSvc {
+  /**
+   * The full badge catalogue, ordered the way the passport screen renders it.
+   *
+   * Moved verbatim out of `passport.controller.ts`. It sits in the service
+   * rather than a repository because this module has no repository at all -
+   * see the flag in `docs/REDIS-PLAN.md` §3.
+   */
+  static async getAllBadges() {
+    return prisma.badge.findMany({
+      orderBy: [{ path: "asc" }, { rarity: "asc" }],
+    });
+  }
+
   static async getOrCreate(userId: string) {
     return prisma.passport.upsert({
       where: { userId },

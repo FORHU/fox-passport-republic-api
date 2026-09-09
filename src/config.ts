@@ -84,10 +84,20 @@ export function refreshTokenTtlMs(): number {
   ];
   return value * unit;
 }
-export const REDIS_HOST = process.env.REDIS_HOST as string;
-export const REDIS_PORT = Number(process.env.REDIS_PORT || 6379);
-export const REDIS_PASSWORD = process.env.REDIS_PASSWORD as string;
-export const REDIS_TTL_SECONDS = Number(process.env.REDIS_TTL_SECONDS) || 3600;
+/*
+ * Redis configuration is deliberately NOT here. Four `REDIS_*` constants used
+ * to sit in this file with nothing reading them - `redis.util` read
+ * `process.env` itself - which is how their defaults came to disagree, and how
+ * `REDIS_TTL_SECONDS` came to look like a live knob when no TTL has ever come
+ * from it. They live in `utils/redis.util.ts` now, next to the client they
+ * configure.
+ *
+ * Importing this module from there was the other option and is worse: this file
+ * runs `dotenv.config()` and validates the token secrets at import time, and
+ * `redis.util` is a leaf that `otp.utils` and `cache.util` both pull in. A test
+ * caught it immediately - dotenv calls `Math.random()` for a promotional tip,
+ * and `auth.otp.spec` asserts that generating an OTP touches no such thing.
+ */
 export const SERVICE_ACCOUNT = process.env.SERVICE_ACCOUNT as string;
 export const S3_CDN_URL = process.env.S3_CDN_URL as string;
 export const AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY as string;

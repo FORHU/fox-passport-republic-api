@@ -1,12 +1,34 @@
 import { prisma } from "../../utils/prisma";
+import { bookingCache } from "../../utils/cache-namespaces";
 import { PaymentStatus } from "@prisma/client";
 
+/**
+ * A ceiling on the all-payments list, not pagination. Same reasoning as the
+ * admin queues: it read the whole table of all time, newest-first, and the
+ * screen that calls it renders what it gets.
+ */
+const PAYMENT_LIMIT = 500;
+
 export default class PaymentRepo {
+  /**
+   * Retires the cached booking reads, for the same reason `BookingRepo` does:
+   * `BookingRepo.findById` includes `payments`, so a payment row changing
+   * changes what the booking page says. Wrapped around every write here.
+   */
+  private static async retiring<T>(write: Promise<T>): Promise<T> {
+    const result = await write;
+    await bookingCache.invalidateAll();
+    return result;
+  }
+
   // READ ALL with filters
-  static async getAllPayments(filters?: {
-    bookingId?: string;
-    paymentStatus?: PaymentStatus;
-  }) {
+  static async getAllPayments(
+    filters?: {
+      bookingId?: string;
+      paymentStatus?: PaymentStatus;
+    },
+    take = PAYMENT_LIMIT,
+  ) {
     return prisma.payment.findMany({
       where: {
         ...(filters?.bookingId && { bookingId: String(filters.bookingId) }),
@@ -34,6 +56,7 @@ export default class PaymentRepo {
       orderBy: {
         paidAt: "desc",
       },
+      take,
     });
   }
 
@@ -79,22 +102,24 @@ export default class PaymentRepo {
     expiresAt?: Date;
     paidAt?: Date;
   }) {
-    return prisma.payment.create({
-      data: {
-        bookingId: String(data.bookingId),
-        amount: data.amount,
-        currency: data.currency,
-        method: data.method,
-        paymentType: data.paymentType,
-        status: data.paymentStatus,
-        transactionId: data.transactionId,
-        expiresAt: data.expiresAt,
-        paidAt: data.paidAt,
-      },
-      include: {
-        booking: true,
-      },
-    });
+    return this.retiring(
+      prisma.payment.create({
+        data: {
+          bookingId: String(data.bookingId),
+          amount: data.amount,
+          currency: data.currency,
+          method: data.method,
+          paymentType: data.paymentType,
+          status: data.paymentStatus,
+          transactionId: data.transactionId,
+          expiresAt: data.expiresAt,
+          paidAt: data.paidAt,
+        },
+        include: {
+          booking: true,
+        },
+      }),
+    );
   }
 
   // UPDATE
@@ -105,16 +130,44 @@ export default class PaymentRepo {
       paidAt?: Date;
     }>,
   ) {
-    return prisma.payment.update({
-      where: { id: String(id) },
-      data: {
-        ...(data.paymentStatus ? { status: data.paymentStatus } : {}),
-        ...(data.paidAt ? { paidAt: data.paidAt } : {}),
-      },
-      include: {
-        booking: true,
-      },
-    });
+    return this.retiring(
+      prisma.payment.update({
+        where: { id: String(id) },
+        data: {
+          ...(data.paymentStatus ? { status: data.paymentStatus } : {}),
+          ...(data.paidAt ? { paidAt: data.paidAt } : {}),
+        },
+        include: {
+          booking: true,
+        },
+      }),
+    );
+  }
+
+  /**
+   * The three queries the Stripe webhook used to run against `prisma` itself.
+   *
+   * `findFirstByTransactionId` is deliberately not `getPaymentByTransactionId`
+   * above: that one is a `findUnique` carrying the booking, its user and its
+   * event, and the refund handler needs none of them. Moved verbatim.
+   */
+  static async findFirstByTransactionId(transactionId: string) {
+    return prisma.payment.findFirst({ where: { transactionId } });
+  }
+
+  static async setTransactionId(id: string, transactionId: string) {
+    return this.retiring(
+      prisma.payment.update({ where: { id }, data: { transactionId } }),
+    );
+  }
+
+  static async markRefunded(id: string) {
+    return this.retiring(
+      prisma.payment.update({
+        where: { id },
+        data: { status: PaymentStatus.refunded },
+      }),
+    );
   }
 
   // Check if payment exists
@@ -136,12 +189,19 @@ export default class PaymentRepo {
   }
 
   // Get booking payments
-  static async getBookingPayments(bookingId: string) {
+  /**
+   * One booking's payments. Bounded too, though a booking realistically holds
+   * two or three - a deposit, a balance, and whatever Stripe retried. The cap
+   * is there so that a runaway retry loop cannot turn the booking page into a
+   * thousand-row response.
+   */
+  static async getBookingPayments(bookingId: string, take = PAYMENT_LIMIT) {
     return prisma.payment.findMany({
       where: { bookingId: String(bookingId) },
       orderBy: {
         createdAt: "desc",
       },
+      take,
     });
   }
 
@@ -164,19 +224,21 @@ export default class PaymentRepo {
     const bookingIds = [...new Set(expiredPayments.map((p) => p.bookingId))];
 
     // 2. Batch cancel payments and their related bookings
-    await prisma.$transaction([
-      prisma.payment.updateMany({
-        where: { id: { in: paymentIds } },
-        data: { status: PaymentStatus.cancelled },
-      }),
-      prisma.booking.updateMany({
-        where: {
-          id: { in: bookingIds },
-          status: "pending", // Only cancel if it's still pending
-        },
-        data: { status: "cancelled" },
-      }),
-    ]);
+    await this.retiring(
+      prisma.$transaction([
+        prisma.payment.updateMany({
+          where: { id: { in: paymentIds } },
+          data: { status: PaymentStatus.cancelled },
+        }),
+        prisma.booking.updateMany({
+          where: {
+            id: { in: bookingIds },
+            status: "pending", // Only cancel if it's still pending
+          },
+          data: { status: "cancelled" },
+        }),
+      ]),
+    );
 
     return expiredPayments.length;
   }

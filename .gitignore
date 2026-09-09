@@ -8,3 +8,6 @@ prisma/migrations/migration_lock.toml
 dist/*
 
 /generated/prisma
+
+# The test database connection string
+.env.test.local

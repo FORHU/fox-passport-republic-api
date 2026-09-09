@@ -1,12 +1,33 @@
 import { prisma } from "../../utils/prisma";
+import { cached } from "../../utils/cache.util";
 
 export default class LocationsSvc {
-  // Returns distinct city names matching the query, sourced from User.city and
-  // Venue.city. No external geocoding dependency.
+  /**
+   * Distinct city names matching the query, sourced from the cities already in
+   * the data rather than from any external geocoder.
+   *
+   * Five `distinct` scans with case-insensitive `contains`, across five tables,
+   * on a typeahead - so it runs on every keystroke and the pattern match cannot
+   * use an ordinary index. The same prefix always yields the same list, and the
+   * set of cities people are in changes on the order of days.
+   *
+   * Keyed on the normalised query and the limit, so two callers typing "mak"
+   * share a fill. Ten minutes: long enough to cover a burst of typing across
+   * many users, short enough that a genuinely new city appears the same day.
+   */
   static async searchCities(q: string, limit = 8): Promise<string[]> {
     const query = q.trim();
     if (query.length < 2) return [];
 
+    return cached(`cities:${query.toLowerCase()}:${limit}`, 10 * 60, () =>
+      this.computeCitySearch(query, limit),
+    );
+  }
+
+  private static async computeCitySearch(
+    query: string,
+    limit: number,
+  ): Promise<string[]> {
     const [
       userCities,
       venueCities,

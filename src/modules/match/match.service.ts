@@ -6,6 +6,7 @@ import EventRequestRepo from "../event-request/event-request.repository";
 import NotificationSvc from "../notifications/user-notification.service";
 import PaymentSvc from "../payment/payment.service";
 import { prisma } from "../../utils/prisma";
+import BookingRepo from "../booking/booking.repository";
 
 export default class MatchSvc {
   static async createMatchRequest(data: {
@@ -85,18 +86,16 @@ export default class MatchSvc {
     });
 
     // 3. Create a Booking in 'pending' status using server-computed event totals.
-    const booking = await prisma.booking.create({
-      data: {
-        eventId: eventRequest.id,
-        userId: data.clientId,
-        guestCount: data.guestCount,
-        totalAmount: eventRequest.totalAmount,
-        hostMarkup: eventRequest.hostMarkupAmount,
-        platformFee: eventRequest.platformFeeAmount,
-        status: "pending",
-        startAt: eventRequest.startAt,
-        endAt: eventRequest.endAt,
-      },
+    const booking = await BookingRepo.createWithIds({
+      eventId: eventRequest.id,
+      userId: data.clientId,
+      guestCount: data.guestCount,
+      totalAmount: eventRequest.totalAmount,
+      hostMarkup: eventRequest.hostMarkupAmount,
+      platformFee: eventRequest.platformFeeAmount,
+      status: "pending",
+      startAt: eventRequest.startAt,
+      endAt: eventRequest.endAt,
     });
 
     // 4. Build event-level supplier transactions from any matched template items.
@@ -192,10 +191,7 @@ export default class MatchSvc {
       if (booking.stripePaymentId) {
         await PaymentSvc.refundPayment(booking.stripePaymentId);
       }
-      await prisma.booking.update({
-        where: { id: booking.id },
-        data: { status: "cancelled" },
-      });
+      await BookingRepo.cancel(booking.id);
     }
 
     if (event.clientId) {

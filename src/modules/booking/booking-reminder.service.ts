@@ -11,7 +11,9 @@ export default class BookingReminderService {
    *  2. Auto-cancel bookings that stayed unpaid past their own start time.
    * Idempotency is tracked on the booking itself (reminderSentAt /
    * paymentReminderSentAt) rather than by scanning the Notification table, so a
-   * missed or overlapping tick never double-sends.
+   * missed or overlapping tick never double-sends. The flag is *claimed* before
+   * the notification is sent, not written after it - see claimReminders. The
+   * cron is in-process, so every instance runs this sweep concurrently.
    */
   static async runSweep() {
     const now = new Date();
@@ -28,10 +30,22 @@ export default class BookingReminderService {
 
     for (const booking of bookings) {
       const eventName = booking.event?.name ?? "your event";
-      const needsReminder = !booking.reminderSentAt;
-      const needsPaymentNudge =
+
+      // What this row looks like it needs. The claim below decides whether this
+      // instance is the one that gets to act on it - the read is a filter, not
+      // the decision.
+      const wantsReminder = !booking.reminderSentAt;
+      const wantsPaymentNudge =
         booking.status === BookingStatus.pending &&
         !booking.paymentReminderSentAt;
+
+      if (!wantsReminder && !wantsPaymentNudge) continue;
+
+      const { reminder: needsReminder, paymentReminder: needsPaymentNudge } =
+        await BookingRepo.claimReminders(booking.id, {
+          reminder: wantsReminder,
+          paymentReminder: wantsPaymentNudge,
+        });
 
       if (needsReminder) {
         await NotificationService.create({
@@ -62,13 +76,6 @@ export default class BookingReminderService {
           ),
         );
       }
-
-      if (needsReminder || needsPaymentNudge) {
-        await BookingRepo.markReminderSent(booking.id, {
-          reminder: needsReminder,
-          paymentReminder: needsPaymentNudge,
-        });
-      }
     }
 
     return bookings.length;
@@ -80,6 +87,8 @@ export default class BookingReminderService {
     for (const booking of overdue) {
       const eventName = booking.event?.name ?? "your event";
 
+      // Reaches the repository without passing through `BookingSvc`, which is
+      // exactly the case the repository-level invalidation exists for.
       await BookingRepo.updateStatus(booking.id, BookingStatus.cancelled);
 
       await NotificationService.create({

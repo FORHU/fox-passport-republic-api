@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { prisma } from "../../utils/prisma";
+import EventSvc from "./event.service";
 
 export default class EventCtrl {
   // List events. Currently only serves "events I organize" — used by the
@@ -15,22 +15,11 @@ export default class EventCtrl {
       const pageNum = page ? Math.max(1, Number(page)) : 1;
       const take = limit ? Math.min(Number(limit), 50) : 20;
 
-      const [events, total] = await Promise.all([
-        prisma.event.findMany({
-          where: { organizerId: String(organizerId) },
-          orderBy: { startAt: "desc" },
-          skip: (pageNum - 1) * take,
-          take,
-          select: {
-            id: true,
-            name: true,
-            startAt: true,
-            eventStatus: true,
-            targetCity: true,
-          },
-        }),
-        prisma.event.count({ where: { organizerId: String(organizerId) } }),
-      ]);
+      const { events, total } = await EventSvc.getEventsByOrganizer(
+        String(organizerId),
+        pageNum,
+        take,
+      );
 
       return res.status(200).json({ events, total });
     } catch (e: unknown) {

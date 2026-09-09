@@ -1,5 +1,6 @@
 import rateLimit from "express-rate-limit";
 import { Request, Response } from "express";
+import { createRateLimitStore } from "../utils/rate-limit-store";
 
 /**
  * Rate limits for the authentication surface.
@@ -58,6 +59,14 @@ interface LimitOptions {
   limit: number;
   message: string;
   /**
+   * Names this limiter's key space in Redis. Distinct per limiter and per axis:
+   * the buckets used to be isolated because every `rateLimit()` call built its
+   * own MemoryStore, and one shared Redis would otherwise let the per-account
+   * login budget and the per-account OTP budget spend each other - both key on
+   * the same normalised email.
+   */
+  prefix: string;
+  /**
    * Count only what failed. Right for guessing endpoints - a successful sign-in
    * is not evidence of an attack, and counting it would punish anyone who
    * genuinely signs in and out repeatedly. Wrong for endpoints where the
@@ -66,10 +75,17 @@ interface LimitOptions {
   failuresOnly?: boolean;
 }
 
-function perIp({ windowMs, limit, message, failuresOnly }: LimitOptions) {
+function perIp({
+  windowMs,
+  limit,
+  message,
+  failuresOnly,
+  prefix,
+}: LimitOptions) {
   return rateLimit({
     windowMs,
     limit,
+    store: createRateLimitStore(`${prefix}:ip`),
     // Default key generator: `app.set("trust proxy", 1)` in app.ts means req.ip
     // is the client, not the proxy in front of it.
     standardHeaders: "draft-7",
@@ -79,10 +95,17 @@ function perIp({ windowMs, limit, message, failuresOnly }: LimitOptions) {
   });
 }
 
-function perAccount({ windowMs, limit, message, failuresOnly }: LimitOptions) {
+function perAccount({
+  windowMs,
+  limit,
+  message,
+  failuresOnly,
+  prefix,
+}: LimitOptions) {
   return rateLimit({
     windowMs,
     limit,
+    store: createRateLimitStore(`${prefix}:account`),
     keyGenerator: (req) => accountKey(req) ?? "",
     // A request naming no account cannot be keyed to one. Skipping keeps them
     // out of a shared empty-string bucket, where unrelated malformed requests
@@ -109,12 +132,14 @@ export const loginRateLimit = [
     windowMs: FIFTEEN_MINUTES,
     limit: 30,
     message: TOO_MANY_ATTEMPTS,
+    prefix: "login",
     failuresOnly: true,
   }),
   perAccount({
     windowMs: FIFTEEN_MINUTES,
     limit: 10,
     message: TOO_MANY_ATTEMPTS,
+    prefix: "login",
     failuresOnly: true,
   }),
 ];
@@ -128,6 +153,7 @@ export const registerRateLimit = [
     windowMs: ONE_HOUR,
     limit: 10,
     message: TOO_MANY_REQUESTS,
+    prefix: "register",
   }),
 ];
 
@@ -142,6 +168,7 @@ export const refreshRateLimit = [
     windowMs: FIFTEEN_MINUTES,
     limit: 60,
     message: TOO_MANY_REQUESTS,
+    prefix: "refresh",
     failuresOnly: true,
   }),
 ];
@@ -158,11 +185,13 @@ export const otpSendRateLimit = [
     windowMs: ONE_HOUR,
     limit: 10,
     message: TOO_MANY_REQUESTS,
+    prefix: "otp-send",
   }),
   perAccount({
     windowMs: ONE_HOUR,
     limit: 5,
     message: TOO_MANY_REQUESTS,
+    prefix: "otp-send",
   }),
 ];
 
@@ -179,12 +208,14 @@ export const otpVerifyRateLimit = [
     windowMs: FIFTEEN_MINUTES,
     limit: 30,
     message: TOO_MANY_ATTEMPTS,
+    prefix: "otp-verify",
     failuresOnly: true,
   }),
   perAccount({
     windowMs: FIFTEEN_MINUTES,
     limit: 10,
     message: TOO_MANY_ATTEMPTS,
+    prefix: "otp-verify",
     failuresOnly: true,
   }),
 ];

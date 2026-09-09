@@ -1,6 +1,7 @@
 // src/app.ts
 import express from "express";
 import rateLimit from "express-rate-limit";
+import { createRateLimitStore } from "./utils/rate-limit-store";
 import helmet from "helmet";
 import router from "./routes";
 import { isDev, CORS_ORIGINS } from "./config";
@@ -63,9 +64,14 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 // Rate Limiter
+//
+// Redis-backed for the same reason the auth limiters are: on the default
+// MemoryStore this budget was per process and reset on every restart. Falls
+// back to memory when Redis is unavailable - see utils/rate-limit-store.
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000,
+  store: createRateLimitStore("global:ip"),
 });
 
 if (!isDev) app.use(limiter);

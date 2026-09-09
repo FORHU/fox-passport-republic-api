@@ -1,4 +1,5 @@
 import { prisma } from "../../utils/prisma";
+import BookingRepo from "../booking/booking.repository";
 import ReviewRepo from "./review.repository";
 
 export default class ReviewSvc {
@@ -45,16 +46,14 @@ export default class ReviewSvc {
         include: { venueTransactions: { take: 1 } },
       });
       if (!event) throw new Error("No event available to link this review to");
-      const booking = await prisma.booking.create({
-        data: {
-          eventId: event.id,
-          userId: String(data.userId),
-          guestCount: 1,
-          totalAmount: 0,
-          status: "confirmed",
-          startAt: new Date(),
-          endAt: new Date(Date.now() + 86400000),
-        },
+      const booking = await BookingRepo.createWithIds({
+        eventId: event.id,
+        userId: String(data.userId),
+        guestCount: 1,
+        totalAmount: 0,
+        status: "confirmed",
+        startAt: new Date(),
+        endAt: new Date(Date.now() + 86400000),
       });
       bookingId = booking.id;
       if (!data.entityId) {
@@ -76,10 +75,9 @@ export default class ReviewSvc {
     const review = await ReviewRepo.createReview({ ...data, bookingId });
 
     if (data.bookingId) {
-      await prisma.booking.update({
-        where: { id: String(data.bookingId) },
-        data: { hasReview: true },
-      });
+      // The repository retires the cache; `hasReview` is what hides the
+      // "leave a review" button.
+      await BookingRepo.setHasReview(String(data.bookingId), true);
     }
 
     // Award leaveReview XP + First Review badge (fire-and-forget)
