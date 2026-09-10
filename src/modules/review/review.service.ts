@@ -34,17 +34,44 @@ const reviewCache = versionedCache("review");
 const REVIEW_TTL = 120;
 
 export default class ReviewSvc {
+  /**
+   * A review requires the booking it is about.
+   *
+   * `bookingId` used to be optional, and the branch that handled its absence
+   * took **the most recently created event in the entire system** and
+   * fabricated a confirmed booking against it — a real row, with a real user
+   * id, in the bookings table — so the review had something to hang off. The
+   * reviewer had not been there, the booking had never happened, and the row
+   * counted as one from then on.
+   *
+   * That was left alone through the caching pass because it is a product
+   * question rather than a caching one, and the answer is this: a review traces
+   * to a stay or it does not exist. The alternative was making `bookingId`
+   * nullable, which spreads the same ambiguity into every reader of
+   * `review.booking` instead of settling it here.
+   *
+   * This is a breaking change for any caller that omitted `bookingId`. The
+   * controller already turns a throw into a 400, so they get one with a reason.
+   */
   static async createReview(data: {
     userId: string;
-    bookingId?: string;
+    bookingId: string;
     entityId: string;
     entityType: string;
     rating: number;
     comment?: string;
   }) {
-    let bookingId = data.bookingId;
+    const bookingId = data.bookingId;
 
-    if (bookingId) {
+    // Checked at runtime as well as in the type: the controller reads this
+    // straight off `req.body`, where it is whatever the client sent.
+    if (!bookingId) {
+      throw new Error(
+        "A review must name the booking it is about (bookingId is required).",
+      );
+    }
+
+    {
       const booking = await prisma.booking.findUnique({
         where: { id: String(bookingId) },
         include: {
@@ -66,29 +93,6 @@ export default class ReviewSvc {
 
       if (!data.entityId) {
         const venueTx = booking.event?.venueTransactions?.[0];
-        if (venueTx?.venueId) {
-          data.entityId = venueTx.venueId;
-          data.entityType = "venue";
-        }
-      }
-    } else {
-      const event = await prisma.event.findFirst({
-        orderBy: { createdAt: "desc" },
-        include: { venueTransactions: { take: 1 } },
-      });
-      if (!event) throw new Error("No event available to link this review to");
-      const booking = await BookingRepo.createWithIds({
-        eventId: event.id,
-        userId: String(data.userId),
-        guestCount: 1,
-        totalAmount: 0,
-        status: "confirmed",
-        startAt: new Date(),
-        endAt: new Date(Date.now() + 86400000),
-      });
-      bookingId = booking.id;
-      if (!data.entityId) {
-        const venueTx = event.venueTransactions?.[0];
         if (venueTx?.venueId) {
           data.entityId = venueTx.venueId;
           data.entityType = "venue";

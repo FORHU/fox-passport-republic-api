@@ -498,6 +498,30 @@ The pattern in that column is worth naming, because it is the same test in
 reading it is the person who just wrote it. Everything above fails on that,
 on authorization, or on money.
 
+### Reviews stopped inventing bookings — 10 Sep
+
+`ReviewSvc.createReview`, given no `bookingId`, took **the most recently created
+event in the entire system** and fabricated a confirmed booking against it so
+the review had something to hang off — a real row, with a real user id, in the
+bookings table. The reviewer had not been there, the booking had never happened,
+and it counted as a booking from then on, in every list and every count that
+reads that table.
+
+It was a flag rather than a fix because the answer is a product decision, and
+the decision is: **a review traces to a stay or it does not exist.**
+`bookingId` is required, the fabricating branch is gone, and the existing checks
+around it are unchanged — the booking must be yours, it must not be pending or
+cancelled, and it may carry only one review.
+
+The alternative was making `bookingId` nullable. That spreads the same ambiguity
+into every reader of `review.booking` rather than settling it at the one place
+that knows.
+
+**Breaking for any caller that omitted `bookingId`**, which is the point; the
+controller already turns the throw into a 400 with the reason.
+`review.requires-booking.spec.ts` pins it, including the negative that matters
+most - nothing on this path may create a booking.
+
 ### A Redis blip disabled the cache for good — 10 Sep
 
 Found by the verification run in §4 and fixed the same day.
@@ -597,18 +621,6 @@ Deliberately not a sweep. A controller holding a query is a layering violation
 with a queue behind it; a service holding one is ordinary here, and only becomes
 a problem when that query needs caching, testing or reuse. Do it per module, as
 each comes up in §2c.
-
-### Reviews attach themselves to an arbitrary booking
-
-Found while routing that module's writes through the repository.
-`ReviewSvc.createReview`, given no `bookingId`, takes **the most recently
-created event in the entire system** and fabricates a confirmed booking against
-it so the review has something to hang off - a real row, with a real user id, in
-the bookings table.
-
-Left alone because it is not a caching question and the fix is a product
-decision: either reviews require a booking, or they stop pretending to have one.
-Both change what the endpoint accepts.
 
 ### The caps are not pagination
 

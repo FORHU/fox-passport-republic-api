@@ -51,7 +51,7 @@ database. That is worth knowing before writing the PR title.
   must not be without invalidation - a stale free/busy answer is two people told
   the same slot is free - and `AuthRepo.updateUserLoginStatus` deliberately does
   not retire the user namespace, because it runs on every sign-in.
-- **§3: four flags** remain open, each with a reason. The largest is 145 direct
+- **§3: three flags** remain open, each with a reason. The largest is 145 direct
   `prisma` calls still sitting in services. `passport` (20) is the one to take
   next: it is the heaviest, it has no repository at all, and its new cache
   invalidation is scattered across six write sites in the service for exactly
