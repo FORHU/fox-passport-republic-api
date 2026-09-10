@@ -1,4 +1,5 @@
 import { prisma } from "../../utils/prisma";
+import { followCache } from "../../utils/cache-namespaces";
 import BlockRepo from "../block/block.repository";
 
 const SUGGESTION_SELECT = {
@@ -10,6 +11,19 @@ const SUGGESTION_SELECT = {
 } as const;
 
 export default class FollowRepo {
+  /**
+   * Retires the cached follow reads.
+   *
+   * At the write rather than in the service because a follow changes what
+   * *both* people see - counts, followers, following, suggestions and the
+   * status badge - and the person who pressed the button is watching for it.
+   */
+  private static async retiring<T>(write: Promise<T>): Promise<T> {
+    const result = await write;
+    await followCache.invalidateAll();
+    return result;
+  }
+
   static async getUserBasic(userId: string) {
     return prisma.user.findUnique({
       where: { id: userId },
@@ -28,18 +42,24 @@ export default class FollowRepo {
     followingId: string,
     status: "pending" | "accepted",
   ) {
-    return prisma.follow.create({ data: { followerId, followingId, status } });
+    return this.retiring(
+      prisma.follow.create({ data: { followerId, followingId, status } }),
+    );
   }
 
   static async delete(followerId: string, followingId: string) {
-    return prisma.follow.deleteMany({ where: { followerId, followingId } });
+    return this.retiring(
+      prisma.follow.deleteMany({ where: { followerId, followingId } }),
+    );
   }
 
   static async accept(followerId: string, followingId: string) {
-    return prisma.follow.updateMany({
-      where: { followerId, followingId, status: "pending" },
-      data: { status: "accepted" },
-    });
+    return this.retiring(
+      prisma.follow.updateMany({
+        where: { followerId, followingId, status: "pending" },
+        data: { status: "accepted" },
+      }),
+    );
   }
 
   static async checkStatus(followerId: string, followingId: string) {

@@ -1,4 +1,5 @@
 import { RoleType, SystemRole } from "@prisma/client";
+import { userCache } from "../../utils/cache-namespaces";
 import { prisma } from "../../utils/prisma";
 import { recordAudit } from "../audit/audit.service";
 import { revokeAllForUser } from "../auth/refresh-token.service";
@@ -164,6 +165,8 @@ export default class RoleAssignmentSvc {
       data: { systemRole: nextRole as SystemRole },
       select: { id: true, email: true, systemRole: true, roleType: true },
     });
+    // A role change is what the public foxer listings filter on.
+    await userCache.invalidateAll();
 
     const revoked = await revokeAllForUser(target.id);
 
@@ -222,6 +225,8 @@ export default class RoleAssignmentSvc {
       data: { roleType: unique as RoleType[] },
       select: { id: true, email: true, systemRole: true, roleType: true },
     });
+    // A role change is what the public foxer listings filter on.
+    await userCache.invalidateAll();
 
     const revoked = await revokeAllForUser(target.id);
 

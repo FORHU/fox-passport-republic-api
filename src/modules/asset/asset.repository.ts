@@ -6,8 +6,16 @@ import {
 } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { toEnum } from "../../utils/enums";
+import { assetCache } from "../../utils/cache-namespaces";
 
 export default class AssetRepo {
+  /** Retires the cached asset reads. `AdminRepo` retires the same namespace on approval. */
+  private static async retiring<T>(write: Promise<T>): Promise<T> {
+    const result = await write;
+    await assetCache.invalidateAll();
+    return result;
+  }
+
   // READ ALL (public — available only)
   static async findAllAssets(filters?: {
     ownerId?: string;
@@ -140,29 +148,31 @@ export default class AssetRepo {
     status?: AssetStatus;
     imgIds: string[];
   }) {
-    return prisma.asset.create({
-      data: {
-        id: data.id,
-        ownerId: String(data.ownerId),
-        category: data.category,
-        name: data.name,
-        description: data.description,
-        quantity: data.quantity,
-        price: data.price,
-        currency: data.currency,
-        billingRate: data.billingRate,
-        condition: data.condition,
-        status: data.status,
-        ...(data.imgIds &&
-          data.imgIds.length > 0 && {
-            images: { connect: data.imgIds.map((id) => ({ id })) },
-          }),
-      },
-      include: {
-        owner: { select: { id: true, name: true, email: true } },
-        images: true,
-      },
-    });
+    return this.retiring(
+      prisma.asset.create({
+        data: {
+          id: data.id,
+          ownerId: String(data.ownerId),
+          category: data.category,
+          name: data.name,
+          description: data.description,
+          quantity: data.quantity,
+          price: data.price,
+          currency: data.currency,
+          billingRate: data.billingRate,
+          condition: data.condition,
+          status: data.status,
+          ...(data.imgIds &&
+            data.imgIds.length > 0 && {
+              images: { connect: data.imgIds.map((id) => ({ id })) },
+            }),
+        },
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          images: true,
+        },
+      }),
+    );
   }
 
   // READ BY ID
@@ -192,35 +202,39 @@ export default class AssetRepo {
       imgIds: string[];
     }>,
   ) {
-    return prisma.asset.update({
-      where: { id: String(id) },
-      data: {
-        category: data.category ?? undefined,
-        name: data.name ?? undefined,
-        description: data.description ?? undefined,
-        quantity: data.quantity ?? undefined,
-        price: data.price ?? undefined,
-        currency: data.currency ?? undefined,
-        billingRate: data.billingRate ?? undefined,
-        condition: data.condition ?? undefined,
-        status: data.status ?? undefined,
-        ...(data.imgIds &&
-          data.imgIds.length > 0 && {
-            images: { connect: data.imgIds.map((id) => ({ id })) },
-          }),
-      },
-      include: {
-        owner: { select: { id: true, name: true, email: true } },
-        images: true,
-      },
-    });
+    return this.retiring(
+      prisma.asset.update({
+        where: { id: String(id) },
+        data: {
+          category: data.category ?? undefined,
+          name: data.name ?? undefined,
+          description: data.description ?? undefined,
+          quantity: data.quantity ?? undefined,
+          price: data.price ?? undefined,
+          currency: data.currency ?? undefined,
+          billingRate: data.billingRate ?? undefined,
+          condition: data.condition ?? undefined,
+          status: data.status ?? undefined,
+          ...(data.imgIds &&
+            data.imgIds.length > 0 && {
+              images: { connect: data.imgIds.map((id) => ({ id })) },
+            }),
+        },
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          images: true,
+        },
+      }),
+    );
   }
 
   // DELETE (Soft delete)
   static async deleteAsset(id: string) {
-    return prisma.asset.update({
-      where: { id: String(id) },
-      data: { deletedAt: new Date() },
-    });
+    return this.retiring(
+      prisma.asset.update({
+        where: { id: String(id) },
+        data: { deletedAt: new Date() },
+      }),
+    );
   }
 }

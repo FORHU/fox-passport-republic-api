@@ -26,6 +26,7 @@ import {
 } from "@prisma/client";
 import { can } from "../../types/permissions";
 import { bookingCache } from "../../utils/cache-namespaces";
+import { fingerprint } from "../../utils/cache.util";
 import {
   announceAdminQueueChanged,
   announceToAdmins,
@@ -441,13 +442,8 @@ export default class BookingSvc {
     // rather than spelled into the key. It already carries the viewer scope, so
     // two callers who share a key are entitled to the same rows - the hash is
     // the whole identity of the answer.
-    const fingerprint = crypto
-      .createHash("sha256")
-      .update(JSON.stringify(where))
-      .digest("hex");
-
     return bookingCache.cached(
-      `list:${fingerprint}:${page}:${limit}`,
+      `list:${fingerprint(where)}:${page}:${limit}`,
       BOOKING_TTL,
       () => BookingRepo.findAll(where, skip, limit),
     );

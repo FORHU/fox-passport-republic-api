@@ -1,6 +1,18 @@
 import UsersRepo from "./users.repository";
 import { RoleType, SystemRole } from "@prisma/client";
 import { hashPassword } from "../../utils/password";
+import { userCache } from "../../utils/cache-namespaces";
+import { fingerprint } from "../../utils/cache.util";
+
+/**
+ * Two minutes.
+ *
+ * The reads below are the public, shared ones - listings and profiles, the
+ * same answer for every caller - and they are the expensive kind: the foxer
+ * listing filters on role, specialization, city and price, and the citizen
+ * profile pulls a passport, badges, stamps, listings and posts.
+ */
+const USER_TTL = 120;
 
 export default class UsersSvc {
   // GET ALL USERS (optionally filtered by roleType, paginated, optionally searched)
@@ -10,11 +22,16 @@ export default class UsersSvc {
     limit = 20,
     search?: string,
   ) {
-    return UsersRepo.getAllUsers(
-      roleTypes as RoleType[] | undefined,
-      page,
-      limit,
-      search,
+    return userCache.cached(
+      `all:${fingerprint({ roleTypes, page, limit, search })}`,
+      USER_TTL,
+      () =>
+        UsersRepo.getAllUsers(
+          roleTypes as RoleType[] | undefined,
+          page,
+          limit,
+          search,
+        ),
     );
   }
 
@@ -34,31 +51,52 @@ export default class UsersSvc {
           .map((r) => r.trim())
           .filter(Boolean) as RoleType[])
       : undefined;
-    return UsersRepo.findFoxers(
-      limit,
-      page,
-      roleTypes,
-      specialization,
-      city,
-      maxPrice,
+    return userCache.cached(
+      `foxers:${fingerprint({ limit, page, roleTypes, specialization, city, maxPrice })}`,
+      USER_TTL,
+      () =>
+        UsersRepo.findFoxers(
+          limit,
+          page,
+          roleTypes,
+          specialization,
+          city,
+          maxPrice,
+        ),
     );
   }
 
   // GET SINGLE FOXER BY ID (public profile with services)
   static async getFoxerById(id: string) {
-    const foxer = await UsersRepo.findFoxerById(id);
+    // The `throw` stays outside: `cached` stores a resolved value, so a
+    // missing foxer has to keep failing after the entry is warm.
+    const foxer = await userCache.cached(`foxer:${id}`, USER_TTL, () =>
+      UsersRepo.findFoxerById(id),
+    );
     if (!foxer) throw new Error("Foxer not found");
     return foxer;
   }
 
   // GET PUBLIC PROFILE (Citizen profile with passport, badges, stamps, listings, and posts)
   static async getPublicProfile(idOrUsername: string) {
-    const profile = await UsersRepo.findPublicCitizenProfile(idOrUsername);
+    const profile = await userCache.cached(
+      `publicProfile:${idOrUsername}`,
+      USER_TTL,
+      () => UsersRepo.findPublicCitizenProfile(idOrUsername),
+    );
     if (!profile) throw new Error("Citizen profile not found");
     return profile;
   }
 
-  // GET USER BY ID
+  /**
+   * Deliberately not cached.
+   *
+   * It is a primary-key lookup - cheap, and not the kind of read this layer is
+   * for - and it is the *hot* one: `updateUser`, `deleteUser` and
+   * `getFoxerStats` all call it as an existence check before writing. Caching
+   * it would put a stale row in front of the checks that guard writes, to save
+   * an indexed lookup.
+   */
   static async getUserById(id: string) {
     const user = await UsersRepo.findUserById(id);
     if (!user) {
@@ -113,7 +151,11 @@ export default class UsersSvc {
   static async getFoxerStats(userId: string) {
     const user = await UsersRepo.findUserById(userId);
     if (!user) throw new Error("User not found");
-    return UsersRepo.getFoxerStats(userId);
+    // Four aggregates over bookings and revenue - the most expensive read in
+    // this module.
+    return userCache.cached(`foxerStats:${userId}`, USER_TTL, () =>
+      UsersRepo.getFoxerStats(userId),
+    );
   }
 
   // DELETE

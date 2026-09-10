@@ -7,9 +7,30 @@ import {
 import { prisma } from "../../utils/prisma";
 import EventTemplateRepo from "./event-template.repository";
 import { PLATFORM_FEE_PERCENT } from "../../config";
+import { eventTemplateCache } from "../../utils/cache-namespaces";
+import { fingerprint } from "../../utils/cache.util";
 
-/** A money column as Prisma returns it, or a plain number from an in-memory draft. */
-type Amount = Prisma.Decimal | number | null | undefined;
+/**
+ * Two minutes.
+ *
+ * Templates are browsed far more than they are edited, and the listing reads
+ * join through every attached asset, service and venue so the price can be
+ * computed. The writes retire the namespace, so this bounds orphans.
+ */
+const TEMPLATE_TTL = 120;
+
+/**
+ * A money column as Prisma returns it, a plain number from an in-memory draft,
+ * or a `string`.
+ *
+ * The string is what a `Decimal` becomes after a JSON round-trip, so it is the
+ * shape every *cached* read here produces - see `Jsonified` in
+ * `cache.util.ts`. Adding it was not a widening for convenience: `tsc` refused
+ * the cached reads until it was there, which is the whole point of that type.
+ * `toAmount` below already went through `Number()`, so nothing about the
+ * arithmetic changes.
+ */
+type Amount = Prisma.Decimal | number | string | null | undefined;
 
 /**
  * Money columns come back as Prisma `Decimal`, whose `valueOf()` is a *string*.
@@ -124,8 +145,14 @@ export default class EventTemplateSvc {
     page?: number;
     limit?: number;
   }) {
-    const { templates, total } =
-      await EventTemplateRepo.findAllTemplates(filters);
+    // The database read is cached; the perk sort below is not. Featured
+    // ranking comes from `passport`, which has its own lifetime and is not
+    // this namespace's to retire.
+    const { templates, total } = await eventTemplateCache.cached(
+      `all:${fingerprint(filters ?? {})}`,
+      TEMPLATE_TTL,
+      () => EventTemplateRepo.findAllTemplates(filters),
+    );
     // event_boost (Lvl 15) > featured_listing (Lvl 10) > unranked
     const { default: PassportSvc } =
       await import("../passport/passport.service");
@@ -159,16 +186,20 @@ export default class EventTemplateSvc {
     page?: number;
     limit?: number;
   }) {
-    const { templates, total } =
-      await EventTemplateRepo.findPublicTemplatesLite({
-        category: filters.category,
-        targetCity: filters.targetCity,
-        city: filters.city,
-        maxPrice: filters.maxPrice,
-        isPublic: filters.isPublic,
-        page: filters.page,
-        limit: filters.limit ?? 50,
-      });
+    const { templates, total } = await eventTemplateCache.cached(
+      `publicLite:${fingerprint(filters)}`,
+      TEMPLATE_TTL,
+      () =>
+        EventTemplateRepo.findPublicTemplatesLite({
+          category: filters.category,
+          targetCity: filters.targetCity,
+          city: filters.city,
+          maxPrice: filters.maxPrice,
+          isPublic: filters.isPublic,
+          page: filters.page,
+          limit: filters.limit ?? 50,
+        }),
+    );
     const { default: PassportSvc } =
       await import("../passport/passport.service");
     const withTotals = templates.map((t) => {
@@ -200,7 +231,11 @@ export default class EventTemplateSvc {
    * lookup without telling an outsider which one it was.
    */
   static async getPublicTemplateWithItemOwners(id: string) {
-    return EventTemplateRepo.findPublicTemplateWithItemOwners(id);
+    return eventTemplateCache.cached(
+      `publicWithOwners:${id}`,
+      TEMPLATE_TTL,
+      () => EventTemplateRepo.findPublicTemplateWithItemOwners(id),
+    );
   }
 
   /**
@@ -218,7 +253,11 @@ export default class EventTemplateSvc {
    * That is the work, and it is not a one-line change.
    */
   static async getRecommendations(take = 6) {
-    const templates = await EventTemplateRepo.findRecommendations(take);
+    const templates = await eventTemplateCache.cached(
+      `recommendations:${take}`,
+      TEMPLATE_TTL,
+      () => EventTemplateRepo.findRecommendations(take),
+    );
 
     return templates.map((t) => ({
       id: t.id,
@@ -231,7 +270,11 @@ export default class EventTemplateSvc {
   }
 
   static async getTemplateById(id: string) {
-    const template = await EventTemplateRepo.findTemplateById(id);
+    const template = await eventTemplateCache.cached(
+      `byId:${id}`,
+      TEMPLATE_TTL,
+      () => EventTemplateRepo.findTemplateById(id),
+    );
     if (!template) {
       throw new Error("Event template not found");
     }
@@ -727,6 +770,14 @@ export default class EventTemplateSvc {
 
   // Returns all match requests sent by an EventFoxer across all their templates.
   static async getOutgoingMatchRequests(ownerId: string) {
+    return eventTemplateCache.cached(
+      `matchRequests:outgoing:${ownerId}`,
+      TEMPLATE_TTL,
+      () => this.loadOutgoingMatchRequests(ownerId),
+    );
+  }
+
+  private static async loadOutgoingMatchRequests(ownerId: string) {
     const templates = await prisma.eventTemplate.findMany({
       where: { ownerId },
       select: {
@@ -820,6 +871,14 @@ export default class EventTemplateSvc {
 
   // Returns all match requests received by a provider (asset/service/venue owner).
   static async getIncomingMatchRequests(userId: string) {
+    return eventTemplateCache.cached(
+      `matchRequests:incoming:${userId}`,
+      TEMPLATE_TTL,
+      () => this.loadIncomingMatchRequests(userId),
+    );
+  }
+
+  private static async loadIncomingMatchRequests(userId: string) {
     const [assets, services, venues] = await Promise.all([
       prisma.eventTemplateAsset.findMany({
         where: { matched: true, asset: { ownerId: userId } },
@@ -961,6 +1020,10 @@ export default class EventTemplateSvc {
    * service, which `tools/validate-architecture.mjs` enforces.
    */
   static async findTrendingByCategory(category: string, limit = 4) {
-    return EventTemplateRepo.findTrendingByCategory(category, limit);
+    return eventTemplateCache.cached(
+      `trending:${category}:${limit}`,
+      TEMPLATE_TTL,
+      () => EventTemplateRepo.findTrendingByCategory(category, limit),
+    );
   }
 }

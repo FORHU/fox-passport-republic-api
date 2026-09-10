@@ -1,6 +1,37 @@
 import { prisma } from "../../utils/prisma";
+import { versionedCache } from "../../utils/cache.util";
 import BookingRepo from "../booking/booking.repository";
 import ReviewRepo from "./review.repository";
+
+/**
+ * Reviews are read far more often than they are written - every venue page,
+ * every event page and every listing pulls them - and the repository reads are
+ * the expensive kind: joins onto the author, optional replies, and for a
+ * listing a rating distribution computed across the whole set.
+ *
+ * **Versioned rather than named keys.** These keys carry a venue id, an event
+ * id, a listing id, a target type, a user id and an `includeReplies` flag, so
+ * the set that exists for "reviews anyone has asked for" cannot be enumerated
+ * from a write that only knows one review's id. One `INCR` retires the lot;
+ * see `cache.util.ts` for why that is the safer shape and not merely cheaper.
+ *
+ * **Local, not in `cache-namespaces.ts`.** That file is for namespaces more
+ * than one module writes. Nothing outside this one writes a review: every
+ * `prisma.review` write lives in `review.repository.ts`, and this service is
+ * the repository's only caller, so the four write methods below are the
+ * complete set of invalidation points.
+ */
+const reviewCache = versionedCache("review");
+
+/**
+ * Two minutes.
+ *
+ * Longer than the booking TTL because nothing here is money and nobody is
+ * watching a review the way a guest watches a payment - and it can afford to be
+ * because the writes below retire the namespace outright, so the TTL is only
+ * ever the bound on an orphan, never the mechanism.
+ */
+const REVIEW_TTL = 120;
 
 export default class ReviewSvc {
   static async createReview(data: {
@@ -71,8 +102,11 @@ export default class ReviewSvc {
       );
     }
 
-    console.log("Saving review with entityId:", data.entityId);
     const review = await ReviewRepo.createReview({ ...data, bookingId });
+    // Before the XP and notification side effects below, which are
+    // fire-and-forget: a caller that reads straight back must not be told the
+    // review it just wrote does not exist.
+    await reviewCache.invalidateAll();
 
     if (data.bookingId) {
       // The repository retires the cache; `hasReview` is what hides the
@@ -149,19 +183,31 @@ export default class ReviewSvc {
   }
 
   static async getAllReviews(includeReplies = false) {
-    return ReviewRepo.getAllReviews(includeReplies);
+    return reviewCache.cached(`all:${includeReplies}`, REVIEW_TTL, () =>
+      ReviewRepo.getAllReviews(includeReplies),
+    );
   }
 
   static async getReviewById(id: string, includeReplies = false) {
-    return ReviewRepo.getReviewById(id, includeReplies);
+    return reviewCache.cached(`byId:${id}:${includeReplies}`, REVIEW_TTL, () =>
+      ReviewRepo.getReviewById(id, includeReplies),
+    );
   }
 
   static async getVenueReviews(venueId: string, includeReplies = false) {
-    return ReviewRepo.getVenueReviews(venueId, includeReplies);
+    return reviewCache.cached(
+      `venue:${venueId}:${includeReplies}`,
+      REVIEW_TTL,
+      () => ReviewRepo.getVenueReviews(venueId, includeReplies),
+    );
   }
 
   static async getEventReviews(eventId: string, includeReplies = false) {
-    return ReviewRepo.getEventReviews(eventId, includeReplies);
+    return reviewCache.cached(
+      `event:${eventId}:${includeReplies}`,
+      REVIEW_TTL,
+      () => ReviewRepo.getEventReviews(eventId, includeReplies),
+    );
   }
 
   static async getReviewsByTarget(
@@ -169,23 +215,39 @@ export default class ReviewSvc {
     targetType: string,
     includeReplies = false,
   ) {
-    return ReviewRepo.findByTarget(targetId, targetType, includeReplies);
+    return reviewCache.cached(
+      `target:${targetType}:${targetId}:${includeReplies}`,
+      REVIEW_TTL,
+      () => ReviewRepo.findByTarget(targetId, targetType, includeReplies),
+    );
   }
 
   static async getListingReviews(listingId: string, includeReplies = false) {
-    console.log("Querying reviews for entityId:", listingId);
-    return ReviewRepo.getListingReviewsWithDistribution(
-      listingId,
-      includeReplies,
+    // The distribution is an aggregate over every review on the listing, which
+    // makes this the most expensive read in the module and the one most worth
+    // caching.
+    return reviewCache.cached(
+      `listing:${listingId}:${includeReplies}`,
+      REVIEW_TTL,
+      () =>
+        ReviewRepo.getListingReviewsWithDistribution(listingId, includeReplies),
     );
   }
 
   static async getRecentActivity(limit: number, includeReplies = false) {
-    return ReviewRepo.getRecentActivity(limit, includeReplies);
+    return reviewCache.cached(
+      `recent:${limit}:${includeReplies}`,
+      REVIEW_TTL,
+      () => ReviewRepo.getRecentActivity(limit, includeReplies),
+    );
   }
 
   static async getUserReviews(userId: string, includeReplies = false) {
-    return ReviewRepo.getUserReviews(userId, includeReplies);
+    return reviewCache.cached(
+      `user:${userId}:${includeReplies}`,
+      REVIEW_TTL,
+      () => ReviewRepo.getUserReviews(userId, includeReplies),
+    );
   }
 
   static async replyToReview(reviewId: string, userId: string, text: string) {
@@ -215,7 +277,11 @@ export default class ReviewSvc {
       throw new Error("Only the review author or the venue host can reply");
     }
 
-    return ReviewRepo.createReply(reviewId, userId, text);
+    const reply = await ReviewRepo.createReply(reviewId, userId, text);
+    // A reply changes every `includeReplies` read of its parent, and the parent
+    // appears in the venue, event, listing, target and recent lists.
+    await reviewCache.invalidateAll();
+    return reply;
   }
 
   /**
@@ -266,7 +332,11 @@ export default class ReviewSvc {
     if (data.rating !== undefined) patch.rating = data.rating;
     if (data.comment !== undefined) patch.comment = data.comment;
 
-    return ReviewRepo.updateReview(id, patch);
+    const updated = await ReviewRepo.updateReview(id, patch);
+    // `rating` feeds the listing distribution and the Earned Specialization
+    // threshold, so a stale copy of it is not only cosmetic.
+    await reviewCache.invalidateAll();
+    return updated;
   }
 
   static async deleteReview(params: {
@@ -276,6 +346,8 @@ export default class ReviewSvc {
   }) {
     const { id, requesterId, requesterRole } = params;
     await this.assertCanMutate(id, requesterId, requesterRole);
-    return ReviewRepo.deleteReview(id);
+    const deleted = await ReviewRepo.deleteReview(id);
+    await reviewCache.invalidateAll();
+    return deleted;
   }
 }

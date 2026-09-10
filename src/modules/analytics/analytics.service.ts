@@ -1,9 +1,26 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
+import { cached } from "../../utils/cache.util";
 
 export default class AnalyticsSvc {
-  // Per-template booking stats for an eventFoxer — gated by analytics_pro perk
+  /**
+   * Per-template booking stats for an eventFoxer, gated by the analytics_pro
+   * perk.
+   *
+   * **TTL only, deliberately.** It is the most expensive read in the codebase -
+   * every template this owner has, every event on each, and every booking on
+   * each of those - and it is a dashboard. Nobody sits on an analytics page
+   * waiting to watch a number move; they open it, read it, and leave. Wiring it
+   * to the booking, event and template namespaces would mean three modules
+   * knowing about this one to save at most two minutes of staleness on a chart.
+   */
   static async getEventStats(ownerId: string) {
+    return cached(`analytics:eventStats:${ownerId}`, 120, () =>
+      this.computeEventStats(ownerId),
+    );
+  }
+
+  private static async computeEventStats(ownerId: string) {
     const templates = await prisma.eventTemplate.findMany({
       where: { ownerId },
       select: {

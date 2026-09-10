@@ -1,4 +1,5 @@
 import { MatchConstraint } from "@prisma/client";
+import { eventTemplateCache } from "../../utils/cache-namespaces";
 import EventTransactionSvc from "../event-transaction/event-transaction.service";
 import EventRequestSvc from "../event-request/event-request.service";
 import EventTemplateRepo from "../event-template/event-template.repository";
@@ -40,6 +41,7 @@ export default class MatchSvc {
           targetCountry: venue.country,
         },
       });
+      await eventTemplateCache.invalidateAll();
 
       templateId = newTemplate.id;
 
@@ -69,6 +71,7 @@ export default class MatchSvc {
             isPublic: false,
           },
         });
+        await eventTemplateCache.invalidateAll();
         templateId = newTemplate.id;
       }
     }

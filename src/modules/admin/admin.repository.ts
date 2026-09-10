@@ -1,5 +1,11 @@
 import { prisma } from "../../utils/prisma";
 import {
+  venueCache,
+  eventTemplateCache,
+  assetCache,
+  serviceCache,
+} from "../../utils/cache-namespaces";
+import {
   AssetStatus,
   BookingStatus,
   EventTemplateStatus,
@@ -250,15 +256,25 @@ export default class AdminRepo {
   // Venues. The approval selects narrowly because the badge check needs only
   // the mayor; the rejection returns the row, as the controller had it.
   static async setVenueStatus(id: string, status: VenueStatus) {
-    return prisma.venue.update({ where: { id }, data: { status } });
+    const venue = await prisma.venue.update({
+      where: { id },
+      data: { status },
+    });
+    // The mayor is refreshing to see whether their venue went live, so this is
+    // the write that must not wait for a TTL. `VenueRepo` retires the same
+    // namespace for the writes it owns.
+    await venueCache.invalidateAll();
+    return venue;
   }
 
   static async approveVenue(id: string) {
-    return prisma.venue.update({
+    const venue = await prisma.venue.update({
       where: { id },
       data: { status: VenueStatus.available },
       select: { id: true, mayorId: true },
     });
+    await venueCache.invalidateAll();
+    return venue;
   }
 
   static async countApprovedVenues(mayorId: string) {
@@ -268,38 +284,52 @@ export default class AdminRepo {
   }
 
   static async approveAsset(id: string) {
-    return prisma.asset.update({
+    const row = await prisma.asset.update({
       where: { id },
       data: { status: AssetStatus.available },
       select: { id: true, ownerId: true },
     });
+    // The owner is watching the page for the approval.
+    await assetCache.invalidateAll();
+    return row;
   }
 
   static async setAssetStatus(id: string, status: AssetStatus) {
-    return prisma.asset.update({ where: { id }, data: { status } });
+    const row = await prisma.asset.update({ where: { id }, data: { status } });
+    await assetCache.invalidateAll();
+    return row;
   }
 
   static async approveService(id: string) {
-    return prisma.service.update({
+    const row = await prisma.service.update({
       where: { id },
       data: { status: ServiceStatus.available },
       select: { id: true, ownerId: true },
     });
+    await serviceCache.invalidateAll();
+    return row;
   }
 
   static async setServiceStatus(id: string, status: ServiceStatus) {
-    return prisma.service.update({ where: { id }, data: { status } });
+    const row = await prisma.service.update({
+      where: { id },
+      data: { status },
+    });
+    await serviceCache.invalidateAll();
+    return row;
   }
 
   static async publishEventTemplate(id: string) {
-    return prisma.eventTemplate.update({
+    const template = await prisma.eventTemplate.update({
       where: { id },
       data: { status: EventTemplateStatus.published, isPublic: true },
     });
+    await eventTemplateCache.invalidateAll();
+    return template;
   }
 
   static async rejectEventTemplate(id: string, reason: string) {
-    return prisma.eventTemplate.update({
+    const template = await prisma.eventTemplate.update({
       where: { id },
       data: {
         status: EventTemplateStatus.rejected,
@@ -307,11 +337,20 @@ export default class AdminRepo {
         rejectionReason: reason,
       },
     });
+    // The owner is watching the page for this exact transition.
+    await eventTemplateCache.invalidateAll();
+    return template;
   }
 
   /** Approving an event publishes its template; rejecting the last one hides it. */
   static async setTemplatePublic(id: string, isPublic: boolean) {
-    return prisma.eventTemplate.update({ where: { id }, data: { isPublic } });
+    const template = await prisma.eventTemplate.update({
+      where: { id },
+      data: { isPublic },
+    });
+    // Publishing is what makes a template appear in the public listings.
+    await eventTemplateCache.invalidateAll();
+    return template;
   }
 
   static async countApprovedEventsForTemplate(templateId: string) {

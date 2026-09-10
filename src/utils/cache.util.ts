@@ -1,5 +1,25 @@
+import crypto from "crypto";
 import type { Prisma } from "@prisma/client";
 import redisUtil from "./redis.util";
+
+/**
+ * A fixed-length key fragment for a filter object that is too long, too
+ * variable or too caller-influenced to spell into a key.
+ *
+ * The rule that makes this safe is that the hashed value must be the *whole*
+ * identity of the answer - including any viewer scoping already folded into it.
+ * Two callers who produce the same fingerprint are then entitled to the same
+ * rows by construction, rather than by a reviewer noticing.
+ *
+ * `JSON.stringify` is stable enough here because these objects are built by our
+ * own `buildFilters`-style code in a fixed order, not parsed from user input.
+ */
+export function fingerprint(value: unknown): string {
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify(value))
+    .digest("hex");
+}
 
 /**
  * Read-through caching for the service layer.

@@ -1,4 +1,5 @@
 import { Prisma, InvestmentType, InventoryCategory } from "@prisma/client";
+import { investmentCache } from "../../utils/cache-namespaces";
 import { prisma } from "../../utils/prisma";
 import { totalPages } from "../../utils/pagination";
 
@@ -22,28 +23,37 @@ export function calculateDistanceKm(
 }
 
 export default class InvestmentRepo {
+  /** Retires the cached investment reads. */
+  private static async retiring<T>(write: Promise<T>): Promise<T> {
+    const result = await write;
+    await investmentCache.invalidateAll();
+    return result;
+  }
+
   // CREATE
   static async createInvestment(data: Prisma.PartnerInvestmentCreateInput) {
-    return prisma.partnerInvestment.create({
-      data,
-      include: {
-        partner: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
-            imgId: true,
-            roleType: true,
+    return this.retiring(
+      prisma.partnerInvestment.create({
+        data,
+        include: {
+          partner: {
+            select: {
+              id: true,
+              name: true,
+              username: true,
+              imgId: true,
+              roleType: true,
+            },
+          },
+          targetVenue: {
+            select: { id: true, name: true, city: true },
+          },
+          targetEvent: {
+            select: { id: true, name: true },
           },
         },
-        targetVenue: {
-          select: { id: true, name: true, city: true },
-        },
-        targetEvent: {
-          select: { id: true, name: true },
-        },
-      },
-    });
+      }),
+    );
   }
 
   // FIND ALL (Paginated)
@@ -255,16 +265,20 @@ export default class InvestmentRepo {
     id: string,
     data: Prisma.PartnerInvestmentUpdateInput,
   ) {
-    return prisma.partnerInvestment.update({
-      where: { id },
-      data,
-    });
+    return this.retiring(
+      prisma.partnerInvestment.update({
+        where: { id },
+        data,
+      }),
+    );
   }
 
   // DELETE
   static async deleteInvestment(id: string) {
-    return prisma.partnerInvestment.delete({
-      where: { id },
-    });
+    return this.retiring(
+      prisma.partnerInvestment.delete({
+        where: { id },
+      }),
+    );
   }
 }

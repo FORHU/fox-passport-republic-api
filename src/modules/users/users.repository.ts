@@ -1,9 +1,21 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
+import { userCache } from "../../utils/cache-namespaces";
 import { SystemRole, RoleType } from "@prisma/client";
 import { totalPages } from "../../utils/pagination";
 
 export default class UsersRepo {
+  /**
+   * Retires the cached user reads - the foxer listings, the public profiles
+   * and the foxer stats. See `cache-namespaces.ts` for the one write that
+   * deliberately does not do this.
+   */
+  private static async retiring<T>(write: Promise<T>): Promise<T> {
+    const result = await write;
+    await userCache.invalidateAll();
+    return result;
+  }
+
   // READ ALL (optionally filtered by roleType)
   static async getAllUsers(
     roleTypes?: RoleType[],
@@ -395,21 +407,23 @@ export default class UsersRepo {
     role?: SystemRole;
     name: string;
   }) {
-    return prisma.user.create({
-      data: {
-        ...data,
-        updatedAt: new Date(),
-      },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        systemRole: true,
-        roleType: true,
-        createdAt: true,
-      },
-    });
+    return this.retiring(
+      prisma.user.create({
+        data: {
+          ...data,
+          updatedAt: new Date(),
+        },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          name: true,
+          systemRole: true,
+          roleType: true,
+          createdAt: true,
+        },
+      }),
+    );
   }
 
   // UPDATE (fields optional)
@@ -424,17 +438,19 @@ export default class UsersRepo {
       isActive: boolean;
     }>,
   ) {
-    return prisma.user.update({
-      where: { id: String(id) },
-      data,
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        createdAt: true,
-      },
-    });
+    return this.retiring(
+      prisma.user.update({
+        where: { id: String(id) },
+        data,
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          name: true,
+          createdAt: true,
+        },
+      }),
+    );
   }
 
   // ADD ROLE TYPE (e.g. become host)
@@ -446,18 +462,20 @@ export default class UsersRepo {
     if (!user) throw new Error("User not found");
     if (user.roleType.includes(roleType))
       return prisma.user.findUnique({ where: { id } });
-    return prisma.user.update({
-      where: { id },
-      data: { roleType: { push: roleType } },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        systemRole: true,
-        roleType: true,
-      },
-    });
+    return this.retiring(
+      prisma.user.update({
+        where: { id },
+        data: { roleType: { push: roleType } },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          name: true,
+          systemRole: true,
+          roleType: true,
+        },
+      }),
+    );
   }
 
   // FOXER STATS — bookings + revenue + avg rating for owned services/assets
@@ -524,9 +542,11 @@ export default class UsersRepo {
 
   // DELETE
   static async deleteUser(id: string) {
-    return prisma.user.delete({
-      where: { id: String(id) },
-    });
+    return this.retiring(
+      prisma.user.delete({
+        where: { id: String(id) },
+      }),
+    );
   }
 
   // READ PUBLIC CITIZEN PROFILE (for /user/:id or author popovers)

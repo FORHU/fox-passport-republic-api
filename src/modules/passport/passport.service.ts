@@ -1,4 +1,22 @@
 import { UserPath, TransactionStatus } from "@prisma/client";
+import { versionedCache, cached } from "../../utils/cache.util";
+
+/**
+ * The passport reads.
+ *
+ * Local rather than in `cache-namespaces.ts`: every write to a passport, a
+ * stamp or a badge is in this file. The module has no repository at all, which
+ * is the `REDIS-PLAN.md` §3 flag - so the invalidation sits beside each write
+ * here rather than in a `retiring` helper.
+ *
+ * This namespace is bumped often, because earning XP is a write and people earn
+ * XP by doing ordinary things. That is the right trade: somebody who just
+ * levelled up is exactly the person refreshing the page.
+ */
+const passportCache = versionedCache("passport");
+
+/** One minute. Short because XP moves; the invalidation does the real work. */
+const PASSPORT_TTL = 60;
 import { prisma } from "../../utils/prisma";
 
 const XP_PER_LEVEL = 1000;
@@ -89,33 +107,50 @@ export default class PassportSvc {
    * see the flag in `docs/REDIS-PLAN.md` §3.
    */
   static async getAllBadges() {
-    return prisma.badge.findMany({
-      orderBy: [{ path: "asc" }, { rarity: "asc" }],
-    });
+    // The badge catalogue is reference data - it changes when someone ships a
+    // migration, not when anyone uses the site - so it is cached on its own key
+    // for an hour, outside the versioned namespace that XP keeps retiring.
+    return cached("passport:badges", 60 * 60, () =>
+      prisma.badge.findMany({
+        orderBy: [{ path: "asc" }, { rarity: "asc" }],
+      }),
+    );
   }
 
   static async getOrCreate(userId: string) {
-    return prisma.passport.upsert({
-      where: { userId },
-      create: { userId },
-      update: {},
-      include: {
-        paths: true,
-        stamps: { orderBy: { createdAt: "desc" } },
-        userBadges: { include: { badge: true } },
-      },
-    });
+    // An upsert is a write: it may create the passport it returns.
+    return this.retiring(
+      prisma.passport.upsert({
+        where: { userId },
+        create: { userId },
+        update: {},
+        include: {
+          paths: true,
+          stamps: { orderBy: { createdAt: "desc" } },
+          userBadges: { include: { badge: true } },
+        },
+      }),
+    );
+  }
+
+  /** Retires the cached passport reads. */
+  private static async retiring<T>(write: Promise<T>): Promise<T> {
+    const result = await write;
+    await passportCache.invalidateAll();
+    return result;
   }
 
   static async getByUserId(userId: string) {
-    return prisma.passport.findUnique({
-      where: { userId },
-      include: {
-        paths: true,
-        stamps: { orderBy: { createdAt: "desc" } },
-        userBadges: { include: { badge: true } },
-      },
-    });
+    return passportCache.cached(`byUser:${userId}`, PASSPORT_TTL, () =>
+      prisma.passport.findUnique({
+        where: { userId },
+        include: {
+          paths: true,
+          stamps: { orderBy: { createdAt: "desc" } },
+          userBadges: { include: { badge: true } },
+        },
+      }),
+    );
   }
 
   // Idempotent badge award — skips silently if badge not found or already earned.
@@ -130,6 +165,7 @@ export default class PassportSvc {
       create: { passportId: passport.id, badgeId: badge.id },
       update: {},
     });
+    await passportCache.invalidateAll();
   }
 
   static async awardXP(userId: string, path: UserPath, amount: number) {
@@ -151,6 +187,8 @@ export default class PassportSvc {
       },
       update: { level, currentXP, totalXP: newTotalXP },
     });
+    // The XP itself, which is what the passport screen and the leaderboard show.
+    await passportCache.invalidateAll();
 
     // Grant perks for every threshold crossed on this path
     if (level !== prevLevel) {
@@ -172,6 +210,8 @@ export default class PassportSvc {
             where: { id: passport.id },
             data: { perks: { push: toAdd } },
           });
+          // A new perk changes `getPerks`, which every listing page reads.
+          await passportCache.invalidateAll();
         }
       }
     }
@@ -189,6 +229,7 @@ export default class PassportSvc {
             where: { id: passport.id },
             data: { perks: { push: [lvl1Perk] } },
           });
+          await passportCache.invalidateAll();
         }
       }
     }
@@ -284,6 +325,7 @@ export default class PassportSvc {
         xpEarned: XP_REWARDS.attendEvent,
       },
     });
+    await passportCache.invalidateAll();
 
     await PassportSvc.awardXP(
       booking.userId,
@@ -389,20 +431,37 @@ export default class PassportSvc {
 
   // Return all perk keys for a user
   static async getPerks(userId: string): Promise<string[]> {
-    const passport = await prisma.passport.findUnique({
-      where: { userId },
-      select: { perks: true },
-    });
+    // The hottest read in the module by a wide margin: every listing page calls
+    // it once per owner, through `sortByFeaturedPerk` and
+    // `enrichWithOwnerBadge`.
+    const passport = await passportCache.cached(
+      `perks:${userId}`,
+      PASSPORT_TTL,
+      () =>
+        prisma.passport.findUnique({
+          where: { userId },
+          select: { perks: true },
+        }),
+    );
     return passport?.perks ?? [];
   }
 
   static async getLeaderboard(limit = 20) {
-    const passports = await prisma.passport.findMany({
-      include: {
-        paths: true,
-        user: { select: { id: true, name: true, imgId: true, roleType: true } },
-      },
-    });
+    // Every passport in the database, with paths and users, sorted in memory.
+    // The most expensive read here and the same answer for everyone.
+    const passports = await passportCache.cached(
+      "leaderboard:all",
+      PASSPORT_TTL,
+      () =>
+        prisma.passport.findMany({
+          include: {
+            paths: true,
+            user: {
+              select: { id: true, name: true, imgId: true, roleType: true },
+            },
+          },
+        }),
+    );
 
     return passports
       .map((p) => {
