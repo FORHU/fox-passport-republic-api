@@ -560,12 +560,52 @@ appearing again with no restart. The rate-limit store needed no change: it
 retries Redis per call and falls back to memory only for that call, so it
 recovers on its own once the client works.
 
+### The admin queues are paginated - 10 Sep
+
+Fixed for the five admin queues: disputes, refunds, asset booking disputes,
+service booking disputes, event templates. Each was a 500-row cap with no way
+to reach anything past it and no signal that anything had been cut off - a
+queue at exactly 500 and one with thousands more behind it looked identical.
+
+`AdminRepo` now returns `{ rows, total }` from a `skip`/`take` query instead of
+a capped `findMany`, `AdminSvc` clamps whatever arrived on `?page`/`?limit`
+into a safe page before it ever reaches a query - `queuePage()`, exported so the
+service can cache on the *clamped* values rather than on `?limit=1e9` and every
+other junk input minting its own entry - and the controllers report
+`{ page, limit, total, totalPages }` alongside the rows.
+
+The cache changed shape along with it. The five queues were five named keys;
+paginated, the set of keys a page-and-limit pair can form is unbounded, which
+is exactly the situation `versionedCache` exists for. They moved to one
+versioned `admin` namespace, and `invalidateQueues` - six call sites, all it
+ever was - collapsed from a hand-maintained list of keys to one `INCR`.
+
+The app-side console had no page control at all, which made the API change a
+real regression on its own: a queue that used to show up to 500 rows would have
+silently shown 50 and stopped, the identical failure mode this was meant to
+fix. `AdminDisputesPanel`'s three lists (refunds, asset bookings, service
+bookings) now carry a pager - same shape as `AdminCitizenTable`'s, which
+already did this for the user directory. `AdminEventsTable` needed nothing: it
+reads `/admin/events` (event *requests*, via `EventRequestSvc`), a different
+endpoint from `/admin/event-templates`, which is not consumed by any live
+console view.
+
+**Review lists (the 200 cap) are unchanged.** They are public browse pages, not
+an internal tool, already render a client-side "show 4 / show all" truncation,
+and nothing in this database is within two orders of magnitude of hitting 200 -
+a materially different risk profile from a queue an admin works daily. Left as
+a cap with the same reasoning as when it was written; revisit if a listing's
+review count ever approaches it.
+
+
 ## 2. Next, in order
 
 **Nothing is left in this section.** Every item below is struck through as of
-10 Sep. What remains of the work is §3 - four flags, each with a reason - and
-the browser verification in §4, which is the only thing here a test cannot
-stand in for.
+10 Sep. What remains is §3's two flags - one real, unfinished work
+(`specialization` and `role-assignment` still have no repository), one
+deliberate design (Redis staying silently optional). The browser verification
+§4 used to name as the one thing a test cannot stand in for ran the same day
+and is recorded there.
 
 ### a. ~~`booking.controller.ts`~~ — done 9 Sep, see §1
 
@@ -639,14 +679,6 @@ with a queue behind it; a service holding one is ordinary here, and only becomes
 a problem when that query needs caching, testing or reuse. Do it per module, as
 each comes up in §2c.
 
-### The caps are not pagination
-
-The admin queues stop at 500 and the review lists at 200 - enough that nothing
-in this database comes close, and the queries are bounded, which is what they
-were not. But the admin console has no pagination to offer beyond the cap, so a
-queue that ever fills it is a screen that silently stops showing rows. The cap
-is the bound; pagination is the feature, and it is a UI change.
-
 ### Redis remains optional, and silently so
 
 Everything degrades rather than failing: no cache, per-process rate limits, and
@@ -659,9 +691,11 @@ worth watching for in staging rather than assuming.
 
 As of the end of 10 Sep, on this branch:
 
-- **379 tests / 34 files** pass — the **whole** suite. It was 333 / 31 at the
+- **397 tests / 35 files** pass — the **whole** suite. It was 333 / 31 at the
   end of 9 Sep; 10 Sep added `redis.reconnect.spec.ts` (6),
-  `review.cache.spec.ts` (11) and `listing.invalidation.spec.ts` (29).
+  `review.cache.spec.ts` (11), `listing.invalidation.spec.ts` (34, five more
+  once `PassportRepo` existed to pin), `review.requires-booking.spec.ts` (8),
+  and five pagination cases folded into `admin.cache.spec.ts`.
 - **0 direct `prisma` calls in all 36 controllers** — the §0b check, and the one
   that will regress first.
   `grep -c "prisma\." src/modules/*/*.controller.ts`
@@ -670,11 +704,12 @@ As of the end of 10 Sep, on this branch:
   is easy to read past.
 - `tsc --noEmit` clean
 - `eslint` 0 errors, 5 pre-existing warnings in the `feed` and `venue` repositories
-- architecture scan intact, 184 files. **The count is load-bearing**: the scan
-  classifies files by suffix, so anything that is not a `.controller`,
-  `.service`, `.repository` or `.routes` inside `src/modules` is skipped
-  silently. Two `.cache.ts` files were added and removed again on 10 Sep on
-  exactly that basis - the number not moving is what caught them.
+- architecture scan intact, 185 files (184 plus `passport.repository.ts`).
+  **The count is load-bearing**: the scan classifies files by suffix, so
+  anything that is not a `.controller`, `.service`, `.repository` or
+  `.routes` inside `src/modules` is skipped silently. Two `.cache.ts` files
+  were added and removed again on 10 Sep on exactly that basis - the number not
+  moving is what caught them.
 - development database intact: 148 users, 128 venues, 19 bookings
 
 Run with:

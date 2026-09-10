@@ -51,7 +51,9 @@ vi.mock("../src/modules/booking/booking.repository", () => ({
   default: bookingRepo,
 }));
 
-vi.mock("../src/utils/redis.util", () => ({ default: { getClient: () => null } }));
+vi.mock("../src/utils/redis.util", () => ({
+  default: { getClient: () => null },
+}));
 
 import ReviewSvc from "../src/modules/review/review.service";
 

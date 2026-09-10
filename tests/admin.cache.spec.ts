@@ -27,6 +27,14 @@ const redis = vi.hoisted(() => {
         keys.forEach((k) => store.delete(k));
         return keys.length;
       }),
+      // versionedCache — the queues carry a page and a limit, so their keys
+      // cannot be named at invalidation time and are retired by an INCR
+      // instead. See cache.util.ts.
+      incr: vi.fn(async (k: string) => {
+        const next = Number(store.get(k) ?? "0") + 1;
+        store.set(k, String(next));
+        return next;
+      }),
     },
   };
 });
@@ -37,14 +45,28 @@ vi.mock("../src/utils/redis.util", () => ({
 
 const repo = vi.hoisted(() => ({
   findStatsInputs: vi.fn(),
-  findDisputedRefunds: vi.fn(async () => [{ id: "refund-1" }]),
-  findAllRefunds: vi.fn(async () => []),
-  findDisputedAssetBookings: vi.fn(async () => []),
-  findDisputedServiceBookings: vi.fn(async () => []),
-  findEventTemplates: vi.fn(async () => []),
+  findDisputedRefunds: vi.fn(async () => ({
+    rows: [{ id: "refund-1" }],
+    total: 1,
+  })),
+  findAllRefunds: vi.fn(async () => ({ rows: [], total: 0 })),
+  findDisputedAssetBookings: vi.fn(async () => ({ rows: [], total: 0 })),
+  findDisputedServiceBookings: vi.fn(async () => ({ rows: [], total: 0 })),
+  findEventTemplates: vi.fn(async () => ({ rows: [], total: 0 })),
 }));
 
-vi.mock("../src/modules/admin/admin.repository", () => ({ default: repo }));
+/**
+ * `queuePage` is real rather than mocked - it is pure, it decides the cache
+ * key the tests below depend on, and re-implementing its clamping here would
+ * just be a second copy to keep in sync with the one under test.
+ */
+vi.mock("../src/modules/admin/admin.repository", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../src/modules/admin/admin.repository")
+    >();
+  return { ...actual, default: repo };
+});
 
 import AdminSvc from "../src/modules/admin/admin.service";
 
@@ -156,7 +178,68 @@ describe("the queues", () => {
 
     expect(repo.findEventTemplates).toHaveBeenCalledTimes(1);
     expect([...redis.store.keys()]).toContain(
-      "cache:admin:event-templates:all",
+      "cache:admin:0:event-templates:all:1:50",
     );
+  });
+});
+
+/**
+ * The queues used to be an unbounded read capped at 500 rows, with no way to
+ * reach anything past the cap and no signal that anything had been cut off. A
+ * queue at exactly 500 and a queue with thousands more behind it looked
+ * identical. This is the fix: every queue is paginated, keys on the *clamped*
+ * page and size rather than on whatever the caller sent, and reports `total`
+ * so the console can say how many rows exist.
+ */
+describe("the queues are paginated, not capped", () => {
+  it("keys on the clamped page and limit, so junk input cannot mint its own entry", async () => {
+    await AdminSvc.getDisputes(1, 1_000_000_000);
+    await AdminSvc.getDisputes(1, 1_000_000_000);
+
+    // 1e9 clamps to QUEUE_MAX_PAGE_SIZE (200), so both calls hit one entry.
+    expect(repo.findDisputedRefunds).toHaveBeenCalledTimes(1);
+    expect(repo.findDisputedRefunds).toHaveBeenCalledWith(0, 200);
+  });
+
+  it("passes skip and take through to the repository", async () => {
+    await AdminSvc.getDisputes(3, 25);
+
+    expect(repo.findDisputedRefunds).toHaveBeenCalledWith(50, 25);
+  });
+
+  it("reports total and totalPages alongside the rows", async () => {
+    repo.findDisputedRefunds.mockResolvedValueOnce({
+      rows: [{ id: "r1" }, { id: "r2" }],
+      total: 87,
+    });
+
+    const result = await AdminSvc.getDisputes(2, 10);
+
+    expect(result).toMatchObject({
+      total: 87,
+      page: 2,
+      limit: 10,
+      totalPages: 9,
+    });
+    expect(result.rows).toHaveLength(2);
+  });
+
+  it("different pages of the same queue are different cache entries", async () => {
+    await AdminSvc.getDisputes(1, 50);
+    await AdminSvc.getDisputes(2, 50);
+    await AdminSvc.getDisputes(1, 50);
+
+    // Page 1 and page 2 are separate fills; page 1 again is a hit.
+    expect(repo.findDisputedRefunds).toHaveBeenCalledTimes(2);
+  });
+
+  it("a queue write retires every page, not just the one open when it happened", async () => {
+    await AdminSvc.getDisputes(1, 50);
+    await AdminSvc.getDisputes(2, 50);
+    await AdminSvc.invalidateQueues();
+    await AdminSvc.getDisputes(1, 50);
+    await AdminSvc.getDisputes(2, 50);
+
+    expect(repo.findDisputedRefunds).toHaveBeenCalledTimes(4);
   });
 });

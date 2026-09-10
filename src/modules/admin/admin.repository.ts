@@ -6,6 +6,7 @@ import {
   serviceCache,
 } from "../../utils/cache-namespaces";
 import {
+  Prisma,
   AssetStatus,
   BookingStatus,
   EventTemplateStatus,
@@ -39,79 +40,145 @@ import {
  *
  * Every queue below was unbounded: each one read its whole table, of all time,
  * on every dashboard load, and caching them made that growth invisible rather
- * than smaller. The console has no pagination to offer instead, so the bound is
- * a cap on the newest rows - the queues are ordered newest-first, and an admin
- * working a queue works the top of it.
+ * than smaller. A cap on the newest rows bounded it, and the note here used to
+ * say that a queue reaching the cap meant the console was no longer the tool
+ * for it - "the fix is pagination, not a bigger number".
  *
- * If a queue ever reaches this, the console is not the tool for that queue any
- * more and the fix is pagination, not a bigger number.
+ * This is that fix. The queues are paginated, so the cap is a page size rather
+ * than a ceiling on what is reachable, and every one returns its `total` so
+ * the console can say how many there are rather than showing 500 and stopping
+ * silently. That silence was the actual defect: a full queue and a queue with
+ * exactly 500 rows looked identical.
  */
-const QUEUE_LIMIT = 500;
+
+/** Rows per page when the caller does not say. */
+export const QUEUE_PAGE_SIZE = 50;
+
+/** The largest page anyone may ask for, so a caller cannot re-create the old
+ *  unbounded read by passing `?limit=100000`. */
+export const QUEUE_MAX_PAGE_SIZE = 200;
+
+/** A page of rows, and how many there are in total. */
+export interface Page<T> {
+  rows: T[];
+  total: number;
+}
+
+/**
+ * Clamps whatever arrived on the query string into a page that is safe to run.
+ *
+ * Exported because the service caches on these values and has to key on the
+ * *clamped* ones - keying on the raw input would mint a distinct cache entry
+ * for `?limit=1e9` and every other junk value, all holding the same rows.
+ */
+export function queuePage(page?: number, limit?: number) {
+  const size = Math.min(
+    Math.max(Math.trunc(limit || QUEUE_PAGE_SIZE), 1),
+    QUEUE_MAX_PAGE_SIZE,
+  );
+  const current = Math.max(Math.trunc(page || 1), 1);
+  return { page: current, limit: size, skip: (current - 1) * size };
+}
 
 export default class AdminRepo {
   /** Refunds that failed or are still pending - the disputes queue. */
-  static async findDisputedRefunds() {
-    return prisma.refund.findMany({
-      where: { status: { in: ["failed", "pending"] } },
-      include: {
-        booking: {
-          include: {
-            user: { select: { id: true, name: true, email: true } },
-            event: { select: { id: true, name: true, startAt: true } },
+  static async findDisputedRefunds(skip = 0, take = QUEUE_PAGE_SIZE) {
+    const where: Prisma.RefundWhereInput = {
+      status: { in: ["failed", "pending"] },
+    };
+    const [rows, total] = await Promise.all([
+      prisma.refund.findMany({
+        where,
+        include: {
+          booking: {
+            include: {
+              user: { select: { id: true, name: true, email: true } },
+              event: { select: { id: true, name: true, startAt: true } },
+            },
           },
+          payment: true,
         },
-        payment: true,
-      },
-      orderBy: { createdAt: "desc" },
-      take: QUEUE_LIMIT,
-    });
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+      }),
+      prisma.refund.count({ where }),
+    ]);
+    return { rows, total };
   }
 
-  static async findAllRefunds() {
-    return prisma.refund.findMany({
-      include: {
-        booking: { select: { id: true, totalAmount: true } },
-        payment: { select: { method: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: QUEUE_LIMIT,
-    });
+  static async findAllRefunds(skip = 0, take = QUEUE_PAGE_SIZE) {
+    const [rows, total] = await Promise.all([
+      prisma.refund.findMany({
+        include: {
+          booking: { select: { id: true, totalAmount: true } },
+          payment: { select: { method: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+      }),
+      prisma.refund.count(),
+    ]);
+    return { rows, total };
   }
 
-  static async findDisputedAssetBookings() {
-    return prisma.assetBooking.findMany({
-      where: { status: "disputed" },
-      include: {
-        asset: { select: { id: true, name: true } },
-        user: { select: { id: true, name: true, email: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: QUEUE_LIMIT,
-    });
+  static async findDisputedAssetBookings(skip = 0, take = QUEUE_PAGE_SIZE) {
+    const where: Prisma.AssetBookingWhereInput = { status: "disputed" };
+    const [rows, total] = await Promise.all([
+      prisma.assetBooking.findMany({
+        where,
+        include: {
+          asset: { select: { id: true, name: true } },
+          user: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+      }),
+      prisma.assetBooking.count({ where }),
+    ]);
+    return { rows, total };
   }
 
-  static async findDisputedServiceBookings() {
-    return prisma.serviceBooking.findMany({
-      where: { status: "disputed" },
-      include: {
-        service: { select: { id: true, name: true } },
-        user: { select: { id: true, name: true, email: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: QUEUE_LIMIT,
-    });
+  static async findDisputedServiceBookings(skip = 0, take = QUEUE_PAGE_SIZE) {
+    const where: Prisma.ServiceBookingWhereInput = { status: "disputed" };
+    const [rows, total] = await Promise.all([
+      prisma.serviceBooking.findMany({
+        where,
+        include: {
+          service: { select: { id: true, name: true } },
+          user: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+      }),
+      prisma.serviceBooking.count({ where }),
+    ]);
+    return { rows, total };
   }
 
-  static async findEventTemplates(status?: EventTemplateStatus) {
-    return prisma.eventTemplate.findMany({
-      where: status ? { status } : {},
-      include: {
-        owner: { select: { id: true, name: true, email: true } },
-        images: true,
-      },
-      orderBy: { createdAt: "desc" },
-      take: QUEUE_LIMIT,
-    });
+  static async findEventTemplates(
+    status?: EventTemplateStatus,
+    skip = 0,
+    take = QUEUE_PAGE_SIZE,
+  ) {
+    const where = status ? { status } : {};
+    const [rows, total] = await Promise.all([
+      prisma.eventTemplate.findMany({
+        where,
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          images: true,
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+      }),
+      prisma.eventTemplate.count({ where }),
+    ]);
+    return { rows, total };
   }
 
   /**

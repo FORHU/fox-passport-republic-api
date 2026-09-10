@@ -18,6 +18,22 @@ import RoleAssignmentSvc, {
   RoleAssignmentError,
 } from "./role-assignment.service";
 
+/**
+ * `?page` and `?limit` off the query string, as numbers or as nothing.
+ *
+ * Genuinely HTTP - turning strings into numbers - so it stays here. The
+ * clamping is not: what counts as a sane page is the repository's business, and
+ * `queuePage` does it there, because the service has to cache on the clamped
+ * values rather than on whatever arrived.
+ */
+function paging(req: Request) {
+  const { page, limit } = req.query as { page?: string; limit?: string };
+  return {
+    page: page ? Number(page) : undefined,
+    limit: limit ? Number(limit) : undefined,
+  };
+}
+
 export default class AdminCtrl {
   // ─── ROLE ASSIGNMENT ─────────────────────────────────────────────────────
 
@@ -81,7 +97,9 @@ export default class AdminCtrl {
 
   static async getDisputes(req: Request, res: Response) {
     try {
-      const refunds = await AdminSvc.getDisputes();
+      const { page, limit } = paging(req);
+      const queue = await AdminSvc.getDisputes(page, limit);
+      const refunds = queue.rows;
 
       // The dates arrive as ISO strings already: the service caches this read,
       // and a cached value has been through JSON. Calling `toISOString()` on
@@ -124,7 +142,16 @@ export default class AdminCtrl {
           : [],
       }));
 
-      return res.status(200).json({ success: true, data: disputes });
+      return res.status(200).json({
+        success: true,
+        data: disputes,
+        pagination: {
+          page: queue.page,
+          limit: queue.limit,
+          total: queue.total,
+          totalPages: queue.totalPages,
+        },
+      });
     } catch (e: unknown) {
       const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
@@ -133,7 +160,9 @@ export default class AdminCtrl {
 
   static async getAllRefunds(req: Request, res: Response) {
     try {
-      const refunds = await AdminSvc.getAllRefunds();
+      const { page, limit } = paging(req);
+      const queue = await AdminSvc.getAllRefunds(page, limit);
+      const refunds = queue.rows;
 
       const mapped = refunds.map((r) => ({
         id: r.id,
@@ -147,7 +176,16 @@ export default class AdminCtrl {
         processedAt: r.resolvedAt ?? undefined,
       }));
 
-      return res.status(200).json({ success: true, data: mapped });
+      return res.status(200).json({
+        success: true,
+        data: mapped,
+        pagination: {
+          page: queue.page,
+          limit: queue.limit,
+          total: queue.total,
+          totalPages: queue.totalPages,
+        },
+      });
     } catch (e: unknown) {
       const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
@@ -180,8 +218,18 @@ export default class AdminCtrl {
 
   static async getAssetBookingDisputes(req: Request, res: Response) {
     try {
-      const bookings = await AdminSvc.getAssetBookingDisputes();
-      return res.status(200).json({ success: true, data: bookings });
+      const { page, limit } = paging(req);
+      const queue = await AdminSvc.getAssetBookingDisputes(page, limit);
+      return res.status(200).json({
+        success: true,
+        data: queue.rows,
+        pagination: {
+          page: queue.page,
+          limit: queue.limit,
+          total: queue.total,
+          totalPages: queue.totalPages,
+        },
+      });
     } catch (e: unknown) {
       const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
@@ -210,8 +258,18 @@ export default class AdminCtrl {
 
   static async getServiceBookingDisputes(req: Request, res: Response) {
     try {
-      const bookings = await AdminSvc.getServiceBookingDisputes();
-      return res.status(200).json({ success: true, data: bookings });
+      const { page, limit } = paging(req);
+      const queue = await AdminSvc.getServiceBookingDisputes(page, limit);
+      return res.status(200).json({
+        success: true,
+        data: queue.rows,
+        pagination: {
+          page: queue.page,
+          limit: queue.limit,
+          total: queue.total,
+          totalPages: queue.totalPages,
+        },
+      });
     } catch (e: unknown) {
       const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
@@ -413,8 +471,22 @@ export default class AdminCtrl {
     try {
       const { status } = req.query as { status?: string };
       const templateStatus = toEnum(EventTemplateStatus, status);
-      const templates = await AdminSvc.getEventTemplates(templateStatus);
-      return res.status(200).json({ success: true, data: templates });
+      const { page, limit } = paging(req);
+      const queue = await AdminSvc.getEventTemplates(
+        templateStatus,
+        page,
+        limit,
+      );
+      return res.status(200).json({
+        success: true,
+        data: queue.rows,
+        pagination: {
+          page: queue.page,
+          limit: queue.limit,
+          total: queue.total,
+          totalPages: queue.totalPages,
+        },
+      });
     } catch (e: unknown) {
       const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
@@ -423,10 +495,22 @@ export default class AdminCtrl {
 
   static async getPendingEventTemplates(req: Request, res: Response) {
     try {
-      const templates = await AdminSvc.getEventTemplates(
+      const { page, limit } = paging(req);
+      const queue = await AdminSvc.getEventTemplates(
         EventTemplateStatus.pending,
+        page,
+        limit,
       );
-      return res.status(200).json({ success: true, data: templates });
+      return res.status(200).json({
+        success: true,
+        data: queue.rows,
+        pagination: {
+          page: queue.page,
+          limit: queue.limit,
+          total: queue.total,
+          totalPages: queue.totalPages,
+        },
+      });
     } catch (e: unknown) {
       const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });

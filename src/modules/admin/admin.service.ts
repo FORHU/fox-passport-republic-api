@@ -6,10 +6,10 @@ import {
   ServiceStatus,
   VenueStatus,
 } from "@prisma/client";
-import AdminRepo from "./admin.repository";
+import AdminRepo, { queuePage } from "./admin.repository";
 import EventRequestSvc from "../event-request/event-request.service";
 import RefundSvc from "../refund/refund.service";
-import { cached, invalidate } from "../../utils/cache.util";
+import { cached, invalidate, versionedCache } from "../../utils/cache.util";
 import { notifyDecision } from "../notifications/decision-notification";
 import { sendDecisionEmail } from "../notifications/decision-email";
 import {
@@ -38,16 +38,22 @@ import {
  * in the console rather than a slightly stale count.
  */
 
-/** Named so the write paths can drop exactly what they invalidated. */
+/**
+ * `stats` is still a named key: there is exactly one of it, it is never
+ * invalidated, and it expires on its own.
+ *
+ * The queues are no longer named. They carry a page and a page size now, so the
+ * set of keys that exists for "the disputes queue" is unbounded and unknowable
+ * from a write that approved one row — which is the situation `versionedCache`
+ * exists for, and the reason it is the safer shape rather than merely the
+ * cheaper one: one invalidation point to get right instead of one per key.
+ */
 export const ADMIN_CACHE_KEYS = {
   stats: "admin:stats",
-  disputes: "admin:disputes",
-  refunds: "admin:refunds",
-  assetDisputes: "admin:disputes:asset",
-  serviceDisputes: "admin:disputes:service",
-  eventTemplates: (status?: EventTemplateStatus) =>
-    `admin:event-templates:${status ?? "all"}`,
 } as const;
+
+/** Every paginated admin queue. Retired wholesale by `invalidateQueues`. */
+const adminCache = versionedCache("admin");
 
 const STATS_TTL = 60;
 const QUEUE_TTL = 30;
@@ -120,34 +126,75 @@ export default class AdminSvc {
     };
   }
 
-  static async getDisputes() {
-    return cached(ADMIN_CACHE_KEYS.disputes, QUEUE_TTL, () =>
-      AdminRepo.findDisputedRefunds(),
+  /**
+   * The queues, paginated.
+   *
+   * Each returns `{ rows, total, page, limit, totalPages }`. `total` is the
+   * part that was missing rather than the paging: a capped queue showed 500
+   * rows and stopped, and looked exactly like a queue that happened to have
+   * 500 rows in it.
+   *
+   * The key is built from the *clamped* page, not from what arrived on the
+   * query string — `queuePage` decides both — so `?limit=1e9` cannot mint its
+   * own cache entry holding the same rows as `?limit=200`.
+   */
+  static async getDisputes(page?: number, limit?: number) {
+    return this.pagedQueue("disputes", page, limit, (skip, take) =>
+      AdminRepo.findDisputedRefunds(skip, take),
     );
   }
 
-  static async getAllRefunds() {
-    return cached(ADMIN_CACHE_KEYS.refunds, QUEUE_TTL, () =>
-      AdminRepo.findAllRefunds(),
+  static async getAllRefunds(page?: number, limit?: number) {
+    return this.pagedQueue("refunds", page, limit, (skip, take) =>
+      AdminRepo.findAllRefunds(skip, take),
     );
   }
 
-  static async getAssetBookingDisputes() {
-    return cached(ADMIN_CACHE_KEYS.assetDisputes, QUEUE_TTL, () =>
-      AdminRepo.findDisputedAssetBookings(),
+  static async getAssetBookingDisputes(page?: number, limit?: number) {
+    return this.pagedQueue("disputes:asset", page, limit, (skip, take) =>
+      AdminRepo.findDisputedAssetBookings(skip, take),
     );
   }
 
-  static async getServiceBookingDisputes() {
-    return cached(ADMIN_CACHE_KEYS.serviceDisputes, QUEUE_TTL, () =>
-      AdminRepo.findDisputedServiceBookings(),
+  static async getServiceBookingDisputes(page?: number, limit?: number) {
+    return this.pagedQueue("disputes:service", page, limit, (skip, take) =>
+      AdminRepo.findDisputedServiceBookings(skip, take),
     );
   }
 
-  static async getEventTemplates(status?: EventTemplateStatus) {
-    return cached(ADMIN_CACHE_KEYS.eventTemplates(status), QUEUE_TTL, () =>
-      AdminRepo.findEventTemplates(status),
+  static async getEventTemplates(
+    status?: EventTemplateStatus,
+    page?: number,
+    limit?: number,
+  ) {
+    return this.pagedQueue(
+      `event-templates:${status ?? "all"}`,
+      page,
+      limit,
+      (skip, take) => AdminRepo.findEventTemplates(status, skip, take),
     );
+  }
+
+  /** The shared shape of the five above: clamp, cache, and report the total. */
+  private static async pagedQueue<T>(
+    name: string,
+    page: number | undefined,
+    limit: number | undefined,
+    load: (skip: number, take: number) => Promise<{ rows: T[]; total: number }>,
+  ) {
+    const clamped = queuePage(page, limit);
+    const { rows, total } = await adminCache.cached(
+      `${name}:${clamped.page}:${clamped.limit}`,
+      QUEUE_TTL,
+      () => load(clamped.skip, clamped.limit),
+    );
+    return {
+      rows,
+      total,
+      page: clamped.page,
+      limit: clamped.limit,
+      totalPages: Math.max(1, Math.ceil(total / clamped.limit)),
+    };
   }
 
   /**
@@ -159,17 +206,13 @@ export default class AdminSvc {
    * the first time someone adds an endpoint.
    */
   static async invalidateQueues(): Promise<void> {
-    await invalidate(
-      ADMIN_CACHE_KEYS.stats,
-      ADMIN_CACHE_KEYS.disputes,
-      ADMIN_CACHE_KEYS.refunds,
-      ADMIN_CACHE_KEYS.assetDisputes,
-      ADMIN_CACHE_KEYS.serviceDisputes,
-      ADMIN_CACHE_KEYS.eventTemplates(),
-      ...Object.values(EventTemplateStatus).map((s) =>
-        ADMIN_CACHE_KEYS.eventTemplates(s),
-      ),
-    );
+    // One `INCR` for every queue, every page and every status, instead of a
+    // list that had to be kept in step with the key builders by hand. `stats`
+    // is still named, because there is one of it.
+    await Promise.all([
+      invalidate(ADMIN_CACHE_KEYS.stats),
+      adminCache.invalidateAll(),
+    ]);
   }
 
   // ─── DECISIONS ────────────────────────────────────────────────────────────
