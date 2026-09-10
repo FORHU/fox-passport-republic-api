@@ -604,18 +604,35 @@ left, plus what the fixing turned up.
 
 ### The same problem one layer down
 
-**The services hold 145 direct `prisma` calls across 20 files** - it was 162
-before this pass moved the booking-family writes into repositories. `passport`
-(20), `specialization` (17), `event-template` (16), `refund` (13) and `review`
-(12) are the weight, and three modules still have no repository at all:
-`passport`, `specialization` and `role-assignment`.
+**The services hold 124 direct `prisma` calls across 19 files** - 162 before
+this pass moved the booking-family writes into repositories, 145 before
+`passport` was extracted on 10 Sep. `specialization` (17), `event-template`
+(16), `refund` (13), `review` (11) and `match` (9) are what is left of the
+weight.
 
-§2c did not move any of them, deliberately. Caching a read and relocating it are
-separate changes, and doing both at once would have meant one commit that
-touched every service in the repository. `passport` is the clearest candidate
-next: it is the heaviest, it has no repository at all, and §2c has just given it
-a cache whose invalidation is scattered across six write sites in the service
-because there is no repository to put a `retiring` helper in.
+**`passport` is done — 10 Sep.** It was the heaviest at 20, had no repository at
+all, and §2c had just given it a cache whose invalidation sat in six
+hand-written `invalidateAll()` calls scattered through the service. That is the
+arrangement §0 re-opened and rejected for bookings, for the reason that applies
+here word for word: the write somebody forgets is the one that matters. It is
+now one `retiring` helper in `PassportRepo`, the shape every other repository
+uses, and the service holds zero `prisma` calls.
+
+Extracting it also collapsed a duplicate: `hasPerk` opened its own uncached path
+to the same row `getPerks` had just cached, so it now goes through `getPerks`
+and shares the entry.
+
+**Two modules still have no repository**, and neither is where it looks:
+`specialization` is `users/specialization.service.ts` and `role-assignment` is
+`admin/role-assignment.service.ts` - both are services filed inside another
+module, which is why a search for their own directories finds nothing.
+`specialization` is the next-heaviest at 17 and the more urgent of the two: it
+reads `rating`, which is what the review authorization work was protecting,
+and Earned specializations are never revoked.
+
+Still deliberately not a sweep. Caching a read and relocating it are separate
+changes, and doing both at once would mean one commit touching every service in
+the repository.
 
 Deliberately not a sweep. A controller holding a query is a layering violation
 with a queue behind it; a service holding one is ordinary here, and only becomes

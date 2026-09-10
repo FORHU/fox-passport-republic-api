@@ -70,6 +70,7 @@ import ProfileRepo from "../src/modules/profile/profile.repository";
 import FollowRepo from "../src/modules/follow/follow.repository";
 import EventTemplateRepo from "../src/modules/event-template/event-template.repository";
 import InvestmentRepo from "../src/modules/investment/investment.repository";
+import PassportRepo from "../src/modules/passport/passport.repository";
 import AdminRepo from "../src/modules/admin/admin.repository";
 
 function version(namespace: string) {
@@ -131,6 +132,35 @@ const suites: [string, string, Write[]][] = [
         () => InvestmentRepo.updateInvestment("i1", {} as never),
       ],
       ["deleteInvestment", () => InvestmentRepo.deleteInvestment("i1")],
+    ],
+  ],
+  /**
+   * Passport is the one where this property replaced something rather than
+   * adding to it. Its invalidation used to be six `invalidateAll()` calls
+   * scattered through the service, one per write, added by hand — the
+   * arrangement §0 of the plan re-opened and rejected for bookings, because the
+   * write somebody forgets is the one that matters. These five are the whole
+   * write surface now.
+   */
+  [
+    "PassportRepo",
+    "passport",
+    [
+      ["upsertPassport", () => PassportRepo.upsertPassport("u1")],
+      ["upsertUserBadge", () => PassportRepo.upsertUserBadge("p1", "b1")],
+      [
+        "upsertPath",
+        () =>
+          PassportRepo.upsertPath({
+            passportId: "p1",
+            path: "user" as never,
+            level: 2,
+            currentXP: 10,
+            totalXP: 1010,
+          }),
+      ],
+      ["pushPerks", () => PassportRepo.pushPerks("p1", ["vip_lounge"])],
+      ["createStamp", () => PassportRepo.createStamp({} as never)],
     ],
   ],
 ];

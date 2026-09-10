@@ -102,3 +102,16 @@ export const investmentCache = versionedCache("investment");
 
 /** Two minutes: written rarely, read on a browse page. */
 export const INVESTMENT_TTL = 120;
+
+/**
+ * Passports. Here rather than a `const` in the service, since `PassportRepo`
+ * gained one and now owns the invalidation for all five passport writes.
+ *
+ * This namespace is retired more often than any other, because earning XP is a
+ * write and people earn XP by doing ordinary things. That is the right trade:
+ * somebody who has just levelled up is exactly the person refreshing the page.
+ */
+export const passportCache = versionedCache("passport");
+
+/** One minute. Short because XP moves; the invalidation does the real work. */
+export const PASSPORT_TTL = 60;
