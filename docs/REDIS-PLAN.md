@@ -410,7 +410,138 @@ regression, and they fail loudly against the broken version.
 
 ---
 
+### The remaining service reads — §2c, 10 Sep
+
+**Every one of the 97 now has a decision.** Fifty-one are cached; the rest are
+deliberately not, and this section is the record of which is which, because
+"nobody has looked at it yet" and "somebody looked and said no" are different
+states and only one of them is work.
+
+#### Cached
+
+| Module | Reads | Namespace | TTL | Retired by |
+|---|---|---|---|---|
+| `review` | 8 | `review`, local | 120s | its own four writes |
+| `venue` | 6 | `venue`, shared | 300s | `VenueRepo` + `AdminRepo` |
+| `asset` | 4 | `asset`, shared | 300s | `AssetRepo` + `AdminRepo` |
+| `service` | 4 | `service`, shared | 300s | `ServiceRepo` + `AdminRepo` |
+| `event-template` | 8 | `event-template`, shared | 120s | its repository, `AdminRepo`, `MatchSvc` |
+| `users` | 5 of 6 | `user`, shared | 120s | five modules, minus one - see below |
+| `follow` | 6 | `follow`, shared | 60s | `FollowRepo` |
+| `passport` | 4 | `passport`, local | 60s | its six writes |
+| `investment` | 4 | `investment`, shared | 120s | `InvestmentRepo` |
+| `analytics` | 1 | none - TTL only | 120s | nothing |
+| `search` | 1 | none - TTL only | 60s | nothing |
+
+Two shapes, and the choice between them is not a style preference:
+
+- **a `const` in the service**, when that service holds every write - `review`
+  and `passport`. Nothing else needs to reach the namespace, so nothing else
+  should be able to.
+- **`utils/cache-namespaces.ts`** whenever more than one *file* has to reach it.
+  Two different situations end up here. Venue, asset, service, event-template
+  and user are written from outside the module that owns the reads, and the
+  approval is what forces it: `AdminRepo` cannot import `VenueSvc` without a
+  cycle. Follow and investment are written by their own repository and read by
+  their own service, which is the same problem one scale smaller - a repository
+  may not import its service either.
+
+Those last two had a `<module>.cache.ts` each for about an hour, which is the
+tidier-looking answer and the wrong one:
+`tools/validate-architecture.mjs` classifies files by suffix, so a `.cache.ts`
+inside a module belongs to no layer and is skipped by the boundary scan
+altogether. The file count in §4 is how that surfaced - two new files, and the
+scan still reported the same 184.
+
+**One write deliberately does not retire anything.**
+`AuthRepo.updateUserLoginStatus` runs on every sign-in and writes `updatedAt`,
+nothing else. Retiring the user namespace there would discard every cached foxer
+listing each time anybody logged in anywhere - a cache whose hit rate falls as
+the site gets busier. `listing.invalidation.spec.ts` pins the exclusion so it
+stays a decision rather than becoming an oversight somebody helpfully "fixes".
+
+**`getUserById` is not cached** either, and for a different reason: it is a
+primary-key lookup, and `updateUser`, `deleteUser` and `getFoxerStats` all call
+it as the existence check before they write. Caching it would put a stale row in
+front of the checks that guard writes, to save an indexed lookup.
+
+**Two reads are TTL-only because they cannot be anything else.**
+`SearchSvc.searchByLocation` and `EventTemplateSvc.matchSearch` read across
+assets, services and venues at once, so the writes that change their answers
+live in three separate namespaces. Putting either in one of those would be worse
+than a TTL, not better: it would look invalidated while still going stale from
+the other two. `AnalyticsSvc.getEventStats` is TTL-only by choice rather than
+necessity - it is the most expensive read in the codebase, and it is a dashboard
+nobody watches for their own write.
+
+#### Not cached, and why
+
+| Module | Reads | Why not |
+|---|---|---|
+| `service-booking`, `asset-booking` | 6 | **`getAvailability` is the one that must not be cached without invalidation.** These modules have no namespace, and a stale free/busy answer is two people both told the same slot is free. The booking module caches its own availability precisely because a booking retires it; these have nothing to retire them. |
+| `waitlist` | 2 | `getWaitlistStatus` returns the caller's own position, which changes the instant they join and is the entire reason anyone opens it. `getCurrentAttendees` feeds a capacity check, where stale means oversold. |
+| `event-request` | 4 | The approval flow. A client refreshes to see whether their request went through; an admin acts and expects the queue to be shorter. Small queries, closely watched - the two conditions under which a cache is a liability. |
+| `role-request` | 2 | Same, one queue smaller. |
+| `feed` | 3 | A timeline. Posts, likes and comments all change it, so the namespace would be bumped by ordinary use faster than it could ever be read from. |
+| `conversations` | 2 | Messages. Live by definition. |
+| `notifications` | 1 | Same. |
+| `block` | 2 | **Authorization.** A stale block is somebody you blocked still reaching you. Never cache this. |
+| `auth` | 1 | `getAuthUser` is the session identity on every authenticated request. A deactivated account must stop working immediately, and it is a keyed lookup anyway. |
+| `refund` | 2 | Money, operational, read by an admin who is about to act on it. |
+| `match` | 2 | Inboxes, watched. |
+| `event-transaction` | 1 | A provider's earnings dashboard - money, and the provider is looking for a payment they expect. |
+| `favorite`, `profile`, `stripe-connect` | 3 | Small per-user reads of the reader's own data, written by the same person who is looking at them. |
+| `event` | 1 | Already carried its own "not cached" note: per host, narrow, one indexed `findMany`, and a host who has just created an event goes straight here to look for it. |
+
+The pattern in that column is worth naming, because it is the same test in
+`cache.util.ts` read backwards: a read is a bad candidate when the person
+reading it is the person who just wrote it. Everything above fails on that,
+on authorization, or on money.
+
+### A Redis blip disabled the cache for good — 10 Sep
+
+Found by the verification run in §4 and fixed the same day.
+`reconnectStrategy` returned `false` once retries passed three, which tells
+node-redis to stop reconnecting **permanently**, and `initialize` only nulls the
+client when the *initial* connect throws. So a reconnect that gave up left
+`getClient()` handing out a closed client for the life of the process: no
+caching, per-process rate limits, and a single warning line an hour in the past.
+Measured before the fix - Redis stopped and restarted under a running API, which
+never wrote another `cache:` or `rl:` key until it was restarted.
+
+**Giving up is right exactly once.** Before the first successful connect it is
+what produces the clean no-Redis state - `connect()` rejects, the client goes
+null, and every caller short-circuits - so a misconfigured port must not retry
+forever. After a success the same `false` is a bug, because the socket closing
+is an outage rather than a mistake. `reconnectDelay(retries, everConnected)` is
+that distinction, pure and exported so `redis.reconnect.spec.ts` can pin both
+halves without a socket.
+
+**The retry is only safe because commands now fail fast.**
+`disableOfflineQueue: true` is the other half of the fix. node-redis queues
+commands by default while a socket is down, so retrying forever without it would
+have parked every cached read on a reconnect that might be minutes away - an
+outage turned into a slow API, which is worse than the cache being off. Every
+caller here already assumes a Redis command fails *fast* and falls through to
+Postgres or to `MemoryStore`.
+
+The recovery is logged, once, on `ready`. The degradation warnings are all
+latched to fire a single time, so without that line nothing ever said the cache
+was back.
+
+**Verified end to end**: Redis stopped under a running API for twenty seconds -
+reads kept returning 200 in ~20ms, no queueing - then restarted. The client
+reconnected on its own, logged it, and both `cache:` and `rl:` keys began
+appearing again with no restart. The rate-limit store needed no change: it
+retries Redis per call and falls back to memory only for that call, so it
+recovers on its own once the client works.
+
 ## 2. Next, in order
+
+**Nothing is left in this section.** Every item below is struck through as of
+10 Sep. What remains of the work is §3 - four flags, each with a reason - and
+the browser verification in §4, which is the only thing here a test cannot
+stand in for.
 
 ### a. ~~`booking.controller.ts`~~ — done 9 Sep, see §1
 
@@ -420,15 +551,10 @@ regression, and they fail loudly against the broken version.
 and sees "unpaid" will pay twice. Either leave payment-status reads uncached or
 invalidate them on every webhook and status transition — do not rely on a TTL.
 
-### c. The remaining service reads — **resume here**
+### c. ~~The remaining service reads~~ — done 10 Sep, see §1
 
-**97 `get`/`find`/`list`/`search` methods across the service layer.** Heaviest:
-`review` (8), `venue` (6), `users` (6), `follow` (6), `event-template` (6),
-`payment` (5).
-
-Work down that list. For each, the questions are which key (include the user id
-if the answer is user-specific), what TTL, and whether a write in the same
-module has to invalidate it.
+All 97 have a decision: 51 cached across nine namespaces, the rest deliberately
+not, each with a reason recorded. §1 carries the table.
 
 
 ### d. ~~The seven stragglers~~ — done 9 Sep, see §0b
@@ -442,7 +568,7 @@ went first on 8 Sep and the writes on 9 Sep, and not for the rest, where a
 handler's read and its write were the same twenty lines and splitting them would
 have produced two commits that neither made sense alone.
 
-**What is left of that idea is one layer down**: the services now hold 162
+**What is left of that idea is one layer down**: the services still hold 145
 direct `prisma` calls. See §3.
 
 ---
@@ -454,11 +580,18 @@ left, plus what the fixing turned up.
 
 ### The same problem one layer down
 
-**The services hold 146 direct `prisma` calls across 20 files** - it was 162
+**The services hold 145 direct `prisma` calls across 20 files** - it was 162
 before this pass moved the booking-family writes into repositories. `passport`
-(20), `specialization` (17), `event-template` (16), `review` (13) and `refund`
-(13) are the weight, and three modules still have no repository at all:
+(20), `specialization` (17), `event-template` (16), `refund` (13) and `review`
+(12) are the weight, and three modules still have no repository at all:
 `passport`, `specialization` and `role-assignment`.
+
+§2c did not move any of them, deliberately. Caching a read and relocating it are
+separate changes, and doing both at once would have meant one commit that
+touched every service in the repository. `passport` is the clearest candidate
+next: it is the heaviest, it has no repository at all, and §2c has just given it
+a cache whose invalidation is scattered across six write sites in the service
+because there is no repository to put a `retiring` helper in.
 
 Deliberately not a sweep. A controller holding a query is a layering violation
 with a queue behind it; a service holding one is ordinary here, and only becomes
@@ -495,11 +628,11 @@ worth watching for in staging rather than assuming.
 
 ## 4. Verification baseline
 
-As of the end of 9 Sep, on this branch:
+As of the end of 10 Sep, on this branch:
 
-- **333 tests / 31 files** pass — the **whole** suite. The two specs that were
-  excluded since 8 Sep run again, against a database of their own; three files
-  came from `main` with PR #78.
+- **379 tests / 34 files** pass — the **whole** suite. It was 333 / 31 at the
+  end of 9 Sep; 10 Sep added `redis.reconnect.spec.ts` (6),
+  `review.cache.spec.ts` (11) and `listing.invalidation.spec.ts` (29).
 - **0 direct `prisma` calls in all 36 controllers** — the §0b check, and the one
   that will regress first.
   `grep -c "prisma\." src/modules/*/*.controller.ts`
@@ -508,7 +641,11 @@ As of the end of 9 Sep, on this branch:
   is easy to read past.
 - `tsc --noEmit` clean
 - `eslint` 0 errors, 5 pre-existing warnings in the `feed` and `venue` repositories
-- architecture scan intact, 184 files
+- architecture scan intact, 184 files. **The count is load-bearing**: the scan
+  classifies files by suffix, so anything that is not a `.controller`,
+  `.service`, `.repository` or `.routes` inside `src/modules` is skipped
+  silently. Two `.cache.ts` files were added and removed again on 10 Sep on
+  exactly that basis - the number not moving is what caught them.
 - development database intact: 148 users, 128 venues, 19 bookings
 
 Run with:
@@ -527,6 +664,49 @@ entry, a repository write bumping the version counter, the bump retiring the
 keys formed before it, and the rate limiter counting and prefixing per limiter.
 That run is also what caught the API connecting to the wrong Redis - see §1.
 
-**Not verified in a browser.** Nobody has watched a booking page while a payment
-lands. That is the remaining gap, and it is the one the whole invalidation
-design exists for.
+**And again on 10 Sep, for the namespaces §2c added.** All nine fill against the
+running API - `venue`, `asset`, `service`, `user`, `review`, `event-template`,
+`passport`, `investment` and the un-namespaced `search` key. Invalidation was
+checked end to end on `user`: a `PUT /profile` bumped `cache:version:user` from
+0 to 1 and orphaned the entry formed before it.
+
+**Verified against the running API on 10 Sep - the server half of this gap.**
+Nobody had watched a booking page while a payment lands. The API side of that
+has now been driven end to end, against the real server, real Postgres and real
+Redis, with `curl` and `redis-cli` standing in as the second and third
+processes:
+
+- **A cached read is genuinely cross-process.** The entry for a booking was
+  edited from `redis-cli`, and the API served the edited value while Postgres
+  still held the original. The server reads through shared Redis; it is not
+  answering out of its own heap.
+- **A payment retires it.** A signed `payment_intent.succeeded` webhook - real
+  HMAC, verified by `constructEvent`, not a mocked call - took a booking from
+  `pending` to `confirmed` and bumped `cache:version:booking` by five, one per
+  write in that handler.
+- **The bump is what retires the entry, not the TTL.** Tightened into a single
+  window: the entry from before the payment was still present with 28 of its 30
+  seconds left, still reading `pending`, while the next read came back
+  `confirmed` from a key formed at the new version. Expiry cannot account for
+  that.
+- **Redis stopped, mid-flight.** Reads returned 200 with correct data, the
+  webhook still settled, one warning was logged, and the limiter fell back to
+  memory and went on enforcing. What it does *not* do afterwards is §3.
+
+**Verified in a browser, later the same day.** Both servers up, Playwright
+driving Chromium, the app's own sign-in, and a signed webhook: the booking page
+flipped from Pending to Confirmed **585ms** after the payment landed, with
+`42["data:invalidate",{"topic":"bookings"}]` in the socket log at +74ms and no
+reload. Against a 60s polling fallback, 585ms is the live path and not the poll -
+which is the distinction the app's `VERIFY.md` exists to draw.
+
+**The first run failed, and that is what it was for.** The frame arrived and the
+page did not move: `BookingDetailClient` still fetched in a `useEffect`, so it
+sat outside React Query and could not hear an invalidation. It is the same defect
+the app's B3 records for the bookings *list*, one screen further in and never
+written down. Fixed in the app repo, and the write-up is in its `VERIFY.md`.
+
+So the scenario this whole design exists for - somebody watching a booking page
+while a payment lands - has now been watched, and it needed a fix on the app side
+to work. Nothing was wrong with the invalidation; the last mile had nobody
+listening.

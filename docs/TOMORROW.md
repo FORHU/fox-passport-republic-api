@@ -15,10 +15,18 @@ being either. This file is the running order; everything else is lookup.
 
 ## 0. In flight
 
-**Redis across the API**, on `feat/redis-backed-rate-limiting`. Resume at
-**`REDIS-PLAN.md` §2c** — the remaining service reads, heaviest first: `review`,
-`venue`, `users`, `follow`, `event-template`. §1 of that document is what has
-landed and why; §3 is what is knowingly still wrong.
+**Redis across the API**, on `feat/redis-backed-rate-limiting`. **§2 is now
+empty** — every item in the running order is struck through as of 10 Sep, §2c
+included. §1 of that document is what has landed and why; §3 is what is
+knowingly still wrong.
+
+**The browser verification is done too** - B4, on 10 Sep, driven with
+Playwright. It failed first (the booking page was outside React Query and could
+not hear the invalidation), which needed a fix in the *app* repo; after that the
+page flipped in 585ms with the frame in the log. §4 has the numbers.
+
+**So nothing on this branch is waiting on this repository.** What is left is §3 -
+four flags, each with a reason - and the two app-side items in §3 of this file.
 
 The branch name no longer describes its contents. It started as the rate-limit
 store and now carries the caching layer, the controller extraction, and a test
@@ -26,13 +34,28 @@ database. That is worth knowing before writing the PR title.
 
 ### What is not done
 
-- **Nobody has watched a booking page while a payment lands.** Every property in
-  §1 is pinned by unit tests, and the two that matter most - a write being
-  visible to the next read across processes, and the API starting with Redis
-  stopped - are the two a unit test cannot vindicate. This is the gap.
-- **§2c: 97 service reads** still have no caching decision made about them.
-- **§3: four flags** remain open, each with a reason. The largest is 146 direct
-  `prisma` calls still sitting in services.
+- **The server half of that is verified - 10 Sep.** A write being visible to the
+  next read across processes, and the API surviving Redis stopping, were the two
+  a unit test cannot vindicate. Both were driven against the running API with
+  `curl` and `redis-cli`; `REDIS-PLAN.md` §4 is what was run and what it showed.
+  **The browser half is still untouched** - nobody has watched the page itself
+  update, which is `VERIFY.md` B3 and B4 in the app and needs both servers up.
+- **A Redis blip used to disable the cache until the API restarted.** Found
+  during that run and fixed the same day - the client reconnects on a capped
+  backoff once it has connected at all, and commands fail fast rather than
+  queueing while it does. `REDIS-PLAN.md` §1 has the reasoning.
+- **§2c is done.** All 97 service reads have a decision: 51 cached across nine
+  namespaces, the rest deliberately not, each with its reason recorded in
+  `REDIS-PLAN.md` §1. The ones worth knowing without opening it:
+  `service-booking` and `asset-booking` `getAvailability` are **not** cached and
+  must not be without invalidation - a stale free/busy answer is two people told
+  the same slot is free - and `AuthRepo.updateUserLoginStatus` deliberately does
+  not retire the user namespace, because it runs on every sign-in.
+- **§3: four flags** remain open, each with a reason. The largest is 145 direct
+  `prisma` calls still sitting in services. `passport` (20) is the one to take
+  next: it is the heaviest, it has no repository at all, and its new cache
+  invalidation is scattered across six write sites in the service for exactly
+  that reason.
 
 ---
 
