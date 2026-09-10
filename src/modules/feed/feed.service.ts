@@ -1,4 +1,10 @@
-import { PostType, FeedTab, UserPath } from "@prisma/client";
+import {
+  PostType,
+  FeedTab,
+  UserPath,
+  PostVisibility,
+  ReactionType,
+} from "@prisma/client";
 import FeedRepo, { QueryFeedOptions } from "./feed.repository";
 import PassportSvc, { XP_REWARDS } from "../passport/passport.service";
 import NotificationService from "../notifications/user-notification.service";
@@ -9,12 +15,52 @@ export interface CreatePostInput {
   type: PostType;
   content: string;
   mediaUrls?: string[];
+  visibility?: PostVisibility;
   venueId?: string;
   assetId?: string;
   serviceId?: string;
   eventId?: string;
   reviewId?: string;
   stampId?: string;
+}
+
+// Matches @handle tokens in post/comment text — letters, digits, underscore,
+// same character set usernames are created with elsewhere in the app.
+const MENTION_PATTERN = /@([a-zA-Z0-9_]{2,32})/g;
+
+async function notifyMentions(
+  content: string,
+  actorId: string,
+  metadata: Record<string, unknown>,
+) {
+  const handles = [...content.matchAll(MENTION_PATTERN)].map((m) => m[1]);
+  if (handles.length === 0) return;
+
+  const uniqueHandles = [...new Set(handles.map((h) => h.toLowerCase()))];
+  const mentioned = await prisma.user.findMany({
+    where: {
+      username: { in: uniqueHandles, mode: "insensitive" },
+      id: { not: actorId },
+    },
+    select: { id: true },
+  });
+
+  await Promise.all(
+    mentioned.map((u) =>
+      NotificationService.create({
+        userId: u.id,
+        type: "feed:mention",
+        title: "You were mentioned in the Republic",
+        message: "Someone mentioned you in a post.",
+        metadata,
+      }).catch((err) =>
+        console.warn(
+          "[FeedService] Best-effort mention notification failed:",
+          err,
+        ),
+      ),
+    ),
+  );
 }
 
 export default class FeedService {
@@ -35,6 +81,7 @@ export default class FeedService {
       type,
       content,
       mediaUrls = [],
+      visibility,
       venueId,
       assetId,
       serviceId,
@@ -202,6 +249,7 @@ export default class FeedService {
       tab,
       content,
       mediaUrls,
+      visibility,
       venueId,
       assetId,
       serviceId,
@@ -209,6 +257,8 @@ export default class FeedService {
       reviewId,
       stampId,
     });
+
+    notifyMentions(content, user.userId, { postId: post.id }).catch(() => {});
 
     // 3. Award XP via PassportSvc (with daily anti-spam cap)
     try {
@@ -273,28 +323,96 @@ export default class FeedService {
     return FeedRepo.deletePost(postId);
   }
 
-  static async toggleLike(postId: string, user: AuthenticatedUser) {
-    const post = await FeedRepo.findPostById(postId);
+  static async editPost(
+    postId: string,
+    user: AuthenticatedUser,
+    input: {
+      content?: string;
+      mediaUrls?: string[];
+      visibility?: PostVisibility;
+    },
+  ) {
+    const post = await FeedRepo.findPostById(postId, user.userId);
+    if (!post) {
+      throw new Error("Post not found");
+    }
+    if (post.authorId !== user.userId) {
+      throw new Error("Unauthorized to edit this post");
+    }
+    if (input.content !== undefined && input.content.trim().length === 0) {
+      throw new Error("Post content cannot be empty");
+    }
+    return FeedRepo.updatePost(postId, {
+      ...(input.content !== undefined ? { content: input.content.trim() } : {}),
+      ...(input.mediaUrls !== undefined ? { mediaUrls: input.mediaUrls } : {}),
+      ...(input.visibility !== undefined
+        ? { visibility: input.visibility }
+        : {}),
+    });
+  }
+
+  // A repost is its own Post row pointing at the original via
+  // originalPostId — the reposter's caption is optional (Facebook allows an
+  // empty-caption share).
+  static async repost(
+    postId: string,
+    user: AuthenticatedUser,
+    caption: string,
+  ) {
+    const original = await FeedRepo.findPostById(postId, user.userId);
+    if (!original) {
+      throw new Error("Post not found");
+    }
+    if (original.originalPostId) {
+      throw new Error("Cannot repost a repost — share the original instead");
+    }
+
+    const post = await FeedRepo.createPost({
+      authorId: user.userId,
+      type: original.type,
+      tab: original.tab,
+      content: caption.trim(),
+      visibility: PostVisibility.public,
+      originalPostId: postId,
+    });
+
+    await FeedRepo.incrementShares(postId);
+
+    if (original.authorId !== user.userId) {
+      NotificationService.create({
+        userId: original.authorId,
+        type: "feed:repost",
+        title: "Your post was reposted",
+        message: `${user.email} reposted your post.`,
+        metadata: { postId, repostId: post.id, reposterId: user.userId },
+      }).catch(() => {});
+    }
+
+    return post;
+  }
+
+  static async setReaction(
+    postId: string,
+    user: AuthenticatedUser,
+    type: ReactionType | null,
+  ) {
+    const post = await FeedRepo.findPostById(postId, user.userId);
     if (!post) {
       throw new Error("Post not found");
     }
 
-    const result = await FeedRepo.toggleLike(postId, user.userId);
+    const result = await FeedRepo.setReaction(postId, user.userId, type);
 
-    // Send notification if newly liked and not by self
-    if (result.liked && post.authorId !== user.userId) {
+    if (type && !post.isLikedByMe && post.authorId !== user.userId) {
       NotificationService.create({
         userId: post.authorId,
         type: "feed:like",
-        title: "New Like on your Republic Post",
-        message: `${user.email} liked your post.`,
-        metadata: {
-          postId,
-          likerId: user.userId,
-        },
+        title: "New Reaction on your Republic Post",
+        message: `${user.email} reacted to your post.`,
+        metadata: { postId, reactorId: user.userId, reaction: type },
       }).catch((err) =>
         console.warn(
-          "[FeedService] Best-effort like notification failed:",
+          "[FeedService] Best-effort reaction notification failed:",
           err,
         ),
       );
@@ -303,20 +421,59 @@ export default class FeedService {
     return result;
   }
 
-  static async getComments(postId: string, limit?: number, cursor?: string) {
-    const post = await FeedRepo.findPostById(postId);
+  static async getReactionBreakdown(postId: string) {
+    return FeedRepo.getReactionBreakdown(postId);
+  }
+
+  static async toggleSave(postId: string, user: AuthenticatedUser) {
+    const post = await FeedRepo.findPostById(postId, user.userId);
     if (!post) {
       throw new Error("Post not found");
     }
-    return FeedRepo.findComments(postId, limit, cursor);
+    return FeedRepo.toggleSave(postId, user.userId);
+  }
+
+  static async getSavedPosts(
+    user: AuthenticatedUser,
+    limit?: number,
+    cursor?: string,
+  ) {
+    return FeedRepo.findSavedPosts(user.userId, limit, cursor);
+  }
+
+  static async hidePost(postId: string, user: AuthenticatedUser) {
+    const post = await FeedRepo.findPostById(postId, user.userId);
+    if (!post) {
+      throw new Error("Post not found");
+    }
+    return FeedRepo.hidePost(postId, user.userId);
+  }
+
+  static async searchMentionCandidates(query: string) {
+    if (!query || query.trim().length === 0) return [];
+    return FeedRepo.searchMentionCandidates(query.trim());
+  }
+
+  static async getComments(
+    postId: string,
+    limit?: number,
+    cursor?: string,
+    viewerId?: string,
+  ) {
+    const post = await FeedRepo.findPostById(postId, viewerId);
+    if (!post) {
+      throw new Error("Post not found");
+    }
+    return FeedRepo.findComments(postId, limit, cursor, viewerId);
   }
 
   static async addComment(
     postId: string,
     user: AuthenticatedUser,
     content: string,
+    parentId?: string,
   ) {
-    const post = await FeedRepo.findPostById(postId);
+    const post = await FeedRepo.findPostById(postId, user.userId);
     if (!post) {
       throw new Error("Post not found");
     }
@@ -326,7 +483,27 @@ export default class FeedService {
       throw new Error("Comment cannot be empty");
     }
 
-    const comment = await FeedRepo.createComment(postId, user.userId, trimmed);
+    if (parentId) {
+      const parent = await FeedRepo.findCommentById(parentId);
+      if (!parent || parent.postId !== postId) {
+        throw new Error("Parent comment not found");
+      }
+      if (parent.parentId) {
+        throw new Error("Cannot reply to a reply");
+      }
+    }
+
+    const comment = await FeedRepo.createComment(
+      postId,
+      user.userId,
+      trimmed,
+      parentId,
+    );
+
+    notifyMentions(trimmed, user.userId, {
+      postId,
+      commentId: comment.id,
+    }).catch(() => {});
 
     // Notify post author if not self
     if (post.authorId !== user.userId) {
@@ -370,5 +547,25 @@ export default class FeedService {
     }
 
     return FeedRepo.deleteComment(commentId);
+  }
+
+  static async toggleCommentLike(commentId: string, user: AuthenticatedUser) {
+    const comment = await FeedRepo.findCommentById(commentId);
+    if (!comment) {
+      throw new Error("Comment not found");
+    }
+    const result = await FeedRepo.toggleCommentLike(commentId, user.userId);
+
+    if (result.liked && comment.authorId !== user.userId) {
+      NotificationService.create({
+        userId: comment.authorId,
+        type: "feed:comment_like",
+        title: "New Like on your Comment",
+        message: `${user.email} liked your comment.`,
+        metadata: { commentId, likerId: user.userId },
+      }).catch(() => {});
+    }
+
+    return result;
   }
 }

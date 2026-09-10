@@ -16,43 +16,76 @@ enum FeedTab {
   partners
 }
 
+enum PostVisibility {
+  public
+  followers
+  only_me
+}
+
+enum ReactionType {
+  like
+  love
+  haha
+  wow
+  sad
+  angry
+}
+
+enum ReportTargetType {
+  post
+  user
+}
+
 model Post {
-  id            String         @id @default(uuid())
-  authorId      String
-  type          PostType
-  tab           FeedTab
-  content       String         @db.Text
-  mediaUrls     String[]       @default([])
+  id         String         @id @default(uuid())
+  authorId   String
+  type       PostType
+  tab        FeedTab
+  content    String         @db.Text
+  mediaUrls  String[]       @default([])
+  visibility PostVisibility @default(public)
 
   // Optional foreign keys to existing entities (validated based on type)
-  venueId       String?
-  assetId       String?
-  serviceId     String?
-  eventId       String?
-  reviewId      String?
-  stampId       String?
+  venueId   String?
+  assetId   String?
+  serviceId String?
+  eventId   String?
+  reviewId  String?
+  stampId   String?
 
   // Counters for performant indexing & sorting
-  likesCount    Int            @default(0)
-  commentsCount Int            @default(0)
-  sharesCount   Int            @default(0)
+  likesCount    Int @default(0)
+  commentsCount Int @default(0)
+  sharesCount   Int @default(0)
 
-  isPinned      Boolean        @default(false)
-  isArchived    Boolean        @default(false)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  isPinned   Boolean   @default(false)
+  isArchived Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  // Set once a post has been edited — null means never edited.
+  editedAt   DateTime?
+
+  // A repost is its own independent Post row, not a pointer-only wrapper —
+  // this just points back at the post it was reposted from (SetNull so
+  // deleting the original doesn't take the repost down with it).
+  originalPostId String?
 
   // Relations
-  author        User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  venue         Venue?         @relation(fields: [venueId], references: [id], onDelete: SetNull)
-  asset         Asset?         @relation(fields: [assetId], references: [id], onDelete: SetNull)
-  service       Service?       @relation(fields: [serviceId], references: [id], onDelete: SetNull)
-  event         Event?         @relation(fields: [eventId], references: [id], onDelete: SetNull)
-  review        Review?        @relation(fields: [reviewId], references: [id], onDelete: SetNull)
-  stamp         PassportStamp? @relation(fields: [stampId], references: [id], onDelete: SetNull)
+  author       User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  venue        Venue?         @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  asset        Asset?         @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  service      Service?       @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  event        Event?         @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  review       Review?        @relation(fields: [reviewId], references: [id], onDelete: SetNull)
+  stamp        PassportStamp? @relation(fields: [stampId], references: [id], onDelete: SetNull)
+  originalPost Post?          @relation("PostRepost", fields: [originalPostId], references: [id], onDelete: SetNull)
+  reposts      Post[]         @relation("PostRepost")
 
-  comments      PostComment[]
-  likes         PostLike[]
+  comments  PostComment[]
+  likes     PostLike[]
+  savedBy   SavedPost[]
+  hiddenFor HiddenPost[]
+  messages  Message[]
 
   @@index([tab, createdAt(sort: Desc)])
   @@index([authorId, createdAt(sort: Desc)])
@@ -61,28 +94,93 @@ model Post {
 }
 
 model PostComment {
-  id        String   @id @default(uuid())
-  postId    String
-  authorId  String
-  content   String   @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(uuid())
+  postId     String
+  authorId   String
+  content    String   @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  // One level of replies only, Facebook/Messenger-style — a reply's own
+  // parentId is always a top-level comment's id, never another reply's.
+  parentId   String?
+  likesCount Int      @default(0)
 
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  post    Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author  User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent  PostComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies PostComment[] @relation("CommentReplies")
+  likes   CommentLike[]
 
   @@index([postId, createdAt(sort: Asc)])
+  @@index([parentId])
   @@map("feed_post_comments")
 }
 
 model PostLike {
   postId    String
   userId    String
-  createdAt DateTime @default(now())
+  // One reaction per user per post — re-reacting with a different emoji
+  // replaces it (upsert on the composite key) rather than stacking.
+  type      ReactionType @default(like)
+  createdAt DateTime     @default(now())
 
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([postId, userId])
   @@map("feed_post_likes")
+}
+
+model CommentLike {
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  comment PostComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@map("feed_post_comment_likes")
+}
+
+model SavedPost {
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@map("feed_saved_posts")
+}
+
+model HiddenPost {
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@map("feed_hidden_posts")
+}
+
+// Polymorphic — targetId points at either a Post or a User depending on
+// targetType, so it deliberately has no foreign key of its own (only
+// reporterId does); the target isn't guaranteed to still exist.
+model Report {
+  id         String           @id @default(uuid())
+  reporterId String
+  targetType ReportTargetType
+  targetId   String
+  reason     String
+  details    String?
+  createdAt  DateTime         @default(now())
+
+  reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([targetType, targetId])
+  @@map("reports")
 }

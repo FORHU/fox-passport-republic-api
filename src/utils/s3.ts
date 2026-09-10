@@ -10,6 +10,8 @@ import {
   AWS_REGION,
   AWS_S3_BUCKET,
   CLOUD_FRONT_DOMAIN,
+  S3_ENDPOINT,
+  S3_FORCE_PATH_STYLE,
 } from "../config";
 
 const s3Client = new S3Client({
@@ -18,6 +20,8 @@ const s3Client = new S3Client({
     accessKeyId: AWS_ACCESS_KEY,
     secretAccessKey: AWS_SECRET_ACCESS_KEY,
   },
+  ...(S3_ENDPOINT && { endpoint: S3_ENDPOINT }),
+  ...(S3_FORCE_PATH_STYLE && { forcePathStyle: true }),
 });
 
 // ULTIMATE CHECKSUM KILLER:
@@ -85,6 +89,19 @@ export async function getGetObjectPresignedUrl(params: { key: string }) {
     const normalizedDomain = CLOUD_FRONT_DOMAIN.replace(/\/+$/, "");
     const normalizedKey = key.replace(/^\/+/, "");
     return `${normalizedDomain}/${normalizedKey}`;
+  }
+  // Local/dev against MinIO: this URL gets persisted permanently (into
+  // Post.mediaUrls, Message.attachmentUrls) rather than re-signed on every
+  // read, so a presigned link (1hr expiry) silently goes dead well before
+  // anyone looks at it again. The local bucket is set to public-read for
+  // exactly this reason — build a stable direct URL instead, which never
+  // expires and needs no signature.
+  if (S3_ENDPOINT) {
+    const normalizedEndpoint = S3_ENDPOINT.replace(/\/+$/, "");
+    const normalizedKey = key.replace(/^\/+/, "");
+    return S3_FORCE_PATH_STYLE
+      ? `${normalizedEndpoint}/${AWS_S3_BUCKET}/${normalizedKey}`
+      : `${normalizedEndpoint}/${normalizedKey}`;
   }
   const command = new GetObjectCommand({
     Bucket: AWS_S3_BUCKET,

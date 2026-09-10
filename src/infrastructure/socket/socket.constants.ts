@@ -45,6 +45,35 @@ export const SOCKET_EVENTS = {
    * refetch from.
    */
   NEW_MESSAGE: "new_message",
+  /**
+   * A message was deleted (by its sender) — carries just enough to remove it
+   * from a message list already held client-side, same reasoning as
+   * NEW_MESSAGE (no per-message REST fetch to refetch from).
+   */
+  MESSAGE_DELETED: "message_deleted",
+  /** A message's reaction list changed — carries the full up-to-date list
+   * for that message (small, at most one per participant). */
+  MESSAGE_REACTION: "message_reaction",
+  /** Someone is typing in a conversation right now — client-emitted
+   * ("typing", see socket.gateway.ts), relayed here to the other
+   * participant. Not persisted; purely transient. */
+  TYPING: "typing",
+  /** A user's online/offline status changed — scoped to their conversation
+   * partners only (see ConversationRepository.getPartnerIds), not broadcast
+   * to everyone connected. */
+  PRESENCE_UPDATE: "presence:update",
+  /** Sent only to the person just removed from a group by its creator —
+   * everyone else just gets the system-message notice + DATA_INVALIDATE,
+   * but the removed person needs their own open window closed client-side
+   * even though they can no longer poll that conversation for updates. */
+  GROUP_REMOVED: "group:removed",
+  /** A message's content changed — carries the full updated message, same
+   * reasoning as NEW_MESSAGE. */
+  MESSAGE_EDITED: "message_edited",
+  /** Someone read up to "now" in a conversation — carries just the reader
+   * and the new cursor, so a group's "Seen by ..." line can update live
+   * without a REST refetch (see ConversationRead). */
+  READ_RECEIPT: "read:receipt",
 } as const;
 
 export type SocketEvent = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];

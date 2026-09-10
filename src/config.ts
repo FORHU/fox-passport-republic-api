@@ -95,6 +95,11 @@ export const AWS_SECRET_ACCESS_KEY = process.env
   .AWS_SECRET_ACCESS_KEY as string;
 export const AWS_S3_BUCKET = process.env.AWS_S3_BUCKET as string;
 export const AWS_REGION = process.env.AWS_REGION as string;
+// Set to point the S3 client at an S3-compatible service (e.g. local MinIO)
+// instead of real AWS. MinIO needs forcePathStyle since it doesn't do
+// virtual-hosted-style bucket URLs by default.
+export const S3_ENDPOINT = process.env.S3_ENDPOINT as string | undefined;
+export const S3_FORCE_PATH_STYLE = process.env.S3_FORCE_PATH_STYLE === "true";
 export const CLOUD_FRONT_DOMAIN = process.env.CLOUD_FRONT_DOMAIN as
   string | undefined;
 

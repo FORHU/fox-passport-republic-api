@@ -2,7 +2,11 @@ import { Server, Socket } from "socket.io";
 import jwt from "jsonwebtoken";
 import { ACCESS_TOKEN_SECRET } from "../../config";
 import { redeemSocketTicket } from "../../modules/auth/socket-ticket.service";
-import { ADMIN_ROOM, userRoom } from "./socket.constants";
+import { ADMIN_ROOM, SOCKET_EVENTS, userRoom } from "./socket.constants";
+import { emitToUser } from "./socket.utils";
+import { markOnline, markOffline } from "./presence";
+import ConversationService from "../../modules/conversations/conversation.service";
+import { prisma } from "../../utils/prisma";
 import type { SystemRole } from "@prisma/client";
 import { can } from "../../types/permissions";
 
@@ -75,8 +79,63 @@ export const registerSocketGateway = (io: Server) => {
       socket.join(ADMIN_ROOM);
     }
 
+    if (socket.userId) {
+      const userId = socket.userId;
+      // Only the *first* concurrent socket for this user is a real
+      // online transition — a second tab/device connecting shouldn't
+      // re-announce someone who was already online.
+      if (markOnline(userId)) {
+        ConversationService.getPartnerIds(userId)
+          .then((partnerIds) => {
+            for (const partnerId of partnerIds) {
+              emitToUser(io, partnerId, SOCKET_EVENTS.PRESENCE_UPDATE, {
+                userId,
+                online: true,
+              });
+            }
+          })
+          .catch(() => {});
+      }
+
+      // Relayed straight through to the other participant — never
+      // persisted, purely a live "X is typing…" signal.
+      socket.on("typing", ({ conversationId }: { conversationId?: string }) => {
+        if (!conversationId) return;
+        ConversationService.getRecipientIds(conversationId, userId)
+          .then((recipientIds) => {
+            for (const recipientId of recipientIds) {
+              emitToUser(io, recipientId, SOCKET_EVENTS.TYPING, {
+                conversationId,
+                userId,
+              });
+            }
+          })
+          .catch(() => {});
+      });
+    }
+
     socket.on("disconnect", () => {
       console.log(`❌ Socket disconnected: ${socket.id}`);
+      if (socket.userId) {
+        const userId = socket.userId;
+        if (markOffline(userId)) {
+          const lastActiveAt = new Date();
+          prisma.user
+            .update({ where: { id: userId }, data: { lastActiveAt } })
+            .catch(() => {});
+          ConversationService.getPartnerIds(userId)
+            .then((partnerIds) => {
+              for (const partnerId of partnerIds) {
+                emitToUser(io, partnerId, SOCKET_EVENTS.PRESENCE_UPDATE, {
+                  userId,
+                  online: false,
+                  lastActiveAt: lastActiveAt.toISOString(),
+                });
+              }
+            })
+            .catch(() => {});
+        }
+      }
     });
   });
 };

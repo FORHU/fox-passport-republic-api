@@ -1,5 +1,34 @@
 import { prisma } from "../../utils/prisma";
-import { PostType, FeedTab, Prisma } from "@prisma/client";
+import {
+  PostType,
+  FeedTab,
+  Prisma,
+  PostVisibility,
+  ReactionType,
+} from "@prisma/client";
+
+const COMMENT_AUTHOR_SELECT = {
+  select: {
+    id: true,
+    name: true,
+    username: true,
+    imgId: true,
+    roleType: true,
+  },
+} as const;
+
+const REPOST_SELECT = {
+  select: {
+    id: true,
+    content: true,
+    mediaUrls: true,
+    type: true,
+    createdAt: true,
+    author: {
+      select: { id: true, name: true, username: true, imgId: true },
+    },
+  },
+} as const;
 
 const AUTHOR_SELECT = {
   select: {
@@ -160,22 +189,49 @@ export default class FeedRepo {
       mode = "recent",
     } = options;
 
-    const where: Prisma.PostWhereInput = {
-      isArchived: false,
-    };
+    // Fetched upfront (not just for this batch's authors) because it now
+    // also gates *which* posts are visible at all — a "followers"-visibility
+    // post from someone the viewer doesn't follow must never reach the
+    // query results, not just render differently once it does.
+    const followingIds: Set<string> = viewerId
+      ? await FeedRepo.getFollowingIds(viewerId)
+      : new Set();
 
-    if (tab) where.tab = tab;
-    if (type) where.type = type;
-    if (authorId) where.authorId = authorId;
+    const andClauses: Prisma.PostWhereInput[] = [{ isArchived: false }];
+    if (tab) andClauses.push({ tab });
+    if (type) andClauses.push({ type });
+    if (authorId) andClauses.push({ authorId });
 
     if (search && search.trim().length > 0) {
       const term = search.trim();
-      where.OR = [
-        { content: { contains: term, mode: "insensitive" } },
-        { author: { name: { contains: term, mode: "insensitive" } } },
-        { author: { username: { contains: term, mode: "insensitive" } } },
-      ];
+      andClauses.push({
+        OR: [
+          { content: { contains: term, mode: "insensitive" } },
+          { author: { name: { contains: term, mode: "insensitive" } } },
+          { author: { username: { contains: term, mode: "insensitive" } } },
+        ],
+      });
     }
+
+    const visibilityOr: Prisma.PostWhereInput[] = [
+      { visibility: PostVisibility.public },
+    ];
+    if (viewerId) {
+      visibilityOr.push({ authorId: viewerId });
+      if (followingIds.size > 0) {
+        visibilityOr.push({
+          visibility: PostVisibility.followers,
+          authorId: { in: [...followingIds] },
+        });
+      }
+    }
+    andClauses.push({ OR: visibilityOr });
+
+    if (viewerId) {
+      andClauses.push({ hiddenFor: { none: { userId: viewerId } } });
+    }
+
+    const where: Prisma.PostWhereInput = { AND: andClauses };
 
     const isTopMode = mode === "top";
     const take = isTopMode ? 500 : limit + 1; // candidate window for top mode
@@ -189,40 +245,26 @@ export default class FeedRepo {
       include: {
         author: AUTHOR_SELECT,
         ...ENTITY_INCLUDE,
+        originalPost: REPOST_SELECT,
         ...(viewerId
           ? {
               likes: {
                 where: { userId: viewerId },
-                select: { userId: true },
+                select: { userId: true, type: true },
               },
             }
           : {}),
       },
     });
 
-    // Fetched once here (regardless of mode) rather than per-post, so
-    // rendering N posts from M distinct authors costs one query instead of
-    // one follow-status lookup per author on the client. Scoped to this
-    // batch's authors (not the viewer's whole follow list) so the cost
-    // tracks page size, not how many people the viewer follows.
-    const authorIds = [...new Set(posts.map((p) => p.authorId))];
-    const followingIds =
-      viewerId && authorIds.length > 0
-        ? await prisma.follow
-            .findMany({
-              where: { followerId: viewerId, followingId: { in: authorIds } },
-              select: { followingId: true },
-            })
-            .then((rows) => new Set(rows.map((f) => f.followingId)))
-        : new Set<string>();
-
     let formatted = posts.map((p) => {
-      const isLikedByMe = viewerId ? (p.likes?.length ?? 0) > 0 : false;
+      const myReaction = viewerId ? p.likes?.[0] : undefined;
       const isFollowingAuthor = viewerId ? followingIds.has(p.authorId) : false;
       const { likes: _likes, ...rest } = p;
       return {
         ...rest,
-        isLikedByMe,
+        isLikedByMe: !!myReaction,
+        myReaction: myReaction?.type ?? null,
         isFollowingAuthor,
       };
     });
@@ -287,17 +329,49 @@ export default class FeedRepo {
     };
   }
 
+  static async getFollowingIds(userId: string): Promise<Set<string>> {
+    const rows = await prisma.follow.findMany({
+      where: { followerId: userId, status: "accepted" },
+      select: { followingId: true },
+    });
+    return new Set(rows.map((f) => f.followingId));
+  }
+
+  // Whether `viewerId` is allowed to see `post` at all — same gate as the
+  // list query's visibility OR, applied to a single already-fetched post
+  // (getPostById fetches by id directly, so it can't filter in the WHERE
+  // the way the list query does).
+  static async canView(
+    post: { authorId: string; visibility: PostVisibility },
+    viewerId?: string,
+  ): Promise<boolean> {
+    if (post.visibility === PostVisibility.public) return true;
+    if (!viewerId) return false;
+    if (post.authorId === viewerId) return true;
+    if (post.visibility === PostVisibility.only_me) return false;
+    const isFollowing = await prisma.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId: viewerId,
+          followingId: post.authorId,
+        },
+      },
+    });
+    return isFollowing?.status === "accepted";
+  }
+
   static async findPostById(id: string, viewerId?: string) {
     const post = await prisma.post.findUnique({
       where: { id },
       include: {
         author: AUTHOR_SELECT,
         ...ENTITY_INCLUDE,
+        originalPost: REPOST_SELECT,
         ...(viewerId
           ? {
               likes: {
                 where: { userId: viewerId },
-                select: { userId: true },
+                select: { userId: true, type: true },
               },
             }
           : {}),
@@ -305,8 +379,9 @@ export default class FeedRepo {
     });
 
     if (!post) return null;
+    if (!(await FeedRepo.canView(post, viewerId))) return null;
 
-    const isLikedByMe = viewerId ? (post.likes?.length ?? 0) > 0 : false;
+    const myReaction = viewerId ? post.likes?.[0] : undefined;
     const isFollowingAuthor = viewerId
       ? await prisma.follow
           .findUnique({
@@ -322,7 +397,8 @@ export default class FeedRepo {
     const { likes: _likes, ...rest } = post;
     return {
       ...rest,
-      isLikedByMe,
+      isLikedByMe: !!myReaction,
+      myReaction: myReaction?.type ?? null,
       isFollowingAuthor,
     };
   }
@@ -333,12 +409,14 @@ export default class FeedRepo {
     tab: FeedTab;
     content: string;
     mediaUrls?: string[];
+    visibility?: PostVisibility;
     venueId?: string | null;
     assetId?: string | null;
     serviceId?: string | null;
     eventId?: string | null;
     reviewId?: string | null;
     stampId?: string | null;
+    originalPostId?: string | null;
   }) {
     return prisma.post.create({
       data: {
@@ -347,17 +425,46 @@ export default class FeedRepo {
         tab: data.tab,
         content: data.content,
         mediaUrls: data.mediaUrls || [],
+        visibility: data.visibility || PostVisibility.public,
         venueId: data.venueId || null,
         assetId: data.assetId || null,
         serviceId: data.serviceId || null,
         eventId: data.eventId || null,
         reviewId: data.reviewId || null,
         stampId: data.stampId || null,
+        originalPostId: data.originalPostId || null,
       },
       include: {
         author: AUTHOR_SELECT,
         ...ENTITY_INCLUDE,
+        originalPost: REPOST_SELECT,
       },
+    });
+  }
+
+  static async updatePost(
+    id: string,
+    data: {
+      content?: string;
+      mediaUrls?: string[];
+      visibility?: PostVisibility;
+    },
+  ) {
+    return prisma.post.update({
+      where: { id },
+      data: { ...data, editedAt: new Date() },
+      include: {
+        author: AUTHOR_SELECT,
+        ...ENTITY_INCLUDE,
+        originalPost: REPOST_SELECT,
+      },
+    });
+  }
+
+  static async incrementShares(id: string) {
+    return prisma.post.update({
+      where: { id },
+      data: { sharesCount: { increment: 1 } },
     });
   }
 
@@ -383,84 +490,171 @@ export default class FeedRepo {
     return prisma.post.count({ where: { authorId } });
   }
 
-  static async toggleLike(postId: string, userId: string) {
+  // `type: null` removes the reaction entirely; otherwise sets/replaces it
+  // — one reaction per user per post, so re-reacting with a different emoji
+  // swaps the row instead of stacking, matching Facebook's reaction model.
+  static async setReaction(
+    postId: string,
+    userId: string,
+    type: ReactionType | null,
+  ) {
     return prisma.$transaction(async (tx) => {
       const existing = await tx.postLike.findUnique({
-        where: {
-          postId_userId: { postId, userId },
-        },
+        where: { postId_userId: { postId, userId } },
       });
 
-      if (existing) {
+      if (!type) {
+        if (!existing) {
+          const post = await tx.post.findUniqueOrThrow({
+            where: { id: postId },
+            select: { likesCount: true },
+          });
+          return { reaction: null, likesCount: post.likesCount };
+        }
         await tx.postLike.delete({
-          where: {
-            postId_userId: { postId, userId },
-          },
+          where: { postId_userId: { postId, userId } },
         });
         const updated = await tx.post.update({
           where: { id: postId },
           data: { likesCount: { decrement: 1 } },
           select: { likesCount: true },
         });
-        return { liked: false, likesCount: Math.max(0, updated.likesCount) };
-      } else {
-        await tx.postLike.create({
-          data: { postId, userId },
+        return { reaction: null, likesCount: Math.max(0, updated.likesCount) };
+      }
+
+      if (existing) {
+        await tx.postLike.update({
+          where: { postId_userId: { postId, userId } },
+          data: { type },
         });
-        const updated = await tx.post.update({
+        const post = await tx.post.findUniqueOrThrow({
           where: { id: postId },
-          data: { likesCount: { increment: 1 } },
           select: { likesCount: true },
         });
-        return { liked: true, likesCount: updated.likesCount };
+        return { reaction: type, likesCount: post.likesCount };
       }
+
+      await tx.postLike.create({ data: { postId, userId, type } });
+      const updated = await tx.post.update({
+        where: { id: postId },
+        data: { likesCount: { increment: 1 } },
+        select: { likesCount: true },
+      });
+      return { reaction: type, likesCount: updated.likesCount };
     });
   }
 
-  static async findComments(postId: string, limit = 50, cursor?: string) {
-    return prisma.postComment.findMany({
+  static async getReactionBreakdown(postId: string) {
+    const rows = await prisma.postLike.groupBy({
+      by: ["type"],
       where: { postId },
+      _count: { type: true },
+    });
+    return rows.map((r) => ({ type: r.type, count: r._count.type }));
+  }
+
+  static async toggleSave(postId: string, userId: string) {
+    const existing = await prisma.savedPost.findUnique({
+      where: { postId_userId: { postId, userId } },
+    });
+    if (existing) {
+      await prisma.savedPost.delete({
+        where: { postId_userId: { postId, userId } },
+      });
+      return { saved: false };
+    }
+    await prisma.savedPost.create({ data: { postId, userId } });
+    return { saved: true };
+  }
+
+  static async findSavedPosts(userId: string, limit = 20, cursor?: string) {
+    const saved = await prisma.savedPost.findMany({
+      where: { userId },
+      take: limit,
+      skip: cursor ? 1 : 0,
+      cursor: cursor
+        ? { postId_userId: { postId: cursor, userId } }
+        : undefined,
+      orderBy: { createdAt: "desc" },
+      include: {
+        post: {
+          include: {
+            author: AUTHOR_SELECT,
+            ...ENTITY_INCLUDE,
+            originalPost: REPOST_SELECT,
+          },
+        },
+      },
+    });
+    return saved.map((s) => s.post);
+  }
+
+  static async hidePost(postId: string, userId: string) {
+    await prisma.hiddenPost.upsert({
+      where: { postId_userId: { postId, userId } },
+      create: { postId, userId },
+      update: {},
+    });
+  }
+
+  static async findComments(
+    postId: string,
+    limit = 50,
+    cursor?: string,
+    viewerId?: string,
+  ) {
+    const comments = await prisma.postComment.findMany({
+      // Top-level only — replies come nested below, one level, same as
+      // Facebook/Messenger rather than a full arbitrary-depth thread.
+      where: { postId, parentId: null },
       take: limit,
       skip: cursor ? 1 : 0,
       cursor: cursor ? { id: cursor } : undefined,
       orderBy: { createdAt: "asc" },
       include: {
-        author: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
-            imgId: true,
-            roleType: true,
+        author: COMMENT_AUTHOR_SELECT,
+        replies: {
+          orderBy: { createdAt: "asc" },
+          include: {
+            author: COMMENT_AUTHOR_SELECT,
+            ...(viewerId
+              ? {
+                  likes: {
+                    where: { userId: viewerId },
+                    select: { userId: true },
+                  },
+                }
+              : {}),
           },
         },
+        ...(viewerId
+          ? { likes: { where: { userId: viewerId }, select: { userId: true } } }
+          : {}),
       },
     });
+
+    const withLikeFlag = (c: any) => {
+      const isLikedByMe = viewerId ? (c.likes?.length ?? 0) > 0 : false;
+      const { likes: _likes, ...rest } = c;
+      return { ...rest, isLikedByMe };
+    };
+
+    return comments.map((c: any) => ({
+      ...withLikeFlag(c),
+      replies: c.replies.map(withLikeFlag),
+    }));
   }
 
   static async createComment(
     postId: string,
     authorId: string,
     content: string,
+    parentId?: string,
   ) {
     return prisma.$transaction(async (tx) => {
       const comment = await tx.postComment.create({
-        data: {
-          postId,
-          authorId,
-          content,
-        },
-        include: {
-          author: {
-            select: {
-              id: true,
-              name: true,
-              username: true,
-              imgId: true,
-              roleType: true,
-            },
-          },
-        },
+        data: { postId, authorId, content, parentId },
+        include: { author: COMMENT_AUTHOR_SELECT },
       });
 
       await tx.post.update({
@@ -480,16 +674,64 @@ export default class FeedRepo {
 
   static async deleteComment(id: string) {
     return prisma.$transaction(async (tx) => {
+      // A top-level comment's replies cascade at the DB level (onDelete:
+      // Cascade on parentId), but commentsCount is a manual counter, so
+      // deleting a parent must also account for however many replies just
+      // went with it.
+      const replyCount = await tx.postComment.count({
+        where: { parentId: id },
+      });
       const comment = await tx.postComment.delete({
         where: { id },
       });
 
       await tx.post.update({
         where: { id: comment.postId },
-        data: { commentsCount: { decrement: 1 } },
+        data: { commentsCount: { decrement: 1 + replyCount } },
       });
 
       return comment;
+    });
+  }
+
+  static async toggleCommentLike(commentId: string, userId: string) {
+    const existing = await prisma.commentLike.findUnique({
+      where: { commentId_userId: { commentId, userId } },
+    });
+    return prisma.$transaction(async (tx) => {
+      if (existing) {
+        await tx.commentLike.delete({
+          where: { commentId_userId: { commentId, userId } },
+        });
+        const updated = await tx.postComment.update({
+          where: { id: commentId },
+          data: { likesCount: { decrement: 1 } },
+          select: { likesCount: true },
+        });
+        return { liked: false, likesCount: Math.max(0, updated.likesCount) };
+      }
+      await tx.commentLike.create({ data: { commentId, userId } });
+      const updated = await tx.postComment.update({
+        where: { id: commentId },
+        data: { likesCount: { increment: 1 } },
+        select: { likesCount: true },
+      });
+      return { liked: true, likesCount: updated.likesCount };
+    });
+  }
+
+  // @mention autocomplete — plain prefix match on name/username, capped
+  // small since this backs a live-typing dropdown, not a search page.
+  static async searchMentionCandidates(query: string, limit = 8) {
+    return prisma.user.findMany({
+      where: {
+        OR: [
+          { name: { startsWith: query, mode: "insensitive" } },
+          { username: { startsWith: query, mode: "insensitive" } },
+        ],
+      },
+      select: { id: true, name: true, username: true, imgId: true },
+      take: limit,
     });
   }
 }
