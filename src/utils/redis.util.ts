@@ -30,8 +30,45 @@ function redisConfig() {
   };
 }
 
+/**
+ * How long to wait before the next connection attempt, or `false` to stop.
+ *
+ * Two situations wear this one callback, and nothing inside it distinguishes
+ * them but `everConnected`: a socket that has never opened and a socket that
+ * has closed look identical from here.
+ *
+ * **Before the first success**, giving up is what produces the clean no-Redis
+ * state - `connect()` rejects, `initialize` nulls the client, and `getClient()`
+ * returns null from then on, which every caller already short-circuits on. A
+ * misconfigured port should not retry for the life of the process.
+ *
+ * **After a success**, Redis has been there once, so a closed socket is an
+ * outage rather than a mistake and is worth waiting out. Giving up here was a
+ * bug: `initialize` only nulls the client when the *initial* connect throws, so
+ * a reconnect that gave up left `getClient()` handing out a closed client for
+ * the life of the process - no caching and per-process rate limits, announced
+ * once and never again. Found on 10 Sep by stopping Redis under a running API:
+ * it never came back until the API was restarted. See `REDIS-PLAN.md` §3.
+ *
+ * Exported for the test, and pure so that the test does not need a socket.
+ */
+export function reconnectDelay(
+  retries: number,
+  everConnected: boolean,
+): number | false {
+  if (!everConnected && retries > 3) return false;
+  return Math.min(retries * 200, 2000);
+}
+
 class RedisUtil {
   private client: ReturnType<typeof createClient> | null = null;
+
+  /**
+   * Whether a connection has ever succeeded on this client. The reconnect
+   * strategy behaves differently either side of that line - see
+   * `reconnectDelay`.
+   */
+  private everConnected = false;
 
   async initialize() {
     // Named before the attempt so both outcomes can say where it was dialling.
@@ -47,14 +84,26 @@ class RedisUtil {
           host,
           port,
           reconnectStrategy: (retries) => {
-            if (retries > 3) {
+            const delay = reconnectDelay(retries, this.everConnected);
+            if (delay === false) {
               console.warn("⚠️ Redis max retries reached. Giving up.");
-              return false;
             }
-            return Math.min(retries * 200, 2000);
+            return delay;
           },
         },
         password,
+        /**
+         * Fail commands immediately while the socket is down instead of
+         * queueing them for a reconnect that may be minutes away.
+         *
+         * This is what makes retrying forever safe. Every caller here is
+         * fail-soft on the assumption that a Redis command fails *fast* - a
+         * cached read falls through to Postgres, the limiter falls back to
+         * memory. With the default queue those calls would instead wait for the
+         * reconnect, turning a Redis outage into a slow API, which is a worse
+         * failure than the one this file exists to prevent.
+         */
+        disableOfflineQueue: true,
       });
 
       this.client.on("error", (err) => {
@@ -63,7 +112,17 @@ class RedisUtil {
         }
       });
 
+      // The recovery deserves a line of its own. Every degradation warning in
+      // this codebase is latched to fire once, so without this nothing ever
+      // says the cache came back.
+      this.client.on("ready", () => {
+        if (this.everConnected) {
+          console.log(`✅ Redis reconnected (${target}) - caching resumed`);
+        }
+      });
+
       await this.client.connect();
+      this.everConnected = true;
       console.log(`✅ Redis connected successfully (${target})`);
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
