@@ -36,6 +36,8 @@ export default class FileCtrl {
         message: "File uploaded and registered successfully",
         fileId: dbFile.id,
         key: key,
+        url: url,
+        file: { url },
       });
     } catch (e: unknown) {
       const error = e as Error;

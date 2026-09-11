@@ -13,8 +13,17 @@ import { fingerprint } from "../../utils/cache.util";
  * profile pulls a passport, badges, stamps, listings and posts.
  */
 const USER_TTL = 120;
+import { isOnline } from "../../infrastructure/socket/presence";
 
 export default class UsersSvc {
+  static async getPresence(userId: string) {
+    const online = isOnline(userId);
+    const lastActiveAt = online
+      ? null
+      : await UsersRepo.getLastActiveAt(userId);
+    return { online, lastActiveAt };
+  }
+
   // GET ALL USERS (optionally filtered by roleType, paginated, optionally searched)
   static async getAllUsers(
     roleTypes?: string[],
