@@ -61,6 +61,18 @@ model User {
   isPrivate                Boolean                   @default(false)
   blockedUsers             Block[]                   @relation("Blocker")
   blockedByUsers           Block[]                   @relation("Blocked")
+  // Last time this user's socket fully disconnected — used to render
+  // "Active {time} ago" once they're offline (see socket.gateway.ts).
+  lastActiveAt             DateTime?
+  commentLikes             CommentLike[]
+  savedPosts               SavedPost[]
+  hiddenPosts              HiddenPost[]
+  postMediaTags            PostMediaTag[]
+  reportsFiled             Report[]
+  groupConversations       ConversationParticipant[]
+  messageReactions         MessageReaction[]
+  conversationReads        ConversationRead[]
+  conversationSettings     ConversationSettings[]
 
   @@map("users")
 }
@@ -98,7 +110,6 @@ model FoxerSpecialization {
 
   @@unique([userId, roleType, category])
   @@index([roleType, category])
-
   @@map("foxer_specializations")
 }
 
@@ -250,7 +261,6 @@ model RefreshToken {
 
   @@index([userId])
   @@index([expiresAt])
-
   @@map("refresh_tokens")
 }
 
@@ -269,13 +279,12 @@ model Follow {
   followerId  String
   followingId String
   status      FollowStatus @default(accepted)
-  createdAt   DateTime @default(now())
-  follower    User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
-  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime     @default(now())
+  follower    User         @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User         @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
 
   @@id([followerId, followingId])
   @@index([followingId, status])
-
   @@map("follows")
 }
 
@@ -288,6 +297,5 @@ model Block {
 
   @@id([blockerId, blockedId])
   @@index([blockedId])
-
   @@map("blocks")
 }

@@ -2,36 +2,175 @@
 // Arrived from main with the conversations module; kept together here rather
 // than in platform.prisma because it is a domain, not a cross-cutting concern.
 
+enum ConversationStatus {
+  pending
+  accepted
+}
+
 // One thread per unique pair of users (userAId < userBId, enforced by the
 // service layer) rather than per-booking, so the same two people reuse one
 // conversation across multiple bookings/matches instead of accumulating
 // duplicate threads.
+//
+// Anyone can message anyone — there's no more "must have an active
+// booking/event" gate on *creating* a thread. `initiatorId` (who started it)
+// and `status` together model a request: a thread between two people with
+// no existing booking/match relationship starts `pending` and sits in the
+// recipient's message requests until they reply (which auto-accepts it, see
+// ConversationService.sendMessage) or explicitly accepts/declines it. A
+// thread between people who already have a real relationship (or that
+// already exists) starts `accepted` outright, same as before.
 model Conversation {
-  id            String    @id @default(uuid())
-  userAId       String
-  userBId       String
+  id            String                    @id @default(uuid())
+  // Nullable so a group thread (isGroup=true) can leave these unset and
+  // rely on `participants` instead — every existing 1:1 thread keeps using
+  // the pair columns unchanged, so no migration of prior rows is needed.
+  userAId       String?
+  userBId       String?
+  isGroup       Boolean                   @default(false)
+  // Only meaningful when isGroup — a 1:1 thread's "name" is just the other
+  // participant, resolved client-side from userA/userB instead.
+  name          String?
+  // Group photo — a CloudFront URL, same convention as User.imgId, not a
+  // raw S3 key. Null shows the generic group icon client-side.
+  imgId         String?
+  initiatorId   String
+  status        ConversationStatus        @default(accepted)
   contextType   String?
   contextId     String?
   contextLabel  String?
   lastMessageAt DateTime?
-  createdAt     DateTime  @default(now())
-  userA         User      @relation("ConversationUserA", fields: [userAId], references: [id], onDelete: Cascade)
-  userB         User      @relation("ConversationUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  createdAt     DateTime                  @default(now())
+  // "Delete Chat" is per-user, Messenger-style: it drops the thread from
+  // that side's list without touching the other person's view or the
+  // message history itself, and clears back to false the next time either
+  // side sends a message (see ConversationService.sendMessage) — so it
+  // resurfaces exactly the way a real chat app reintroduces a re-activated
+  // thread instead of staying hidden forever. Only meaningful for 1:1
+  // threads — group membership (leaving) is tracked via `participants`.
+  hiddenForA    Boolean                   @default(false)
+  hiddenForB    Boolean                   @default(false)
+  userA         User?                     @relation("ConversationUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB         User?                     @relation("ConversationUserB", fields: [userBId], references: [id], onDelete: Cascade)
   messages      Message[]
+  participants  ConversationParticipant[]
+  reads         ConversationRead[]
+  settings      ConversationSettings[]
 
   @@unique([userAId, userBId])
+  @@index([userBId, status])
+  @@index([userAId, status])
   @@map("conversations")
 }
 
+// Group-thread membership. A 1:1 Conversation has no rows here — it uses
+// userAId/userBId instead — so this only ever gets read/written for
+// isGroup=true threads.
+model ConversationParticipant {
+  conversationId String
+  userId         String
+  joinedAt       DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+// A read *cursor*, not a per-message row — one per (conversation, user),
+// bumped to now() on markRead. Cheap regardless of history length, and
+// enough to answer "has this participant seen message X yet?" by comparing
+// `lastReadAt` against that message's `createdAt`, which is what a group's
+// "Seen by ..." line needs. The existing single-timestamp `Message.readAt`
+// stays as-is for the unambiguous 1:1 case.
+model ConversationRead {
+  conversationId String
+  userId         String
+  lastReadAt     DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@map("conversation_reads")
+}
+
+// Per-viewer preferences on a shared thread — muting/pinning is personal,
+// so this is deliberately keyed like ConversationRead rather than living
+// as a column on Conversation itself (which every participant shares).
+// A missing row means "not muted, not pinned" (the defaults below).
+model ConversationSettings {
+  conversationId String
+  userId         String
+  muted          Boolean   @default(false)
+  // Null = not pinned. Set to now() on pin so multiple pinned threads keep
+  // sorting most-recently-pinned-first, same as most chat apps.
+  pinnedAt       DateTime?
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@map("conversation_settings")
+}
+
+// `system` messages are group-membership events ("X left the group", "X
+// added Y") — auto-generated by the service layer, never sent by a user
+// directly, and rendered as a centered notice instead of a bubble.
+enum MessageType {
+  text
+  system
+}
+
 model Message {
-  id             String       @id @default(uuid())
+  id             String            @id @default(uuid())
   conversationId String
   senderId       String
   content        String
+  type           MessageType       @default(text)
+  // Set when this message is a shared feed post rather than (or alongside)
+  // free text — SetNull instead of Cascade so a deleted post doesn't take
+  // the message thread's history down with it.
+  sharedPostId   String?
+  // Uploaded image/file URLs attached to this message — same shape as
+  // Post.mediaUrls, so a message can be pure text, pure attachments, or both.
+  attachmentUrls String[]          @default([])
+  // The message this one is replying to, Messenger-style — SetNull so
+  // deleting the original (see deleteMessage) leaves the reply standing
+  // with just its quoted snippet gone, rather than cascading the delete.
+  replyToId      String?
+  // Set by ForwardMessageModal — a fresh, independent message in the
+  // recipient's thread (not a pointer back to the original), so this is
+  // just a label flag with no relation to unwind if the original is later
+  // deleted.
+  isForwarded    Boolean           @default(false)
   readAt         DateTime?
-  createdAt      DateTime     @default(now())
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  createdAt      DateTime          @default(now())
+  // Set on edit — null means never edited. Editing is content-only; a
+  // message that started with attachments/a shared post keeps them.
+  editedAt       DateTime?
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  sharedPost     Post?             @relation(fields: [sharedPostId], references: [id], onDelete: SetNull)
+  replyTo        Message?          @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies        Message[]         @relation("MessageReplies")
+  reactions      MessageReaction[]
 
   @@map("messages")
+}
+
+// One reaction per user per message — reacting again with a different
+// emoji replaces it (upsert on the composite key) rather than stacking.
+model MessageReaction {
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@map("message_reactions")
 }

@@ -1,8 +1,17 @@
 import UsersRepo from "./users.repository";
 import { RoleType, SystemRole } from "@prisma/client";
 import { hashPassword } from "../../utils/password";
+import { isOnline } from "../../infrastructure/socket/presence";
 
 export default class UsersSvc {
+  static async getPresence(userId: string) {
+    const online = isOnline(userId);
+    const lastActiveAt = online
+      ? null
+      : await UsersRepo.getLastActiveAt(userId);
+    return { online, lastActiveAt };
+  }
+
   // GET ALL USERS (optionally filtered by roleType, paginated, optionally searched)
   static async getAllUsers(
     roleTypes?: string[],

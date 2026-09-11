@@ -360,6 +360,14 @@ export default class UsersRepo {
    * Adding a field here should be a deliberate decision, which is what an
    * allow-list forces.
    */
+  static async getLastActiveAt(id: string) {
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { lastActiveAt: true },
+    });
+    return user?.lastActiveAt ?? null;
+  }
+
   static async findUserById(id: string) {
     return prisma.user.findUnique({
       where: { id: String(id) },

@@ -113,6 +113,18 @@ export default class UsersCtrl {
     }
   }
 
+  // READ PRESENCE — initial online/last-seen snapshot; live updates arrive
+  // over the socket (see socket.gateway.ts PRESENCE_UPDATE).
+  static async getPresence(req: Request, res: Response) {
+    try {
+      const presence = await UsersSvc.getPresence(req.params.id);
+      return res.status(200).json({ success: true, data: presence });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res.status(400).json({ success: false, message: err.message });
+    }
+  }
+
   // READ ONE
   static async getUserById(req: Request, res: Response) {
     try {
