@@ -11,6 +11,13 @@ import NotificationService from "../notifications/user-notification.service";
 import { prisma } from "../../utils/prisma";
 import { AuthenticatedUser } from "../../types/auth";
 
+export interface MediaTagInput {
+  mediaUrl: string;
+  userId: string;
+  x: number;
+  y: number;
+}
+
 export interface CreatePostInput {
   type: PostType;
   content: string;
@@ -22,6 +29,7 @@ export interface CreatePostInput {
   eventId?: string;
   reviewId?: string;
   stampId?: string;
+  mediaTags?: MediaTagInput[];
 }
 
 // Matches @handle tokens in post/comment text — letters, digits, underscore,
@@ -63,6 +71,59 @@ async function notifyMentions(
   );
 }
 
+// Every tagged mediaUrl must belong to the post's own media, and every
+// tagged userId must be a real user — checked up front so a bad tag never
+// gets written and the post create doesn't partially succeed.
+async function validateMediaTags(
+  mediaTags: MediaTagInput[],
+  postMediaUrls: string[],
+) {
+  for (const tag of mediaTags) {
+    if (!postMediaUrls.includes(tag.mediaUrl)) {
+      throw new Error(
+        `Media tag references a mediaUrl that isn't part of this post: ${tag.mediaUrl}`,
+      );
+    }
+  }
+
+  const userIds = [...new Set(mediaTags.map((t) => t.userId))];
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true },
+  });
+  if (users.length !== userIds.length) {
+    throw new Error("One or more tagged users could not be found");
+  }
+}
+
+async function notifyMediaTags(
+  mediaTags: { userId: string }[],
+  actorId: string,
+  postId: string,
+) {
+  const uniqueUserIds = [...new Set(mediaTags.map((t) => t.userId))].filter(
+    (id) => id !== actorId,
+  );
+  if (uniqueUserIds.length === 0) return;
+
+  await Promise.all(
+    uniqueUserIds.map((userId) =>
+      NotificationService.create({
+        userId,
+        type: "feed:media_tag",
+        title: "You were tagged in a photo",
+        message: "Someone tagged you in a photo on the Republic feed.",
+        metadata: { postId },
+      }).catch((err) =>
+        console.warn(
+          "[FeedService] Best-effort media tag notification failed:",
+          err,
+        ),
+      ),
+    ),
+  );
+}
+
 export default class FeedService {
   static async getFeed(options: QueryFeedOptions) {
     return FeedRepo.findPosts(options);
@@ -88,7 +149,12 @@ export default class FeedService {
       eventId,
       reviewId,
       stampId,
+      mediaTags,
     } = input;
+
+    if (mediaTags && mediaTags.length > 0) {
+      await validateMediaTags(mediaTags, mediaUrls);
+    }
 
     let tab: FeedTab = FeedTab.community;
 
@@ -256,9 +322,13 @@ export default class FeedService {
       eventId,
       reviewId,
       stampId,
+      mediaTags,
     });
 
     notifyMentions(content, user.userId, { postId: post.id }).catch(() => {});
+    if (mediaTags && mediaTags.length > 0) {
+      notifyMediaTags(mediaTags, user.userId, post.id).catch(() => {});
+    }
 
     // 3. Award XP via PassportSvc (with daily anti-spam cap)
     try {
@@ -567,5 +637,65 @@ export default class FeedService {
     }
 
     return result;
+  }
+
+  static async addMediaTag(
+    postId: string,
+    user: AuthenticatedUser,
+    input: MediaTagInput,
+  ) {
+    const post = await FeedRepo.findPostById(postId, user.userId);
+    if (!post) {
+      throw new Error("Post not found");
+    }
+    if (post.authorId !== user.userId) {
+      throw new Error("Unauthorized: only the post author can tag people");
+    }
+
+    await validateMediaTags([input], post.mediaUrls);
+
+    const tag = await FeedRepo.createMediaTag(postId, input);
+
+    if (input.userId !== user.userId) {
+      NotificationService.create({
+        userId: input.userId,
+        type: "feed:media_tag",
+        title: "You were tagged in a photo",
+        message: `${user.email} tagged you in a photo on the Republic feed.`,
+        metadata: { postId, tagId: tag.id, taggerId: user.userId },
+      }).catch((err) =>
+        console.warn(
+          "[FeedService] Best-effort media tag notification failed:",
+          err,
+        ),
+      );
+    }
+
+    return tag;
+  }
+
+  static async deleteMediaTag(
+    postId: string,
+    tagId: string,
+    user: AuthenticatedUser,
+  ) {
+    const tag = await FeedRepo.findMediaTagById(tagId);
+    if (!tag || tag.postId !== postId) {
+      throw new Error("Media tag not found");
+    }
+
+    const post = await FeedRepo.findPostById(postId);
+    const canDelete =
+      tag.userId === user.userId ||
+      (post && post.authorId === user.userId) ||
+      user.systemRole === "admin" ||
+      user.systemRole === "admin_secretary";
+
+    if (!canDelete) {
+      throw new Error("Unauthorized to remove this tag");
+    }
+
+    await FeedRepo.deleteMediaTag(tagId);
+    return { success: true };
   }
 }

@@ -67,6 +67,7 @@ model User {
   commentLikes             CommentLike[]
   savedPosts               SavedPost[]
   hiddenPosts              HiddenPost[]
+  postMediaTags            PostMediaTag[]
   reportsFiled             Report[]
   groupConversations       ConversationParticipant[]
   messageReactions         MessageReaction[]

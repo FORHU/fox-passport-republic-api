@@ -77,6 +77,17 @@ export default class FeedController {
       eventId: Joi.string().optional().allow(null),
       reviewId: Joi.string().optional().allow(null),
       stampId: Joi.string().optional().allow(null),
+      mediaTags: Joi.array()
+        .items(
+          Joi.object({
+            mediaUrl: Joi.string().uri().required(),
+            userId: Joi.string().required(),
+            x: Joi.number().min(0).max(100).required(),
+            y: Joi.number().min(0).max(100).required(),
+          }),
+        )
+        .max(50)
+        .optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -308,6 +319,42 @@ export default class FeedController {
     try {
       const { commentId } = req.params;
       const result = await FeedService.toggleCommentLike(commentId, req.user!);
+      return res.status(200).json({ success: true, data: result });
+    } catch (e: unknown) {
+      const error = e as Error;
+      return res
+        .status(statusForError(error.message))
+        .json({ success: false, message: error.message });
+    }
+  }
+
+  static async addMediaTag(req: Request, res: Response) {
+    const schema = Joi.object({
+      mediaUrl: Joi.string().uri().required(),
+      userId: Joi.string().required(),
+      x: Joi.number().min(0).max(100).required(),
+      y: Joi.number().min(0).max(100).required(),
+    });
+    const { error, value } = schema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    try {
+      const { id } = req.params;
+      const tag = await FeedService.addMediaTag(id, req.user!, value);
+      return res.status(201).json({ success: true, data: tag });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res
+        .status(statusForError(err.message))
+        .json({ success: false, message: err.message });
+    }
+  }
+
+  static async deleteMediaTag(req: Request, res: Response) {
+    try {
+      const { id, tagId } = req.params;
+      const result = await FeedService.deleteMediaTag(id, tagId, req.user!);
       return res.status(200).json({ success: true, data: result });
     } catch (e: unknown) {
       const error = e as Error;

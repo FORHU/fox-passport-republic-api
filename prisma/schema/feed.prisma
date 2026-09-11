@@ -86,11 +86,33 @@ model Post {
   savedBy   SavedPost[]
   hiddenFor HiddenPost[]
   messages  Message[]
+  mediaTags PostMediaTag[]
 
   @@index([tab, createdAt(sort: Desc)])
   @@index([authorId, createdAt(sort: Desc)])
   @@index([type])
   @@map("feed_posts")
+}
+
+// Pins a citizen to an (x, y) spot on one photo/video within a post's
+// mediaUrls — distinct from an @mention in the post text (see
+// MENTION_PATTERN in feed.service.ts). x/y are 0-100 percentages from the
+// media's top-left corner, resolution-independent.
+model PostMediaTag {
+  id        String   @id @default(uuid())
+  postId    String
+  mediaUrl  String
+  userId    String
+  x         Float
+  y         Float
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId])
+  @@map("feed_post_media_tags")
 }
 
 model PostComment {

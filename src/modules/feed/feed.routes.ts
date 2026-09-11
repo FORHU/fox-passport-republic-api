@@ -20,6 +20,12 @@ router.post("/:id/reaction", authenticate, FeedController.setReaction);
 router.get("/:id/reactions", FeedController.getReactionBreakdown);
 router.post("/:id/save", authenticate, FeedController.toggleSave);
 router.post("/:id/hide", authenticate, FeedController.hidePost);
+router.post("/:id/media-tags", authenticate, FeedController.addMediaTag);
+router.delete(
+  "/:id/media-tags/:tagId",
+  authenticate,
+  FeedController.deleteMediaTag,
+);
 
 // Comments
 router.get("/:id/comments", optionalAuth, FeedController.getComments);

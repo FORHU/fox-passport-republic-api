@@ -30,6 +30,15 @@ const REPOST_SELECT = {
   },
 } as const;
 
+const MEDIA_TAG_INCLUDE = {
+  include: {
+    user: {
+      select: { id: true, name: true, username: true, imgId: true },
+    },
+  },
+  orderBy: { createdAt: "asc" as const },
+} as const;
+
 const AUTHOR_SELECT = {
   select: {
     id: true,
@@ -246,6 +255,7 @@ export default class FeedRepo {
         author: AUTHOR_SELECT,
         ...ENTITY_INCLUDE,
         originalPost: REPOST_SELECT,
+        mediaTags: MEDIA_TAG_INCLUDE,
         ...(viewerId
           ? {
               likes: {
@@ -367,6 +377,7 @@ export default class FeedRepo {
         author: AUTHOR_SELECT,
         ...ENTITY_INCLUDE,
         originalPost: REPOST_SELECT,
+        mediaTags: MEDIA_TAG_INCLUDE,
         ...(viewerId
           ? {
               likes: {
@@ -417,28 +428,48 @@ export default class FeedRepo {
     reviewId?: string | null;
     stampId?: string | null;
     originalPostId?: string | null;
+    mediaTags?: { mediaUrl: string; userId: string; x: number; y: number }[];
   }) {
-    return prisma.post.create({
-      data: {
-        authorId: data.authorId,
-        type: data.type,
-        tab: data.tab,
-        content: data.content,
-        mediaUrls: data.mediaUrls || [],
-        visibility: data.visibility || PostVisibility.public,
-        venueId: data.venueId || null,
-        assetId: data.assetId || null,
-        serviceId: data.serviceId || null,
-        eventId: data.eventId || null,
-        reviewId: data.reviewId || null,
-        stampId: data.stampId || null,
-        originalPostId: data.originalPostId || null,
-      },
-      include: {
-        author: AUTHOR_SELECT,
-        ...ENTITY_INCLUDE,
-        originalPost: REPOST_SELECT,
-      },
+    return prisma.$transaction(async (tx) => {
+      const post = await tx.post.create({
+        data: {
+          authorId: data.authorId,
+          type: data.type,
+          tab: data.tab,
+          content: data.content,
+          mediaUrls: data.mediaUrls || [],
+          visibility: data.visibility || PostVisibility.public,
+          venueId: data.venueId || null,
+          assetId: data.assetId || null,
+          serviceId: data.serviceId || null,
+          eventId: data.eventId || null,
+          reviewId: data.reviewId || null,
+          stampId: data.stampId || null,
+          originalPostId: data.originalPostId || null,
+        },
+      });
+
+      if (data.mediaTags && data.mediaTags.length > 0) {
+        await tx.postMediaTag.createMany({
+          data: data.mediaTags.map((t) => ({
+            postId: post.id,
+            mediaUrl: t.mediaUrl,
+            userId: t.userId,
+            x: t.x,
+            y: t.y,
+          })),
+        });
+      }
+
+      return tx.post.findUniqueOrThrow({
+        where: { id: post.id },
+        include: {
+          author: AUTHOR_SELECT,
+          ...ENTITY_INCLUDE,
+          originalPost: REPOST_SELECT,
+          mediaTags: MEDIA_TAG_INCLUDE,
+        },
+      });
     });
   }
 
@@ -457,6 +488,7 @@ export default class FeedRepo {
         author: AUTHOR_SELECT,
         ...ENTITY_INCLUDE,
         originalPost: REPOST_SELECT,
+        mediaTags: MEDIA_TAG_INCLUDE,
       },
     });
   }
@@ -733,5 +765,23 @@ export default class FeedRepo {
       select: { id: true, name: true, username: true, imgId: true },
       take: limit,
     });
+  }
+
+  static async createMediaTag(
+    postId: string,
+    data: { mediaUrl: string; userId: string; x: number; y: number },
+  ) {
+    return prisma.postMediaTag.create({
+      data: { postId, ...data },
+      include: MEDIA_TAG_INCLUDE.include,
+    });
+  }
+
+  static async findMediaTagById(id: string) {
+    return prisma.postMediaTag.findUnique({ where: { id } });
+  }
+
+  static async deleteMediaTag(id: string) {
+    return prisma.postMediaTag.delete({ where: { id } });
   }
 }
