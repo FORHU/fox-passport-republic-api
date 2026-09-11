@@ -1,5 +1,6 @@
 import { prisma } from "../../utils/prisma";
 import { EventCategory } from "@prisma/client";
+import { cached } from "../../utils/cache.util";
 
 type CategorySummary = {
   name: string;
@@ -18,7 +19,22 @@ type CategorySummary = {
  * on `Asset.category`, `Venue.category`, `Service.category`, and `EventTemplate.category`.
  */
 export default class CategoryRepo {
+  /**
+   * Four aggregates - three groupBy plus a raw COUNT over the whole services
+   * table - for an answer that is identical for every caller and changes only
+   * when a listing is created. Cached for five minutes.
+   *
+   * Not invalidated on listing creation, deliberately: the value is a set of
+   * counts on a browse page, nobody is waiting to see their own asset move a
+   * number, and wiring this to every asset/venue/service/template write would
+   * spread cache knowledge across four modules to save at most five minutes of
+   * staleness on a count.
+   */
   static async getAllCategories(): Promise<CategorySummary[]> {
+    return cached("categories:all", 5 * 60, () => this.computeAllCategories());
+  }
+
+  private static async computeAllCategories(): Promise<CategorySummary[]> {
     const [assetCats, venueCats, rawServiceCats, eventTemplateCats] =
       await Promise.all([
         prisma.asset.groupBy({

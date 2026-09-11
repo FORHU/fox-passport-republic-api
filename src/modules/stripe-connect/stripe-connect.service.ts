@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { userCache } from "../../utils/cache-namespaces";
 import { prisma } from "../../utils/prisma";
 import {
   STRIPE_SECRET_KEY,
@@ -25,6 +26,7 @@ export async function createStripeConnectAccount(user: {
     where: { id: user.id },
     data: { stripeAccountId: account.id },
   });
+  await userCache.invalidateAll();
 
   return account;
 }
@@ -78,6 +80,7 @@ export default class StripeConnectSvc {
       where: { id: userId },
       data: { stripeAccountId: account.id },
     });
+    await userCache.invalidateAll();
 
     return account.id;
   }
@@ -122,5 +125,6 @@ export default class StripeConnectSvc {
         stripeOnboardingComplete: !!account.details_submitted,
       },
     });
+    await userCache.invalidateAll();
   }
 }

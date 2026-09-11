@@ -1,15 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import PaymentSvc from "./payment.service";
-import StripeConnectSvc from "../stripe-connect/stripe-connect.service";
 import Stripe from "stripe";
-import { prisma } from "../../utils/prisma";
-import { BookingStatus, PaymentStatus } from "@prisma/client";
-import RefundSvc from "../refund/refund.service";
-import {
-  announceToAdmins,
-  announceToUser,
-} from "../../infrastructure/socket/invalidate";
 
 export default class PaymentController {
   // GET ALL PAYMENTS
@@ -298,155 +290,10 @@ export default class PaymentController {
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // Handle the event
-    switch (event.type) {
-      case "payment_intent.succeeded":
-        const paymentIntent = event.data.object as Stripe.PaymentIntent;
-        const bookingId = paymentIntent.metadata.bookingId;
-
-        console.log(
-          `✅ PaymentIntent succeeded: ${paymentIntent.id} for booking ${bookingId}`,
-        );
-
-        try {
-          // Load the booking so we know its current state before mutating it.
-          // `userId` and the organizer are selected for the announcement
-          // below: this is the one handler with nobody in the room, and the
-          // browser that started the payment is sitting on a page waiting for
-          // exactly this.
-          const booking = await prisma.booking.findUnique({
-            where: { id: bookingId },
-            select: {
-              id: true,
-              status: true,
-              stripePaymentId: true,
-              userId: true,
-              event: { select: { organizerId: true } },
-            },
-          });
-
-          // Find the pending payment for this booking
-          const payments = await PaymentSvc.getBookingPayments(bookingId);
-          const pendingPayment = payments.find(
-            (p) => p.status === PaymentStatus.pending,
-          );
-
-          if (pendingPayment) {
-            await PaymentSvc.updatePayment(pendingPayment.id, {
-              paymentStatus: PaymentStatus.completed,
-            });
-
-            // Update transaction ID to Stripe's ID
-            await prisma.payment.update({
-              where: { id: pendingPayment.id },
-              data: { transactionId: paymentIntent.id },
-            });
-          } else {
-            // If no pending payment found, create a completed one
-            await PaymentSvc.createPayment({
-              bookingId,
-              amount: paymentIntent.amount / 100,
-              currency: paymentIntent.currency.toUpperCase(),
-              method: "stripe",
-              paymentType: "full",
-              paymentStatus: PaymentStatus.completed,
-              transactionId: paymentIntent.id,
-            });
-          }
-
-          // Link the Stripe PaymentIntent id to the Booking (idempotent).
-          if (booking && booking.stripePaymentId !== paymentIntent.id) {
-            try {
-              await prisma.booking.update({
-                where: { id: bookingId },
-                data: { stripePaymentId: paymentIntent.id },
-              });
-            } catch (err) {
-              console.error(
-                "Failed to set booking.stripePaymentId in webhook:",
-                err,
-              );
-            }
-          }
-
-          // Mark the booking confirmed so it can later be checked-in/settled.
-          // Only when it's still pending — never un-complete or un-cancel a booking.
-          if (booking && booking.status === BookingStatus.pending) {
-            try {
-              await prisma.booking.update({
-                where: { id: bookingId },
-                data: { status: BookingStatus.confirmed },
-              });
-
-              // Inside the status check on purpose: Stripe retries deliveries,
-              // and a redelivery for an already-confirmed intent has changed
-              // nothing worth telling anyone about.
-              announceToUser(booking.userId, "bookings");
-              announceToUser(booking.event?.organizerId, "bookings");
-              announceToAdmins("bookings");
-            } catch (err) {
-              console.error(
-                "Failed to set booking.status to confirmed in webhook:",
-                err,
-              );
-            }
-          }
-        } catch (error) {
-          console.error("Error updating payment via webhook:", error);
-        }
-        break;
-
-      case "payment_intent.payment_failed":
-        const failedIntent = event.data.object as Stripe.PaymentIntent;
-        console.log(`❌ PaymentIntent failed: ${failedIntent.id}`);
-        break;
-
-      case "charge.refunded": {
-        const charge = event.data.object as Stripe.Charge;
-        if (charge.refunded && charge.payment_intent) {
-          const piId =
-            typeof charge.payment_intent === "string"
-              ? charge.payment_intent
-              : charge.payment_intent.id;
-          const payment = await prisma.payment.findFirst({
-            where: { transactionId: piId },
-          });
-          if (payment) {
-            await prisma.payment.update({
-              where: { id: payment.id },
-              data: { status: PaymentStatus.refunded },
-            });
-          }
-        }
-        break;
-      }
-
-      case "refund.updated":
-        const refundUpdated = event.data.object as Stripe.Refund;
-        if (refundUpdated.status === "failed") {
-          await RefundSvc.handleWebhookRefundFailed(event);
-        } else if (refundUpdated.status === "succeeded") {
-          await RefundSvc.handleWebhookRefundSucceeded(event);
-        }
-        break;
-
-      case "account.updated":
-        // Keeps User.stripeChargesEnabled/stripePayoutsEnabled/stripeOnboardingComplete
-        // in sync with the connected account's real state. See
-        // docs/adr/0002-stripe-connect-payouts.md. Deployment note: the Stripe
-        // webhook endpoint must also be subscribed to this event type.
-        try {
-          const account = event.data.object as Stripe.Account;
-          await StripeConnectSvc.handleAccountUpdated(account);
-          console.log(`✅ account.updated synced for ${account.id}`);
-        } catch (error) {
-          console.error("Error syncing account.updated via webhook:", error);
-        }
-        break;
-
-      default:
-        console.log(`ℹ️ Unhandled event type ${event.type}`);
-    }
+    // Everything the event means is the service's business - see
+    // `docs/REDIS-PLAN.md` §0b. What stays here is the part that is genuinely
+    // HTTP: the raw body, the signature header, and the 400s above.
+    await PaymentSvc.handleStripeEvent(event);
 
     res.json({ received: true });
   }

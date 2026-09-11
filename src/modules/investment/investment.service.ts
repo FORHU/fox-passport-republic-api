@@ -5,6 +5,8 @@ import {
   UserPath,
 } from "@prisma/client";
 import InvestmentRepo from "./investment.repository";
+import { investmentCache, INVESTMENT_TTL } from "../../utils/cache-namespaces";
+import { fingerprint } from "../../utils/cache.util";
 import UsersRepo from "../users/users.repository";
 import FeedRepo from "../feed/feed.repository";
 import PassportSvc from "../passport/passport.service";
@@ -107,7 +109,11 @@ export default class InvestmentSvc {
     limit?: number;
     page?: number;
   }) {
-    return InvestmentRepo.findInvestments(params);
+    return investmentCache.cached(
+      `list:${fingerprint(params)}`,
+      INVESTMENT_TTL,
+      () => InvestmentRepo.findInvestments(params),
+    );
   }
 
   // GET MAP VIEW PINS
@@ -117,7 +123,11 @@ export default class InvestmentSvc {
     country?: string;
     bounds?: { minLat: number; maxLat: number; minLng: number; maxLng: number };
   }) {
-    return InvestmentRepo.findInvestmentsOnMap(params);
+    return investmentCache.cached(
+      `map:${fingerprint(params)}`,
+      INVESTMENT_TTL,
+      () => InvestmentRepo.findInvestmentsOnMap(params),
+    );
   }
 
   // GET NEARBY INVENTORY FOR A VENUE (Equipment Pooling)
@@ -133,17 +143,29 @@ export default class InvestmentSvc {
       return [];
     }
 
-    return InvestmentRepo.findNearbyInventory({
-      lat: venue.lat,
-      lng: venue.lng,
-      category: params.category,
-      maxRadiusKm: params.maxRadiusKm,
-    });
+    // Keyed on the venue's coordinates rather than its id: two venues at the
+    // same point have the same neighbours, and the venue lookup above already
+    // ran against `venueCache`.
+    return investmentCache.cached(
+      `nearby:${fingerprint({ lat: venue.lat, lng: venue.lng, category: params.category, maxRadiusKm: params.maxRadiusKm })}`,
+      INVESTMENT_TTL,
+      () =>
+        InvestmentRepo.findNearbyInventory({
+          lat: venue.lat as number,
+          lng: venue.lng as number,
+          category: params.category,
+          maxRadiusKm: params.maxRadiusKm,
+        }),
+    );
   }
 
   // GET SINGLE
   static async getInvestmentById(id: string) {
-    const investment = await InvestmentRepo.findById(id);
+    const investment = await investmentCache.cached(
+      `byId:${id}`,
+      INVESTMENT_TTL,
+      () => InvestmentRepo.findById(id),
+    );
     if (!investment) throw new Error("Investment not found");
     return investment;
   }

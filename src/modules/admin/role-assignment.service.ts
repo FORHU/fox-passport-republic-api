@@ -1,7 +1,27 @@
 import { RoleType, SystemRole } from "@prisma/client";
+import { userCache } from "../../utils/cache-namespaces";
 import { prisma } from "../../utils/prisma";
 import { recordAudit } from "../audit/audit.service";
 import { revokeAllForUser } from "../auth/refresh-token.service";
+import AdminSvc from "./admin.service";
+import {
+  announceAdminQueueChanged,
+  announceToUser,
+} from "../../infrastructure/socket/invalidate";
+
+/**
+ * Both role changes tell the same three parties, so they say it once here.
+ *
+ * `roles` maps to the shared `["me"]` profile key - the person's own screen
+ * updates without waiting for the poll, and since their sessions were just
+ * revoked they will be re-authenticating shortly anyway. The admin console's
+ * user list is stale too, hence the queue retire.
+ */
+async function announceRoleChange(targetId: string): Promise<void> {
+  announceToUser(targetId, "roles");
+  announceAdminQueueChanged();
+  await AdminSvc.invalidateQueues();
+}
 
 /**
  * Changing what a person *is*.
@@ -116,6 +136,9 @@ export default class RoleAssignmentSvc {
     }
 
     if (previous === nextRole) {
+      // Announced even when nothing changed, as the controller did: an admin
+      // who clicked deserves to see the list settle either way.
+      await announceRoleChange(target.id);
       return { target, previous, changed: false as const };
     }
 
@@ -142,6 +165,8 @@ export default class RoleAssignmentSvc {
       data: { systemRole: nextRole as SystemRole },
       select: { id: true, email: true, systemRole: true, roleType: true },
     });
+    // A role change is what the public foxer listings filter on.
+    await userCache.invalidateAll();
 
     const revoked = await revokeAllForUser(target.id);
 
@@ -155,6 +180,7 @@ export default class RoleAssignmentSvc {
       metadata: { previous, next: nextRole, sessionsRevoked: revoked },
     });
 
+    await announceRoleChange(updated.id);
     return { target: updated, previous, changed: true as const };
   }
 
@@ -199,6 +225,8 @@ export default class RoleAssignmentSvc {
       data: { roleType: unique as RoleType[] },
       select: { id: true, email: true, systemRole: true, roleType: true },
     });
+    // A role change is what the public foxer listings filter on.
+    await userCache.invalidateAll();
 
     const revoked = await revokeAllForUser(target.id);
 
@@ -212,6 +240,7 @@ export default class RoleAssignmentSvc {
       metadata: { previous, next: unique, sessionsRevoked: revoked },
     });
 
+    await announceRoleChange(updated.id);
     return { target: updated, previous };
   }
 }

@@ -1,14 +1,9 @@
 import Stripe from "stripe";
-import {
-  PaymentStatus,
-  Prisma,
-  RefundStatus,
-  type Refund,
-} from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
+import PaymentRepo from "../payment/payment.repository";
 import { STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents, formatCurrency } from "../../utils/pricing";
-import { sendBookingCancelledEmail } from "../../utils/emails/cancellation";
 import { sendRefundUpdateEmail } from "../../utils/emails/refund";
 import NotificationService from "../notifications/user-notification.service";
 
@@ -162,212 +157,6 @@ export default class RefundSvc {
     };
   }
 
-  static async cancelAndRefund(bookingId: string, userId: string) {
-    const booking = await prisma.booking.findUnique({
-      where: { id: bookingId },
-      include: {
-        payments: true,
-        user: { select: { id: true, name: true, email: true } },
-        event: {
-          include: {
-            template: {
-              include: {
-                cancellationPolicy: {
-                  include: { rules: { orderBy: { hoursBeforeEvent: "desc" } } },
-                },
-              },
-            },
-            venueTransactions: {
-              include: {
-                venue: {
-                  include: {
-                    cancellationPolicy: {
-                      include: {
-                        rules: { orderBy: { hoursBeforeEvent: "desc" } },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            serviceTransactions: {
-              include: {
-                service: {
-                  include: {
-                    cancellationPolicy: {
-                      include: {
-                        rules: { orderBy: { hoursBeforeEvent: "desc" } },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-    if (!booking) throw new Error("Booking not found");
-    if (booking.userId !== userId) throw new Error("Unauthorized");
-    if (booking.status === "cancelled")
-      throw new Error("Booking is already cancelled");
-
-    const policy = (booking.event.template?.cancellationPolicy ??
-      booking.event.venueTransactions?.[0]?.venue?.cancellationPolicy ??
-      booking.event.serviceTransactions?.[0]?.service?.cancellationPolicy) as
-      CancellationPolicy | undefined;
-    const { refundPercent, hoursUntilEvent } = RefundSvc.computeRefund(
-      booking.startAt,
-      policy,
-    );
-
-    if (hoursUntilEvent <= 0) {
-      throw new Error(
-        "Event has already started — cancellation is no longer allowed",
-      );
-    }
-
-    const completedPayments = booking.payments.filter(
-      (p) => p.status === "completed",
-    );
-    const pendingPayments = booking.payments.filter(
-      (p) => p.status === "pending",
-    );
-
-    // Void any pending (not-yet-captured) transactions instead of refunding them.
-    for (const payment of pendingPayments) {
-      if (payment.transactionId?.startsWith("pi_")) {
-        try {
-          await stripe.paymentIntents.cancel(payment.transactionId);
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (err) {
-          // If it can't be cancelled (e.g. already captured/succeeded on Stripe's
-          // side), fall through — it'll be handled as a completed payment on the
-          // next sync, or can be retried manually.
-        }
-      }
-
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: { status: PaymentStatus.cancelled },
-      });
-    }
-
-    if (completedPayments.length === 0) {
-      const updated = await prisma.booking.update({
-        where: { id: bookingId },
-        data: { status: "cancelled" },
-      });
-      return { booking: updated, refunds: [] };
-    }
-
-    const refunds: Refund[] = [];
-
-    for (const payment of completedPayments) {
-      let stripeRefundId: string | null = null;
-      let refundStatus: RefundStatus = RefundStatus.pending;
-      let failureReason: string | null = null;
-
-      const estimatedRefund = payment.amount.mul(refundPercent).div(100);
-
-      if (refundPercent <= 0) {
-        // Nothing to refund for this payment under the policy — record it as
-        // a resolved zero-amount refund so it's visible in history.
-        const refund = await prisma.refund.create({
-          data: {
-            bookingId,
-            paymentId: payment.id,
-            amount: 0,
-            currency: payment.currency,
-            stripeRefundId: null,
-            status: RefundStatus.succeeded,
-            failureReason: null,
-            initiatedBy: userId,
-          },
-        });
-        refunds.push(refund);
-        continue;
-      }
-
-      if (payment.transactionId?.startsWith("pi_")) {
-        try {
-          const refund = await stripe.refunds.create({
-            payment_intent: payment.transactionId,
-            amount: toStripeCents(estimatedRefund.toNumber()),
-          });
-          stripeRefundId = refund.id;
-          refundStatus =
-            refund.status === "succeeded" ? "succeeded" : "pending";
-          if (refund.status === "failed") {
-            failureReason = refund.failure_reason ?? "Unknown Stripe error";
-            refundStatus = "failed";
-          }
-        } catch (e: unknown) {
-          const err = e as Error;
-          stripeRefundId = null;
-          refundStatus = "failed";
-          failureReason = err.message ?? "Stripe refund failed";
-        }
-      }
-
-      const refund = await prisma.refund.create({
-        data: {
-          bookingId,
-          paymentId: payment.id,
-          amount: estimatedRefund,
-          currency: payment.currency,
-          stripeRefundId,
-          status: refundStatus,
-          failureReason,
-          initiatedBy: userId,
-        },
-      });
-
-      if (refundStatus === "succeeded") {
-        await prisma.payment.update({
-          where: { id: payment.id },
-          data: { status: "refunded" },
-        });
-      }
-
-      refunds.push(refund);
-    }
-
-    const updated = await prisma.booking.update({
-      where: { id: bookingId },
-      data: { status: "cancelled" },
-    });
-
-    const eventName = booking.event?.name ?? "Unknown Event";
-    const userEmail = booking.user?.email;
-    const totalPaid = completedPayments.reduce(
-      (s, p) => s.add(p.amount),
-      new Prisma.Decimal(0),
-    );
-    const totalRefunded = refunds.reduce(
-      (s, r) => s.add(r.amount ?? 0),
-      new Prisma.Decimal(0),
-    );
-
-    if (userEmail) {
-      sendBookingCancelledEmail({
-        to: userEmail,
-        eventName,
-        bookingId,
-        startDate: booking.startAt?.toISOString() ?? "N/A",
-        totalPaid: formatCurrency(totalPaid),
-        refundAmount: formatCurrency(totalRefunded),
-        refundStatus: refunds.some((r) => r.status === RefundStatus.failed)
-          ? "Some refunds failed — contact support"
-          : "Processed successfully",
-      });
-    }
-
-    notifyBookingCancelled(booking, eventName, bookingId);
-
-    return { booking: updated, refunds };
-  }
-
   static async getFailedRefunds() {
     return prisma.refund.findMany({
       where: {
@@ -469,10 +258,9 @@ export default class RefundSvc {
       });
 
       if (newRefundStatus === "succeeded" && refund.payment) {
-        await prisma.payment.update({
-          where: { id: refund.payment.id },
-          data: { status: "refunded" },
-        });
+        // Through the repository, which retires the cached booking: payments
+        // are part of it, and the citizen is watching this one.
+        await PaymentRepo.markRefunded(refund.payment.id);
       }
 
       return updated;
@@ -508,10 +296,7 @@ export default class RefundSvc {
     });
 
     if (refund.payment) {
-      await prisma.payment.update({
-        where: { id: refund.payment.id },
-        data: { status: "refunded" },
-      });
+      await PaymentRepo.markRefunded(refund.payment.id);
     }
 
     return updated;
@@ -591,10 +376,7 @@ export default class RefundSvc {
     });
 
     if (existing.payment) {
-      await prisma.payment.update({
-        where: { id: existing.payment.id },
-        data: { status: "refunded" },
-      });
+      await PaymentRepo.markRefunded(existing.payment.id);
     }
 
     if (existing.booking?.user?.email) {
@@ -618,39 +400,5 @@ export default class RefundSvc {
         metadata: { link: `/bookings/${existing.bookingId}` },
       }).catch((e) => console.error("Failed to create refund notification", e));
     }
-  }
-}
-
-// Fire-and-forget in-app notifications mirroring the booking-cancelled email
-// (guest who booked + the host/organizer).
-function notifyBookingCancelled(
-  booking: {
-    user?: { id: string } | null;
-    event?: { organizerId?: string | null } | null;
-  } | null,
-  eventName: string,
-  bookingId: string,
-) {
-  const guestId = booking?.user?.id;
-  const hostId = booking?.event?.organizerId;
-
-  if (guestId) {
-    NotificationService.create({
-      userId: guestId,
-      type: "BOOKING_CANCELLED",
-      title: "Booking cancelled",
-      message: `Your booking for ${eventName} has been cancelled.`,
-      metadata: { link: `/bookings/${bookingId}` },
-    }).catch((e) => console.error("Failed to create guest notification", e));
-  }
-
-  if (hostId && hostId !== guestId) {
-    NotificationService.create({
-      userId: hostId,
-      type: "BOOKING_CANCELLED",
-      title: "Booking cancelled",
-      message: `The booking for ${eventName} has been cancelled.`,
-      metadata: { link: `/host/bookings/${bookingId}` },
-    }).catch((e) => console.error("Failed to create host notification", e));
   }
 }

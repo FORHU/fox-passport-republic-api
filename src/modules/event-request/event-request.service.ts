@@ -4,6 +4,8 @@ import EventRequestRepo from "./event-request.repository";
 import EventTemplateRepo from "../event-template/event-template.repository";
 import EventTemplateSvc from "../event-template/event-template.service";
 import { can } from "../../types/permissions";
+import { sendApprovedEmail } from "../../utils/emails/approved";
+import { sendRejectedEmail } from "../../utils/emails/rejected";
 
 export default class EventRequestSvc {
   static async createDirectEvent(data: {
@@ -97,7 +99,25 @@ export default class EventRequestSvc {
       );
     }
 
-    return EventRequestRepo.updateRequestStatus(id, "approved");
+    const updated = await EventRequestRepo.updateRequestStatus(id, "approved");
+
+    // The decision email was sent from the controller, which re-fetched the
+    // event to find the host's address - a second query for a row this method
+    // has already loaded. Fire-and-forget: a mail provider having a bad minute
+    // must not fail an approval that is already committed.
+    if (request.host?.email) {
+      try {
+        sendApprovedEmail({
+          to: request.host.email,
+          entityName: request.name,
+          entityType: "Event",
+        });
+      } catch (emailErr) {
+        console.error("Failed to send approval email:", emailErr);
+      }
+    }
+
+    return updated;
   }
 
   static async rejectRequest(
@@ -110,7 +130,25 @@ export default class EventRequestSvc {
     if (!request) throw new Error("Request not found");
     if (!can(systemRole, "queue:decide"))
       throw new Error("Unauthorized: Only admins can reject requests");
-    return EventRequestRepo.rejectRequest(id, reason);
+
+    const updated = await EventRequestRepo.rejectRequest(id, reason);
+
+    // Only with a reason, as the controller had it: a rejection email with no
+    // reason in it is worse than none.
+    if (request.host?.email && reason) {
+      try {
+        sendRejectedEmail({
+          to: request.host.email,
+          entityName: request.name,
+          entityType: "Event",
+          reason,
+        });
+      } catch (emailErr) {
+        console.error("Failed to send rejection email:", emailErr);
+      }
+    }
+
+    return updated;
   }
 
   static async completeEvent(id: string) {

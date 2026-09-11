@@ -1,18 +1,77 @@
 import { prisma } from "../../utils/prisma";
+import { versionedCache } from "../../utils/cache.util";
+import BookingRepo from "../booking/booking.repository";
 import ReviewRepo from "./review.repository";
 
+/**
+ * Reviews are read far more often than they are written - every venue page,
+ * every event page and every listing pulls them - and the repository reads are
+ * the expensive kind: joins onto the author, optional replies, and for a
+ * listing a rating distribution computed across the whole set.
+ *
+ * **Versioned rather than named keys.** These keys carry a venue id, an event
+ * id, a listing id, a target type, a user id and an `includeReplies` flag, so
+ * the set that exists for "reviews anyone has asked for" cannot be enumerated
+ * from a write that only knows one review's id. One `INCR` retires the lot;
+ * see `cache.util.ts` for why that is the safer shape and not merely cheaper.
+ *
+ * **Local, not in `cache-namespaces.ts`.** That file is for namespaces more
+ * than one module writes. Nothing outside this one writes a review: every
+ * `prisma.review` write lives in `review.repository.ts`, and this service is
+ * the repository's only caller, so the four write methods below are the
+ * complete set of invalidation points.
+ */
+const reviewCache = versionedCache("review");
+
+/**
+ * Two minutes.
+ *
+ * Longer than the booking TTL because nothing here is money and nobody is
+ * watching a review the way a guest watches a payment - and it can afford to be
+ * because the writes below retire the namespace outright, so the TTL is only
+ * ever the bound on an orphan, never the mechanism.
+ */
+const REVIEW_TTL = 120;
+
 export default class ReviewSvc {
+  /**
+   * A review requires the booking it is about.
+   *
+   * `bookingId` used to be optional, and the branch that handled its absence
+   * took **the most recently created event in the entire system** and
+   * fabricated a confirmed booking against it — a real row, with a real user
+   * id, in the bookings table — so the review had something to hang off. The
+   * reviewer had not been there, the booking had never happened, and the row
+   * counted as one from then on.
+   *
+   * That was left alone through the caching pass because it is a product
+   * question rather than a caching one, and the answer is this: a review traces
+   * to a stay or it does not exist. The alternative was making `bookingId`
+   * nullable, which spreads the same ambiguity into every reader of
+   * `review.booking` instead of settling it here.
+   *
+   * This is a breaking change for any caller that omitted `bookingId`. The
+   * controller already turns a throw into a 400, so they get one with a reason.
+   */
   static async createReview(data: {
     userId: string;
-    bookingId?: string;
+    bookingId: string;
     entityId: string;
     entityType: string;
     rating: number;
     comment?: string;
   }) {
-    let bookingId = data.bookingId;
+    const bookingId = data.bookingId;
 
-    if (bookingId) {
+    // Checked at runtime as well as in the type: the controller reads this
+    // straight off `req.body`, where it is whatever the client sent.
+    if (!bookingId) {
+      throw new Error(
+        "A review must name the booking it is about (bookingId is required).",
+      );
+    }
+
+    {
       const booking = await prisma.booking.findUnique({
         where: { id: String(bookingId) },
         include: {
@@ -39,31 +98,6 @@ export default class ReviewSvc {
           data.entityType = "venue";
         }
       }
-    } else {
-      const event = await prisma.event.findFirst({
-        orderBy: { createdAt: "desc" },
-        include: { venueTransactions: { take: 1 } },
-      });
-      if (!event) throw new Error("No event available to link this review to");
-      const booking = await prisma.booking.create({
-        data: {
-          eventId: event.id,
-          userId: String(data.userId),
-          guestCount: 1,
-          totalAmount: 0,
-          status: "confirmed",
-          startAt: new Date(),
-          endAt: new Date(Date.now() + 86400000),
-        },
-      });
-      bookingId = booking.id;
-      if (!data.entityId) {
-        const venueTx = event.venueTransactions?.[0];
-        if (venueTx?.venueId) {
-          data.entityId = venueTx.venueId;
-          data.entityType = "venue";
-        }
-      }
     }
 
     if (!data.entityId) {
@@ -72,14 +106,16 @@ export default class ReviewSvc {
       );
     }
 
-    console.log("Saving review with entityId:", data.entityId);
     const review = await ReviewRepo.createReview({ ...data, bookingId });
+    // Before the XP and notification side effects below, which are
+    // fire-and-forget: a caller that reads straight back must not be told the
+    // review it just wrote does not exist.
+    await reviewCache.invalidateAll();
 
     if (data.bookingId) {
-      await prisma.booking.update({
-        where: { id: String(data.bookingId) },
-        data: { hasReview: true },
-      });
+      // The repository retires the cache; `hasReview` is what hides the
+      // "leave a review" button.
+      await BookingRepo.setHasReview(String(data.bookingId), true);
     }
 
     // Award leaveReview XP + First Review badge (fire-and-forget)
@@ -151,19 +187,31 @@ export default class ReviewSvc {
   }
 
   static async getAllReviews(includeReplies = false) {
-    return ReviewRepo.getAllReviews(includeReplies);
+    return reviewCache.cached(`all:${includeReplies}`, REVIEW_TTL, () =>
+      ReviewRepo.getAllReviews(includeReplies),
+    );
   }
 
   static async getReviewById(id: string, includeReplies = false) {
-    return ReviewRepo.getReviewById(id, includeReplies);
+    return reviewCache.cached(`byId:${id}:${includeReplies}`, REVIEW_TTL, () =>
+      ReviewRepo.getReviewById(id, includeReplies),
+    );
   }
 
   static async getVenueReviews(venueId: string, includeReplies = false) {
-    return ReviewRepo.getVenueReviews(venueId, includeReplies);
+    return reviewCache.cached(
+      `venue:${venueId}:${includeReplies}`,
+      REVIEW_TTL,
+      () => ReviewRepo.getVenueReviews(venueId, includeReplies),
+    );
   }
 
   static async getEventReviews(eventId: string, includeReplies = false) {
-    return ReviewRepo.getEventReviews(eventId, includeReplies);
+    return reviewCache.cached(
+      `event:${eventId}:${includeReplies}`,
+      REVIEW_TTL,
+      () => ReviewRepo.getEventReviews(eventId, includeReplies),
+    );
   }
 
   static async getReviewsByTarget(
@@ -171,23 +219,39 @@ export default class ReviewSvc {
     targetType: string,
     includeReplies = false,
   ) {
-    return ReviewRepo.findByTarget(targetId, targetType, includeReplies);
+    return reviewCache.cached(
+      `target:${targetType}:${targetId}:${includeReplies}`,
+      REVIEW_TTL,
+      () => ReviewRepo.findByTarget(targetId, targetType, includeReplies),
+    );
   }
 
   static async getListingReviews(listingId: string, includeReplies = false) {
-    console.log("Querying reviews for entityId:", listingId);
-    return ReviewRepo.getListingReviewsWithDistribution(
-      listingId,
-      includeReplies,
+    // The distribution is an aggregate over every review on the listing, which
+    // makes this the most expensive read in the module and the one most worth
+    // caching.
+    return reviewCache.cached(
+      `listing:${listingId}:${includeReplies}`,
+      REVIEW_TTL,
+      () =>
+        ReviewRepo.getListingReviewsWithDistribution(listingId, includeReplies),
     );
   }
 
   static async getRecentActivity(limit: number, includeReplies = false) {
-    return ReviewRepo.getRecentActivity(limit, includeReplies);
+    return reviewCache.cached(
+      `recent:${limit}:${includeReplies}`,
+      REVIEW_TTL,
+      () => ReviewRepo.getRecentActivity(limit, includeReplies),
+    );
   }
 
   static async getUserReviews(userId: string, includeReplies = false) {
-    return ReviewRepo.getUserReviews(userId, includeReplies);
+    return reviewCache.cached(
+      `user:${userId}:${includeReplies}`,
+      REVIEW_TTL,
+      () => ReviewRepo.getUserReviews(userId, includeReplies),
+    );
   }
 
   static async replyToReview(reviewId: string, userId: string, text: string) {
@@ -217,7 +281,11 @@ export default class ReviewSvc {
       throw new Error("Only the review author or the venue host can reply");
     }
 
-    return ReviewRepo.createReply(reviewId, userId, text);
+    const reply = await ReviewRepo.createReply(reviewId, userId, text);
+    // A reply changes every `includeReplies` read of its parent, and the parent
+    // appears in the venue, event, listing, target and recent lists.
+    await reviewCache.invalidateAll();
+    return reply;
   }
 
   /**
@@ -268,7 +336,11 @@ export default class ReviewSvc {
     if (data.rating !== undefined) patch.rating = data.rating;
     if (data.comment !== undefined) patch.comment = data.comment;
 
-    return ReviewRepo.updateReview(id, patch);
+    const updated = await ReviewRepo.updateReview(id, patch);
+    // `rating` feeds the listing distribution and the Earned Specialization
+    // threshold, so a stale copy of it is not only cosmetic.
+    await reviewCache.invalidateAll();
+    return updated;
   }
 
   static async deleteReview(params: {
@@ -278,6 +350,8 @@ export default class ReviewSvc {
   }) {
     const { id, requesterId, requesterRole } = params;
     await this.assertCanMutate(id, requesterId, requesterRole);
-    return ReviewRepo.deleteReview(id);
+    const deleted = await ReviewRepo.deleteReview(id);
+    await reviewCache.invalidateAll();
+    return deleted;
   }
 }

@@ -1,4 +1,5 @@
 import FollowRepo from "./follow.repository";
+import { followCache, FOLLOW_TTL } from "../../utils/cache-namespaces";
 import BlockRepo from "../block/block.repository";
 import {
   notifyFollowRequest,
@@ -82,7 +83,11 @@ export default class FollowService {
   }
 
   static async getRequests(userId: string, page: number, limit: number) {
-    const { rows, total } = await FollowRepo.getRequests(userId, page, limit);
+    const { rows, total } = await followCache.cached(
+      `requests:${userId}:${page}:${limit}`,
+      FOLLOW_TTL,
+      () => FollowRepo.getRequests(userId, page, limit),
+    );
     return {
       data: rows,
       total,
@@ -97,8 +102,17 @@ export default class FollowService {
     page: number,
     limit: number,
   ) {
+    // The visibility check runs on every call, outside the cache. It decides
+    // who may see a private account's list, and a cached `isAcceptedFollower`
+    // would keep answering yes for a minute after the follow was withdrawn.
     await this.assertListVisible(viewerId, userId);
-    const { rows, total } = await FollowRepo.getFollowers(userId, page, limit);
+    // The rows themselves are the same for everyone allowed to see them, so
+    // the viewer is not part of the key - the check above is what varies.
+    const { rows, total } = await followCache.cached(
+      `followers:${userId}:${page}:${limit}`,
+      FOLLOW_TTL,
+      () => FollowRepo.getFollowers(userId, page, limit),
+    );
     return {
       data: rows,
       total,
@@ -114,7 +128,11 @@ export default class FollowService {
     limit: number,
   ) {
     await this.assertListVisible(viewerId, userId);
-    const { rows, total } = await FollowRepo.getFollowing(userId, page, limit);
+    const { rows, total } = await followCache.cached(
+      `following:${userId}:${page}:${limit}`,
+      FOLLOW_TTL,
+      () => FollowRepo.getFollowing(userId, page, limit),
+    );
     return {
       data: rows,
       total,
@@ -125,7 +143,9 @@ export default class FollowService {
 
   static async getCounts(viewerId: string, userId: string) {
     await this.assertListVisible(viewerId, userId);
-    return FollowRepo.getCounts(userId);
+    return followCache.cached(`counts:${userId}`, FOLLOW_TTL, () =>
+      FollowRepo.getCounts(userId),
+    );
   }
 
   // A private account's followers/following are visible only to its owner
@@ -148,10 +168,20 @@ export default class FollowService {
   }
 
   static async getStatus(followerId: string, followingId: string) {
-    return FollowRepo.checkStatus(followerId, followingId);
+    return followCache.cached(
+      `status:${followerId}:${followingId}`,
+      FOLLOW_TTL,
+      () => FollowRepo.checkStatus(followerId, followingId),
+    );
   }
 
   static async getSuggestions(userId: string, page: number, limit: number) {
-    return FollowRepo.getSuggestions(userId, page, limit);
+    // The most expensive read here - it walks the follow graph - and the one
+    // nobody is watching for their own write to appear in.
+    return followCache.cached(
+      `suggestions:${userId}:${page}:${limit}`,
+      FOLLOW_TTL,
+      () => FollowRepo.getSuggestions(userId, page, limit),
+    );
   }
 }

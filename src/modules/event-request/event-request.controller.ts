@@ -1,8 +1,5 @@
 import { Request, Response } from "express";
 import EventRequestSvc from "./event-request.service";
-import { prisma } from "../../utils/prisma";
-import { sendApprovedEmail } from "../../utils/emails/approved";
-import { sendRejectedEmail } from "../../utils/emails/rejected";
 import Joi from "joi";
 
 export default class EventRequestCtrl {
@@ -82,22 +79,6 @@ export default class EventRequestCtrl {
         systemRole,
       );
 
-      try {
-        const event = await prisma.event.findUnique({
-          where: { id },
-          include: { host: { select: { email: true, name: true } } },
-        });
-        if (event?.host?.email) {
-          sendApprovedEmail({
-            to: event.host.email,
-            entityName: event.name,
-            entityType: "Event",
-          });
-        }
-      } catch (emailErr) {
-        console.error("Failed to send approval email:", emailErr);
-      }
-
       return res.status(200).json({ success: true, data: updated });
     } catch (e: unknown) {
       const error = e as Error;
@@ -123,23 +104,6 @@ export default class EventRequestCtrl {
         userId,
         systemRole,
       );
-
-      try {
-        const event = await prisma.event.findUnique({
-          where: { id },
-          include: { host: { select: { email: true, name: true } } },
-        });
-        if (event?.host?.email && value.reason) {
-          sendRejectedEmail({
-            to: event.host.email,
-            entityName: event.name,
-            entityType: "Event",
-            reason: value.reason,
-          });
-        }
-      } catch (emailErr) {
-        console.error("Failed to send rejection email:", emailErr);
-      }
 
       return res.status(200).json({ success: true, data: updated });
     } catch (e: unknown) {

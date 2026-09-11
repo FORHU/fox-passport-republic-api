@@ -1,4 +1,6 @@
 import VenueRepo from "./venue.repository";
+import { venueCache } from "../../utils/cache-namespaces";
+import { fingerprint } from "../../utils/cache.util";
 import {
   VenueStatus,
   BillingRate,
@@ -13,6 +15,17 @@ import {
   polygonsOverlap,
   pointInPolygon,
 } from "../../utils/geo";
+
+/**
+ * Five minutes.
+ *
+ * Venues are the slowest-changing thing in the system - a venue is created
+ * once, edited rarely, and approved once - and the reads are the expensive
+ * kind: joins onto the mayor and images, and for the overlap candidates every
+ * live venue in the database. The writes retire the namespace outright, so the
+ * TTL bounds orphans rather than staleness.
+ */
+const VENUE_TTL = 300;
 
 export default class VenueSvc {
   /**
@@ -160,7 +173,15 @@ export default class VenueSvc {
     lightweight?: boolean;
     search?: string;
   }) {
-    const { venues, total } = await VenueRepo.findAllVenues(filters);
+    // Only the database read is cached. The enrichment below reaches into
+    // `passport` for perks and badges, which live on their own lifetime and are
+    // not this namespace's to retire - caching the enriched result would tie a
+    // venue entry to a perk expiring.
+    const { venues, total } = await venueCache.cached(
+      `list:${fingerprint(filters ?? {})}`,
+      VENUE_TTL,
+      () => VenueRepo.findAllVenues(filters),
+    );
 
     if (filters?.lightweight) {
       return { venues, total };
@@ -183,7 +204,13 @@ export default class VenueSvc {
   }
 
   static async getVenueById(id: string, requesterId?: string) {
-    const venue = await VenueRepo.findVenueById(id);
+    // The row is shared; `viewerHasVipAccess` below is not, and is computed per
+    // request outside the cached block. The two `throw`s stay outside as well:
+    // `cached` stores a resolved value, so an error is not something it can
+    // serve, and an archived venue must keep failing after the entry is warm.
+    const venue = await venueCache.cached(`byId:${id}`, VENUE_TTL, () =>
+      VenueRepo.findVenueById(id),
+    );
 
     if (!venue) throw new Error("Venue not found");
     if (venue.status === VenueStatus.archived)
@@ -266,7 +293,15 @@ export default class VenueSvc {
 
   // Venues whose service-area polygon covers `point`.
   static async getVenuesCoveringPoint(point: { lat: number; lng: number }) {
-    const candidates = await VenueRepo.findAvailableVenuesWithBoundary();
+    // Keyed on nothing, because the point is not part of the query: the
+    // expensive half is fetching every live venue with a boundary, and that
+    // answer is the same for every caller. Caching per point instead would mint
+    // an unbounded key set for a filter that runs in memory anyway.
+    const candidates = await venueCache.cached(
+      "boundaries:available",
+      VENUE_TTL,
+      () => VenueRepo.findAvailableVenuesWithBoundary(),
+    );
     const asLngLat: LngLat = [point.lng, point.lat];
 
     return candidates.filter((venue) => {
@@ -280,7 +315,11 @@ export default class VenueSvc {
   // overlap while drawing, instead of only finding out from the
   // assertNoOverlap rejection on submit, and see other venues generally.
   static async getReferenceBoundaries(excludeId?: string) {
-    const venues = await VenueRepo.findLiveVenuesForReference(excludeId);
+    const venues = await venueCache.cached(
+      `reference:${excludeId ?? "none"}`,
+      VENUE_TTL,
+      () => VenueRepo.findLiveVenuesForReference(excludeId),
+    );
     return venues.map((v) => ({
       id: v.id,
       name: v.name,
@@ -294,7 +333,14 @@ export default class VenueSvc {
 
   static async getVenueByIdForMayor(id: string, mayorId: string) {
     // Mayor can see their own venues regardless of status
-    const venue = await VenueRepo.findVenueByIdAndOwner(id, mayorId);
+    // The owner is part of the key, not a filter applied after the fact: this
+    // read returns a venue in any status, so a key that omitted the mayor would
+    // let one owner's draft be served to another.
+    const venue = await venueCache.cached(
+      `byIdForMayor:${id}:${mayorId}`,
+      VENUE_TTL,
+      () => VenueRepo.findVenueByIdAndOwner(id, mayorId),
+    );
     if (!venue) {
       throw new Error("Venue not found or access denied");
     }
@@ -424,6 +470,10 @@ export default class VenueSvc {
     hostId?: string;
     status?: VenueStatus;
   }) {
-    return VenueRepo.findAllVenuesAdmin(filters);
+    return venueCache.cached(
+      `admin:${fingerprint(filters ?? {})}`,
+      VENUE_TTL,
+      () => VenueRepo.findAllVenuesAdmin(filters),
+    );
   }
 }

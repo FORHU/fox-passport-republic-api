@@ -1,5 +1,7 @@
-import { UserPath, TransactionStatus } from "@prisma/client";
-import { prisma } from "../../utils/prisma";
+import { UserPath } from "@prisma/client";
+import { cached } from "../../utils/cache.util";
+import { passportCache, PASSPORT_TTL } from "../../utils/cache-namespaces";
+import PassportRepo from "./passport.repository";
 
 const XP_PER_LEVEL = 1000;
 const XP_MULTIPLIER = 1.15;
@@ -81,42 +83,37 @@ function calculateLevel(totalXP: number): {
 }
 
 export default class PassportSvc {
+  /**
+   * The full badge catalogue, ordered the way the passport screen renders it.
+   *
+   * Moved verbatim out of `passport.controller.ts`; the query itself now lives
+   * in `PassportRepo`, which this module went without until 10 Sep.
+   */
+  static async getAllBadges() {
+    // The badge catalogue is reference data - it changes when someone ships a
+    // migration, not when anyone uses the site - so it is cached on its own key
+    // for an hour, outside the versioned namespace that XP keeps retiring.
+    return cached("passport:badges", 60 * 60, () =>
+      PassportRepo.findAllBadges(),
+    );
+  }
+
   static async getOrCreate(userId: string) {
-    return prisma.passport.upsert({
-      where: { userId },
-      create: { userId },
-      update: {},
-      include: {
-        paths: true,
-        stamps: { orderBy: { createdAt: "desc" } },
-        userBadges: { include: { badge: true } },
-      },
-    });
+    return PassportRepo.upsertPassport(userId);
   }
 
   static async getByUserId(userId: string) {
-    return prisma.passport.findUnique({
-      where: { userId },
-      include: {
-        paths: true,
-        stamps: { orderBy: { createdAt: "desc" } },
-        userBadges: { include: { badge: true } },
-      },
-    });
+    return passportCache.cached(`byUser:${userId}`, PASSPORT_TTL, () =>
+      PassportRepo.findByUserId(userId),
+    );
   }
 
   // Idempotent badge award — skips silently if badge not found or already earned.
   static async awardBadgeByName(userId: string, badgeName: string) {
-    const badge = await prisma.badge.findUnique({ where: { name: badgeName } });
+    const badge = await PassportRepo.findBadgeByName(badgeName);
     if (!badge) return;
     const passport = await PassportSvc.getOrCreate(userId);
-    await prisma.userBadge.upsert({
-      where: {
-        passportId_badgeId: { passportId: passport.id, badgeId: badge.id },
-      },
-      create: { passportId: passport.id, badgeId: badge.id },
-      update: {},
-    });
+    await PassportRepo.upsertUserBadge(passport.id, badge.id);
   }
 
   static async awardXP(userId: string, path: UserPath, amount: number) {
@@ -127,16 +124,12 @@ export default class PassportSvc {
     const newTotalXP = (existing?.totalXP ?? 0) + amount;
     const { level, currentXP, requiredXP } = calculateLevel(newTotalXP);
 
-    await prisma.passportPath.upsert({
-      where: { passportId_path: { passportId: passport.id, path } },
-      create: {
-        passportId: passport.id,
-        path,
-        level,
-        currentXP,
-        totalXP: newTotalXP,
-      },
-      update: { level, currentXP, totalXP: newTotalXP },
+    await PassportRepo.upsertPath({
+      passportId: passport.id,
+      path,
+      level,
+      currentXP,
+      totalXP: newTotalXP,
     });
 
     // Grant perks for every threshold crossed on this path
@@ -148,17 +141,11 @@ export default class PassportSvc {
 
       if (newlyUnlocked.length > 0) {
         // Push only perks not already in the array (idempotent)
-        const current = await prisma.passport.findUnique({
-          where: { id: passport.id },
-          select: { perks: true },
-        });
+        const current = await PassportRepo.findPerksById(passport.id);
         const existing = current?.perks ?? [];
         const toAdd = newlyUnlocked.filter((p) => !existing.includes(p));
         if (toAdd.length > 0) {
-          await prisma.passport.update({
-            where: { id: passport.id },
-            data: { perks: { push: toAdd } },
-          });
+          await PassportRepo.pushPerks(passport.id, toAdd);
         }
       }
     }
@@ -167,15 +154,9 @@ export default class PassportSvc {
     if (prevLevel === 1 && (existing?.totalXP ?? 0) === 0) {
       const lvl1Perk = PERK_THRESHOLDS[path]?.find((t) => t.level === 1)?.perk;
       if (lvl1Perk) {
-        const current = await prisma.passport.findUnique({
-          where: { id: passport.id },
-          select: { perks: true },
-        });
+        const current = await PassportRepo.findPerksById(passport.id);
         if (!(current?.perks ?? []).includes(lvl1Perk)) {
-          await prisma.passport.update({
-            where: { id: passport.id },
-            data: { perks: { push: [lvl1Perk] } },
-          });
+          await PassportRepo.pushPerks(passport.id, [lvl1Perk]);
         }
       }
     }
@@ -196,51 +177,19 @@ export default class PassportSvc {
   // Called automatically when a Booking reaches `completed` status.
   // Idempotent — safe to call multiple times (unique constraint on bookingId).
   static async issueStamp(bookingId: string) {
-    const booking = await prisma.booking.findUnique({
-      where: { id: bookingId },
-      include: {
-        event: {
-          select: {
-            id: true,
-            name: true,
-            startAt: true,
-            targetCity: true,
-            targetCountry: true,
-          },
-        },
-        user: { select: { id: true } },
-      },
-    });
+    const booking = await PassportRepo.findBookingForStamp(bookingId);
     if (!booking) return;
 
     const passport = await PassportSvc.getOrCreate(booking.userId);
 
     // Idempotent — if stamp already exists for this booking, skip
-    const existing = await prisma.passportStamp.findUnique({
-      where: { bookingId },
-    });
+    const existing = await PassportRepo.findStampByBooking(bookingId);
     if (existing) return;
 
     // The venue on the stamp must be the one actually confirmed for THIS
-    // booking — scoped by bookingId (an event can host many bookings) and
-    // included:true (excludes venue options the guest didn't pick), and
-    // only once the Venue Foxer's transaction has been approved. Without
-    // this, an unscoped/unfiltered lookup can attribute the stamp to a
-    // different booking's venue or one the guest never actually visited.
-    const venueTx = await prisma.eventVenueTransaction.findFirst({
-      where: {
-        bookingId,
-        included: true,
-        status: TransactionStatus.approved,
-      },
-      orderBy: { createdAt: "asc" },
-      select: {
-        venueId: true,
-        venue: {
-          select: { id: true, name: true, city: true, stampIconUrl: true },
-        },
-      },
-    });
+    // booking. The scoping that guarantees that is in the repository, with the
+    // reason it matters.
+    const venueTx = await PassportRepo.findApprovedVenueForBooking(bookingId);
 
     const venue = venueTx?.venue;
     const venueId = venue?.id ?? null;
@@ -259,17 +208,15 @@ export default class PassportSvc {
 
     const imageUrl = venue?.stampIconUrl || fallbackSeal;
 
-    await prisma.passportStamp.create({
-      data: {
-        passportId: passport.id,
-        bookingId,
-        eventName: booking.event?.name ?? "Event",
-        eventDate: booking.startAt,
-        location,
-        venueId,
-        imageUrl,
-        xpEarned: XP_REWARDS.attendEvent,
-      },
+    await PassportRepo.createStamp({
+      passportId: passport.id,
+      bookingId,
+      eventName: booking.event?.name ?? "Event",
+      eventDate: booking.startAt,
+      location,
+      venueId,
+      imageUrl,
+      xpEarned: XP_REWARDS.attendEvent,
     });
 
     await PassportSvc.awardXP(
@@ -280,13 +227,9 @@ export default class PassportSvc {
 
     // Milestone Badges: Track distinct venue stamps collected
     try {
-      const distinctVenues = await prisma.passportStamp.groupBy({
-        by: ["venueId"],
-        where: {
-          passportId: passport.id,
-          venueId: { not: null },
-        },
-      });
+      const distinctVenues = await PassportRepo.findDistinctStampVenues(
+        passport.id,
+      );
 
       if (distinctVenues.length >= 5) {
         await PassportSvc.awardBadgeByName(booking.userId, "Manila Explorer");
@@ -315,10 +258,7 @@ export default class PassportSvc {
     ];
     if (ownerIds.length === 0) return items;
 
-    const passports = await prisma.passport.findMany({
-      where: { userId: { in: ownerIds } },
-      select: { userId: true, perks: true },
-    });
+    const passports = await PassportRepo.findPerksForUsers(ownerIds);
     const perkMap = new Map(passports.map((p) => [p.userId, p.perks]));
 
     const score = (item: T) => {
@@ -336,11 +276,10 @@ export default class PassportSvc {
 
   // Check if a user has a specific perk key unlocked
   static async hasPerk(userId: string, perkKey: string): Promise<boolean> {
-    const passport = await prisma.passport.findUnique({
-      where: { userId },
-      select: { perks: true },
-    });
-    return passport?.perks.includes(perkKey) ?? false;
+    // Through `getPerks` so this shares the cached entry rather than opening a
+    // second, uncached path to the same row.
+    const perks = await PassportSvc.getPerks(userId);
+    return perks.includes(perkKey);
   }
 
   // Enrich a list of items with the highest-priority badge each owner holds.
@@ -359,10 +298,7 @@ export default class PassportSvc {
       ...new Set(items.map((i) => i[ownerField]).filter(Boolean) as string[]),
     ];
 
-    const passports = await prisma.passport.findMany({
-      where: { userId: { in: ownerIds } },
-      select: { userId: true, perks: true },
-    });
+    const passports = await PassportRepo.findPerksForUsers(ownerIds);
     const perkMap = new Map(passports.map((p) => [p.userId, p.perks]));
 
     return items.map((item) => {
@@ -376,20 +312,25 @@ export default class PassportSvc {
 
   // Return all perk keys for a user
   static async getPerks(userId: string): Promise<string[]> {
-    const passport = await prisma.passport.findUnique({
-      where: { userId },
-      select: { perks: true },
-    });
+    // The hottest read in the module by a wide margin: every listing page calls
+    // it once per owner, through `sortByFeaturedPerk` and
+    // `enrichWithOwnerBadge`.
+    const passport = await passportCache.cached(
+      `perks:${userId}`,
+      PASSPORT_TTL,
+      () => PassportRepo.findPerksByUserId(userId),
+    );
     return passport?.perks ?? [];
   }
 
   static async getLeaderboard(limit = 20) {
-    const passports = await prisma.passport.findMany({
-      include: {
-        paths: true,
-        user: { select: { id: true, name: true, imgId: true, roleType: true } },
-      },
-    });
+    // Every passport in the database, with paths and users, sorted in memory.
+    // The most expensive read here and the same answer for everyone.
+    const passports = await passportCache.cached(
+      "leaderboard:all",
+      PASSPORT_TTL,
+      () => PassportRepo.findAllWithPaths(),
+    );
 
     return passports
       .map((p) => {

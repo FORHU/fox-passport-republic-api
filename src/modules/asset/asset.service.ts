@@ -5,7 +5,12 @@ import {
   AssetStatus,
 } from "@prisma/client";
 import AssetRepo from "./asset.repository";
+import { assetCache } from "../../utils/cache-namespaces";
+import { fingerprint } from "../../utils/cache.util";
 import { v4 as uuidv4 } from "uuid";
+
+/** Five minutes, matching venues: listings are browsed far more than edited. */
+const ASSET_TTL = 300;
 
 export default class AssetSvc {
   static async createAsset(data: {
@@ -55,7 +60,13 @@ export default class AssetSvc {
     page?: number;
     limit?: number;
   }) {
-    const { assets, total } = await AssetRepo.findAllAssets(filters);
+    // The perk sort and badge enrichment below stay outside: they belong to
+    // `passport`, which this namespace does not retire.
+    const { assets, total } = await assetCache.cached(
+      `all:${fingerprint(filters ?? {})}`,
+      ASSET_TTL,
+      () => AssetRepo.findAllAssets(filters),
+    );
     const { default: PassportSvc } =
       await import("../passport/passport.service");
     const sorted = await PassportSvc.sortByFeaturedPerk(
@@ -77,11 +88,15 @@ export default class AssetSvc {
     page?: number;
     limit: number;
   }) {
-    return AssetRepo.findPublicAssets(filters);
+    return assetCache.cached(`public:${fingerprint(filters)}`, ASSET_TTL, () =>
+      AssetRepo.findPublicAssets(filters),
+    );
   }
 
   static async getAssetById(id: string) {
-    const asset = await AssetRepo.findAssetById(id);
+    const asset = await assetCache.cached(`byId:${id}`, ASSET_TTL, () =>
+      AssetRepo.findAssetById(id),
+    );
     if (!asset) throw new Error("Asset not found");
     const { default: PassportSvc } =
       await import("../passport/passport.service");
@@ -146,6 +161,10 @@ export default class AssetSvc {
     category?: string;
     status?: AssetStatus;
   }) {
-    return AssetRepo.findAllAssetsAdmin(filters);
+    return assetCache.cached(
+      `admin:${fingerprint(filters ?? {})}`,
+      ASSET_TTL,
+      () => AssetRepo.findAllAssetsAdmin(filters),
+    );
   }
 }

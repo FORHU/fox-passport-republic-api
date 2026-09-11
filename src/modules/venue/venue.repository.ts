@@ -1,4 +1,5 @@
 import { prisma } from "../../utils/prisma";
+import { venueCache } from "../../utils/cache-namespaces";
 import {
   VenueStatus,
   BillingRate,
@@ -19,6 +20,20 @@ const mayorSelect = {
 } as const;
 
 export default class VenueRepo {
+  /**
+   * Retires the cached venue reads, the same shape `BookingRepo` uses.
+   *
+   * Wrapped around every write here rather than called from the services,
+   * because a write that forgets is a mayor looking at a venue they have just
+   * edited and seeing the old one. `AdminRepo` retires the same namespace when
+   * it approves or rejects.
+   */
+  private static async retiring<T>(write: Promise<T>): Promise<T> {
+    const result = await write;
+    await venueCache.invalidateAll();
+    return result;
+  }
+
   static async createVenue(data: {
     mayorId: string;
     name: string;
@@ -43,16 +58,18 @@ export default class VenueRepo {
     billingRate: BillingRate;
   }) {
     const { imgIds, ...venueScalars } = data;
-    return prisma.venue.create({
-      data: {
-        ...venueScalars,
-        ...(imgIds &&
-          imgIds.length > 0 && {
-            images: { connect: imgIds.map((id) => ({ id })) },
-          }),
-      },
-      include: { mayor: mayorSelect, images: true },
-    });
+    return this.retiring(
+      prisma.venue.create({
+        data: {
+          ...venueScalars,
+          ...(imgIds &&
+            imgIds.length > 0 && {
+              images: { connect: imgIds.map((id) => ({ id })) },
+            }),
+        },
+        include: { mayor: mayorSelect, images: true },
+      }),
+    );
   }
 
   static async findVenueById(id: string) {
@@ -220,23 +237,27 @@ export default class VenueRepo {
     }>,
   ) {
     const { imgIds, ...rest } = data;
-    return prisma.venue.update({
-      where: { id: String(id) },
-      data: {
-        ...rest,
-        ...(imgIds !== undefined && {
-          images: { set: imgIds.map((fid) => ({ id: fid })) },
-        }),
-      },
-      include: { mayor: mayorSelect, images: true },
-    });
+    return this.retiring(
+      prisma.venue.update({
+        where: { id: String(id) },
+        data: {
+          ...rest,
+          ...(imgIds !== undefined && {
+            images: { set: imgIds.map((fid) => ({ id: fid })) },
+          }),
+        },
+        include: { mayor: mayorSelect, images: true },
+      }),
+    );
   }
 
   static async archiveVenue(id: string) {
-    return prisma.venue.update({
-      where: { id: String(id) },
-      data: { status: VenueStatus.archived },
-    });
+    return this.retiring(
+      prisma.venue.update({
+        where: { id: String(id) },
+        data: { status: VenueStatus.archived },
+      }),
+    );
   }
 
   // Every live (pending or available) venue with a boundary — candidates for

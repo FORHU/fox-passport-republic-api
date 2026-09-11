@@ -2,6 +2,33 @@ import jwt from "jsonwebtoken";
 import { prisma } from "../src/utils/prisma";
 import { RoleType, SystemRole } from "@prisma/client";
 
+/**
+ * This file is imported only by the specs that *write* to the database, and
+ * those specs delete what they seed. On 8 Sep they deleted it from the
+ * development database - 148 users, 128 venues, and everything else - because
+ * that is the database `.env` points at, and nothing said otherwise.
+ *
+ * Nothing here can tell a seeded row from a real one, so the fix is upstream:
+ * seeding is refused unless the target database is named as a test database.
+ * Create one with:
+ *
+ *   docker exec local_postgres psql -U admin -d postgres  *     -c "CREATE DATABASE foxpassportrepublic_test"
+ *   cp .env.test.example .env.test.local     # then set the password
+ *   DATABASE_URL=<that url> npx prisma migrate deploy
+ *
+ * The specs that only read are unaffected: they never import this file.
+ */
+const databaseName = (process.env.DATABASE_URL ?? "").split("/").pop() ?? "";
+
+if (!databaseName.replace(/\?.*$/, "").endsWith("_test")) {
+  throw new Error(
+    `Refusing to seed: DATABASE_URL points at "${databaseName || "nothing"}", ` +
+      "which is not a test database. These specs delete what they create and " +
+      "cannot tell your data from theirs. See tests/setup.ts for how to make " +
+      "one, or run with --exclude to skip the specs that seed.",
+  );
+}
+
 const TEST_SECRET = process.env.ACCESS_TOKEN_SECRET || "accesssecret123";
 
 export function createTestToken(
@@ -81,16 +108,18 @@ export async function seedTestBooking(
   });
 }
 
-export async function cleanupWaitlist() {
-  await prisma.waitlist.deleteMany({});
-}
-
 export async function cleanupTestData(
   userIds: string[],
   templateIds: string[],
 ) {
-  // Delete in dependency order: waitlist → bookings (by event) → events → templates → users
-  await prisma.waitlist.deleteMany({});
+  // Delete in dependency order: waitlist → bookings (by event) → events →
+  // templates → users. Scoped to the templates this run created: it used to be
+  // `deleteMany({})`, which empties the table for everyone.
+  if (templateIds.length > 0) {
+    await prisma.waitlist.deleteMany({
+      where: { templateId: { in: templateIds } },
+    });
+  }
   if (templateIds.length > 0) {
     const events = await prisma.event.findMany({
       where: { templateId: { in: templateIds } },

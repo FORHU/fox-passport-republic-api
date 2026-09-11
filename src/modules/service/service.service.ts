@@ -1,6 +1,11 @@
 import ServiceRepo from "./service.repository";
+import { serviceCache } from "../../utils/cache-namespaces";
+import { fingerprint } from "../../utils/cache.util";
 import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
+
+/** Five minutes, matching the other two listing types. */
+const SERVICE_TTL = 300;
 
 export default class ServiceSvc {
   static async createService(data: {
@@ -53,7 +58,12 @@ export default class ServiceSvc {
     page?: number;
     limit?: number;
   }) {
-    const { services, total } = await ServiceRepo.getAllServices(filters);
+    // The perk sort and badge enrichment stay outside - they are `passport`'s.
+    const { services, total } = await serviceCache.cached(
+      `all:${fingerprint(filters ?? {})}`,
+      SERVICE_TTL,
+      () => ServiceRepo.getAllServices(filters),
+    );
     const { default: PassportSvc } =
       await import("../passport/passport.service");
     const sorted = await PassportSvc.sortByFeaturedPerk(
@@ -75,11 +85,17 @@ export default class ServiceSvc {
     page?: number;
     limit: number;
   }) {
-    return ServiceRepo.findPublicServices(filters);
+    return serviceCache.cached(
+      `public:${fingerprint(filters)}`,
+      SERVICE_TTL,
+      () => ServiceRepo.findPublicServices(filters),
+    );
   }
 
   static async getServiceById(id: string) {
-    const service = await ServiceRepo.getServiceById(id);
+    const service = await serviceCache.cached(`byId:${id}`, SERVICE_TTL, () =>
+      ServiceRepo.getServiceById(id),
+    );
     if (!service || service.deletedAt) throw new Error("Service not found");
     const { default: PassportSvc } =
       await import("../passport/passport.service");
@@ -145,6 +161,10 @@ export default class ServiceSvc {
     category?: ServiceCategory;
     status?: ServiceStatus;
   }) {
-    return ServiceRepo.getAllServicesAdmin(filters);
+    return serviceCache.cached(
+      `admin:${fingerprint(filters ?? {})}`,
+      SERVICE_TTL,
+      () => ServiceRepo.getAllServicesAdmin(filters),
+    );
   }
 }

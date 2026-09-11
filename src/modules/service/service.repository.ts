@@ -1,7 +1,15 @@
 import { prisma } from "../../utils/prisma";
+import { serviceCache } from "../../utils/cache-namespaces";
 import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 
 export default class ServiceRepo {
+  /** Retires the cached service reads. `AdminRepo` retires the same namespace on approval. */
+  private static async retiring<T>(write: Promise<T>): Promise<T> {
+    const result = await write;
+    await serviceCache.invalidateAll();
+    return result;
+  }
+
   // READ ALL (public — available only)
   static async getAllServices(filters?: {
     ownerId?: string;
@@ -136,32 +144,34 @@ export default class ServiceRepo {
     status?: ServiceStatus;
     imgIds: string[];
   }) {
-    return prisma.service.create({
-      data: {
-        id: data.id,
-        ownerId: String(data.ownerId),
-        category: data.category,
-        name: data.name,
-        description: data.description,
-        city: data.city,
-        state: data.state,
-        country: data.country,
-        isWillingToTravel: data.isWillingToTravel,
-        tags: data.tags,
-        price: data.price,
-        currency: data.currency,
-        billingRate: data.billingRate,
-        status: data.status,
-        ...(data.imgIds &&
-          data.imgIds.length > 0 && {
-            images: { connect: data.imgIds.map((id) => ({ id })) },
-          }),
-      },
-      include: {
-        owner: { select: { id: true, name: true, email: true } },
-        images: true,
-      },
-    });
+    return this.retiring(
+      prisma.service.create({
+        data: {
+          id: data.id,
+          ownerId: String(data.ownerId),
+          category: data.category,
+          name: data.name,
+          description: data.description,
+          city: data.city,
+          state: data.state,
+          country: data.country,
+          isWillingToTravel: data.isWillingToTravel,
+          tags: data.tags,
+          price: data.price,
+          currency: data.currency,
+          billingRate: data.billingRate,
+          status: data.status,
+          ...(data.imgIds &&
+            data.imgIds.length > 0 && {
+              images: { connect: data.imgIds.map((id) => ({ id })) },
+            }),
+        },
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          images: true,
+        },
+      }),
+    );
   }
 
   static async getServiceById(id: string) {
@@ -192,37 +202,41 @@ export default class ServiceRepo {
       imgIds: string[];
     }>,
   ) {
-    return prisma.service.update({
-      where: { id: String(id) },
-      data: {
-        category: data.category ?? undefined,
-        name: data.name ?? undefined,
-        description: data.description ?? undefined,
-        city: data.city ?? undefined,
-        state: data.state ?? undefined,
-        country: data.country ?? undefined,
-        isWillingToTravel: data.isWillingToTravel ?? undefined,
-        tags: data.tags ?? undefined,
-        price: data.price ?? undefined,
-        currency: data.currency ?? undefined,
-        billingRate: data.billingRate ?? undefined,
-        status: data.status ?? undefined,
-        ...(data.imgIds &&
-          data.imgIds.length > 0 && {
-            images: { connect: data.imgIds.map((id) => ({ id })) },
-          }),
-      },
-      include: {
-        owner: { select: { id: true, name: true, email: true } },
-        images: true,
-      },
-    });
+    return this.retiring(
+      prisma.service.update({
+        where: { id: String(id) },
+        data: {
+          category: data.category ?? undefined,
+          name: data.name ?? undefined,
+          description: data.description ?? undefined,
+          city: data.city ?? undefined,
+          state: data.state ?? undefined,
+          country: data.country ?? undefined,
+          isWillingToTravel: data.isWillingToTravel ?? undefined,
+          tags: data.tags ?? undefined,
+          price: data.price ?? undefined,
+          currency: data.currency ?? undefined,
+          billingRate: data.billingRate ?? undefined,
+          status: data.status ?? undefined,
+          ...(data.imgIds &&
+            data.imgIds.length > 0 && {
+              images: { connect: data.imgIds.map((id) => ({ id })) },
+            }),
+        },
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          images: true,
+        },
+      }),
+    );
   }
 
   static async deleteService(id: string) {
-    return prisma.service.update({
-      where: { id: String(id) },
-      data: { deletedAt: new Date() },
-    });
+    return this.retiring(
+      prisma.service.update({
+        where: { id: String(id) },
+        data: { deletedAt: new Date() },
+      }),
+    );
   }
 }

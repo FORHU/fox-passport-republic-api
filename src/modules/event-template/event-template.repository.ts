@@ -1,4 +1,5 @@
 import { prisma } from "../../utils/prisma";
+import { eventTemplateCache } from "../../utils/cache-namespaces";
 import {
   Prisma,
   EventCategory,
@@ -30,6 +31,20 @@ type UpdateTemplateData = Omit<
 type MatchData = Record<string, string | number | boolean | Date | null>;
 
 export default class EventTemplateRepo {
+  /**
+   * Retires the cached template reads.
+   *
+   * Every write here is wrapped, not just the ones touching `eventTemplate`:
+   * attaching an asset, a service or a venue changes the price the listing
+   * quotes, because that price is computed from the attached items rather than
+   * stored.
+   */
+  private static async retiring<T>(write: Promise<T>): Promise<T> {
+    const result = await write;
+    await eventTemplateCache.invalidateAll();
+    return result;
+  }
+
   // CREATE
   static async createTemplate(data: {
     ownerId: string;
@@ -41,16 +56,20 @@ export default class EventTemplateRepo {
     maxAttendees?: number;
   }) {
     const { imgIds, ...rest } = data;
-    return prisma.eventTemplate.create({
-      data: {
-        ...rest,
-        images: imgIds ? { connect: imgIds.map((id) => ({ id })) } : undefined,
-      },
-      include: {
-        owner: { select: { id: true, name: true, email: true } },
-        images: true,
-      },
-    });
+    return this.retiring(
+      prisma.eventTemplate.create({
+        data: {
+          ...rest,
+          images: imgIds
+            ? { connect: imgIds.map((id) => ({ id })) }
+            : undefined,
+        },
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          images: true,
+        },
+      }),
+    );
   }
 
   // FIND ALL
@@ -163,6 +182,45 @@ export default class EventTemplateRepo {
   }
 
   // FIND BY ID
+  /**
+   * The public template a booking is built from, with each item's owner - the
+   * provider ids the per-partner escrow transactions are written against.
+   *
+   * `isPublic` is part of the lookup rather than a check afterwards, so an
+   * unapproved template is a miss and not a leak. Moved out of
+   * `booking.controller.ts` unchanged; it is the only read there that was not
+   * about bookings at all.
+   */
+  static async findPublicTemplateWithItemOwners(id: string) {
+    return prisma.eventTemplate.findUnique({
+      where: { id, isPublic: true },
+      include: {
+        templateAssets: { include: { asset: { include: { owner: true } } } },
+        templateServices: {
+          include: { service: { include: { owner: true } } },
+        },
+        templateVenues: { include: { venue: { include: { mayor: true } } } },
+      },
+    });
+  }
+
+  /**
+   * The newest published templates, for the recommendation strip. One image
+   * each - the strip renders a single thumbnail.
+   *
+   * Moved verbatim out of `event-template.controller.ts`.
+   */
+  static async findRecommendations(take: number) {
+    return prisma.eventTemplate.findMany({
+      where: { isPublic: true, status: EventTemplateStatus.published },
+      orderBy: { createdAt: "desc" },
+      take,
+      include: {
+        images: { take: 1, select: { url: true } },
+      },
+    });
+  }
+
   static async findTemplateById(id: string) {
     return prisma.eventTemplate.findUnique({
       where: { id },
@@ -179,26 +237,28 @@ export default class EventTemplateRepo {
   // UPDATE
   static async updateTemplate(id: string, data: UpdateTemplateData) {
     const { imgIds, ...rest } = data;
-    return prisma.eventTemplate.update({
-      where: { id },
-      data: {
-        ...rest,
-        images: imgIds
-          ? { set: imgIds.map((id: string) => ({ id })) }
-          : undefined,
-      },
-      include: {
-        owner: { select: { id: true, name: true, email: true } },
-        // NOTE: must match createTemplate/findTemplateById's include — without these,
-        // calculateTotalsBreakdown() has no template items to sum and silently
-        // returns 0 for itemsTotal/hostMarkupAmount/platformFeeAmount/totalAmount
-        // after every update (pre-existing bug, surfaced while testing hostMarkupPercent).
-        templateAssets: { include: { asset: true } },
-        templateServices: { include: { service: true } },
-        templateVenues: { include: { venue: true } },
-        images: true,
-      },
-    });
+    return this.retiring(
+      prisma.eventTemplate.update({
+        where: { id },
+        data: {
+          ...rest,
+          images: imgIds
+            ? { set: imgIds.map((id: string) => ({ id })) }
+            : undefined,
+        },
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          // NOTE: must match createTemplate/findTemplateById's include — without these,
+          // calculateTotalsBreakdown() has no template items to sum and silently
+          // returns 0 for itemsTotal/hostMarkupAmount/platformFeeAmount/totalAmount
+          // after every update (pre-existing bug, surfaced while testing hostMarkupPercent).
+          templateAssets: { include: { asset: true } },
+          templateServices: { include: { service: true } },
+          templateVenues: { include: { venue: true } },
+          images: true,
+        },
+      }),
+    );
   }
 
   // SUBMIT FOR REVIEW
@@ -210,18 +270,20 @@ export default class EventTemplateRepo {
       throw new Error(
         "Template is not in draft — already submitted or published",
       );
-    return prisma.eventTemplate.update({
-      where: { id },
-      data: { status: "pending" },
-      select: {
-        id: true,
-        name: true,
-        status: true,
-        ownerId: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    return this.retiring(
+      prisma.eventTemplate.update({
+        where: { id },
+        data: { status: "pending" },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          ownerId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+    );
   }
 
   // ASSETS
@@ -235,30 +297,34 @@ export default class EventTemplateRepo {
     agreedPrice?: number,
     isOptional?: boolean,
   ) {
-    return prisma.eventTemplateAsset.create({
-      data: {
-        templateId,
-        assetId,
-        quantity,
-        description,
-        matchedAt,
-        agreedPrice: agreedPrice ?? 0,
-        isOptional: isOptional ?? false,
-        ...(matchData || {}),
-      },
-      include: { asset: true },
-    });
+    return this.retiring(
+      prisma.eventTemplateAsset.create({
+        data: {
+          templateId,
+          assetId,
+          quantity,
+          description,
+          matchedAt,
+          agreedPrice: agreedPrice ?? 0,
+          isOptional: isOptional ?? false,
+          ...(matchData || {}),
+        },
+        include: { asset: true },
+      }),
+    );
   }
 
   static async updateAssetMatch(
     id: string,
     data: Prisma.EventTemplateAssetUncheckedUpdateInput,
   ) {
-    return prisma.eventTemplateAsset.update({
-      where: { id },
-      data,
-      include: { asset: true },
-    });
+    return this.retiring(
+      prisma.eventTemplateAsset.update({
+        where: { id },
+        data,
+        include: { asset: true },
+      }),
+    );
   }
 
   static async searchAssetsByLocation(filters: {
@@ -282,9 +348,11 @@ export default class EventTemplateRepo {
   }
 
   static async removeAsset(templateId: string, assetId: string) {
-    return prisma.eventTemplateAsset.deleteMany({
-      where: { templateId, assetId },
-    });
+    return this.retiring(
+      prisma.eventTemplateAsset.deleteMany({
+        where: { templateId, assetId },
+      }),
+    );
   }
 
   // SERVICES
@@ -297,29 +365,33 @@ export default class EventTemplateRepo {
     agreedPrice?: number,
     isOptional?: boolean,
   ) {
-    return prisma.eventTemplateService.create({
-      data: {
-        templateId,
-        serviceId,
-        description,
-        matchedAt,
-        agreedPrice: agreedPrice ?? 0,
-        isOptional: isOptional ?? false,
-        ...(matchData || {}),
-      },
-      include: { service: true },
-    });
+    return this.retiring(
+      prisma.eventTemplateService.create({
+        data: {
+          templateId,
+          serviceId,
+          description,
+          matchedAt,
+          agreedPrice: agreedPrice ?? 0,
+          isOptional: isOptional ?? false,
+          ...(matchData || {}),
+        },
+        include: { service: true },
+      }),
+    );
   }
 
   static async updateServiceMatch(
     id: string,
     data: Prisma.EventTemplateServiceUncheckedUpdateInput,
   ) {
-    return prisma.eventTemplateService.update({
-      where: { id },
-      data,
-      include: { service: true },
-    });
+    return this.retiring(
+      prisma.eventTemplateService.update({
+        where: { id },
+        data,
+        include: { service: true },
+      }),
+    );
   }
 
   static async searchServicesByLocation(filters: {
@@ -343,9 +415,11 @@ export default class EventTemplateRepo {
   }
 
   static async removeService(templateId: string, serviceId: string) {
-    return prisma.eventTemplateService.deleteMany({
-      where: { templateId, serviceId },
-    });
+    return this.retiring(
+      prisma.eventTemplateService.deleteMany({
+        where: { templateId, serviceId },
+      }),
+    );
   }
 
   // VENUES
@@ -358,29 +432,33 @@ export default class EventTemplateRepo {
     agreedPrice?: number,
     isOptional?: boolean,
   ) {
-    return prisma.eventTemplateVenue.create({
-      data: {
-        templateId,
-        venueId,
-        description,
-        matchedAt,
-        agreedPrice: agreedPrice ?? 0,
-        isOptional: isOptional ?? false,
-        ...(matchData || {}),
-      },
-      include: { venue: true },
-    });
+    return this.retiring(
+      prisma.eventTemplateVenue.create({
+        data: {
+          templateId,
+          venueId,
+          description,
+          matchedAt,
+          agreedPrice: agreedPrice ?? 0,
+          isOptional: isOptional ?? false,
+          ...(matchData || {}),
+        },
+        include: { venue: true },
+      }),
+    );
   }
 
   static async updateVenueMatch(
     id: string,
     data: Prisma.EventTemplateVenueUncheckedUpdateInput,
   ) {
-    return prisma.eventTemplateVenue.update({
-      where: { id },
-      data,
-      include: { venue: true },
-    });
+    return this.retiring(
+      prisma.eventTemplateVenue.update({
+        where: { id },
+        data,
+        include: { venue: true },
+      }),
+    );
   }
 
   static async searchVenuesByLocation(filters: {
@@ -403,9 +481,11 @@ export default class EventTemplateRepo {
   }
 
   static async removeVenue(templateId: string, venueId: string) {
-    return prisma.eventTemplateVenue.deleteMany({
-      where: { templateId, venueId },
-    });
+    return this.retiring(
+      prisma.eventTemplateVenue.deleteMany({
+        where: { templateId, venueId },
+      }),
+    );
   }
 
   // TRENDING — top N public templates in a category ranked by approved-Event count
@@ -450,8 +530,10 @@ export default class EventTemplateRepo {
 
   // DELETE TEMPLATE
   static async deleteTemplate(id: string) {
-    return prisma.eventTemplate.delete({
-      where: { id },
-    });
+    return this.retiring(
+      prisma.eventTemplate.delete({
+        where: { id },
+      }),
+    );
   }
 }
