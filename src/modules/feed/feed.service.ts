@@ -228,7 +228,7 @@ export default class FeedService {
           user.roleType.includes("gearFoxer") ||
           user.roleType.includes("investor");
         if (!isAuthorized) {
-          throw new Error("Unauthorized: Gear Foxer or Partner role required");
+          throw new Error("Unauthorized: Equipment Foxer or Partner role required");
         }
         const asset = await prisma.asset.findUnique({
           where: { id: assetId },
@@ -254,7 +254,7 @@ export default class FeedService {
           user.roleType.includes("investor");
         if (!isAuthorized) {
           throw new Error(
-            "Unauthorized: Service Foxer or Partner role required",
+            "Unauthorized: Talent Foxer or Partner role required",
           );
         }
         const service = await prisma.service.findUnique({

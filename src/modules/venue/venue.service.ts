@@ -81,6 +81,23 @@ export default class VenueSvc {
     status?: VenueStatus;
     price?: number;
     billingRate?: BillingRate;
+
+    facilities?: string[];
+    recommendedCapacity?: number;
+    seatingArrangements?: string[];
+    stageConfig?: string;
+    setupOptions?: string[];
+    operatingHours?: any;
+    blockedDates?: Date[];
+    minBookingTime?: number;
+    depositRequirements?: string;
+    floorPlanUrls?: string[];
+    seatingLayoutUrls?: string[];
+    parkingInformation?: string;
+    accessibilityInformation?: string;
+    entranceInstructions?: string;
+    recommendedAssets?: string[];
+    recommendedServices?: string[];
   }) {
     // Business logic: validate business rules before creation
     if (data.price && data.price < 0) {
@@ -140,6 +157,32 @@ export default class VenueSvc {
       status: finalStatus,
       price: data.price ?? 0,
       billingRate: (data.billingRate as BillingRate) ?? BillingRate.daily,
+
+      facilities: data.facilities ?? [],
+      recommendedCapacity: data.recommendedCapacity,
+      seatingArrangements: data.seatingArrangements ?? [],
+      stageConfig: data.stageConfig,
+      setupOptions: data.setupOptions ?? [],
+      operatingHours: data.operatingHours ? (data.operatingHours as Prisma.InputJsonValue) : undefined,
+      blockedDates: data.blockedDates ?? [],
+      minBookingTime: data.minBookingTime,
+      depositRequirements: data.depositRequirements,
+      floorPlanUrls: data.floorPlanUrls ?? [],
+      seatingLayoutUrls: data.seatingLayoutUrls ?? [],
+      parkingInformation: data.parkingInformation,
+      accessibilityInformation: data.accessibilityInformation,
+      entranceInstructions: data.entranceInstructions,
+
+      ...(data.recommendedAssets?.length && {
+        recommendedAssets: {
+          connect: data.recommendedAssets.map((id) => ({ id })),
+        },
+      }),
+      ...(data.recommendedServices?.length && {
+        recommendedServices: {
+          connect: data.recommendedServices.map((id) => ({ id })),
+        },
+      }),
     });
 
     // Award uploadVenue XP to the venueFoxer who created the listing
@@ -370,6 +413,23 @@ export default class VenueSvc {
       policies: string[];
       status: VenueStatus;
       billingRate: BillingRate;
+
+      facilities: string[];
+      recommendedCapacity: number;
+      seatingArrangements: string[];
+      stageConfig: string;
+      setupOptions: string[];
+      operatingHours: any;
+      blockedDates: Date[];
+      minBookingTime: number;
+      depositRequirements: string;
+      floorPlanUrls: string[];
+      seatingLayoutUrls: string[];
+      parkingInformation: string;
+      accessibilityInformation: string;
+      entranceInstructions: string;
+      recommendedAssets: string[];
+      recommendedServices: string[];
     }>;
   }) {
     const { id, requesterId, requesterRole, data } = params;
@@ -426,7 +486,7 @@ export default class VenueSvc {
       if (boundaryChanged) centroid = polygonCentroid(resolvedBoundary);
     }
 
-    const { boundary, status: _rawStatus, ...rest } = data;
+    const { boundary, status: _rawStatus, recommendedAssets, recommendedServices, ...rest } = data;
     return VenueRepo.updateVenue(id, {
       ...rest,
       // Never the raw `data.status` — always the clamped value, so a
@@ -437,6 +497,16 @@ export default class VenueSvc {
         boundary: boundary as unknown as Prisma.InputJsonValue,
         lat: centroid?.lat,
         lng: centroid?.lng,
+      }),
+      ...(recommendedAssets !== undefined && {
+        recommendedAssets: {
+          set: recommendedAssets.map((id) => ({ id })),
+        },
+      }),
+      ...(recommendedServices !== undefined && {
+        recommendedServices: {
+          set: recommendedServices.map((id) => ({ id })),
+        },
       }),
     });
   }

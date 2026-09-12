@@ -109,24 +109,28 @@ export default class AdminCtrl {
         id: r.id,
         bookingId: r.bookingId,
         bookingType: "event" as const,
-        reason: r.failureReason || "Refund failed",
-        description: r.adminNotes || undefined,
+        // `failureReason`/`adminNotes`/`resolvedAt`/`resolvedBy` no longer
+        // exist on `Refund` — `reason` is the one surviving free-text field.
+        reason: r.reason || "Refund failed",
+        description: undefined,
         // A failed refund surfaces to admins as its own dispute state.
         status: r.status === "failed" ? ("refund_failed" as const) : r.status,
         createdAt: r.createdAt,
-        resolvedAt: r.resolvedAt ?? undefined,
-        resolvedBy: r.resolvedBy || undefined,
-        adminNotes: r.adminNotes || undefined,
+        resolvedAt: undefined,
+        resolvedBy: undefined,
+        adminNotes: undefined,
         citizen: {
-          id: r.booking.user?.id ?? "",
-          name: r.booking.user?.name ?? "Unknown",
-          email: r.booking.user?.email ?? "",
+          id: r.booking?.user?.id ?? "",
+          name: r.booking?.user?.name ?? "Unknown",
+          email: r.booking?.user?.email ?? "",
         },
         booking: {
-          totalAmount: r.booking.totalAmount,
-          status: r.booking.status,
-          startAt: r.booking.startAt ?? undefined,
-          event: r.booking.event ? { name: r.booking.event.name } : undefined,
+          totalAmount: r.booking?.totalAmount,
+          status: r.booking?.status,
+          startAt: r.booking?.startAt ?? undefined,
+          event: r.booking?.event
+            ? { name: r.booking.event.name }
+            : undefined,
         },
         refunds: r.payment
           ? [
@@ -170,10 +174,12 @@ export default class AdminCtrl {
         amount: r.amount,
         status: r.status,
         method: r.payment?.method ?? "stripe",
-        failureReason: r.failureReason || undefined,
-        adminNotes: r.adminNotes || undefined,
+        // `failureReason`/`adminNotes`/`resolvedAt` no longer exist on
+        // `Refund` — `reason` is the one surviving free-text field.
+        failureReason: r.reason || undefined,
+        adminNotes: undefined,
         createdAt: r.createdAt,
-        processedAt: r.resolvedAt ?? undefined,
+        processedAt: undefined,
       }));
 
       return res.status(200).json({

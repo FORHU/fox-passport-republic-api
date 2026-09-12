@@ -92,7 +92,6 @@ export default class BookingRepo {
             invitedBy: { select: { id: true, name: true } },
           },
         },
-        payments: true,
         assetTransactions: true,
         serviceTransactions: true,
         venueTransactions: {
@@ -117,7 +116,6 @@ export default class BookingRepo {
     return prisma.booking.findUnique({
       where: { id },
       include: {
-        payments: true,
         user: { select: { id: true, name: true, email: true } },
         event: {
           include: {
@@ -290,7 +288,13 @@ export default class BookingRepo {
     data: { transactionId: string; method: string },
   ) {
     return this.retiring(
-      prisma.payment.update({ where: { id: paymentId }, data }),
+      prisma.payment.update({
+        where: { id: paymentId },
+        data: {
+          providerReference: data.transactionId,
+          method: data.method,
+        },
+      }),
     );
   }
 

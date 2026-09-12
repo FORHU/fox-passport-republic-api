@@ -26,7 +26,6 @@ model PassportPath {
   passport   Passport @relation(fields: [passportId], references: [id], onDelete: Cascade)
 
   @@unique([passportId, path])
-
   @@map("passport_paths")
 }
 
@@ -55,7 +54,6 @@ model UserBadge {
   badge      Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
 
   @@unique([passportId, badgeId])
-
   @@map("user_badges")
 }
 
@@ -107,7 +105,6 @@ model Review {
 
   @@unique([bookingId])
   @@index([userId, entityId, entityType])
-
   @@map("reviews")
 }
 

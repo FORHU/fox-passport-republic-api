@@ -142,6 +142,7 @@ export default class ServiceRepo {
     currency?: string;
     billingRate: BillingRate;
     status?: ServiceStatus;
+    venueId?: string;
     imgIds: string[];
   }) {
     return this.retiring(
@@ -199,6 +200,7 @@ export default class ServiceRepo {
       currency: string;
       billingRate: BillingRate;
       status: ServiceStatus;
+      venueId: string;
       imgIds: string[];
     }>,
   ) {

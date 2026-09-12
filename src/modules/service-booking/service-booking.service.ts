@@ -57,7 +57,7 @@ export default class ServiceBookingSvc {
       endDate,
       billingRate: service.billingRate,
     });
-    // service_lower_fees perk: service foxer owner pays 0% platform commission
+    // service_lower_fees perk: Talent Foxer owner pays 0% platform commission
     const { default: PassportSvc } =
       await import("../passport/passport.service");
     const ownerHasLowerFees = await PassportSvc.hasPerk(
