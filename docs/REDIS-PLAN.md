@@ -644,11 +644,18 @@ left, plus what the fixing turned up.
 
 ### The same problem one layer down
 
-**The services hold 124 direct `prisma` calls across 19 files** - 162 before
-this pass moved the booking-family writes into repositories, 145 before
-`passport` was extracted on 10 Sep. `specialization` (17), `event-template`
-(16), `refund` (13), `review` (11) and `match` (9) are what is left of the
-weight.
+**The services held 124 direct `prisma` calls across 19 files when this branch
+was written** - 162 before this pass moved the booking-family writes into
+repositories, 145 before `passport` was extracted on 10 Sep.
+`specialization` (17), `event-template` (16), `refund` (13), `review` (11) and
+`match` (9) were what was left of the weight at that point.
+
+**Re-measured 12 Sep against current `main`: 140 calls across 21 files** - the
+count went up, not down, because `feat/foxcommunity` (PR #79, unrelated to this
+work) landed on `main` afterward and added `conversations.service.ts` (3 → 13)
+and `reports.service.ts` (new, 2), plus grew `feed.service.ts` (6 → 8). Not a
+regression in this branch's work — `specialization` is still exactly 17, still
+the next candidate, untouched since this was written.
 
 **`passport` is done — 10 Sep.** It was the heaviest at 20, had no repository at
 all, and §2c had just given it a cache whose invalidation sat in six

@@ -141,12 +141,17 @@ reintroduce a warning telling people to work around a problem that is fixed.
 
 ---
 
-## 3. The auth chain, and what is still mismatched
+## 3. The auth chain — merged 12 Sep, verification still owed
 
 AUTH-01 through AUTH-06 are written. The **api** half merged to `main` via
-PR #77 on 8 Sep. The **app** half (`feat/auth-03-api-cookies`) is pushed and
-**not merged**, so the api's cookie authorship is live on `main` while the app's
-relay is not — which is what produced a logout that did not log anyone out.
+PR #77 on 8 Sep, and the **app** half merged 12 Sep via PR #60
+(`merge-auth-03-into-main`), against an app `main` that had moved substantially
+since the branch was cut. Two conflicts (`useLogout.ts`,
+`AuthStoreProvider.tsx`), resolved in favor of the app's `endSession()`
+abstraction while keeping its `promptLogin` option and `/?auth=expired` toast
+handoff. Both repos' cookie authorship is now live on `main` together, which
+should close the logout-that-didn't-log-anyone-out bug — **not yet confirmed in
+a browser.**
 
 The six browser checks are written out as § Browser verification in the app's
 `docs/AUTH_HARDENING.md`. **None has been run.** AUTH-05 is blocked outright:
