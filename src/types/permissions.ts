@@ -69,6 +69,21 @@ export const PERMISSIONS = [
 export type Permission = (typeof PERMISSIONS)[number];
 
 /**
+ * Permissions an Event Foxer may delegate to someone else for a single event,
+ * via `EventOrganizerAssignment.permissions` — not a `RoleType` grant, and not
+ * visible to `can()`/`permissionsForUser()` at all. Scoped entirely to that
+ * one event: approving requests, reviews, payouts and XP still key off
+ * `Event.organizerId` alone regardless of what a delegate holds here.
+ *
+ * Keeping this as an explicit allow-list (rather than accepting any
+ * `Permission`) means a new delegable capability is a deliberate code change,
+ * not an accident of some other permission existing in the main table.
+ */
+export const DELEGABLE_EVENT_PERMISSIONS = ["booking:check-in"] as const;
+export type DelegableEventPermission =
+  (typeof DELEGABLE_EVENT_PERMISSIONS)[number];
+
+/**
  * The grant table.
  *
  * `admin_secretary` exists to work the approval queues without seeing who
