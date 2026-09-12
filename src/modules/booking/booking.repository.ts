@@ -166,7 +166,9 @@ export default class BookingRepo {
   static async findByTicketCode(ticketCode: string) {
     return prisma.booking.findUnique({
       where: { ticketCode },
-      include: { event: { select: { organizerId: true, name: true } } },
+      include: {
+        event: { select: { id: true, organizerId: true, name: true } },
+      },
     });
   }
 
@@ -181,7 +183,9 @@ export default class BookingRepo {
       where: { ticketCode },
       include: {
         booking: {
-          include: { event: { select: { organizerId: true, name: true } } },
+          include: {
+            event: { select: { id: true, organizerId: true, name: true } },
+          },
         },
       },
     });
