@@ -20,7 +20,11 @@ function assertCanManage(
 }
 
 export default class EventOrganizerService {
-  static async list(eventId: string, callerId: string, callerSystemRole: string) {
+  static async list(
+    eventId: string,
+    callerId: string,
+    callerSystemRole: string,
+  ) {
     const event = await EventOrganizerRepo.findEvent(eventId);
     if (!event) throw new Error("Event not found");
     assertCanManage(event, callerId, callerSystemRole);
