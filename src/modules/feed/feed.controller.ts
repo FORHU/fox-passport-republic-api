@@ -163,6 +163,19 @@ export default class FeedController {
     }
   }
 
+  static async trackShare(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const result = await FeedService.trackShare(id);
+      return res.status(200).json({ success: true, data: result });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res
+        .status(statusForError(err.message))
+        .json({ success: false, message: err.message });
+    }
+  }
+
   static async setReaction(req: Request, res: Response) {
     const schema = Joi.object({
       type: Joi.string()

@@ -461,6 +461,15 @@ export default class FeedService {
     return post;
   }
 
+  static async trackShare(postId: string) {
+    const post = await FeedRepo.findPostById(postId);
+    if (!post) {
+      throw new Error("Post not found");
+    }
+    await FeedRepo.incrementShares(postId);
+    return { success: true };
+  }
+
   static async setReaction(
     postId: string,
     user: AuthenticatedUser,

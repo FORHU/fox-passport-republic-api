@@ -16,6 +16,7 @@ router.post("/", authenticate, FeedController.createPost);
 router.patch("/:id", authenticate, FeedController.editPost);
 router.delete("/:id", authenticate, FeedController.deletePost);
 router.post("/:id/repost", authenticate, FeedController.repost);
+router.post("/:id/share", optionalAuth, FeedController.trackShare);
 router.post("/:id/reaction", authenticate, FeedController.setReaction);
 router.get("/:id/reactions", FeedController.getReactionBreakdown);
 router.post("/:id/save", authenticate, FeedController.toggleSave);
