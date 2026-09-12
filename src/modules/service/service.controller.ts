@@ -51,7 +51,6 @@ export default class ServiceCtrl {
       status: Joi.string()
         .valid(...Object.values(ServiceStatus))
         .optional(),
-      cancellationPolicyId: Joi.string().uuid().optional(),
     });
 
     const { error, value } = schema.validate(req.body, { stripUnknown: true });
