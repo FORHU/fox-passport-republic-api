@@ -24,50 +24,94 @@ enum TransportPolicy {
 }
 
 model PartnerInvestment {
-  id                  String             @id @default(uuid())
-  partnerId           String
-  type                InvestmentType
-  title               String
-  description         String             @db.Text
+  id          String         @id @default(uuid())
+  partnerId   String
+  type        InvestmentType
+  title       String
+  description String         @db.Text
 
   // Physical Inventory Attributes
-  inventoryCategory   InventoryCategory?
-  quantityTotal       Int?               @default(1)
-  quantityAvailable   Int?               @default(1)
-  itemCondition       String?            // "mint", "good", "heavy_duty"
+  inventoryCategory InventoryCategory?
+  quantityTotal     Int?               @default(1)
+  quantityAvailable Int?               @default(1)
+  itemCondition     String? // "mint", "good", "heavy_duty"
 
   // Terms & Valuation
-  monetaryValue       Decimal            @db.Decimal(12, 2)
-  usageTerms          String?            // "free_for_partner_venues", "daily_lease", "rev_share"
-  dailyRentalRate     Decimal?           @db.Decimal(12, 2)
+  monetaryValue       Decimal  @db.Decimal(12, 2)
+  usageTerms          String? // "free_for_partner_venues", "daily_lease", "rev_share"
+  dailyRentalRate     Decimal? @db.Decimal(12, 2)
   revenueSharePercent Float?
 
   // Depot / Storage Location (for inventory map & logistics)
-  address             String?
-  city                String?
-  state               String?
-  country             String?            @default("Philippines")
-  lat                 Float?
-  lng                 Float?
-  deliveryRadiusKm    Float?             @default(25.0)
-  transportPolicy     TransportPolicy?   @default(self_pickup)
+  address          String?
+  city             String?
+  state            String?
+  country          String?          @default("Philippines")
+  lat              Float?
+  lng              Float?
+  deliveryRadiusKm Float?           @default(25.0)
+  transportPolicy  TransportPolicy? @default(self_pickup)
 
   // Target links (optional if pledged to specific venue/event)
-  targetVenueId       String?
-  targetEventId       String?
+  targetVenueId String?
+  targetEventId String?
 
-  status              String             @default("active") // "active", "allocated", "depleted"
-  mediaUrls           String[]           @default([])
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  status    String   @default("active") // "active", "allocated", "depleted"
+  mediaUrls String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  partner             User               @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  targetVenue         Venue?             @relation(fields: [targetVenueId], references: [id], onDelete: SetNull)
-  targetEvent         Event?             @relation(fields: [targetEventId], references: [id], onDelete: SetNull)
+  partner     User   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  targetVenue Venue? @relation(fields: [targetVenueId], references: [id], onDelete: SetNull)
+  targetEvent Event? @relation(fields: [targetEventId], references: [id], onDelete: SetNull)
 
   @@index([partnerId])
   @@index([lat, lng])
   @@index([type, status])
   @@map("partner_investments")
+}
+
+enum PartnershipType {
+  investment
+  sponsorship
+  resource_contribution
+  business_partnership
+}
+
+enum PartnershipProposalStatus {
+  pending
+  accepted
+  rejected
+  withdrawn
+}
+
+model PartnershipProposal {
+  id        String @id @default(uuid())
+  partnerId String
+
+  targetEventId String?
+  targetVenueId String?
+
+  partnershipType PartnershipType
+  title           String
+  description     String          @db.Text
+
+  proposedAmount       Decimal? @db.Decimal(12, 2)
+  proposedContribution String?  @db.Text
+  proposedBenefits     String?  @db.Text
+
+  status PartnershipProposalStatus @default(pending)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  partner     User   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  targetEvent Event? @relation(fields: [targetEventId], references: [id], onDelete: SetNull)
+  targetVenue Venue? @relation(fields: [targetVenueId], references: [id], onDelete: SetNull)
+
+  @@index([partnerId])
+  @@index([targetEventId])
+  @@index([targetVenueId])
+  @@map("partnership_proposals")
 }
