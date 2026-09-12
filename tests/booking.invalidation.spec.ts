@@ -49,9 +49,16 @@ const db = vi.hoisted(() => {
       get: (_t, method) =>
         vi.fn(async () =>
           // `findMany` feeds the expiry sweep, which does nothing at all when
-          // it finds nothing - so it has to find something here.
+          // it finds nothing - so it has to find something here. Shaped for
+          // `PaymentRepo.cancelExpiredPayments`, the one caller that nests
+          // this deep (booking id via the payment's invoice item).
           method === "findMany"
-            ? [{ id: "p1", bookingId: "b1" }]
+            ? [
+                {
+                  id: "p1",
+                  invoice: { items: [{ sourceId: "b1" }] },
+                },
+              ]
             : { id: "b1", count: 1 },
         ),
     });
@@ -122,7 +129,7 @@ const paymentWrites: [string, () => Promise<unknown>][] = [
   [
     "updatePayment",
     () =>
-      PaymentRepo.updatePayment("p1", { paymentStatus: "completed" as never }),
+      PaymentRepo.updatePayment("p1", { paymentStatus: "paid" as never }),
   ],
   ["setTransactionId", () => PaymentRepo.setTransactionId("p1", "pi_1")],
   ["markRefunded", () => PaymentRepo.markRefunded("p1")],

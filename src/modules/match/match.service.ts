@@ -1,4 +1,4 @@
-import { MatchConstraint } from "@prisma/client";
+import { MatchConstraint, InvoiceSourceType } from "@prisma/client";
 import { eventTemplateCache } from "../../utils/cache-namespaces";
 import EventTransactionSvc from "../event-transaction/event-transaction.service";
 import EventRequestSvc from "../event-request/event-request.service";
@@ -209,7 +209,7 @@ export default class MatchSvc {
   }
 
   static async getMyMatches(clientId: string) {
-    return prisma.booking.findMany({
+    const bookings = await prisma.booking.findMany({
       where: { userId: clientId },
       include: {
         event: {
@@ -226,17 +226,43 @@ export default class MatchSvc {
             host: { select: { id: true, name: true, imgId: true } },
           },
         },
-        payments: {
-          select: {
-            id: true,
-            amount: true,
-            status: true,
-            method: true,
-            createdAt: true,
-          },
-        },
       },
       orderBy: { createdAt: "desc" },
     });
+
+    // `Booking` has no `payments` relation any more — payments are
+    // invoice-scoped, reached through the `booking`-sourced InvoiceItem.
+    // Batched rather than one query per booking.
+    const bookingIds = bookings.map((b) => b.id);
+    const items = await prisma.invoiceItem.findMany({
+      where: {
+        sourceType: InvoiceSourceType.booking,
+        sourceId: { in: bookingIds },
+      },
+      select: {
+        sourceId: true,
+        invoice: {
+          select: {
+            payments: {
+              select: {
+                id: true,
+                amount: true,
+                status: true,
+                method: true,
+                createdAt: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    const paymentsByBookingId = new Map(
+      items.map((i) => [i.sourceId, i.invoice.payments]),
+    );
+
+    return bookings.map((b) => ({
+      ...b,
+      payments: paymentsByBookingId.get(b.id) ?? [],
+    }));
   }
 }

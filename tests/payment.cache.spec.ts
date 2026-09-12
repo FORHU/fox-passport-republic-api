@@ -70,7 +70,7 @@ import { bookingCache } from "../src/utils/cache-namespaces";
 const PAYMENT = {
   id: "p1",
   bookingId: "b1",
-  status: "completed",
+  status: "paid",
   amount: new Prisma.Decimal("1500.00"),
   createdAt: new Date("2026-09-09T10:00:00.000Z"),
 };
@@ -147,7 +147,11 @@ describe("sharing the booking namespace", () => {
     await PaymentSvc.getBookingPayments("b1");
     await PaymentSvc.getRemainingBalance("b1");
 
-    expect(paymentRepo.getBookingPayments).toHaveBeenCalledTimes(2);
+    // `getRemainingBalance` now calls `getBookingPayments` itself too —
+    // `Booking` carries no `payments` relation any more, so it can't read
+    // them off `bookingRepo.findById` the way it used to. Each round is
+    // one direct call plus one from inside `getRemainingBalance`.
+    expect(paymentRepo.getBookingPayments).toHaveBeenCalledTimes(4);
     expect(bookingRepo.findById).toHaveBeenCalledTimes(2);
   });
 });

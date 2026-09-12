@@ -35,6 +35,8 @@ import eventRoutes from "../modules/event/event.routes";
 import followRoutes from "../modules/follow/follow.routes";
 import blockRoutes from "../modules/block/block.routes";
 import reportsRoutes from "../modules/reports/reports.routes";
+import biddingRoutes from "../modules/bidding/bidding.routes";
+import partnershipRoutes from "../modules/partnership/partnership.routes";
 
 const router = express.Router();
 
@@ -85,7 +87,8 @@ router.use("/v1/stripe-connect", stripeConnectRoutes);
 router.use("/v1/feed", feedRoutes);
 router.use("/v1/investments", investmentRoutes);
 router.use("/v1/events", eventRoutes);
-
+router.use("/v1/bids", biddingRoutes);
+router.use("/v1/partnerships", partnershipRoutes);
 // Admin Routes
 router.use("/v1/admin", adminRoutes);
 

@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { prisma } from "../../utils/prisma";
-import { RoleType, PayoutStatus } from "@prisma/client";
+import { PayoutSourceType, PayoutStatus } from "@prisma/client";
 import { STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents } from "../../utils/pricing";
 
@@ -18,35 +18,33 @@ const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
  */
 export default class PayoutSvc {
   /**
-   * Idempotency guard: the @@unique([sourceType, sourceId, recipientId, role])
-   * constraint means calling this twice for the same recipient/source/role is
-   * a no-op the second time (update: {}), so updateStatus(completed) being
-   * called more than once never double-pays anyone.
+   * Idempotency guard: the @@unique([sourceType, sourceId, providerId])
+   * constraint means calling this twice for the same provider/source is a
+   * no-op the second time (update: {}), so updateStatus(completed) being
+   * called more than once never double-pays anyone. There is no `role` on
+   * the current `Payout` model — `sourceType` alone already disambiguates
+   * which capacity the provider is being paid in.
    */
   static async createPayoutRecord(data: {
-    recipientId: string;
-    role: RoleType;
-    sourceType: string;
+    providerId: string;
+    sourceType: PayoutSourceType;
     sourceId: string;
     amount: number;
-    currency?: string;
   }) {
     return prisma.payout.upsert({
       where: {
-        sourceType_sourceId_recipientId_role: {
+        sourceType_sourceId_providerId: {
           sourceType: data.sourceType,
           sourceId: data.sourceId,
-          recipientId: data.recipientId,
-          role: data.role,
+          providerId: data.providerId,
         },
       },
       create: {
-        recipientId: data.recipientId,
-        role: data.role,
+        providerId: data.providerId,
         sourceType: data.sourceType,
         sourceId: data.sourceId,
-        amount: data.amount,
-        currency: data.currency ?? "PHP",
+        allocationAmount: data.amount,
+        payoutAmount: data.amount,
       },
       update: {}, // already exists — no-op, this is the idempotency guard
     });
@@ -56,28 +54,29 @@ export default class PayoutSvc {
   static async fireTransfer(payoutId: string): Promise<void> {
     const payout = await prisma.payout.findUnique({
       where: { id: payoutId },
-      include: { recipient: true },
+      include: { providerUser: true },
     });
     if (!payout) return;
     if (payout.status !== PayoutStatus.pending) return; // already paid or failed, don't retry blindly
 
-    const recipient = payout.recipient;
+    const recipient = payout.providerUser;
     if (!recipient.stripeAccountId || !recipient.stripePayoutsEnabled) {
       await prisma.payout.update({
         where: { id: payoutId },
         data: {
           status: PayoutStatus.failed,
-          failureReason:
-            "Recipient has not completed Stripe Connect onboarding",
         },
       });
+      console.error(
+        `Payout ${payoutId} failed: recipient ${recipient.id} has not completed Stripe Connect onboarding`,
+      );
       return;
     }
 
     try {
       const transfer = await stripe.transfers.create({
-        amount: toStripeCents(payout.amount.toNumber()),
-        currency: payout.currency.toLowerCase(),
+        amount: toStripeCents(payout.payoutAmount.toNumber()),
+        currency: "php",
         destination: recipient.stripeAccountId,
         transfer_group: payout.sourceId,
       });
@@ -85,8 +84,8 @@ export default class PayoutSvc {
         where: { id: payoutId },
         data: {
           status: PayoutStatus.paid,
-          stripeTransferId: transfer.id,
-          failureReason: null,
+          providerReference: transfer.id,
+          paidAt: new Date(),
         },
       });
     } catch (e: unknown) {
@@ -95,19 +94,19 @@ export default class PayoutSvc {
         where: { id: payoutId },
         data: {
           status: PayoutStatus.failed,
-          failureReason: err.message ?? "Stripe transfer failed",
         },
       });
+      console.error(
+        `Payout ${payoutId} Stripe transfer failed: ${err.message ?? "unknown error"}`,
+      );
     }
   }
 
   private static async createAndFire(data: {
-    recipientId: string;
-    role: RoleType;
-    sourceType: string;
+    providerId: string;
+    sourceType: PayoutSourceType;
     sourceId: string;
     amount: number;
-    currency?: string;
   }) {
     const payout = await this.createPayoutRecord(data);
     await this.fireTransfer(payout.id);
@@ -123,9 +122,8 @@ export default class PayoutSvc {
 
     const results = await Promise.allSettled([
       this.createAndFire({
-        recipientId: booking.asset.ownerId,
-        role: RoleType.gearFoxer,
-        sourceType: "assetBooking",
+        providerId: booking.asset.ownerId,
+        sourceType: PayoutSourceType.event_asset_transaction,
         sourceId: booking.id,
         amount: booking.totalAmount.sub(booking.platformFeeAmount).toNumber(),
       }),
@@ -143,9 +141,8 @@ export default class PayoutSvc {
 
     const results = await Promise.allSettled([
       this.createAndFire({
-        recipientId: booking.service.ownerId,
-        role: RoleType.serviceFoxer,
-        sourceType: "serviceBooking",
+        providerId: booking.service.ownerId,
+        sourceType: PayoutSourceType.event_service_transaction,
         sourceId: booking.id,
         amount: booking.totalAmount.sub(booking.platformFeeAmount).toNumber(),
       }),
@@ -176,14 +173,13 @@ export default class PayoutSvc {
     // sourceId is the transaction row's own id (not booking.id) — necessary because
     // a single provider can supply more than one item to the same event (e.g. two
     // separate Assets owned by the same Foxer). Using booking.id alone would collide
-    // on the (sourceType, sourceId, recipientId, role) unique constraint and silently
+    // on the (sourceType, sourceId, providerId) unique constraint and silently
     // drop the second item's payout.
     for (const tx of booking.assetTransactions) {
       jobs.push(
         this.createAndFire({
-          recipientId: tx.providerId,
-          role: RoleType.gearFoxer,
-          sourceType: "eventAssetTransaction",
+          providerId: tx.providerId,
+          sourceType: PayoutSourceType.event_asset_transaction,
           sourceId: tx.id,
           amount: tx.agreedPrice.toNumber(),
         }),
@@ -192,9 +188,8 @@ export default class PayoutSvc {
     for (const tx of booking.serviceTransactions) {
       jobs.push(
         this.createAndFire({
-          recipientId: tx.providerId,
-          role: RoleType.serviceFoxer,
-          sourceType: "eventServiceTransaction",
+          providerId: tx.providerId,
+          sourceType: PayoutSourceType.event_service_transaction,
           sourceId: tx.id,
           amount: tx.agreedPrice.toNumber(),
         }),
@@ -203,9 +198,8 @@ export default class PayoutSvc {
     for (const tx of booking.venueTransactions) {
       jobs.push(
         this.createAndFire({
-          recipientId: tx.providerId,
-          role: RoleType.venueFoxer,
-          sourceType: "eventVenueTransaction",
+          providerId: tx.providerId,
+          sourceType: PayoutSourceType.event_venue_transaction,
           sourceId: tx.id,
           amount: tx.agreedPrice.toNumber(),
         }),
@@ -215,9 +209,8 @@ export default class PayoutSvc {
     // only ever one Host per Event).
     jobs.push(
       this.createAndFire({
-        recipientId: booking.event.organizerId,
-        role: RoleType.eventFoxer,
-        sourceType: "eventHostMarkup",
+        providerId: booking.event.organizerId,
+        sourceType: PayoutSourceType.event_host_markup,
         sourceId: booking.id,
         amount: booking.event.hostMarkupAmount.toNumber(),
       }),

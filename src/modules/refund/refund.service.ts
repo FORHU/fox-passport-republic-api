@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { Prisma } from "@prisma/client";
+import { Prisma, PaymentStatus, RefundStatus } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import PaymentRepo from "../payment/payment.repository";
 import { STRIPE_SECRET_KEY } from "../../config";
@@ -67,7 +67,6 @@ export default class RefundSvc {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
-        payments: true,
         event: {
           include: {
             template: {
@@ -138,10 +137,9 @@ export default class RefundSvc {
           : "No refund available under the applicable cancellation policy";
     }
 
-    const totalPaid = booking.payments
-      .filter(
-        (p) => p.status === "completed" || (p.status as string) === "succeeded",
-      )
+    const payments = await PaymentRepo.getBookingPayments(bookingId);
+    const totalPaid = payments
+      .filter((p) => p.status === PaymentStatus.paid)
       .reduce((sum, p) => sum.add(p.amount), new Prisma.Decimal(0));
 
     const estimatedRefund = totalPaid.mul(refundPercent).div(100);
@@ -158,10 +156,12 @@ export default class RefundSvc {
   }
 
   static async getFailedRefunds() {
+    // No separate "resolved" flag any more — `retryRefund`/`resolveManual`
+    // both move a refund's status away from `failed` on success, so a plain
+    // status filter already is the unresolved list.
     return prisma.refund.findMany({
       where: {
-        status: "failed",
-        resolved: false,
+        status: RefundStatus.failed,
       },
       include: {
         booking: {
@@ -192,9 +192,9 @@ export default class RefundSvc {
 
     let stripeFailureDetail: Record<string, unknown> | null = null;
 
-    if (refund.stripeRefundId) {
+    if (refund.providerReference) {
       try {
-        const sr = await stripe.refunds.retrieve(refund.stripeRefundId);
+        const sr = await stripe.refunds.retrieve(refund.providerReference);
         stripeFailureDetail = {
           id: sr.id,
           status: sr.status,
@@ -204,7 +204,7 @@ export default class RefundSvc {
         if (sr.status === "succeeded") {
           await prisma.refund.update({
             where: { id: refundId },
-            data: { status: "succeeded" },
+            data: { status: RefundStatus.succeeded },
           });
         }
       } catch {
@@ -228,36 +228,32 @@ export default class RefundSvc {
     if (refund.status !== "failed")
       throw new Error("Only failed refunds can be retried");
 
-    if (!refund.payment?.transactionId?.startsWith("pi_")) {
+    if (!refund.payment?.providerReference?.startsWith("pi_")) {
       throw new Error("No Stripe PaymentIntent to refund");
     }
 
     try {
       const sr = await stripe.refunds.create({
-        payment_intent: refund.payment.transactionId,
+        payment_intent: refund.payment.providerReference,
         amount: toStripeCents(refund.amount.toNumber()),
       });
 
       const newRefundStatus =
-        sr.status === "succeeded" ? "succeeded" : "pending";
-      const newFailureReason =
-        sr.status === "failed" ? (sr.failure_reason ?? "Unknown") : null;
+        sr.status === "succeeded"
+          ? RefundStatus.succeeded
+          : sr.status === "failed"
+            ? RefundStatus.failed
+            : RefundStatus.pending;
 
       const updated = await prisma.refund.update({
         where: { id: refundId },
         data: {
           status: newRefundStatus,
-          stripeRefundId: sr.id,
-          failureReason: newFailureReason,
-          failureCode: null,
-          resolved: false,
-          resolvedBy: null,
-          resolvedAt: null,
-          adminNotes: null,
+          providerReference: sr.id,
         },
       });
 
-      if (newRefundStatus === "succeeded" && refund.payment) {
+      if (newRefundStatus === RefundStatus.succeeded && refund.payment) {
         // Through the repository, which retires the cached booking: payments
         // are part of it, and the citizen is watching this one.
         await PaymentRepo.markRefunded(refund.payment.id);
@@ -265,14 +261,13 @@ export default class RefundSvc {
 
       return updated;
     } catch (e: unknown) {
+      // No `failureReason`/`failureCode` columns any more — the refund stays
+      // `failed` and this is the only surviving record of why.
       const err = e as Error & { code?: string };
-      await prisma.refund.update({
-        where: { id: refundId },
-        data: {
-          failureReason: err.message ?? "Stripe refund failed on retry",
-          failureCode: err.code ?? null,
-        },
-      });
+      console.error(
+        `Refund retry failed for ${refundId}: ${err.message}`,
+        err.code,
+      );
       throw new Error(`Retry failed: ${err.message}`);
     }
   }
@@ -284,14 +279,17 @@ export default class RefundSvc {
     });
     if (!refund) throw new Error("Refund not found");
 
+    // No `resolved`/`resolvedBy`/`resolvedAt`/`adminNotes` columns any more —
+    // moving status to `succeeded` is itself the resolution (see
+    // `getFailedRefunds`); the admin id and note are audit-logged only.
+    console.log(
+      `Refund ${refundId} manually resolved by admin ${adminId}: ${notes}`,
+    );
+
     const updated = await prisma.refund.update({
       where: { id: refundId },
       data: {
-        status: "succeeded",
-        resolved: true,
-        resolvedBy: adminId,
-        resolvedAt: new Date(),
-        adminNotes: notes,
+        status: RefundStatus.succeeded,
       },
     });
 
@@ -306,17 +304,20 @@ export default class RefundSvc {
     const refund = event.data.object as Stripe.Refund;
     if (!refund.id) return;
 
+    // No `failureReason`/`failureCode` columns any more — the webhook
+    // payload's own `failure_reason` is logged, not persisted.
+    console.error(
+      `Refund webhook reported failure for ${refund.id}: ${refund.failure_reason ?? "unknown"}`,
+    );
     await prisma.refund.updateMany({
-      where: { stripeRefundId: refund.id },
+      where: { providerReference: refund.id },
       data: {
-        status: "failed",
-        failureReason: refund.failure_reason ?? "Webhook reported failure",
-        failureCode: null,
+        status: RefundStatus.failed,
       },
     });
 
     const existing = await prisma.refund.findFirst({
-      where: { stripeRefundId: refund.id },
+      where: { providerReference: refund.id },
       include: {
         booking: {
           include: {
@@ -328,7 +329,7 @@ export default class RefundSvc {
       },
     });
 
-    if (existing?.booking?.user?.email) {
+    if (existing?.booking?.user?.email && existing.bookingId) {
       sendRefundUpdateEmail({
         to: existing.booking.user.email,
         eventName: existing.booking.event?.name ?? "Unknown Event",
@@ -339,7 +340,7 @@ export default class RefundSvc {
       });
     }
 
-    if (existing?.booking?.user?.id) {
+    if (existing?.booking?.user?.id && existing.bookingId) {
       NotificationService.create({
         userId: existing.booking.user.id,
         type: "PAYOUT",
@@ -357,7 +358,7 @@ export default class RefundSvc {
     if (!refund.id) return;
 
     const existing = await prisma.refund.findFirst({
-      where: { stripeRefundId: refund.id },
+      where: { providerReference: refund.id },
       include: {
         booking: {
           include: {
@@ -372,14 +373,14 @@ export default class RefundSvc {
 
     await prisma.refund.update({
       where: { id: existing.id },
-      data: { status: "succeeded" },
+      data: { status: RefundStatus.succeeded },
     });
 
     if (existing.payment) {
       await PaymentRepo.markRefunded(existing.payment.id);
     }
 
-    if (existing.booking?.user?.email) {
+    if (existing.booking?.user?.email && existing.bookingId) {
       sendRefundUpdateEmail({
         to: existing.booking.user.email,
         eventName: existing.booking.event?.name ?? "Unknown Event",
@@ -389,7 +390,7 @@ export default class RefundSvc {
       });
     }
 
-    if (existing.booking?.user?.id) {
+    if (existing.booking?.user?.id && existing.bookingId) {
       NotificationService.create({
         userId: existing.booking.user.id,
         type: "PAYOUT",

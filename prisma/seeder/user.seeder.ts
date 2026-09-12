@@ -146,7 +146,7 @@ export async function seedUsers(prisma: PrismaClient) {
       {
         email: "servicefoxer@example.com",
         password: SEED_PASSWORD,
-        name: "Service Foxer Cruz",
+        name: "Talent Foxer Cruz",
         username: "foxer_service",
         systemRole: "user",
         roleType: ["serviceFoxer"],
@@ -157,7 +157,7 @@ export async function seedUsers(prisma: PrismaClient) {
       {
         email: "gearfoxer@example.com",
         password: SEED_PASSWORD,
-        name: "Gear Foxer Dela Rosa",
+        name: "Equipment Foxer Dela Rosa",
         username: "foxer_gear",
         systemRole: "user",
         roleType: ["gearFoxer"],

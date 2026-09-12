@@ -45,6 +45,8 @@ export const PERMISSIONS = [
   "disputes:resolve",
   /** May issue, retry and resolve refunds. */
   "refunds:manage",
+  /** May manage event delegates as a system administrator. */
+  "event:manage-organizers",
 
   // ── The supply side ───────────────────────────────────────────────────
   // Held through `RoleType`, not through `SystemRole`. Deliberately *not*
@@ -108,6 +110,7 @@ const GRANTS: Record<SystemRole, readonly Permission[]> = {
     "payments:read:all",
     "disputes:resolve",
     "refunds:manage",
+    "event:manage-organizers",
     // The only supply-side permission an admin holds, because the guard it
     // replaces — `requireHost` — was `["eventFoxer", "admin"]`. Every other
     // `venue:` / `asset:` / `service:` / `template:` / `payouts:` capability

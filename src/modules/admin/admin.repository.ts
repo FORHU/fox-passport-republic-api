@@ -268,14 +268,15 @@ export default class AdminRepo {
     id: string,
     data: { resolvedBy: string; adminNotes: string },
   ) {
+    // No `resolved`/`resolvedBy`/`resolvedAt`/`adminNotes` columns any more —
+    // moving status to `succeeded` is itself the resolution (see
+    // `RefundSvc.getFailedRefunds`); the note is folded into `reason`, the
+    // one surviving free-text field, rather than dropped.
     return prisma.refund.update({
       where: { id },
       data: {
         status: "succeeded",
-        resolved: true,
-        resolvedBy: data.resolvedBy,
-        resolvedAt: new Date(),
-        adminNotes: data.adminNotes,
+        reason: data.adminNotes,
       },
     });
   }
@@ -285,18 +286,17 @@ export default class AdminRepo {
     amount: number;
     reason: string;
     adminId: string;
+    paymentId: string;
   }) {
+    // No `currency`/`initiatedBy`/`resolved`/`resolvedBy`/`resolvedAt`
+    // columns any more — see `resolveRefund` above.
     return prisma.refund.create({
       data: {
         bookingId: data.bookingId,
+        paymentId: data.paymentId,
         amount: data.amount,
-        currency: "PHP",
         status: "succeeded",
-        initiatedBy: data.adminId,
-        adminNotes: data.reason,
-        resolved: true,
-        resolvedBy: data.adminId,
-        resolvedAt: new Date(),
+        reason: data.reason,
       },
     });
   }

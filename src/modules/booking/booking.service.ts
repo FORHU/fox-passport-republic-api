@@ -5,6 +5,7 @@ import EventRequestRepo from "../event-request/event-request.repository";
 import EventOrganizerRepo from "../event-organizer/event-organizer.repository";
 import EventTemplateSvc from "../event-template/event-template.service";
 import PaymentSvc from "../payment/payment.service";
+import PaymentRepo from "../payment/payment.repository";
 import PayoutSvc from "../payout/payout.service";
 import RefundSvc from "../refund/refund.service";
 import WaitlistSvc from "../waitlist/waitlist.service";
@@ -943,17 +944,18 @@ export default class BookingSvc {
       ? `Policy: ${policyName} — ${ruleDesc ?? "no rule matched"}`
       : ruleDesc;
 
-    const completedPayments = booking.payments.filter(
-      (p) => p.status === "completed",
+    const bookingPayments = await PaymentRepo.getBookingPayments(id);
+    const completedPayments = bookingPayments.filter(
+      (p) => p.status === PaymentStatus.paid,
     );
-    const pendingPayments = booking.payments.filter(
-      (p) => p.status === "pending",
+    const pendingPayments = bookingPayments.filter(
+      (p) => p.status === PaymentStatus.pending,
     );
 
     for (const payment of pendingPayments) {
-      if (payment.transactionId?.startsWith("pi_")) {
+      if (payment.providerReference?.startsWith("pi_")) {
         try {
-          await stripe.paymentIntents.cancel(payment.transactionId);
+          await stripe.paymentIntents.cancel(payment.providerReference);
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (err) {
           // fall through
@@ -1009,48 +1011,53 @@ export default class BookingSvc {
             bookingId: id,
             paymentId: payment.id,
             amount: 0,
-            currency: payment.currency,
-            stripeRefundId: null,
+            providerReference: null,
             status: RefundStatus.succeeded,
-            failureReason: null,
-            initiatedBy: requesterId,
-            adminNotes: matchedRuleInfo,
+            reason: matchedRuleInfo,
           }),
         );
         continue;
       }
 
-      if (payment.transactionId?.startsWith("pi_")) {
+      if (payment.providerReference?.startsWith("pi_")) {
         try {
           const refund = await stripe.refunds.create({
-            payment_intent: payment.transactionId,
+            payment_intent: payment.providerReference,
             amount: toStripeCents(estimatedRefund.toNumber()),
           });
           stripeRefundId = refund.id;
           refundStatus =
-            refund.status === "succeeded" ? "succeeded" : "pending";
+            refund.status === "succeeded"
+              ? RefundStatus.succeeded
+              : RefundStatus.pending;
           if (refund.status === "failed") {
             failureReason = refund.failure_reason ?? "Unknown Stripe error";
-            refundStatus = "failed";
+            refundStatus = RefundStatus.failed;
           }
         } catch (e: unknown) {
           const err = e as Error;
           stripeRefundId = null;
-          refundStatus = "failed";
+          refundStatus = RefundStatus.failed;
           failureReason = err.message ?? "Stripe refund failed";
         }
+      }
+
+      // No `failureReason`/`initiatedBy` columns on `Refund` any more —
+      // logged for the record, not persisted; `reason` carries the policy
+      // explanation, the one piece worth keeping on the row itself.
+      if (failureReason) {
+        console.error(
+          `Refund failed for payment ${payment.id} (booking ${id}, requested by ${requesterId}): ${failureReason}`,
+        );
       }
 
       const refund = await BookingRepo.createRefund({
         bookingId: id,
         paymentId: payment.id,
         amount: estimatedRefund,
-        currency: payment.currency,
-        stripeRefundId,
+        providerReference: stripeRefundId,
         status: refundStatus,
-        failureReason,
-        initiatedBy: requesterId,
-        adminNotes: matchedRuleInfo,
+        reason: matchedRuleInfo,
       });
 
       if (refundStatus === "succeeded") {
@@ -1167,7 +1174,7 @@ export default class BookingSvc {
       (p) => p.status === PaymentStatus.pending,
     );
     const existingTransaction = payments.find(
-      (p) => p.transactionId === input.transactionId,
+      (p) => p.providerReference === input.transactionId,
     );
 
     let payment;
@@ -1176,9 +1183,9 @@ export default class BookingSvc {
       input.method === "stripe";
 
     if (existingTransaction) {
-      if (existingTransaction.status !== PaymentStatus.completed) {
+      if (existingTransaction.status !== PaymentStatus.paid) {
         await PaymentSvc.updatePayment(existingTransaction.id, {
-          paymentStatus: PaymentStatus.completed,
+          paymentStatus: PaymentStatus.paid,
         });
       }
 
@@ -1191,7 +1198,7 @@ export default class BookingSvc {
     } else if (pendingPayment) {
       // mark pending payment as completed
       await PaymentSvc.updatePayment(pendingPayment.id, {
-        paymentStatus: PaymentStatus.completed,
+        paymentStatus: PaymentStatus.paid,
       });
       // set the transaction id to the one provided by client
       await BookingRepo.setPaymentTransaction(pendingPayment.id, {
@@ -1214,7 +1221,7 @@ export default class BookingSvc {
         currency: "PHP",
         method: input.method,
         paymentType: "full",
-        paymentStatus: PaymentStatus.completed,
+        paymentStatus: PaymentStatus.paid,
         transactionId: input.transactionId,
       });
 
