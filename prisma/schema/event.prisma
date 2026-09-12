@@ -129,8 +129,37 @@ model Event {
   venueTransactions   EventVenueTransaction[]
   posts               Post[]
   partnerInvestments  PartnerInvestment[]
+  organizerDelegates  EventOrganizerAssignment[]
 
   @@map("events")
+}
+
+// A delegate the event's owning Foxer (the `host`/`organizerId` relation
+// above, itself already named "EventOrganizer" in Prisma) has authorized to
+// act on their behalf for this one event. `permissions` is per-assignment
+// rather than fixed, mirroring how mapanytime's SellerOrganizationMembers
+// scopes staff — but the set of strings that anything actually checks is
+// still a small allow-list in code (src/types/permissions.ts's
+// DELEGABLE_EVENT_PERMISSIONS), not an open vocabulary: adding a new
+// delegable capability is a code change, granting an existing one to a
+// specific person is not. Deliberately excludes approving requests, reviews,
+// payouts and XP, which still key off `Event.organizerId` alone regardless
+// of what's in this array.
+model EventOrganizerAssignment {
+  id           String   @id @default(uuid())
+  eventId      String
+  userId       String
+  assignedById String
+  permissions  String[] @default(["booking:check-in"])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  event      Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user       User  @relation("EventOrganizerAssignmentDelegate", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy User  @relation("EventOrganizerAssignmentAssignedBy", fields: [assignedById], references: [id])
+
+  @@unique([eventId, userId])
+  @@map("event_organizer_assignments")
 }
 
 model EventAssetTransaction {

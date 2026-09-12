@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import BookingRepo from "./booking.repository";
 import EventRepo from "../event/event.repository";
 import EventRequestRepo from "../event-request/event-request.repository";
+import EventOrganizerRepo from "../event-organizer/event-organizer.repository";
 import EventTemplateSvc from "../event-template/event-template.service";
 import PaymentSvc from "../payment/payment.service";
 import PayoutSvc from "../payout/payout.service";
@@ -626,7 +627,21 @@ export default class BookingSvc {
     if (!booking) throw new Error("Booking not found");
 
     const isOwner = booking.userId === requesterId;
-    const isOrganizer = booking.event?.organizerId === requesterId;
+    let isOrganizer = booking.event?.organizerId === requesterId;
+    // A check-in delegate may only push a booking to `completed` (the status
+    // check-in settles to) — never `cancelled` or anything else, which stay
+    // the actual organizer's call alone. See EventOrganizerAssignment.
+    if (
+      !isOrganizer &&
+      status === ItemBookingStatus.completed &&
+      booking.event
+    ) {
+      isOrganizer = await EventOrganizerRepo.isAuthorized(
+        booking.event.id,
+        requesterId,
+        "booking:check-in",
+      );
+    }
     if (!isOwner && !isOrganizer) throw new Error("Unauthorized");
 
     const updated = await BookingRepo.updateStatus(
@@ -698,8 +713,17 @@ export default class BookingSvc {
     const booking = await BookingRepo.findById(id);
     if (!booking) throw new Error("Booking not found");
 
-    const organizerId = booking.event?.organizerId;
-    if (organizerId !== hostId) {
+    const isOrganizer = booking.event?.organizerId === hostId;
+    const authorized =
+      isOrganizer ||
+      (booking.event
+        ? await EventOrganizerRepo.isAuthorized(
+            booking.event.id,
+            hostId,
+            "booking:check-in",
+          )
+        : false);
+    if (!authorized) {
       throw new Error("Unauthorized — you are not the host of this event");
     }
 
@@ -1285,12 +1309,22 @@ export default class BookingSvc {
     }
   }
 
-  /** Host scans a booking QR at the door. The organiser id authorises them. */
+  /** The organiser id — or a delegated event organizer — authorises a scan. */
   static async checkInByTicketCode(ticketCode: string, hostId: string) {
     const booking = await BookingRepo.findByTicketCode(ticketCode);
     if (!booking) throw new BookingError("Invalid ticket code", 404);
 
-    if (booking.event?.organizerId !== hostId) {
+    const isOrganizer = booking.event?.organizerId === hostId;
+    const authorized =
+      isOrganizer ||
+      (booking.event
+        ? await EventOrganizerRepo.isAuthorized(
+            booking.event.id,
+            hostId,
+            "booking:check-in",
+          )
+        : false);
+    if (!authorized) {
       throw new BookingError(
         "Unauthorized — you are not the host of this event",
         403,
@@ -1300,13 +1334,23 @@ export default class BookingSvc {
     return this.checkInAndSettle(booking.id, hostId);
   }
 
-  /** Host scans a guest's QR at the door. */
+  /** Host or a delegated event organizer scans a guest's QR at the door. */
   static async checkInAttendeeByTicketCode(ticketCode: string, hostId: string) {
     const attendee =
       await BookingRepo.findAttendeeByTicketCodeForCheckIn(ticketCode);
     if (!attendee) throw new BookingError("Invalid ticket code", 404);
 
-    if (attendee.booking.event?.organizerId !== hostId) {
+    const isOrganizer = attendee.booking.event?.organizerId === hostId;
+    const authorized =
+      isOrganizer ||
+      (attendee.booking.event
+        ? await EventOrganizerRepo.isAuthorized(
+            attendee.booking.event.id,
+            hostId,
+            "booking:check-in",
+          )
+        : false);
+    if (!authorized) {
       throw new BookingError(
         "Unauthorized — you are not the host of this event",
         403,

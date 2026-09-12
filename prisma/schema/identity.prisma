@@ -23,6 +23,8 @@ model User {
   assetTransactions        EventAssetTransaction[]   @relation("AssetProvider")
   clientEvents             Event[]                   @relation("EventClient")
   organizedEvents          Event[]                   @relation("EventOrganizer")
+  organizerAssignments     EventOrganizerAssignment[] @relation("EventOrganizerAssignmentDelegate")
+  organizerAssignmentsMade EventOrganizerAssignment[] @relation("EventOrganizerAssignmentAssignedBy")
   serviceTransactions      EventServiceTransaction[] @relation("ServiceProvider")
   eventTemplates           EventTemplate[]
   venueTransactions        EventVenueTransaction[]   @relation("VenueProvider")
