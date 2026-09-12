@@ -121,6 +121,44 @@ silently unchecked.
 `schema` and `migrations.path`. Getting either wrong fails quietly rather than
 loudly — see entry 2.
 
+## 11. A required column with no default only works against an empty table
+
+`20260909014607_add_conversation_requests` (merged to `main`) originally did:
+
+```sql
+ALTER TABLE "conversations" ADD COLUMN "initiatorId" TEXT NOT NULL,
+ADD COLUMN "status" "ConversationStatus" NOT NULL DEFAULT 'accepted';
+```
+
+Prisma's own generated comment above this block said *"This is not possible if
+the table is not empty"* — and it shipped anyway. Found 12 Sep running
+`migrate deploy` against a local database with 148 seeded users and existing
+conversations: `column "initiatorId" of relation "conversations" contains null
+values`, migration marked failed in `_prisma_migrations`, all 10 migrations
+behind it blocked until resolved. Postgres DDL is transactional, so the local
+failure rolled back clean — no partial damage — but the same failure was
+waiting for whichever real environment hit it next: the "Owed elsewhere"
+Dockerfile note below means that failure is a boot crash, not a watched deploy
+step.
+
+**Fixed in the migration file itself** (add nullable → backfill → constrain):
+`initiatorId` now backfills from `COALESCE("userAId", "userBId")` for
+pre-existing rows before the `NOT NULL` is applied. Safe because every
+pre-existing row keeps its default `status` of `'accepted'` — see the model's
+own doc-comment — so who "initiated" a thread that predates this column is
+cosmetic. **Editing an already-merged migration file changes its checksum**,
+which only matters for an environment that already applied the original
+version successfully (only possible against a table that was empty at deploy
+time); confirm that hasn't happened in staging/prod before assuming this is
+the end of it. Any local database still holding the failed record needs
+`prisma migrate resolve --rolled-back 20260909014607_add_conversation_requests`
+before `migrate deploy` will pick up the fix.
+
+Generally: a required column with no `@default` is safe to hand-write only when
+the table is provably empty in every environment that will run it. Otherwise
+it is an add-nullable-then-backfill-then-constrain migration, always, even when
+`prisma migrate dev` offers to generate the one-step version.
+
 ---
 
 ## Owed elsewhere
@@ -130,4 +168,4 @@ loudly — see entry 2.
   to it. Unverifiable from a developer machine.
 - **The Dockerfile runs `prisma migrate deploy` at container boot.** A migration
   that fails does not fail a deploy step someone is watching — it fails
-  *startup*.
+  *startup*. Entry 11 above is a live instance of this, not yet fixed.
