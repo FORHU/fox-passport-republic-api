@@ -1,4 +1,5 @@
 import { prisma } from "../../utils/prisma";
+import PaymentPayoutSvc from "./payout.service";
 
 export default class WebhookSvc {
   /**
@@ -52,7 +53,7 @@ export default class WebhookSvc {
    * Synchronizes Invoice and Checkout status based on a successful payment intent.
    */
   static async handlePaymentSuccess(providerSessionId: string, providerReference: string, amountPaid: number, currency: string) {
-    await prisma.$transaction(async (tx) => {
+    const invoiceId = await prisma.$transaction(async (tx) => {
       // 1. Find the active checkout
       const checkout = await tx.checkout.findUnique({
         where: { providerSessionId }
@@ -113,7 +114,13 @@ export default class WebhookSvc {
       }
 
       // (Later: Emit a domain event or call business modules to transition their state based on Invoice paid)
+      return checkout.invoiceId;
     });
+
+    // Outside the transaction above — allocatePayouts opens (and fires
+    // Stripe transfers outside) its own transaction, and re-reads the
+    // invoice/payment rows the block above just committed.
+    await PaymentPayoutSvc.allocatePayouts(invoiceId);
   }
 
   /**

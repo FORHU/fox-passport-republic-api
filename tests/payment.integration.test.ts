@@ -222,4 +222,124 @@ describe('Central Payment & Checkout Integration Tests', () => {
       expect(payouts).toBeDefined();
     });
   });
+
+  describe('Payout Idempotency', () => {
+    // Regression test for the @@unique([sourceType, sourceId, providerId])
+    // constraint on Payout: without it, a retried webhook calling
+    // allocatePayouts twice for the same invoice would create two Payout
+    // rows (and, in production, fire two Stripe transfers) for the same
+    // provider's cut of the same transaction.
+    let provider: any;
+    let event: any;
+    let asset: any;
+    let transaction: any;
+
+    beforeAll(async () => {
+      provider = await prisma.user.create({
+        data: {
+          email: 'payout_idempotency_provider@example.com',
+          password: 'password123',
+          name: 'Payout Idempotency Provider',
+        },
+      });
+      asset = await prisma.asset.create({
+        data: {
+          ownerId: provider.id,
+          category: 'sound_system',
+          name: 'Idempotency Test Speakers',
+          description: 'desc',
+          price: 100,
+          billingRate: 'daily',
+          status: 'available',
+        },
+      });
+      event = await prisma.event.create({
+        data: {
+          name: 'Payout Idempotency Test Event',
+          organizerId: testUser.id,
+          clientId: testUser.id,
+          startAt: new Date(),
+          endAt: new Date(),
+          description: 'Test',
+          guestCount: 10,
+          totalAmount: 1000,
+          eventCategory: 'corporate',
+        },
+      });
+      transaction = await prisma.eventAssetTransaction.create({
+        data: {
+          eventId: event.id,
+          assetId: asset.id,
+          providerId: provider.id,
+          agreedPrice: 1000,
+          status: 'approved',
+        },
+      });
+    });
+
+    afterAll(async () => {
+      await prisma.payout.deleteMany({ where: { providerId: provider.id } });
+      await prisma.eventAssetTransaction.deleteMany({ where: { id: transaction.id } });
+      await prisma.event.deleteMany({ where: { id: event.id } });
+      await prisma.asset.deleteMany({ where: { id: asset.id } });
+      await prisma.user.deleteMany({ where: { id: provider.id } });
+    });
+
+    it('calling allocatePayouts twice for the same invoice creates exactly one Payout row', async () => {
+      const invoice = await InvoiceSvc.createInvoice({
+        payerId: testUser.id,
+        items: [
+          {
+            amount: 1000,
+            description: 'Idempotency test item',
+            sourceType: 'event_asset_transaction' as any,
+            sourceId: transaction.id,
+          },
+        ],
+      });
+      await prisma.invoice.update({
+        where: { id: invoice.id },
+        data: { status: 'paid' },
+      });
+      await prisma.payment.create({
+        data: {
+          invoiceId: invoice.id,
+          amount: 1000,
+          method: 'card',
+          status: 'paid',
+        },
+      });
+
+      // Simulates a retried webhook: the same invoice allocated twice.
+      await PayoutSvc.allocatePayouts(invoice.id);
+      await PayoutSvc.allocatePayouts(invoice.id);
+
+      const payouts = await prisma.payout.findMany({
+        where: {
+          sourceType: 'event_asset_transaction',
+          sourceId: transaction.id,
+          providerId: provider.id,
+        },
+      });
+
+      expect(payouts.length).toBe(1);
+      expect(payouts[0].allocationAmount.toNumber()).toBe(1000);
+    });
+
+    it('the DB constraint itself rejects a duplicate row, independent of the service layer', async () => {
+      // Belt-and-braces: prove the guarantee lives in the schema, not just
+      // in allocatePayouts remembering to upsert.
+      await expect(
+        prisma.payout.create({
+          data: {
+            providerId: provider.id,
+            sourceType: 'event_asset_transaction',
+            sourceId: transaction.id,
+            allocationAmount: 1000,
+            payoutAmount: 1000,
+          },
+        }),
+      ).rejects.toThrow();
+    });
+  });
 });
