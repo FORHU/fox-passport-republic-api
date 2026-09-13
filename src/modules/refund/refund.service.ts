@@ -218,8 +218,7 @@ export default class RefundSvc {
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  static async retryRefund(refundId: string, adminId: string) {
+  static async retryRefund(refundId: string, _adminId: string) {
     const refund = await prisma.refund.findUnique({
       where: { id: refundId },
       include: { payment: true },

@@ -13,7 +13,6 @@ export async function sendEmail({
   subject,
   text,
   html,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   attachments,
 }: {
   to: string;
@@ -51,6 +50,10 @@ export async function sendEmail({
 
   if (html) {
     mailOptions.html = html;
+  }
+
+  if (attachments) {
+    mailOptions.attachments = attachments;
   }
 
   try {

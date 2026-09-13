@@ -110,10 +110,9 @@ function toHttpError(err: unknown): HttpError {
 app.use(
   (
     err: unknown,
-    req: express.Request,
+    _req: express.Request,
     res: express.Response,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    next: express.NextFunction,
+    _next: express.NextFunction,
   ) => {
     const error = toHttpError(err);
     console.error("❌ GLOBAL ERROR:", error.message);

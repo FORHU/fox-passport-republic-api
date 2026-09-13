@@ -941,8 +941,7 @@ export default class BookingSvc {
       if (payment.providerReference?.startsWith("pi_")) {
         try {
           await stripe.paymentIntents.cancel(payment.providerReference);
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (err) {
+        } catch {
           // fall through
         }
       }
