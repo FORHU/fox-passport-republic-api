@@ -42,8 +42,10 @@ const postWebhook = () =>
 
 describe("Stripe webhook dispatch — new Checkout Session flow vs legacy PaymentIntent flow", () => {
   let testUser: any;
+  const originalSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   beforeAll(async () => {
+    process.env.STRIPE_WEBHOOK_SECRET = "whsec_test_secret";
     testUser = await prisma.user.upsert({
       where: { email: "checkout_webhook_test@example.com" },
       update: {},
@@ -56,6 +58,7 @@ describe("Stripe webhook dispatch — new Checkout Session flow vs legacy Paymen
   });
 
   afterAll(async () => {
+    process.env.STRIPE_WEBHOOK_SECRET = originalSecret;
     await prisma.checkout.deleteMany({});
     await prisma.payment.deleteMany({});
     await prisma.invoiceItem.deleteMany({});
