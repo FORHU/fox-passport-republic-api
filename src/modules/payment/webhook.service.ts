@@ -1,4 +1,5 @@
 import { prisma } from "../../utils/prisma";
+import { Prisma } from "@prisma/client";
 import PaymentPayoutSvc from "./payout.service";
 
 export default class WebhookSvc {
@@ -10,7 +11,7 @@ export default class WebhookSvc {
     provider: string,
     providerEventId: string,
     eventType: string,
-    payload: any,
+    payload: Prisma.InputJsonValue,
     processor: () => Promise<void>,
   ) {
     // 1. Create or retrieve the event record
@@ -100,8 +101,10 @@ export default class WebhookSvc {
 
       // 5. Confirm Voucher Redemption if a discount was applied
       if (invoice.discountAmount.toNumber() > 0 && invoice.discountSnapshot) {
-        const snapshot = invoice.discountSnapshot as any;
-        if (snapshot.voucherId) {
+        const snapshot = invoice.discountSnapshot as {
+          voucherId?: string;
+        } | null;
+        if (snapshot?.voucherId) {
           // Verify if it hasn't been redeemed yet (should be unique per invoice)
           const existingRedemption = await tx.voucherRedemption.findUnique({
             where: { invoiceId: invoice.id },

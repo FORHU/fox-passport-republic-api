@@ -281,9 +281,11 @@ export default class FeedRepo {
 
     let nextCursor = null;
 
+    type ScoredPost = (typeof formatted)[number] & { _score?: number };
+
     if (isTopMode) {
       const now = Date.now();
-      formatted.forEach((p: any) => {
+      (formatted as ScoredPost[]).forEach((p) => {
         let score = 0;
 
         // Affinity
@@ -306,9 +308,9 @@ export default class FeedRepo {
       });
 
       // Sort by score
-      formatted.sort((a: any, b: any) => {
+      (formatted as ScoredPost[]).sort((a, b) => {
         if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-        return b._score - a._score;
+        return (b._score ?? 0) - (a._score ?? 0);
       });
 
       // Paginate in-memory array
@@ -331,7 +333,7 @@ export default class FeedRepo {
     }
 
     // Clean up temporary score property
-    formatted.forEach((p: any) => delete p._score);
+    (formatted as ScoredPost[]).forEach((p) => delete p._score);
 
     return {
       posts: formatted,
@@ -665,13 +667,13 @@ export default class FeedRepo {
       },
     });
 
-    const withLikeFlag = (c: any) => {
+    const withLikeFlag = <T extends { likes?: { userId: string }[] }>(c: T) => {
       const isLikedByMe = viewerId ? (c.likes?.length ?? 0) > 0 : false;
       const { likes: _likes, ...rest } = c;
       return { ...rest, isLikedByMe };
     };
 
-    return comments.map((c: any) => ({
+    return comments.map((c) => ({
       ...withLikeFlag(c),
       replies: c.replies.map(withLikeFlag),
     }));

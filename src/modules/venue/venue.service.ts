@@ -87,7 +87,7 @@ export default class VenueSvc {
     seatingArrangements?: string[];
     stageConfig?: string;
     setupOptions?: string[];
-    operatingHours?: any;
+    operatingHours?: Prisma.InputJsonValue;
     blockedDates?: Date[];
     minBookingTime?: number;
     depositRequirements?: string;
@@ -421,7 +421,7 @@ export default class VenueSvc {
       seatingArrangements: string[];
       stageConfig: string;
       setupOptions: string[];
-      operatingHours: any;
+      operatingHours: Prisma.InputJsonValue;
       blockedDates: Date[];
       minBookingTime: number;
       depositRequirements: string;

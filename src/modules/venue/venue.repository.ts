@@ -62,7 +62,7 @@ export default class VenueRepo {
     seatingArrangements: string[];
     stageConfig?: string;
     setupOptions: string[];
-    operatingHours?: any;
+    operatingHours?: Prisma.InputJsonValue;
     blockedDates: Date[];
     minBookingTime?: number;
     depositRequirements?: string;
@@ -71,8 +71,8 @@ export default class VenueRepo {
     parkingInformation?: string;
     accessibilityInformation?: string;
     entranceInstructions?: string;
-    recommendedAssets?: any;
-    recommendedServices?: any;
+    recommendedAssets?: Prisma.InputJsonValue;
+    recommendedServices?: Prisma.InputJsonValue;
   }) {
     const { imgIds, ...venueScalars } = data;
     return this.retiring(
@@ -180,37 +180,40 @@ export default class VenueRepo {
         : {}),
     };
 
-    const queryArgs: any = {
-      where,
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: limit,
-    };
-
-    if (lightweight) {
-      queryArgs.select = {
-        id: true,
-        name: true,
-        lat: true,
-        lng: true,
-        boundary: true,
-        category: true,
-        price: true,
-        images: {
-          take: 1,
-          select: { id: true, url: true },
-        },
-      };
-    } else {
-      queryArgs.include = {
-        mayor: mayorSelect,
-        images: true,
-        packages: true,
-      };
-    }
+    const venuesPromise = lightweight
+      ? prisma.venue.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: limit,
+          select: {
+            id: true,
+            name: true,
+            lat: true,
+            lng: true,
+            boundary: true,
+            category: true,
+            price: true,
+            images: {
+              take: 1,
+              select: { id: true, url: true },
+            },
+          },
+        })
+      : prisma.venue.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: limit,
+          include: {
+            mayor: mayorSelect,
+            images: true,
+            packages: true,
+          },
+        });
 
     const [venues, total] = await Promise.all([
-      prisma.venue.findMany(queryArgs),
+      venuesPromise,
       prisma.venue.count({ where }),
     ]);
 

@@ -95,7 +95,7 @@ export class StripeAdapter implements PaymentProvider {
     };
   }
 
-  verifyWebhook(payload: any, signature: string): any {
+  verifyWebhook(payload: string | Buffer, signature: string): Stripe.Event {
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
     return stripe.webhooks.constructEvent(payload, signature, endpointSecret);
   }

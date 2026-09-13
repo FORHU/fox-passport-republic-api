@@ -2,14 +2,18 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import BiddingSvc from "./bidding.service";
 
+function getErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : "An unexpected error occurred";
+}
+
 export default class BiddingCtrl {
   static async getOpenSlots(req: Request, res: Response) {
     try {
       const categoryId = req.query.categoryId as string | undefined;
       const slots = await BiddingSvc.getOpenSlots(categoryId);
       res.status(200).json({ success: true, data: slots });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ success: false, message: getErrorMessage(err) });
     }
   }
 
@@ -33,8 +37,8 @@ export default class BiddingCtrl {
       });
 
       res.status(201).json({ success: true, data: bid });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ success: false, message: getErrorMessage(err) });
     }
   }
 
@@ -43,8 +47,8 @@ export default class BiddingCtrl {
       const { id } = req.params;
       const result = await BiddingSvc.acceptServiceBid(id, req.user!.userId);
       res.status(200).json({ success: true, data: result });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ success: false, message: getErrorMessage(err) });
     }
   }
 
@@ -53,8 +57,8 @@ export default class BiddingCtrl {
       const { id } = req.params;
       const result = await BiddingSvc.rejectServiceBid(id, req.user!.userId);
       res.status(200).json({ success: true, data: result });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ success: false, message: getErrorMessage(err) });
     }
   }
 
@@ -63,8 +67,8 @@ export default class BiddingCtrl {
       const { eventId } = req.params;
       const bids = await BiddingSvc.getServiceBidsForEvent(eventId);
       res.status(200).json({ success: true, data: bids });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ success: false, message: getErrorMessage(err) });
     }
   }
 
@@ -90,8 +94,8 @@ export default class BiddingCtrl {
       });
 
       res.status(201).json({ success: true, data: bid });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ success: false, message: getErrorMessage(err) });
     }
   }
 
@@ -100,8 +104,8 @@ export default class BiddingCtrl {
       const { id } = req.params;
       const result = await BiddingSvc.acceptAssetBid(id, req.user!.userId);
       res.status(200).json({ success: true, data: result });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ success: false, message: getErrorMessage(err) });
     }
   }
 
@@ -110,8 +114,8 @@ export default class BiddingCtrl {
       const { id } = req.params;
       const result = await BiddingSvc.rejectAssetBid(id, req.user!.userId);
       res.status(200).json({ success: true, data: result });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ success: false, message: getErrorMessage(err) });
     }
   }
 
@@ -120,8 +124,8 @@ export default class BiddingCtrl {
       const { eventId } = req.params;
       const bids = await BiddingSvc.getAssetBidsForEvent(eventId);
       res.status(200).json({ success: true, data: bids });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ success: false, message: getErrorMessage(err) });
     }
   }
 }

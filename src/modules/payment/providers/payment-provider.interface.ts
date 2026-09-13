@@ -39,5 +39,5 @@ export interface PaymentProvider {
    * Verifies the signature of an incoming webhook payload.
    * Throws an error if invalid.
    */
-  verifyWebhook(payload: any, signature: string): any;
+  verifyWebhook(payload: string | Buffer, signature: string): unknown;
 }

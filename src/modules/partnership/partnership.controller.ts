@@ -2,6 +2,10 @@ import { Request, Response } from "express";
 import { PartnershipSvc } from "./partnership.service";
 import { AuthenticatedUser } from "../../types/auth";
 
+function getErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : "An unexpected error occurred";
+}
+
 export class PartnershipController {
   static async createProposal(req: Request, res: Response) {
     try {
@@ -10,8 +14,8 @@ export class PartnershipController {
 
       const proposal = await PartnershipSvc.createProposal(user.userId, data);
       res.status(201).json({ success: true, data: proposal });
-    } catch (error: any) {
-      res.status(400).json({ success: false, message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ success: false, message: getErrorMessage(error) });
     }
   }
 
@@ -20,8 +24,8 @@ export class PartnershipController {
       const { id } = req.params;
       const proposal = await PartnershipSvc.getProposal(id);
       res.status(200).json({ success: true, data: proposal });
-    } catch (error: any) {
-      res.status(404).json({ success: false, message: error.message });
+    } catch (error: unknown) {
+      res.status(404).json({ success: false, message: getErrorMessage(error) });
     }
   }
 
@@ -34,8 +38,8 @@ export class PartnershipController {
         targetVenueId: targetVenueId as string,
       });
       res.status(200).json({ success: true, data: proposals });
-    } catch (error: any) {
-      res.status(400).json({ success: false, message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ success: false, message: getErrorMessage(error) });
     }
   }
 
@@ -45,9 +49,10 @@ export class PartnershipController {
       const { id } = req.params;
       const proposal = await PartnershipSvc.acceptProposal(id, user);
       res.status(200).json({ success: true, data: proposal });
-    } catch (error: any) {
-      const status = error.message.includes("Unauthorized") ? 403 : 400;
-      res.status(status).json({ success: false, message: error.message });
+    } catch (error: unknown) {
+      const message = getErrorMessage(error);
+      const status = message.includes("Unauthorized") ? 403 : 400;
+      res.status(status).json({ success: false, message });
     }
   }
 
@@ -57,9 +62,10 @@ export class PartnershipController {
       const { id } = req.params;
       const proposal = await PartnershipSvc.rejectProposal(id, user);
       res.status(200).json({ success: true, data: proposal });
-    } catch (error: any) {
-      const status = error.message.includes("Unauthorized") ? 403 : 400;
-      res.status(status).json({ success: false, message: error.message });
+    } catch (error: unknown) {
+      const message = getErrorMessage(error);
+      const status = message.includes("Unauthorized") ? 403 : 400;
+      res.status(status).json({ success: false, message });
     }
   }
 
@@ -69,9 +75,10 @@ export class PartnershipController {
       const { id } = req.params;
       const proposal = await PartnershipSvc.withdrawProposal(id, user.userId);
       res.status(200).json({ success: true, data: proposal });
-    } catch (error: any) {
-      const status = error.message.includes("Unauthorized") ? 403 : 400;
-      res.status(status).json({ success: false, message: error.message });
+    } catch (error: unknown) {
+      const message = getErrorMessage(error);
+      const status = message.includes("Unauthorized") ? 403 : 400;
+      res.status(status).json({ success: false, message });
     }
   }
 }
