@@ -32,8 +32,6 @@ export default class SpecializationSvc {
         });
         if (bookingIds.length === 0) return false;
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const bIds = bookingIds.map((b) => b.id);
         const templates = await prisma.eventTemplate.findMany({
           where: { ownerId: organizerId, category },
           select: { id: true },

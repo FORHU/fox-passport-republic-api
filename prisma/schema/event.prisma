@@ -51,6 +51,7 @@ model EventTemplateAsset {
   matchRequestStatus MatchRequestStatus @default(pending)
   asset              Asset?             @relation(fields: [assetId], references: [id])
   template           EventTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  eventAssetBids     EventAssetBid[]
 
   @@map("event_template_assets")
 }
@@ -72,6 +73,7 @@ model EventTemplateService {
   matchRequestStatus MatchRequestStatus @default(pending)
   service            Service?           @relation(fields: [serviceId], references: [id])
   template           EventTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  eventServiceBids   EventServiceBid[]
 
   @@map("event_template_services")
 }
@@ -98,38 +100,41 @@ model EventTemplateVenue {
 }
 
 model Event {
-  id                  String                    @id @default(uuid())
-  clientId            String
-  organizerId         String
-  templateId          String?
-  name                String
-  description         String
-  eventCategory       EventCategory
-  startAt             DateTime
-  endAt               DateTime
-  guestCount          Int
-  totalAmount         Decimal                   @db.Decimal(12, 2)
-  itemsTotal          Decimal                   @default(0) @db.Decimal(12, 2)
-  hostMarkupAmount    Decimal                   @default(0) @db.Decimal(12, 2)
-  platformFeeAmount   Decimal                   @default(0) @db.Decimal(12, 2)
-  eventStatus         EventStatus               @default(pending)
-  requestStatus       RequestStatus             @default(pending)
-  rejectionReason     String?
-  targetCity          String?
-  targetState         String?
-  targetCountry       String?                   @default("Philippines")
-  createdAt           DateTime                  @default(now())
-  updatedAt           DateTime                  @updatedAt
-  bookings            Booking[]
-  assetTransactions   EventAssetTransaction[]
-  client              User                      @relation("EventClient", fields: [clientId], references: [id])
-  host                User                      @relation("EventOrganizer", fields: [organizerId], references: [id])
-  template            EventTemplate?            @relation(fields: [templateId], references: [id])
-  serviceTransactions EventServiceTransaction[]
-  venueTransactions   EventVenueTransaction[]
-  posts               Post[]
-  partnerInvestments  PartnerInvestment[]
-  organizerDelegates  EventOrganizerAssignment[]
+  id                   String                     @id @default(uuid())
+  clientId             String
+  organizerId          String
+  templateId           String?
+  name                 String
+  description          String
+  eventCategory        EventCategory
+  startAt              DateTime
+  endAt                DateTime
+  guestCount           Int
+  totalAmount          Decimal                    @db.Decimal(12, 2)
+  itemsTotal           Decimal                    @default(0) @db.Decimal(12, 2)
+  hostMarkupAmount     Decimal                    @default(0) @db.Decimal(12, 2)
+  platformFeeAmount    Decimal                    @default(0) @db.Decimal(12, 2)
+  eventStatus          EventStatus                @default(pending)
+  requestStatus        RequestStatus              @default(pending)
+  rejectionReason      String?
+  targetCity           String?
+  targetState          String?
+  targetCountry        String?                    @default("Philippines")
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  bookings             Booking[]
+  assetTransactions    EventAssetTransaction[]
+  client               User                       @relation("EventClient", fields: [clientId], references: [id])
+  host                 User                       @relation("EventOrganizer", fields: [organizerId], references: [id])
+  template             EventTemplate?             @relation(fields: [templateId], references: [id])
+  serviceTransactions  EventServiceTransaction[]
+  venueTransactions    EventVenueTransaction[]
+  posts                Post[]
+  partnerInvestments   PartnerInvestment[]
+  partnershipProposals PartnershipProposal[]
+  organizerDelegates   EventOrganizerAssignment[]
+  eventServiceBids     EventServiceBid[]
+  eventAssetBids       EventAssetBid[]
 
   @@map("events")
 }
@@ -281,4 +286,52 @@ enum EventCategory {
   wedding
   social
   other
+}
+
+model EventServiceBid {
+  id                     String    @id @default(uuid())
+  eventId                String
+  eventTemplateServiceId String
+  providerId             String // The Talent Foxer applying
+  proposedServiceId      String // The specific Service listing the Foxer is offering
+  message                String? // Cover letter/pitch
+  proposedPrice          Decimal   @db.Decimal(12, 2)
+  status                 BidStatus @default(pending)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  event             Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  provider          User                 @relation(fields: [providerId], references: [id])
+  proposedService   Service              @relation(fields: [proposedServiceId], references: [id])
+  targetRequirement EventTemplateService @relation(fields: [eventTemplateServiceId], references: [id])
+
+  @@map("event_service_bids")
+}
+
+enum BidStatus {
+  pending
+  accepted
+  rejected
+  withdrawn
+}
+
+model EventAssetBid {
+  id                   String    @id @default(uuid())
+  eventId              String
+  eventTemplateAssetId String
+  providerId           String // The Gear Foxer applying
+  proposedAssetId      String // The specific Asset listing the Foxer is offering
+  message              String? // Cover letter/pitch
+  proposedPrice        Decimal   @db.Decimal(12, 2)
+  proposedQuantity     Int       @default(1)
+  status               BidStatus @default(pending)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  event             Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  provider          User               @relation(fields: [providerId], references: [id])
+  proposedAsset     Asset              @relation(fields: [proposedAssetId], references: [id])
+  targetRequirement EventTemplateAsset @relation(fields: [eventTemplateAssetId], references: [id])
+
+  @@map("event_asset_bids")
 }

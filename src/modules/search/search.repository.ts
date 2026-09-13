@@ -9,7 +9,7 @@ import { toEnum } from "../../utils/enums";
 
 export default class SearchRepo {
   // Aggregate discovery search: given a location (city) and optional category,
-  // return event templates + gear foxers + service foxers (with their top items).
+  // return event templates + Equipment Foxers + Talent Foxers (with their top items).
   static async searchByLocation(
     location?: string,
     category?: string,

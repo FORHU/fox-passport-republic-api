@@ -14,6 +14,10 @@ module.exports = {
     seed: "pnpm exec tsx prisma/seed.ts",
   },
   datasource: {
-    url: process.env.DATABASE_URL
+    url: process.env.DATABASE_URL,
+    // Only needed for `migrate dev`/`migrate diff` against the migrations
+    // directory — a disposable scratch database Prisma replays migrations
+    // into to compute a diff. Unset is fine for `migrate deploy`/`generate`.
+    shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL
   },
 };

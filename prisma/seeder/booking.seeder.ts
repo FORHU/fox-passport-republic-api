@@ -2,11 +2,11 @@ import {
   PrismaClient,
   BookingStatus,
   PaymentStatus,
-  PaymentType,
   EventCategory,
   EventStatus,
   RequestStatus,
 } from "@prisma/client";
+import PaymentRepo from "../../src/modules/payment/payment.repository";
 
 export async function seedBookings(prisma: PrismaClient, users: any[]) {
   try {
@@ -179,12 +179,11 @@ export async function seedBookings(prisma: PrismaClient, users: any[]) {
         startAt: new Date(Date.now() + 7 * 86400000),
         endAt: new Date(Date.now() + 7 * 86400000 + 6 * 3600000),
         payment: {
-          id: "seed-payment-birthday-01",
           amount: 37500, // 50% deposit
           currency: "PHP",
           method: "stripe",
-          paymentType: PaymentType.deposit,
-          status: PaymentStatus.completed,
+          paymentType: "deposit" as const,
+          status: PaymentStatus.paid,
           transactionId: "pi_seed_birthday_01",
         },
       },
@@ -199,12 +198,11 @@ export async function seedBookings(prisma: PrismaClient, users: any[]) {
         startAt: new Date(Date.now() + 14 * 86400000),
         endAt: new Date(Date.now() + 14 * 86400000 + 8 * 3600000),
         payment: {
-          id: "seed-payment-corporate-01",
           amount: 30000, // 50% deposit
           currency: "PHP",
           method: "stripe",
-          paymentType: PaymentType.deposit,
-          status: PaymentStatus.completed,
+          paymentType: "deposit" as const,
+          status: PaymentStatus.paid,
           transactionId: "pi_seed_corporate_01",
         },
       },
@@ -233,21 +231,21 @@ export async function seedBookings(prisma: PrismaClient, users: any[]) {
         },
       });
 
-      // Seed the deposit payment record
-      await prisma.payment.upsert({
-        where: { id: payment.id },
-        update: { status: payment.status },
-        create: {
-          id: payment.id,
+      // Seed the deposit payment record — `Payment` is invoice-scoped now
+      // (no `id` to upsert against), so re-run safety is a existence check
+      // rather than an upsert.
+      const existingPayments = await PaymentRepo.getBookingPayments(b.id);
+      if (existingPayments.length === 0) {
+        await PaymentRepo.createPayment({
           bookingId: b.id,
           amount: payment.amount,
           currency: payment.currency,
           method: payment.method,
           paymentType: payment.paymentType,
-          status: payment.status,
+          paymentStatus: payment.status,
           transactionId: payment.transactionId,
-        },
-      });
+        });
+      }
 
       console.log(`✓ Seeded booking: ${b.id}`);
     }

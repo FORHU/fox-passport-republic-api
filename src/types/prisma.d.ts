@@ -23,7 +23,6 @@ export type BookingWithRelations = Prisma.BookingGetPayload<{
         invitedBy: { select: { id: true; name: true } };
       };
     };
-    payments: true;
     assetTransactions: true;
     serviceTransactions: true;
     venueTransactions: {

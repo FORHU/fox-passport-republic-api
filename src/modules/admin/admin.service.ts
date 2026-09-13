@@ -2,6 +2,7 @@ import {
   AssetStatus,
   EventTemplateStatus,
   ItemBookingStatus,
+  PaymentStatus,
   Prisma,
   ServiceStatus,
   VenueStatus,
@@ -9,6 +10,7 @@ import {
 import AdminRepo, { queuePage } from "./admin.repository";
 import EventRequestSvc from "../event-request/event-request.service";
 import RefundSvc from "../refund/refund.service";
+import PaymentRepo from "../payment/payment.repository";
 import { cached, invalidate, versionedCache } from "../../utils/cache.util";
 import { notifyDecision } from "../notifications/decision-notification";
 import { sendDecisionEmail } from "../notifications/decision-email";
@@ -326,7 +328,20 @@ export default class AdminSvc {
     reason: string;
     adminId: string;
   }) {
-    const refund = await AdminRepo.createManualRefund(data);
+    // `Refund.paymentId` is required — an admin picks a booking and an
+    // amount, not a specific payment row, so resolve the one to attach to:
+    // the booking's latest paid payment. Refunding a booking with no paid
+    // payment isn't a real manual-refund case.
+    const payments = await PaymentRepo.getBookingPayments(data.bookingId);
+    const paidPayment = payments.find((p) => p.status === PaymentStatus.paid);
+    if (!paidPayment) {
+      throw new Error("This booking has no paid payment to refund");
+    }
+
+    const refund = await AdminRepo.createManualRefund({
+      ...data,
+      paymentId: paidPayment.id,
+    });
     await this.announceRefundChanged(refund.bookingId);
     return refund;
   }

@@ -56,6 +56,23 @@ export default class VenueRepo {
     status?: VenueStatus;
     price: number;
     billingRate: BillingRate;
+
+    facilities: string[];
+    recommendedCapacity?: number;
+    seatingArrangements: string[];
+    stageConfig?: string;
+    setupOptions: string[];
+    operatingHours?: any;
+    blockedDates: Date[];
+    minBookingTime?: number;
+    depositRequirements?: string;
+    floorPlanUrls: string[];
+    seatingLayoutUrls: string[];
+    parkingInformation?: string;
+    accessibilityInformation?: string;
+    entranceInstructions?: string;
+    recommendedAssets?: any;
+    recommendedServices?: any;
   }) {
     const { imgIds, ...venueScalars } = data;
     return this.retiring(
@@ -67,7 +84,13 @@ export default class VenueRepo {
               images: { connect: imgIds.map((id) => ({ id })) },
             }),
         },
-        include: { mayor: mayorSelect, images: true },
+        include: {
+          mayor: mayorSelect,
+          images: true,
+          packages: true,
+          recommendedAssets: true,
+          recommendedServices: true,
+        },
       }),
     );
   }
@@ -83,8 +106,14 @@ export default class VenueRepo {
             name: true,
             email: true,
             imgId: true,
-            createdAt: true,
           },
+        },
+        packages: true,
+        recommendedAssets: {
+          include: { images: true },
+        },
+        recommendedServices: {
+          include: { images: true },
         },
       },
     });
@@ -173,7 +202,11 @@ export default class VenueRepo {
         },
       };
     } else {
-      queryArgs.include = { mayor: mayorSelect, images: true };
+      queryArgs.include = {
+        mayor: mayorSelect,
+        images: true,
+        packages: true,
+      };
     }
 
     const [venues, total] = await Promise.all([
@@ -203,7 +236,17 @@ export default class VenueRepo {
   static async findVenueByIdAndOwner(id: string, mayorId: string) {
     return prisma.venue.findFirst({
       where: { id: String(id), mayorId: String(mayorId) },
-      include: { mayor: mayorSelect, images: true },
+      include: {
+        mayor: mayorSelect,
+        images: true,
+        packages: true,
+        recommendedAssets: {
+          include: { images: true },
+        },
+        recommendedServices: {
+          include: { images: true },
+        },
+      },
     });
   }
 
@@ -246,7 +289,13 @@ export default class VenueRepo {
             images: { set: imgIds.map((fid) => ({ id: fid })) },
           }),
         },
-        include: { mayor: mayorSelect, images: true },
+        include: {
+          mayor: mayorSelect,
+          images: true,
+          packages: true,
+          recommendedAssets: true,
+          recommendedServices: true,
+        },
       }),
     );
   }

@@ -33,7 +33,5 @@ export interface ServerToClientEvents {
   [SOCKET_EVENTS.DATA_INVALIDATE]: (payload: InvalidatePayload) => void;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface ClientToServerEvents {
-  // Define any events that the client can send to the server here
-}
+// Define any events that the client can send to the server here
+export type ClientToServerEvents = Record<string, never>;

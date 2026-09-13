@@ -86,7 +86,7 @@ export default class ServiceBookingRepo {
       where: { id },
       data: {
         status: ItemBookingStatus.confirmed,
-        paymentStatus: PaymentStatus.completed,
+        paymentStatus: PaymentStatus.paid,
         paymentTransactionId: transactionId,
         paymentMethod: method,
       },

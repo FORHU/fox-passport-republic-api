@@ -1,4 +1,4 @@
-import PaymentRepo from "./payment.repository";
+import PaymentRepo, { PENDING_PAYMENT_TTL_MS } from "./payment.repository";
 import BookingRepo from "../booking/booking.repository";
 import crypto from "crypto";
 import {
@@ -13,9 +13,10 @@ import { bookingCache } from "../../utils/cache-namespaces";
 /**
  * Payments are cached in the **booking** namespace, not one of their own.
  *
- * They are the same payload - `BookingRepo.findById` includes `payments`, and
- * the balance below is computed from a booking - and they are changed by the
- * same writes. Both repositories already retire that namespace at every write,
+ * A `Payment` is invoice-scoped now (`invoiceId`, not `bookingId`), reached
+ * through the one-item Invoice `PaymentRepo` lazily creates per booking — but
+ * the balance below is still computed from a booking, and they are changed by
+ * the same writes. Both repositories already retire that namespace at every write,
  * so these reads arrive invalidated with no new invalidation point to
  * remember. A `payment` namespace would need every one of those writes to bump
  * two counters instead of one, and the second one is the one somebody forgets.
@@ -174,7 +175,7 @@ export default class PaymentSvc {
       expiresAt: data.expiresAt,
       paidAt:
         data.paidAt ||
-        (paymentStatus === PaymentStatus.completed ? new Date() : undefined),
+        (paymentStatus === PaymentStatus.paid ? new Date() : undefined),
     });
 
     // If this payment is a Stripe payment (either method explicitly 'stripe'
@@ -215,9 +216,8 @@ export default class PaymentSvc {
     }
 
     if (
-      payment.expiresAt &&
-      new Date() > payment.expiresAt &&
-      payment.status === PaymentStatus.pending
+      payment.status === PaymentStatus.pending &&
+      Date.now() - payment.createdAt.getTime() > PENDING_PAYMENT_TTL_MS
     ) {
       await this.sweepExpiredPayments();
       throw new Error("Payment has expired and is now cancelled");
@@ -226,15 +226,16 @@ export default class PaymentSvc {
     const updated = await PaymentRepo.updatePayment(id, {
       paymentStatus: data.paymentStatus,
       paidAt:
-        data.paymentStatus === PaymentStatus.completed
+        data.paymentStatus === PaymentStatus.paid
           ? (payment.paidAt ?? new Date())
           : undefined,
     });
 
-    if (
-      data.paymentStatus === PaymentStatus.completed &&
-      (updated.paymentType === "deposit" || updated.paymentType === "full")
-    ) {
+    // `paymentType` (deposit/full) is no longer stored on `Payment` — every
+    // real payment was one or the other, so the old check was always true for
+    // any payment reaching `paid`; this keeps that behavior without the field.
+    const bookingId = updated.invoice.items[0]?.sourceId;
+    if (data.paymentStatus === PaymentStatus.paid && bookingId) {
       // Full payment means the citizen has paid in full — it does NOT mean the event
       // has happened yet. Mirrors AssetBooking/ServiceBooking's confirmPayment, which
       // also lands on "confirmed": confirmArrival ("confirmed"/"pending" -> "active")
@@ -243,12 +244,12 @@ export default class PaymentSvc {
       // docs/adr/0002-stripe-connect-payouts.md ("Payout timing: on status -> completed").
       // The repository retires the cache - the booking page is what the
       // citizen is looking at when this lands.
-      await BookingRepo.markConfirmed(updated.bookingId);
+      await BookingRepo.markConfirmed(bookingId);
 
       // Auto-approve all included pending item transactions now that payment is confirmed.
       // Without this, venue/asset/service transactions stay "pending" forever and
       // providers won't receive payouts (payout fan-out iterates included txns).
-      await this.approveBookingTransactions(updated.bookingId);
+      await this.approveBookingTransactions(bookingId);
     }
 
     return updated;
@@ -282,8 +283,9 @@ export default class PaymentSvc {
     // the previous `any` casts hid that. Convert explicitly before arithmetic.
     const totalAgreed = Number(booking.event?.totalAmount ?? 0);
 
-    const paidAmount = (booking.payments ?? [])
-      .filter((p) => p.status === PaymentStatus.completed)
+    const payments = await PaymentRepo.getBookingPayments(bookingId);
+    const paidAmount = payments
+      .filter((p) => p.status === PaymentStatus.paid)
       .reduce((sum, p) => sum + Number(p.amount), 0);
 
     return {
@@ -439,7 +441,7 @@ export default class PaymentSvc {
 
       if (pendingPayment) {
         await this.updatePayment(pendingPayment.id, {
-          paymentStatus: PaymentStatus.completed,
+          paymentStatus: PaymentStatus.paid,
         });
         await PaymentRepo.setTransactionId(pendingPayment.id, paymentIntent.id);
       } else {
@@ -450,7 +452,7 @@ export default class PaymentSvc {
           currency: paymentIntent.currency.toUpperCase(),
           method: "stripe",
           paymentType: "full",
-          paymentStatus: PaymentStatus.completed,
+          paymentStatus: PaymentStatus.paid,
           transactionId: paymentIntent.id,
         });
       }

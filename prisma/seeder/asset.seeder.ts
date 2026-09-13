@@ -290,7 +290,7 @@ export async function seedAssets(prisma: PrismaClient, users: any[]) {
     console.log("Starting asset seed...");
     const gearFoxer = users.find((u) => u.email === "gearfoxer@example.com");
     if (!gearFoxer)
-      throw new Error("Gear foxer user not found for asset seeding");
+      throw new Error("Equipment Foxer user not found for asset seeding");
 
     const assets = [
       {

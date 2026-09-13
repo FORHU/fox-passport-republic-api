@@ -9,6 +9,7 @@
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "validate": "node tools/validate-architecture.mjs",
+    "validate:rbac": "node tools/validate-rbac-guards.mjs",
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "vitest run",
     "test:watch": "vitest",

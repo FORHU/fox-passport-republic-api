@@ -13,7 +13,7 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
       (u) => u.email === "servicefoxer@example.com",
     );
     if (!serviceFoxer)
-      throw new Error("Service foxer user not found for service seeding");
+      throw new Error("Talent Foxer user not found for service seeding");
 
     const gearFoxer = users.find((u) => u.email === "gearfoxer@example.com");
     const jasmine = users.find((u) => u.email === "jasmine.reyes@foxers.ph");
@@ -283,7 +283,7 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
         isWillingToTravel: false,
       },
 
-      // ── Gear Foxer Dela Rosa (foxerAsset) ────────────────────────────────
+      // ── Equipment Foxer Dela Rosa (foxerAsset) ────────────────────────────────
       ...(gearFoxer
         ? [
             {
@@ -804,7 +804,7 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
         type: "image/jpeg",
       },
 
-      // Gear Foxer — sound & lighting portfolio
+      // Equipment Foxer — sound & lighting portfolio
       {
         id: "seed-img-gear-sound-1",
         serviceId: "seed-service-gear-lacoustics-sound",
@@ -1011,7 +1011,7 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
       );
     }
 
-    // Gear foxer service images
+    // Equipment Foxer service images
     for (let i = 1; i <= 60; i++) {
       const foxer = users.find(
         (u: any) => u.email === `gf-${String(i).padStart(2, "0")}@foxers.ph`,
@@ -1035,7 +1035,7 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
       );
     }
 
-    // Service foxer service images
+    // Talent Foxer service images
     for (let i = 1; i <= 60; i++) {
       const foxer = users.find(
         (u: any) => u.email === `sf-${String(i).padStart(2, "0")}@foxers.ph`,

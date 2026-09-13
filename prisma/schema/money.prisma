@@ -1,70 +1,269 @@
 // Payments, payouts, refunds and the policies that govern them.
 
+enum InvoiceStatus {
+  pending
+  processing
+  paid
+  failed
+  cancelled
+  refunded
+  partially_refunded
+}
+
+enum InvoiceSourceType {
+  booking
+  event_asset_transaction
+  event_service_transaction
+  event_venue_transaction
+  partner_investment
+  sponsorship
+}
+
+enum CheckoutStatus {
+  active
+  completed
+  expired
+  failed
+}
+
+enum RefundStatus {
+  pending
+  succeeded
+  failed
+}
+
+enum PayoutStatus {
+  pending
+  paid
+  failed
+}
+
+enum PayoutSourceType {
+  event_asset_transaction
+  event_service_transaction
+  event_venue_transaction
+  event_host_markup
+  sponsorship
+}
+
+model PlatformFeeConfig {
+  id   String @id @default(uuid())
+  name String
+
+  transactionType String?
+  category        String?
+  subcategory     String?
+
+  percentage  Decimal? @db.Decimal(5, 2)
+  fixedAmount Decimal? @db.Decimal(12, 2)
+  currency    String   @default("PHP")
+
+  priority Int     @default(0)
+  active   Boolean @default(true)
+
+  effectiveFrom  DateTime  @default(now())
+  effectiveUntil DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([transactionType])
+  @@index([category])
+  @@index([active])
+  @@map("platform_fee_configs")
+}
+
+// --- PROMOTIONS & VOUCHERS ---
+
+model Promotion {
+  id              String    @id @default(uuid())
+  name            String
+  description     String?
+
+  transactionType String?
+  category        String?
+  subcategory     String?
+
+  discountType    String    // "percentage" or "fixed"
+  discountValue   Decimal   @db.Decimal(12, 2)
+  minSubtotal     Decimal?  @db.Decimal(12, 2)
+  maxDiscount     Decimal?  @db.Decimal(12, 2)
+
+  active          Boolean   @default(true)
+  startDate       DateTime?
+  endDate         DateTime?
+  
+  usageLimit      Int?
+  perUserLimit    Int?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  vouchers        Voucher[]
+
+  @@map("promotions")
+}
+
+model Voucher {
+  id              String    @id @default(uuid())
+  code            String    @unique
+  promotionId     String
+  
+  active          Boolean   @default(true)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  promotion       Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  redemptions     VoucherRedemption[]
+
+  @@map("vouchers")
+}
+
+model VoucherRedemption {
+  id              String    @id @default(uuid())
+  voucherId       String
+  userId          String
+  invoiceId       String    @unique
+  discountAmount  Decimal   @db.Decimal(12, 2)
+  
+  redeemedAt      DateTime  @default(now())
+
+  voucher         Voucher   @relation(fields: [voucherId], references: [id])
+  user            User      @relation(fields: [userId], references: [id])
+  invoice         Invoice   @relation(fields: [invoiceId], references: [id])
+
+  @@map("voucher_redemptions")
+}
+
+model Invoice {
+  id                  String        @id @default(uuid())
+  payerId             String
+  subtotalAmount      Decimal       @db.Decimal(12, 2) // Sum of items
+  
+  discountAmount      Decimal       @default(0) @db.Decimal(12, 2)
+  discountSnapshot    Json?
+  
+  discountedSubtotal  Decimal       @default(0) @db.Decimal(12, 2)
+  
+  platformFeeAmount   Decimal       @default(0) @db.Decimal(12, 2) // Snapshotted fee
+  platformFeeSnapshot Json? // Snapshot of PlatformFeeConfig
+  
+  grossAmount         Decimal       @db.Decimal(12, 2) // discountedSubtotal + fee
+  currency            String        @default("PHP")
+  status              InvoiceStatus @default(pending)
+  dueDate             DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  payer     User          @relation(fields: [payerId], references: [id])
+  items     InvoiceItem[]
+  checkouts Checkout[]
+  payments  Payment[]
+  redemption VoucherRedemption?
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String            @id @default(uuid())
+  invoiceId   String
+  amount      Decimal           @db.Decimal(12, 2)
+  description String
+  sourceType  InvoiceSourceType
+  sourceId    String
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
+
+model Checkout {
+  id                String         @id @default(uuid())
+  invoiceId         String
+  provider          String // e.g., "stripe"
+  providerSessionId String?        @unique // e.g., Stripe Checkout Session ID
+  status            CheckoutStatus @default(active)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("checkouts")
+}
+
 model Payment {
   id                String        @id @default(uuid())
-  bookingId         String
+  invoiceId         String
   amount            Decimal       @db.Decimal(12, 2)
-  currency          String
   method            String
-  paymentType       PaymentType
-  status            PaymentStatus
-  transactionId     String?       @unique
-  expiresAt         DateTime?
+  provider          String        @default("stripe")
+  providerReference String?       @unique
+  status            PaymentStatus @default(pending)
   paidAt            DateTime?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
-  hostMarkupAmount  Decimal       @default(0) @db.Decimal(12, 2)
-  platformFeeAmount Decimal       @default(0) @db.Decimal(12, 2)
-  booking           Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  refunds           Refund[]
+
+  invoice Invoice  @relation(fields: [invoiceId], references: [id])
+  refunds Refund[]
 
   @@map("payments")
 }
 
 model Payout {
-  id               String       @id @default(uuid())
-  recipientId      String
-  role             RoleType
-  sourceType       String // "assetBooking" | "serviceBooking" | "booking"
-  sourceId         String
-  amount           Decimal      @db.Decimal(12, 2)
-  currency         String       @default("PHP")
-  stripeTransferId String?
-  status           PayoutStatus @default(pending)
-  failureReason    String?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  recipient        User         @relation(fields: [recipientId], references: [id])
+  id                String           @id @default(uuid())
+  providerId        String
+  sourceType        PayoutSourceType
+  sourceId          String
+  allocationAmount  Decimal          @db.Decimal(12, 2)
+  platformFeeAmount Decimal          @default(0) @db.Decimal(12, 2)
+  gatewayFeeAmount  Decimal          @default(0) @db.Decimal(12, 2)
+  payoutAmount      Decimal          @db.Decimal(12, 2) // allocation - fees
+  status            PayoutStatus     @default(pending)
+  providerReference String? // e.g., Stripe Transfer ID
+  paidAt            DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
-  @@unique([sourceType, sourceId, recipientId, role])
-  @@index([sourceType, sourceId])
-  @@index([recipientId])
+  providerUser User @relation(fields: [providerId], references: [id])
+
+  // Idempotency guard: a retried webhook or a defensively-repeated
+  // updateStatus(completed) must not create a second Payout (and fire a
+  // second Stripe transfer) for the same provider's cut of the same source
+  // row. `PayoutSvc.createPayoutRecord` upserts against this.
+  @@unique([sourceType, sourceId, providerId])
   @@map("payouts")
 }
 
 model Refund {
-  id             String       @id @default(uuid())
-  bookingId      String
-  paymentId      String?
-  amount         Decimal      @db.Decimal(12, 2)
-  currency       String       @default("PHP")
-  stripeRefundId String?      @unique
-  status         RefundStatus @default(pending)
-  failureReason  String?
-  failureCode    String?
-  initiatedBy    String?
-  resolved       Boolean      @default(false)
-  resolvedBy     String?
-  resolvedAt     DateTime?
-  adminNotes     String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  booking        Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  payment        Payment?     @relation(fields: [paymentId], references: [id])
+  id                String       @id @default(uuid())
+  paymentId         String
+  amount            Decimal      @db.Decimal(12, 2)
+  reason            String?
+  providerReference String?      @unique
+  status            RefundStatus @default(pending)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
-  @@index([bookingId])
-  @@index([status])
+  payment   Payment  @relation(fields: [paymentId], references: [id])
+  booking   Booking? @relation(fields: [bookingId], references: [id])
+  bookingId String?
+
   @@map("refunds")
+}
+
+model PaymentProviderEvent {
+  id              String    @id @default(uuid())
+  provider        String // "stripe"
+  providerEventId String
+  eventType       String // e.g., "payment_intent.succeeded"
+  payload         Json
+  processed       Boolean   @default(false)
+  processedAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@unique([provider, providerEventId])
+  @@map("payment_provider_events")
 }
 
 model CancellationPolicy {
@@ -91,29 +290,4 @@ model CancellationRule {
   policy           CancellationPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
 
   @@map("cancellation_rules")
-}
-
-model StripeEvent {
-  id        String   @id
-  type      String
-  createdAt DateTime @default(now())
-
-  @@map("stripe_events")
-}
-
-enum RefundStatus {
-  pending
-  succeeded
-  failed
-}
-
-enum PayoutStatus {
-  pending
-  paid
-  failed
-}
-
-enum PaymentType {
-  deposit
-  full
 }

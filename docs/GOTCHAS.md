@@ -159,6 +159,32 @@ the table is provably empty in every environment that will run it. Otherwise
 it is an add-nullable-then-backfill-then-constrain migration, always, even when
 `prisma migrate dev` offers to generate the one-step version.
 
+## 12. A migration baselined with `migrate resolve --applied` was never tested against a real deploy
+
+`20260912164852_central_payment_bidding_partnership_reconciliation` exists
+because the dev database drifted ahead of migration history — the central
+payment/bidding/partnership schema had been applied with `prisma db push`,
+which doesn't write a migration file, and by the time this was noticed the
+drift was too large for `migrate dev` to reconcile without offering a full
+`migrate reset` (entry 7).
+
+The fix was: generate the SQL diff between the 74 tracked migrations and the
+current schema (`migrate diff`, needs `shadowDatabaseUrl` — added to
+`prisma.config.js`, wired to `SHADOW_DATABASE_URL`), write it as migration 75,
+and mark it `--applied` since the dev DB already had this state. Verified two
+ways — `migrate diff --exit-code` reports no drift, and all 75 migrations
+replay cleanly via `migrate deploy` against a **completely fresh** database —
+but "fresh" is the operative word. Neither check proves anything about running
+it against a database that already has real data and a different history,
+which is exactly the entry-11 failure mode (a column addition that's safe
+against an empty table and not against a populated one).
+
+**Before this branch — or this migration specifically — ever reaches a shared
+environment: run `prisma migrate deploy` against a copy of that environment's
+actual data first**, not just a fresh one. Baselining assumes the target
+already matches; nothing has confirmed that assumption for anywhere but this
+one developer machine.
+
 ---
 
 ## Owed elsewhere
@@ -169,3 +195,7 @@ it is an add-nullable-then-backfill-then-constrain migration, always, even when
 - **The Dockerfile runs `prisma migrate deploy` at container boot.** A migration
   that fails does not fail a deploy step someone is watching — it fails
   *startup*. Entry 11 above is a live instance of this, not yet fixed.
+- **Entry 12's migration has never run against real (non-fresh) data.** There
+  is no staging or production environment yet, so this is a flag for whenever
+  one exists, not an active risk today — but it is the first thing to check
+  before this repository's first real deploy.

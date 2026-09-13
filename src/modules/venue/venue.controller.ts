@@ -29,6 +29,23 @@ interface CreateVenuePayload {
   price?: number;
   billingRate?: BillingRate;
   cancellationPolicyId?: string;
+
+  facilities?: string[];
+  recommendedCapacity?: number;
+  seatingArrangements?: string[];
+  stageConfig?: string;
+  setupOptions?: string[];
+  operatingHours?: any;
+  blockedDates?: Date[];
+  minBookingTime?: number;
+  depositRequirements?: string;
+  floorPlanUrls?: string[];
+  seatingLayoutUrls?: string[];
+  parkingInformation?: string;
+  accessibilityInformation?: string;
+  entranceInstructions?: string;
+  recommendedAssets?: string[];
+  recommendedServices?: string[];
 }
 
 export default class VenueCtrl {
@@ -78,6 +95,23 @@ export default class VenueCtrl {
         .valid("hourly", "daily", "weekly", "monthly", "yearly", "one_time")
         .default("daily"),
       cancellationPolicyId: Joi.string().uuid().optional(),
+
+      facilities: Joi.array().items(Joi.string()).optional(),
+      recommendedCapacity: Joi.number().integer().min(1).optional(),
+      seatingArrangements: Joi.array().items(Joi.string()).optional(),
+      stageConfig: Joi.string().optional(),
+      setupOptions: Joi.array().items(Joi.string()).optional(),
+      operatingHours: Joi.any().optional(),
+      blockedDates: Joi.array().items(Joi.date().iso()).optional(),
+      minBookingTime: Joi.number().integer().min(1).optional(),
+      depositRequirements: Joi.string().optional(),
+      floorPlanUrls: Joi.array().items(Joi.string()).optional(),
+      seatingLayoutUrls: Joi.array().items(Joi.string()).optional(),
+      parkingInformation: Joi.string().optional(),
+      accessibilityInformation: Joi.string().optional(),
+      entranceInstructions: Joi.string().optional(),
+      recommendedAssets: Joi.array().items(Joi.string().uuid()).optional(),
+      recommendedServices: Joi.array().items(Joi.string().uuid()).optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -211,6 +245,23 @@ export default class VenueCtrl {
         .valid("hourly", "daily", "weekly", "monthly", "yearly", "one_time")
         .optional(),
       cancellationPolicyId: Joi.string().uuid().optional(),
+
+      facilities: Joi.array().items(Joi.string()).optional(),
+      recommendedCapacity: Joi.number().integer().min(1).optional(),
+      seatingArrangements: Joi.array().items(Joi.string()).optional(),
+      stageConfig: Joi.string().optional(),
+      setupOptions: Joi.array().items(Joi.string()).optional(),
+      operatingHours: Joi.any().optional(),
+      blockedDates: Joi.array().items(Joi.date().iso()).optional(),
+      minBookingTime: Joi.number().integer().min(1).optional(),
+      depositRequirements: Joi.string().optional(),
+      floorPlanUrls: Joi.array().items(Joi.string()).optional(),
+      seatingLayoutUrls: Joi.array().items(Joi.string()).optional(),
+      parkingInformation: Joi.string().optional(),
+      accessibilityInformation: Joi.string().optional(),
+      entranceInstructions: Joi.string().optional(),
+      recommendedAssets: Joi.array().items(Joi.string().uuid()).optional(),
+      recommendedServices: Joi.array().items(Joi.string().uuid()).optional(),
     }).min(1);
 
     const { error, value } = schema.validate(req.body);

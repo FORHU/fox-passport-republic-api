@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import PaymentSvc from "./payment.service";
+import WebhookSvc from "./webhook.service";
 import Stripe from "stripe";
 
 export default class PaymentController {
@@ -292,8 +293,50 @@ export default class PaymentController {
 
     // Everything the event means is the service's business - see
     // `docs/REDIS-PLAN.md` §0b. What stays here is the part that is genuinely
-    // HTTP: the raw body, the signature header, and the 400s above.
-    await PaymentSvc.handleStripeEvent(event);
+    // HTTP: the raw body, the signature header, and the 400s above — plus
+    // this one dispatch, because `PaymentSvc.handleStripeEvent`'s own switch
+    // has no case for the new Checkout Session flow's event types (they fell
+    // into its `default: console.log("Unhandled event type")` branch, which
+    // is silent data loss: a citizen could pay and the payment would never
+    // be confirmed). `payment_intent.succeeded` and everything else keeps
+    // going through the legacy handler, untouched.
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      await WebhookSvc.processEventWithIdempotency(
+        "stripe",
+        event.id,
+        event.type,
+        event.data.object,
+        async () => {
+          const providerReference =
+            typeof session.payment_intent === "string"
+              ? session.payment_intent
+              : (session.payment_intent?.id ?? session.id);
+          await WebhookSvc.handlePaymentSuccess(
+            session.id,
+            providerReference,
+            // Stripe reports amount_total in the smallest currency unit;
+            // the invoice/checkout amounts here are whole-currency, matching
+            // how `StripeAdapter.createCheckout` sent it (`amount * 100`).
+            (session.amount_total ?? 0) / 100,
+            session.currency ?? "php",
+          );
+        },
+      );
+    } else if (event.type === "checkout.session.expired") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      await WebhookSvc.processEventWithIdempotency(
+        "stripe",
+        event.id,
+        event.type,
+        event.data.object,
+        async () => {
+          await WebhookSvc.handleCheckoutExpired(session.id);
+        },
+      );
+    } else {
+      await PaymentSvc.handleStripeEvent(event);
+    }
 
     res.json({ received: true });
   }

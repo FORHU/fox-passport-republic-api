@@ -40,8 +40,10 @@ enum RequestStatus {
 
 enum PaymentStatus {
   pending
-  completed
+  processing
+  paid
   failed
-  refunded
   cancelled
+  refunded
+  partially_refunded
 }

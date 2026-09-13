@@ -124,8 +124,7 @@ class RedisUtil {
       await this.client.connect();
       this.everConnected = true;
       console.log(`✅ Redis connected successfully (${target})`);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (error) {
+    } catch {
       console.error(
         `❌ Redis connection failed at ${target} — app will continue without ` +
           "Redis: no caching, and rate-limit counters go per-process",

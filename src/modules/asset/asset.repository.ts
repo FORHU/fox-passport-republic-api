@@ -146,6 +146,7 @@ export default class AssetRepo {
     billingRate: BillingRate;
     condition?: AssetCondition;
     status?: AssetStatus;
+    venueId?: string;
     imgIds: string[];
   }) {
     return this.retiring(
@@ -199,6 +200,7 @@ export default class AssetRepo {
       billingRate: BillingRate;
       condition: AssetCondition;
       status: AssetStatus;
+      venueId: string;
       imgIds: string[];
     }>,
   ) {

@@ -59,8 +59,7 @@ export const registerSocketGateway = (io: Server) => {
       socket.userId = decoded.userId;
       socket.systemRole = decoded.systemRole;
       return next();
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (err) {
+    } catch {
       return next(new Error("Invalid or expired token"));
     }
   });

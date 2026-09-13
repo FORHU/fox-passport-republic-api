@@ -28,6 +28,7 @@ interface CreateAssetPayload {
   imgIds: string[];
   status?: AssetStatus;
   cancellationPolicyId?: string;
+  venueId?: string;
 }
 
 type UpdateAssetPayload = Partial<CreateAssetPayload>;

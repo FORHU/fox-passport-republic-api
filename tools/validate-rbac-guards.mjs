@@ -1,0 +1,196 @@
+#!/usr/bin/env node
+/**
+ * RBAC guard scan — `RBAC-PLAN.md` Phase 4, items 3 and 5.
+ *
+ * Two checks, over every `*.routes.ts` file under `src/modules`:
+ *
+ *   1. **No role-name guards outside `permissions.ts`.** `requireRole`,
+ *      `requireAdmin` and `requireHost` are deprecated in favour of
+ *      `requirePermission`; a route file that calls any of them directly is a
+ *      regression back to the model the RBAC migration removed. This check is
+ *      unconditional and fails the build the moment any file uses one —
+ *      there is no allow-list, because there is no legitimate reason for a
+ *      route file to reach for a role name again.
+ *
+ *      Not hypothetical: `bidding.routes.ts` and `partnership.routes.ts` both
+ *      shipped with `requireRole(...)` on 13 Sep, after `RBAC-PLAN.md` had
+ *      already recorded "zero call sites remain" — proof this check would
+ *      have caught something that actually happened, not just something that
+ *      theoretically could.
+ *
+ *   2. **Every authenticated route carries a capability check.** A
+ *      `router.<verb>()` registration that carries `authenticate` (directly,
+ *      or inherited from a preceding `router.use(authenticate)` in the same
+ *      file) must also carry `requirePermission(...)`, or appear on the
+ *      allow-list below with a reason. This one *is* allow-listed, because
+ *      "authenticated but correctly guarded by ownership inside the service,
+ *      not by a route-level permission" is a real and common shape here (a
+ *      citizen reading their own profile, for instance) — RBAC-PLAN.md §Phase
+ *      4 item 5 calls this out explicitly rather than pretending every one of
+ *      these is a bug.
+ *
+ * Run: `node tools/validate-rbac-guards.mjs`
+ *
+ * Status: check 1 is enforced (exits non-zero on any hit — there is nothing
+ * to allow-list). Check 2 currently runs in **report mode**: it prints every
+ * authenticated-and-unguarded route not on `ALLOW_LIST` below and exits 0
+ * regardless, because populating that list correctly means looking at each
+ * one and confirming what actually guards it (ownership check, admin-only
+ * business rule, etc.) — the same audit `RBAC-PLAN.md` scoped as its own
+ * item, not something to fake from a static scan. Once that audit is done and
+ * `ALLOW_LIST` is complete, flip `REPORT_ONLY` to `false` so this becomes a
+ * real CI gate instead of a count someone has to remember to read.
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import process from "node:process";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT_DIR = path.resolve(__dirname, "../src/modules");
+
+const REPORT_ONLY = true;
+
+/**
+ * Routes that are `authenticate`d but deliberately have no `requirePermission`
+ * — each entry needs a reason, because an entry with no reason is exactly the
+ * kind of thing this scan exists to stop accumulating silently. Keyed as
+ * `"<module>.routes.ts <METHOD> <path>"`, matching how violations are printed
+ * below so an entry can be copy-pasted from the report straight into here.
+ *
+ * Empty today, deliberately: no route has been individually re-audited and
+ * signed off yet. That is the work `RBAC-PLAN.md` Phase 4 item 5 still owes;
+ * this file does not pretend to have done it by shipping a guessed list.
+ */
+const ALLOW_LIST = new Set([
+  // "users.routes.ts GET /:id/profile — self-service, no separate permission needed",
+]);
+
+const BANNED_GUARDS = ["requireRole", "requireAdmin", "requireHost"];
+const VERBS = ["get", "post", "put", "patch", "delete"];
+
+function stripComments(src) {
+  // RBAC-PLAN.md Phase 4 item 3's own lesson: strip comments before matching,
+  // or a comment that mentions `requireRole` (like this file's own docblock)
+  // trips the ban it is explaining.
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
+
+/** Find the text of every balanced-paren call to `router.<verb>(` or `router.use(`. */
+function extractRouterCalls(src) {
+  const calls = [];
+  const callStart = /router\.(use|get|post|put|patch|delete)\s*\(/g;
+  let match;
+  while ((match = callStart.exec(src)) !== null) {
+    const verb = match[1];
+    let depth = 1;
+    let i = match.index + match[0].length;
+    const start = i;
+    while (i < src.length && depth > 0) {
+      if (src[i] === "(") depth++;
+      else if (src[i] === ")") depth--;
+      i++;
+    }
+    calls.push({ verb, args: src.slice(start, i - 1) });
+  }
+  return calls;
+}
+
+function firstStringLiteral(args) {
+  const m = args.match(/^\s*["'`]([^"'`]*)["'`]/);
+  return m ? m[1] : null;
+}
+
+function scanFile(file) {
+  const raw = fs.readFileSync(file, "utf8");
+  const src = stripComments(raw);
+  const rel = path.relative(ROOT_DIR, file).split(path.sep).join("/");
+
+  const bannedHits = [];
+  for (const guard of BANNED_GUARDS) {
+    if (new RegExp(`\\b${guard}\\s*\\(`).test(src)) bannedHits.push(guard);
+  }
+
+  const calls = extractRouterCalls(src);
+  let fileWideAuth = false;
+  const unguarded = [];
+
+  for (const call of calls) {
+    if (call.verb === "use") {
+      if (/\bauthenticate\b/.test(call.args)) fileWideAuth = true;
+      continue;
+    }
+    const isAuthed = fileWideAuth || /\bauthenticate\b/.test(call.args);
+    if (!isAuthed) continue;
+    if (/\brequirePermission\s*\(/.test(call.args)) continue;
+
+    const routePath = firstStringLiteral(call.args) ?? "(dynamic path)";
+    const key = `${path.basename(file)} ${call.verb.toUpperCase()} ${routePath}`;
+    if (ALLOW_LIST.has(key)) continue;
+    unguarded.push(key);
+  }
+
+  return { rel, bannedHits, unguarded };
+}
+
+function main() {
+  const files = [];
+  for (const mod of fs.readdirSync(ROOT_DIR, { withFileTypes: true })) {
+    if (!mod.isDirectory()) continue;
+    const dir = path.join(ROOT_DIR, mod.name);
+    for (const entry of fs.readdirSync(dir)) {
+      if (entry.endsWith(".routes.ts")) files.push(path.join(dir, entry));
+    }
+  }
+
+  console.log("\x1b[36m🛡️  RBAC guard scan...\x1b[0m");
+
+  let bannedTotal = 0;
+  let unguardedTotal = 0;
+
+  for (const file of files) {
+    const { rel, bannedHits, unguarded } = scanFile(file);
+
+    for (const guard of bannedHits) {
+      bannedTotal++;
+      console.error(
+        `\x1b[31m[BANNED GUARD]\x1b[0m ${rel} calls ${guard}(...) directly — convert to requirePermission.`,
+      );
+    }
+
+    for (const key of unguarded) {
+      unguardedTotal++;
+      console.log(`  \x1b[33m[unguarded]\x1b[0m ${key}`);
+    }
+  }
+
+  console.log(
+    `\nScanned ${files.length} route files. ${bannedTotal} banned-guard hit(s), ${unguardedTotal} authenticated route(s) with no requirePermission and no allow-list entry.`,
+  );
+
+  if (bannedTotal > 0) {
+    console.error(
+      "\x1b[31m✖ Banned role-name guard(s) found in route files — see above.\x1b[0m",
+    );
+    process.exit(1);
+  }
+
+  if (unguardedTotal > 0 && !REPORT_ONLY) {
+    console.error(
+      "\x1b[31m✖ Authenticated route(s) with no capability check and no allow-list entry.\x1b[0m",
+    );
+    process.exit(1);
+  }
+
+  if (unguardedTotal > 0) {
+    console.log(
+      "\x1b[33mReport mode: not failing the build. Populate ALLOW_LIST (with a reason each) and flip REPORT_ONLY to false once the audit is done.\x1b[0m",
+    );
+  }
+
+  console.log("\x1b[32m✅ No banned role-name guards.\x1b[0m");
+}
+
+main();
