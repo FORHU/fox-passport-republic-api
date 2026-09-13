@@ -757,21 +757,6 @@ export default class BookingSvc {
     return confirmed;
   }
 
-  static async dispute(id: string, requesterId: string) {
-    const booking = await BookingRepo.findById(id);
-    if (!booking) throw new Error("Booking not found");
-    if (booking.userId !== requesterId)
-      throw new Error("Only the client can report a dispute");
-    if (["completed", "cancelled", "disputed"].includes(booking.status)) {
-      throw new Error("Booking cannot be disputed at this stage");
-    }
-    const disputed = await BookingRepo.dispute(id);
-    announceBookingChanged(booking.userId, booking.event?.organizerId);
-    // The only way a row reaches the admin Disputes tab.
-    announceToAdmins("disputes");
-    return disputed;
-  }
-
   // ─── FLOWS THAT LIVED IN THE CONTROLLER ───────────────────────────────────
   //
   // Three handlers held most of `booking.controller.ts`: a template booking, a

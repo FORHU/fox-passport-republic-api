@@ -291,14 +291,7 @@ export default class BookingCtrl {
     try {
       const schema = Joi.object({
         status: Joi.string()
-          .valid(
-            "pending",
-            "confirmed",
-            "active",
-            "completed",
-            "cancelled",
-            "disputed",
-          )
+          .valid("pending", "confirmed", "active", "completed", "cancelled")
           .required(),
       });
 
@@ -325,17 +318,6 @@ export default class BookingCtrl {
         req.params.id,
         req.user!.userId,
       );
-      return res.status(200).json({ success: true, data: booking });
-    } catch (e: unknown) {
-      const err = e as Error;
-      return res.status(400).json({ success: false, message: err.message });
-    }
-  }
-
-  // PATCH DISPUTE — mirrors asset-booking.controller.ts:130-137
-  static async dispute(req: Request, res: Response) {
-    try {
-      const booking = await BookingSvc.dispute(req.params.id, req.user!.userId);
       return res.status(200).json({ success: true, data: booking });
     } catch (e: unknown) {
       const err = e as Error;

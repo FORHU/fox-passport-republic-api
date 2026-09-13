@@ -516,17 +516,4 @@ export default class BookingRepo {
       }),
     );
   }
-
-  static async dispute(id: string) {
-    return this.retiring(
-      prisma.booking.update({
-        where: { id },
-        data: { status: BookingStatus.disputed },
-        include: {
-          event: true,
-          user: { select: { id: true, name: true, email: true } },
-        },
-      }),
-    );
-  }
 }

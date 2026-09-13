@@ -113,7 +113,6 @@ const bookingWrites: [string, () => Promise<unknown>][] = [
   ["finalizeAttendees", () => BookingRepo.finalizeAttendees("b1")],
   ["updateStatus", () => BookingRepo.updateStatus("b1", "cancelled" as never)],
   ["confirmArrival", () => BookingRepo.confirmArrival("b1")],
-  ["dispute", () => BookingRepo.dispute("b1")],
   [
     "claimReminders",
     () =>
@@ -128,8 +127,7 @@ const paymentWrites: [string, () => Promise<unknown>][] = [
   ["createPayment", () => PaymentRepo.createPayment({} as never)],
   [
     "updatePayment",
-    () =>
-      PaymentRepo.updatePayment("p1", { paymentStatus: "paid" as never }),
+    () => PaymentRepo.updatePayment("p1", { paymentStatus: "paid" as never }),
   ],
   ["setTransactionId", () => PaymentRepo.setTransactionId("p1", "pi_1")],
   ["markRefunded", () => PaymentRepo.markRefunded("p1")],
