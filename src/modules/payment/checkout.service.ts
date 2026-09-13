@@ -15,19 +15,22 @@ export default class CheckoutSvc {
     return prisma.$transaction(async (tx) => {
       const invoice = await tx.invoice.findUnique({
         where: { id: invoiceId },
-        include: { checkouts: true }
+        include: { checkouts: true },
       });
 
       if (!invoice) throw new Error("Invoice not found");
       if (invoice.status === "paid") throw new Error("Invoice is already paid");
-      if (invoice.status === "cancelled") throw new Error("Invoice is cancelled");
+      if (invoice.status === "cancelled")
+        throw new Error("Invoice is cancelled");
 
       // Expire any existing active checkouts
-      const activeCheckouts = invoice.checkouts.filter(c => c.status === "active");
+      const activeCheckouts = invoice.checkouts.filter(
+        (c) => c.status === "active",
+      );
       for (const c of activeCheckouts) {
         await tx.checkout.update({
           where: { id: c.id },
-          data: { status: "expired" }
+          data: { status: "expired" },
         });
       }
 
@@ -41,7 +44,7 @@ export default class CheckoutSvc {
         invoice.grossAmount.toNumber(),
         invoice.currency,
         successUrl,
-        cancelUrl
+        cancelUrl,
       );
 
       // Save Checkout
@@ -50,20 +53,21 @@ export default class CheckoutSvc {
           invoiceId,
           provider: "stripe",
           providerSessionId: sessionData.providerSessionId,
-          status: "active"
-        }
+          status: "active",
+        },
       });
 
       return {
         checkoutId: checkout.id,
-        url: sessionData.url
+        url: sessionData.url,
+        status: checkout.status,
       };
     });
   }
 
   static async getCheckout(checkoutId: string) {
     const checkout = await prisma.checkout.findUnique({
-      where: { id: checkoutId }
+      where: { id: checkoutId },
     });
     if (!checkout) throw new Error("Checkout not found");
     return checkout;
@@ -71,14 +75,14 @@ export default class CheckoutSvc {
 
   static async expireCheckout(checkoutId: string) {
     const checkout = await prisma.checkout.findUnique({
-      where: { id: checkoutId }
+      where: { id: checkoutId },
     });
     if (!checkout) throw new Error("Checkout not found");
     if (checkout.status !== "active") return checkout;
 
     return prisma.checkout.update({
       where: { id: checkoutId },
-      data: { status: "expired" }
+      data: { status: "expired" },
     });
   }
 }

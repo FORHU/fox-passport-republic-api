@@ -1,0 +1,130 @@
+import { Request, Response } from "express";
+import Joi from "joi";
+import EventCheckoutSvc from "../payment/event-checkout.service";
+import PartnershipCheckoutSvc from "../payment/partnership-checkout.service";
+import InvoiceSvc from "../payment/invoice.service";
+import { can } from "../../types/permissions";
+
+/**
+ * The HTTP layer for Central Payment's checkout flow. Deliberately thin —
+ * every response shape and business rule here already exists in
+ * `EventCheckoutSvc`, `PartnershipCheckoutSvc` and `InvoiceSvc`; this file's
+ * only job is Joi validation, calling the right service method, and mapping
+ * its result/errors onto the locked response contracts. See
+ * `docs/CENTRAL-PAYMENT-FRONTEND-PLAN.md` (app repo) for why these four
+ * response shapes are flat JSON rather than this codebase's usual
+ * `{ success, data }` envelope — the frontend is already built against them
+ * exactly as documented there.
+ */
+function statusForCheckoutError(message: string): number {
+  if (message.includes("not found")) return 404;
+  if (message.startsWith("Unauthorized")) return 403;
+  if (message.includes("already been paid")) return 409;
+  return 400;
+}
+
+const voucherSchema = Joi.object({
+  voucherCode: Joi.string().trim().optional(),
+});
+
+export default class CheckoutController {
+  // POST /v1/events/:eventId/checkout
+  static async createEventCheckout(req: Request, res: Response) {
+    const { error, value } = voucherSchema.validate(req.body ?? {});
+    if (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    try {
+      const result = await EventCheckoutSvc.createEventCheckout(
+        req.params.eventId,
+        req.user!.userId,
+        value.voucherCode,
+      );
+      return res.status(201).json({
+        invoiceId: result.invoice.id,
+        checkoutId: result.checkoutId,
+        url: result.url,
+        status: result.status,
+      });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res
+        .status(statusForCheckoutError(err.message))
+        .json({ success: false, message: err.message });
+    }
+  }
+
+  // GET /v1/events/:eventId/payment-summary
+  static async getEventPaymentSummary(req: Request, res: Response) {
+    const schema = Joi.object({ voucherCode: Joi.string().trim().optional() });
+    const { error, value } = schema.validate(req.query);
+    if (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    try {
+      const summary = await EventCheckoutSvc.getPaymentSummary(
+        req.params.eventId,
+        req.user!.userId,
+        value.voucherCode,
+      );
+      return res.status(200).json(summary);
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res
+        .status(statusForCheckoutError(err.message))
+        .json({ success: false, message: err.message });
+    }
+  }
+
+  // POST /v1/partnerships/:proposalId/checkout
+  static async createSponsorshipCheckout(req: Request, res: Response) {
+    const { error, value } = voucherSchema.validate(req.body ?? {});
+    if (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    try {
+      const result = await PartnershipCheckoutSvc.createSponsorshipCheckout(
+        req.params.proposalId,
+        req.user!.userId,
+        value.voucherCode,
+      );
+      return res.status(201).json({
+        invoiceId: result.invoice.id,
+        checkoutId: result.checkoutId,
+        url: result.url,
+        status: result.status,
+      });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res
+        .status(statusForCheckoutError(err.message))
+        .json({ success: false, message: err.message });
+    }
+  }
+
+  // GET /v1/invoices/:id
+  static async getInvoiceStatus(req: Request, res: Response) {
+    try {
+      const result = await InvoiceSvc.getInvoiceStatus(req.params.id);
+      const { userId, systemRole } = req.user!;
+      if (result.payerId !== userId && !can(systemRole, "payments:read:all")) {
+        return res.status(403).json({
+          success: false,
+          message: "Unauthorized: you may only view your own invoices",
+        });
+      }
+      return res.status(200).json({
+        invoiceId: result.invoiceId,
+        status: result.status,
+        paymentStatus: result.paymentStatus,
+      });
+    } catch (e: unknown) {
+      const err = e as Error;
+      const status = err.message.includes("not found") ? 404 : 400;
+      return res.status(status).json({ success: false, message: err.message });
+    }
+  }
+}

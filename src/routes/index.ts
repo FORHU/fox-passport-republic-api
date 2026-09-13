@@ -37,6 +37,7 @@ import blockRoutes from "../modules/block/block.routes";
 import reportsRoutes from "../modules/reports/reports.routes";
 import biddingRoutes from "../modules/bidding/bidding.routes";
 import partnershipRoutes from "../modules/partnership/partnership.routes";
+import checkoutRoutes from "../modules/checkout/checkout.routes";
 
 const router = express.Router();
 
@@ -89,6 +90,9 @@ router.use("/v1/investments", investmentRoutes);
 router.use("/v1/events", eventRoutes);
 router.use("/v1/bids", biddingRoutes);
 router.use("/v1/partnerships", partnershipRoutes);
+// Central Payment checkout — mounted at bare /v1, not nested under events/
+// partnerships, so it stays a self-contained module. See checkout.routes.ts.
+router.use("/v1", checkoutRoutes);
 // Admin Routes
 router.use("/v1/admin", adminRoutes);
 
