@@ -12,7 +12,10 @@ function assertCanManage(
   callerId: string,
   callerSystemRole: string,
 ) {
-  if (event.organizerId !== callerId && !can(callerSystemRole, "event:manage-organizers")) {
+  if (
+    event.organizerId !== callerId &&
+    !can(callerSystemRole, "event:manage-organizers")
+  ) {
     throw new Error(
       "Unauthorized: only this event's organizer can manage its delegates",
     );

@@ -14,23 +14,27 @@ export default class PaymentPayoutSvc {
     const payoutIds = await prisma.$transaction(async (tx) => {
       const invoice = await tx.invoice.findUnique({
         where: { id: invoiceId },
-        include: { items: true, payments: { where: { status: "paid" } } }
+        include: { items: true, payments: { where: { status: "paid" } } },
       });
 
       if (!invoice) throw new Error("Invoice not found");
-      if (invoice.status !== "paid") throw new Error("Cannot allocate a non-paid invoice");
+      if (invoice.status !== "paid")
+        throw new Error("Cannot allocate a non-paid invoice");
 
       // Fast-path guard — the per-item upsert below is the real idempotency
       // guarantee (matches payout/payout.service.ts's @@unique([sourceType,
       // sourceId, providerId])), this just avoids the query loop entirely on
       // a retried webhook once allocation has already happened once.
-      const sourceIds = invoice.items.map(i => i.sourceId);
-      const existingPayouts = await tx.payout.count({ where: { sourceId: { in: sourceIds } } });
+      const sourceIds = invoice.items.map((i) => i.sourceId);
+      const existingPayouts = await tx.payout.count({
+        where: { sourceId: { in: sourceIds } },
+      });
       if (existingPayouts > 0) return [];
 
       // We assume one primary successful payment for this invoice for fee calculations
       const payment = invoice.payments[0];
-      if (!payment) throw new Error("No successful payment found for paid invoice");
+      if (!payment)
+        throw new Error("No successful payment found for paid invoice");
 
       // In V1, we split the platform fee across the line items proportionally.
       // Business Rule: FoxPassport absorbs promotional discounts by default,
@@ -49,7 +53,7 @@ export default class PaymentPayoutSvc {
         const itemPlatformFee = platformFeeNum * itemRatio;
 
         // Mock Gateway Fee for Stripe (e.g., 2.9% + $0.30/Php15)
-        const gatewayFee = (itemAmount * 0.029) + (15 * itemRatio);
+        const gatewayFee = itemAmount * 0.029 + 15 * itemRatio;
 
         const payoutAmount = itemAmount - itemPlatformFee - gatewayFee;
 
@@ -62,25 +66,34 @@ export default class PaymentPayoutSvc {
 
         switch (item.sourceType) {
           case PayoutSourceType.event_venue_transaction: {
-            const venueTx = await tx.eventVenueTransaction.findUnique({ where: { id: item.sourceId } });
+            const venueTx = await tx.eventVenueTransaction.findUnique({
+              where: { id: item.sourceId },
+            });
             if (venueTx) recipientId = venueTx.providerId;
             payoutSourceType = PayoutSourceType.event_venue_transaction;
             break;
           }
           case PayoutSourceType.event_asset_transaction: {
-            const assetTx = await tx.eventAssetTransaction.findUnique({ where: { id: item.sourceId } });
+            const assetTx = await tx.eventAssetTransaction.findUnique({
+              where: { id: item.sourceId },
+            });
             if (assetTx) recipientId = assetTx.providerId;
             payoutSourceType = PayoutSourceType.event_asset_transaction;
             break;
           }
           case PayoutSourceType.event_service_transaction: {
-            const serviceTx = await tx.eventServiceTransaction.findUnique({ where: { id: item.sourceId } });
+            const serviceTx = await tx.eventServiceTransaction.findUnique({
+              where: { id: item.sourceId },
+            });
             if (serviceTx) recipientId = serviceTx.providerId;
             payoutSourceType = PayoutSourceType.event_service_transaction;
             break;
           }
           case PayoutSourceType.sponsorship: {
-            const sponsorship = await tx.partnershipProposal.findUnique({ where: { id: item.sourceId }, include: { targetEvent: true, targetVenue: true } });
+            const sponsorship = await tx.partnershipProposal.findUnique({
+              where: { id: item.sourceId },
+              include: { targetEvent: true, targetVenue: true },
+            });
             if (sponsorship?.targetEvent) {
               recipientId = sponsorship.targetEvent.organizerId;
             } else if (sponsorship?.targetVenue) {

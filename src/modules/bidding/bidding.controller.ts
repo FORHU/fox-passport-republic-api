@@ -24,7 +24,8 @@ export default class BiddingCtrl {
       });
 
       const { error, value } = schema.validate(req.body);
-      if (error) return res.status(400).json({ success: false, message: error.message });
+      if (error)
+        return res.status(400).json({ success: false, message: error.message });
 
       const bid = await BiddingSvc.submitServiceBid({
         ...value,
@@ -80,7 +81,8 @@ export default class BiddingCtrl {
       });
 
       const { error, value } = schema.validate(req.body);
-      if (error) return res.status(400).json({ success: false, message: error.message });
+      if (error)
+        return res.status(400).json({ success: false, message: error.message });
 
       const bid = await BiddingSvc.submitAssetBid({
         ...value,

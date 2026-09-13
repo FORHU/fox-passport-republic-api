@@ -46,7 +46,7 @@ export default class BiddingRepo {
             id: true,
             name: true,
             imgId: true,
-          }
+          },
         },
         proposedService: true,
       },
@@ -66,7 +66,7 @@ export default class BiddingRepo {
             endAt: true,
             eventStatus: true,
             targetCity: true,
-          }
+          },
         },
         proposedService: true,
       },
@@ -120,7 +120,7 @@ export default class BiddingRepo {
             id: true,
             name: true,
             imgId: true,
-          }
+          },
         },
         proposedAsset: true,
       },
@@ -140,7 +140,7 @@ export default class BiddingRepo {
             endAt: true,
             eventStatus: true,
             targetCity: true,
-          }
+          },
         },
         proposedAsset: true,
       },

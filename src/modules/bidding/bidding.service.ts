@@ -10,32 +10,32 @@ export default class BiddingSvc {
     return BiddingRepo.findAssetBidsByEventId(eventId);
   }
 
-  static async getOpenSlots(categoryId?: string) {
+  static async getOpenSlots(_categoryId?: string) {
     // Basic implementation: find events that are pending or ongoing.
     const events = await prisma.event.findMany({
       where: {
         eventStatus: {
           in: ["pending", "ongoing"],
-        }
+        },
       },
       include: {
         template: {
           include: {
             templateServices: true,
-          }
+          },
         },
         host: {
           select: {
             id: true,
             name: true,
             imgId: true,
-          }
-        }
+          },
+        },
       },
       orderBy: { startAt: "asc" },
       take: 50,
     });
-    
+
     return events;
   }
 
@@ -50,26 +50,35 @@ export default class BiddingSvc {
     proposedPrice: number;
   }) {
     // 0. Verify provider capability
-    const provider = await prisma.user.findUnique({ where: { id: data.providerId } });
+    const provider = await prisma.user.findUnique({
+      where: { id: data.providerId },
+    });
     if (!provider) throw new Error("Provider not found");
     if (!provider.roleType.includes("serviceFoxer")) {
-      throw new Error("Unauthorized: you must have the Talent Foxer capability to submit a service bid");
+      throw new Error(
+        "Unauthorized: you must have the Talent Foxer capability to submit a service bid",
+      );
     }
 
     // 1. Verify service belongs to provider
-    const service = await prisma.service.findUnique({ where: { id: data.proposedServiceId } });
+    const service = await prisma.service.findUnique({
+      where: { id: data.proposedServiceId },
+    });
     if (!service) throw new Error("Service not found");
-    if (service.ownerId !== data.providerId) throw new Error("Unauthorized: you do not own this service");
+    if (service.ownerId !== data.providerId)
+      throw new Error("Unauthorized: you do not own this service");
 
     // 2. Verify event is active and requirement exists
-    const event = await prisma.event.findUnique({ where: { id: data.eventId } });
+    const event = await prisma.event.findUnique({
+      where: { id: data.eventId },
+    });
     if (!event) throw new Error("Event not found");
     if (["completed", "cancelled"].includes(event.eventStatus)) {
       throw new Error("Cannot bid on a completed or cancelled event");
     }
 
     const requirement = await prisma.eventTemplateService.findUnique({
-      where: { id: data.eventTemplateServiceId }
+      where: { id: data.eventTemplateServiceId },
     });
     if (!requirement) throw new Error("Event requirement not found");
     if (requirement.templateId !== event.templateId) {
@@ -84,7 +93,7 @@ export default class BiddingSvc {
     return prisma.$transaction(async (tx) => {
       const bid = await tx.eventServiceBid.findUnique({
         where: { id: bidId },
-        include: { event: true, proposedService: true }
+        include: { event: true, proposedService: true },
       });
       if (!bid) throw new Error("Bid not found");
 
@@ -112,17 +121,19 @@ export default class BiddingSvc {
         where: {
           eventTemplateServiceId: bid.eventTemplateServiceId,
           eventId: bid.eventId,
-          status: "accepted"
-        }
+          status: "accepted",
+        },
       });
       if (existingAccepted) {
-        throw new Error("This requirement has already been fulfilled by another accepted bid");
+        throw new Error(
+          "This requirement has already been fulfilled by another accepted bid",
+        );
       }
 
       // Accept this bid
       await tx.eventServiceBid.update({
         where: { id: bidId },
-        data: { status: "accepted" }
+        data: { status: "accepted" },
       });
 
       // Reject all other pending bids for this same requirement
@@ -131,9 +142,9 @@ export default class BiddingSvc {
           eventTemplateServiceId: bid.eventTemplateServiceId,
           eventId: bid.eventId,
           status: "pending",
-          id: { not: bidId }
+          id: { not: bidId },
         },
-        data: { status: "rejected" }
+        data: { status: "rejected" },
       });
 
       // Automatically create EventServiceTransaction
@@ -146,7 +157,7 @@ export default class BiddingSvc {
           agreedPrice: bid.proposedPrice,
           currency: "PHP",
           included: false,
-        }
+        },
       });
 
       return { bidId, transactionId: transaction.id };
@@ -171,7 +182,6 @@ export default class BiddingSvc {
     return BiddingRepo.updateServiceBidStatus(bidId, "rejected");
   }
 
-
   // --- Asset (Gear) Bids ---
 
   static async submitAssetBid(data: {
@@ -184,26 +194,35 @@ export default class BiddingSvc {
     proposedQuantity?: number;
   }) {
     // 0. Verify provider capability
-    const provider = await prisma.user.findUnique({ where: { id: data.providerId } });
+    const provider = await prisma.user.findUnique({
+      where: { id: data.providerId },
+    });
     if (!provider) throw new Error("Provider not found");
     if (!provider.roleType.includes("gearFoxer")) {
-      throw new Error("Unauthorized: you must have the Gear Foxer capability to submit an asset bid");
+      throw new Error(
+        "Unauthorized: you must have the Gear Foxer capability to submit an asset bid",
+      );
     }
 
     // 1. Verify asset belongs to provider
-    const asset = await prisma.asset.findUnique({ where: { id: data.proposedAssetId } });
+    const asset = await prisma.asset.findUnique({
+      where: { id: data.proposedAssetId },
+    });
     if (!asset) throw new Error("Asset not found");
-    if (asset.ownerId !== data.providerId) throw new Error("Unauthorized: you do not own this gear/asset");
+    if (asset.ownerId !== data.providerId)
+      throw new Error("Unauthorized: you do not own this gear/asset");
 
     // 2. Verify event is active and requirement exists
-    const event = await prisma.event.findUnique({ where: { id: data.eventId } });
+    const event = await prisma.event.findUnique({
+      where: { id: data.eventId },
+    });
     if (!event) throw new Error("Event not found");
     if (["completed", "cancelled"].includes(event.eventStatus)) {
       throw new Error("Cannot bid on a completed or cancelled event");
     }
 
     const requirement = await prisma.eventTemplateAsset.findUnique({
-      where: { id: data.eventTemplateAssetId }
+      where: { id: data.eventTemplateAssetId },
     });
     if (!requirement) throw new Error("Event requirement not found");
     if (requirement.templateId !== event.templateId) {
@@ -218,7 +237,7 @@ export default class BiddingSvc {
     return prisma.$transaction(async (tx) => {
       const bid = await tx.eventAssetBid.findUnique({
         where: { id: bidId },
-        include: { event: true, proposedAsset: true, targetRequirement: true }
+        include: { event: true, proposedAsset: true, targetRequirement: true },
       });
       if (!bid) throw new Error("Bid not found");
 
@@ -249,17 +268,19 @@ export default class BiddingSvc {
         where: {
           eventTemplateAssetId: bid.eventTemplateAssetId,
           eventId: bid.eventId,
-          status: "accepted"
-        }
+          status: "accepted",
+        },
       });
       if (existingAccepted) {
-        throw new Error("This requirement has already been fulfilled by another accepted bid");
+        throw new Error(
+          "This requirement has already been fulfilled by another accepted bid",
+        );
       }
 
       // Accept this bid
       await tx.eventAssetBid.update({
         where: { id: bidId },
-        data: { status: "accepted" }
+        data: { status: "accepted" },
       });
 
       // Reject all other pending bids for this same requirement
@@ -268,9 +289,9 @@ export default class BiddingSvc {
           eventTemplateAssetId: bid.eventTemplateAssetId,
           eventId: bid.eventId,
           status: "pending",
-          id: { not: bidId }
+          id: { not: bidId },
         },
-        data: { status: "rejected" }
+        data: { status: "rejected" },
       });
 
       // Automatically create EventAssetTransaction
@@ -283,7 +304,7 @@ export default class BiddingSvc {
           agreedPrice: bid.proposedPrice,
           currency: "PHP",
           included: false,
-        }
+        },
       });
 
       return { bidId, transactionId: transaction.id };

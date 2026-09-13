@@ -1,11 +1,6 @@
 import { prisma } from "../../utils/prisma";
 import PricingSvc, { PricingContext } from "../pricing/pricing.service";
-import {
-  Invoice,
-  InvoiceItem,
-  Prisma,
-  InvoiceSourceType,
-} from "@prisma/client";
+import { Prisma, InvoiceSourceType } from "@prisma/client";
 type Decimal = Prisma.Decimal;
 
 export interface CreateInvoiceParams {

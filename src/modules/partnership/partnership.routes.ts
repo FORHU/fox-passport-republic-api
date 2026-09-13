@@ -1,38 +1,38 @@
-import { Router } from 'express';
-import { PartnershipController } from './partnership.controller';
+import { Router } from "express";
+import { PartnershipController } from "./partnership.controller";
 import {
   authenticate,
   requirePermission,
-} from '../../middleware/auth.middleware';
+} from "../../middleware/auth.middleware";
 
 const router = Router();
 
-router.get('/proposals', PartnershipController.listProposals);
-router.get('/proposals/:id', PartnershipController.getProposal);
+router.get("/proposals", PartnershipController.listProposals);
+router.get("/proposals/:id", PartnershipController.getProposal);
 
 router.post(
-  '/proposals',
+  "/proposals",
   authenticate,
-  requirePermission('partnership:propose'),
-  PartnershipController.createProposal
+  requirePermission("partnership:propose"),
+  PartnershipController.createProposal,
 );
 
 router.patch(
-  '/proposals/:id/accept',
+  "/proposals/:id/accept",
   authenticate,
-  PartnershipController.acceptProposal
+  PartnershipController.acceptProposal,
 );
 
 router.patch(
-  '/proposals/:id/reject',
+  "/proposals/:id/reject",
   authenticate,
-  PartnershipController.rejectProposal
+  PartnershipController.rejectProposal,
 );
 
 router.patch(
-  '/proposals/:id/withdraw',
+  "/proposals/:id/withdraw",
   authenticate,
-  PartnershipController.withdrawProposal
+  PartnershipController.withdrawProposal,
 );
 
 export default router;

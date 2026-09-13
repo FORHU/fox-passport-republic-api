@@ -1,6 +1,10 @@
 import { prisma } from "../../utils/prisma";
 import { bookingCache } from "../../utils/cache-namespaces";
-import { PaymentStatus, InvoiceSourceType, InvoiceStatus } from "@prisma/client";
+import {
+  PaymentStatus,
+  InvoiceSourceType,
+  InvoiceStatus,
+} from "@prisma/client";
 
 /**
  * A ceiling on the all-payments list, not pagination. Same reasoning as the
@@ -308,9 +312,7 @@ export default class PaymentRepo {
     const paymentIds = expiredPayments.map((p) => p.id);
     const bookingIds = [
       ...new Set(
-        expiredPayments.flatMap((p) =>
-          p.invoice.items.map((i) => i.sourceId),
-        ),
+        expiredPayments.flatMap((p) => p.invoice.items.map((i) => i.sourceId)),
       ),
     ];
 

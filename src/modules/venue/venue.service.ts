@@ -163,7 +163,9 @@ export default class VenueSvc {
       seatingArrangements: data.seatingArrangements ?? [],
       stageConfig: data.stageConfig,
       setupOptions: data.setupOptions ?? [],
-      operatingHours: data.operatingHours ? (data.operatingHours as Prisma.InputJsonValue) : undefined,
+      operatingHours: data.operatingHours
+        ? (data.operatingHours as Prisma.InputJsonValue)
+        : undefined,
       blockedDates: data.blockedDates ?? [],
       minBookingTime: data.minBookingTime,
       depositRequirements: data.depositRequirements,
@@ -486,7 +488,13 @@ export default class VenueSvc {
       if (boundaryChanged) centroid = polygonCentroid(resolvedBoundary);
     }
 
-    const { boundary, status: _rawStatus, recommendedAssets, recommendedServices, ...rest } = data;
+    const {
+      boundary,
+      status: _rawStatus,
+      recommendedAssets,
+      recommendedServices,
+      ...rest
+    } = data;
     return VenueRepo.updateVenue(id, {
       ...rest,
       // Never the raw `data.status` — always the clamped value, so a

@@ -1,6 +1,11 @@
 import Stripe from "stripe";
 import { STRIPE_SECRET_KEY } from "../../../config";
-import { CheckoutSessionData, PaymentProvider, PaymentStatusData, RefundData } from "./payment-provider.interface";
+import {
+  CheckoutSessionData,
+  PaymentProvider,
+  PaymentStatusData,
+  RefundData,
+} from "./payment-provider.interface";
 
 const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-08-27.basil",
@@ -12,7 +17,7 @@ export class StripeAdapter implements PaymentProvider {
     amount: number,
     currency: string,
     successUrl: string,
-    cancelUrl: string
+    cancelUrl: string,
   ): Promise<CheckoutSessionData> {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -45,7 +50,9 @@ export class StripeAdapter implements PaymentProvider {
     };
   }
 
-  async getPaymentStatus(providerSessionId: string): Promise<PaymentStatusData> {
+  async getPaymentStatus(
+    providerSessionId: string,
+  ): Promise<PaymentStatusData> {
     const session = await stripe.checkout.sessions.retrieve(providerSessionId);
 
     let status: PaymentStatusData["status"] = "pending";
@@ -64,7 +71,10 @@ export class StripeAdapter implements PaymentProvider {
     };
   }
 
-  async refund(providerReference: string, amount?: number): Promise<RefundData> {
+  async refund(
+    providerReference: string,
+    amount?: number,
+  ): Promise<RefundData> {
     const refundParams: Stripe.RefundCreateParams = {
       payment_intent: providerReference,
     };

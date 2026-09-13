@@ -58,7 +58,7 @@ export default class WebhookSvc {
     providerSessionId: string,
     providerReference: string,
     amountPaid: number,
-    currency: string,
+    _currency: string,
   ) {
     const invoiceId = await prisma.$transaction(async (tx) => {
       // 1. Find the active checkout
@@ -75,7 +75,7 @@ export default class WebhookSvc {
       });
 
       // 3. Create or update the Payment record
-      const payment = await tx.payment.upsert({
+      const _payment = await tx.payment.upsert({
         where: { providerReference },
         update: {
           status: "paid",

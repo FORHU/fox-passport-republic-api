@@ -1,6 +1,6 @@
-import { Request, Response } from 'express';
-import { PartnershipSvc } from './partnership.service';
-import { AuthenticatedUser } from '../../types/auth';
+import { Request, Response } from "express";
+import { PartnershipSvc } from "./partnership.service";
+import { AuthenticatedUser } from "../../types/auth";
 
 export class PartnershipController {
   static async createProposal(req: Request, res: Response) {
@@ -46,7 +46,7 @@ export class PartnershipController {
       const proposal = await PartnershipSvc.acceptProposal(id, user);
       res.status(200).json({ success: true, data: proposal });
     } catch (error: any) {
-      const status = error.message.includes('Unauthorized') ? 403 : 400;
+      const status = error.message.includes("Unauthorized") ? 403 : 400;
       res.status(status).json({ success: false, message: error.message });
     }
   }
@@ -58,7 +58,7 @@ export class PartnershipController {
       const proposal = await PartnershipSvc.rejectProposal(id, user);
       res.status(200).json({ success: true, data: proposal });
     } catch (error: any) {
-      const status = error.message.includes('Unauthorized') ? 403 : 400;
+      const status = error.message.includes("Unauthorized") ? 403 : 400;
       res.status(status).json({ success: false, message: error.message });
     }
   }
@@ -70,7 +70,7 @@ export class PartnershipController {
       const proposal = await PartnershipSvc.withdrawProposal(id, user.userId);
       res.status(200).json({ success: true, data: proposal });
     } catch (error: any) {
-      const status = error.message.includes('Unauthorized') ? 403 : 400;
+      const status = error.message.includes("Unauthorized") ? 403 : 400;
       res.status(status).json({ success: false, message: error.message });
     }
   }

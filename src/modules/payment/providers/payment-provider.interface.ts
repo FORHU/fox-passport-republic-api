@@ -4,13 +4,13 @@ export interface CheckoutSessionData {
 }
 
 export interface PaymentStatusData {
-  status: 'pending' | 'processing' | 'paid' | 'failed' | 'cancelled';
+  status: "pending" | "processing" | "paid" | "failed" | "cancelled";
   providerReference?: string;
 }
 
 export interface RefundData {
   providerReference: string;
-  status: 'pending' | 'succeeded' | 'failed';
+  status: "pending" | "succeeded" | "failed";
 }
 
 export interface PaymentProvider {
@@ -22,7 +22,7 @@ export interface PaymentProvider {
     amount: number,
     currency: string,
     successUrl: string,
-    cancelUrl: string
+    cancelUrl: string,
   ): Promise<CheckoutSessionData>;
 
   /**

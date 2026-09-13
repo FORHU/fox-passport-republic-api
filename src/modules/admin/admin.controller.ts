@@ -128,9 +128,7 @@ export default class AdminCtrl {
           totalAmount: r.booking?.totalAmount,
           status: r.booking?.status,
           startAt: r.booking?.startAt ?? undefined,
-          event: r.booking?.event
-            ? { name: r.booking.event.name }
-            : undefined,
+          event: r.booking?.event ? { name: r.booking.event.name } : undefined,
         },
         refunds: r.payment
           ? [

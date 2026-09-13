@@ -1,5 +1,5 @@
 import { prisma } from "../../utils/prisma";
-import { PlatformFeeConfig, Voucher, Promotion, Prisma } from "@prisma/client";
+import { PlatformFeeConfig, Prisma } from "@prisma/client";
 type Decimal = Prisma.Decimal;
 
 export interface PricingContext {
@@ -39,14 +39,11 @@ export default class PricingSvc {
       where: {
         active: true,
         effectiveFrom: { lte: new Date() },
-        OR: [
-          { effectiveUntil: null },
-          { effectiveUntil: { gt: new Date() } }
-        ]
+        OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: new Date() } }],
       },
       orderBy: {
-        priority: 'desc'
-      }
+        priority: "desc",
+      },
     });
 
     let bestMatch: PlatformFeeConfig | null = null;
@@ -54,17 +51,22 @@ export default class PricingSvc {
 
     for (const rule of rules) {
       let score = 0;
-      
+
       // Strict exclusions (if rule defines a context property, it must match)
-      if (rule.transactionType && rule.transactionType !== context.transactionType) continue;
+      if (
+        rule.transactionType &&
+        rule.transactionType !== context.transactionType
+      )
+        continue;
       if (rule.category && rule.category !== context.category) continue;
-      if (rule.subcategory && rule.subcategory !== context.subcategory) continue;
+      if (rule.subcategory && rule.subcategory !== context.subcategory)
+        continue;
 
       // Scoring
       if (rule.transactionType === context.transactionType) score += 10;
       if (rule.category === context.category) score += 100;
       if (rule.subcategory === context.subcategory) score += 1000;
-      
+
       score += rule.priority; // Allow manual override
 
       if (score > matchScore) {
@@ -79,10 +81,14 @@ export default class PricingSvc {
   /**
    * Validates a voucher code against the context and calculates the discount amount.
    */
-  static async validateAndCalculateVoucher(code: string, subtotal: number, context: PricingContext) {
+  static async validateAndCalculateVoucher(
+    code: string,
+    subtotal: number,
+    context: PricingContext,
+  ) {
     const voucher = await prisma.voucher.findUnique({
       where: { code },
-      include: { promotion: true }
+      include: { promotion: true },
     });
 
     if (!voucher || !voucher.active || !voucher.promotion.active) {
@@ -92,14 +98,21 @@ export default class PricingSvc {
     const promo = voucher.promotion;
     const now = new Date();
 
-    if (promo.startDate && promo.startDate > now) throw new Error("Voucher is not yet active.");
-    if (promo.endDate && promo.endDate < now) throw new Error("Voucher has expired.");
-    
+    if (promo.startDate && promo.startDate > now)
+      throw new Error("Voucher is not yet active.");
+    if (promo.endDate && promo.endDate < now)
+      throw new Error("Voucher has expired.");
+
     if (promo.minSubtotal && subtotal < promo.minSubtotal.toNumber()) {
-      throw new Error(`Minimum subtotal of ${promo.minSubtotal.toNumber()} required for this voucher.`);
+      throw new Error(
+        `Minimum subtotal of ${promo.minSubtotal.toNumber()} required for this voucher.`,
+      );
     }
 
-    if (promo.transactionType && promo.transactionType !== context.transactionType) {
+    if (
+      promo.transactionType &&
+      promo.transactionType !== context.transactionType
+    ) {
       throw new Error("Voucher not valid for this transaction type.");
     }
 
@@ -110,7 +123,7 @@ export default class PricingSvc {
     // Limits check
     if (promo.usageLimit !== null) {
       const globalUsage = await prisma.voucherRedemption.count({
-        where: { voucher: { promotionId: promo.id } }
+        where: { voucher: { promotionId: promo.id } },
       });
       if (globalUsage >= promo.usageLimit) {
         throw new Error("Voucher usage limit reached.");
@@ -119,10 +132,10 @@ export default class PricingSvc {
 
     if (promo.perUserLimit !== null && context.userId) {
       const userUsage = await prisma.voucherRedemption.count({
-        where: { 
+        where: {
           voucher: { promotionId: promo.id },
-          userId: context.userId
-        }
+          userId: context.userId,
+        },
       });
       if (userUsage >= promo.perUserLimit) {
         throw new Error("You have reached the usage limit for this voucher.");
@@ -151,7 +164,7 @@ export default class PricingSvc {
     return {
       voucher,
       promotion: promo,
-      discountAmount
+      discountAmount,
     };
   }
 
@@ -159,21 +172,29 @@ export default class PricingSvc {
    * Calculates the full pricing breakdown sequentially:
    * Base Subtotal -> Discount -> Discounted Subtotal -> Platform Fee -> Final Amount
    */
-  static async calculatePrice(subtotal: Decimal | number, context: PricingContext): Promise<PricingBreakdown> {
-    const subtotalNum = subtotal instanceof Prisma.Decimal ? subtotal.toNumber() : subtotal;
+  static async calculatePrice(
+    subtotal: Decimal | number,
+    context: PricingContext,
+  ): Promise<PricingBreakdown> {
+    const subtotalNum =
+      subtotal instanceof Prisma.Decimal ? subtotal.toNumber() : subtotal;
     let discountAmount = 0;
     let appliedVoucher = null;
 
     // 1. Discount/Voucher
     if (context.voucherCode && context.userId) {
-      const validated = await this.validateAndCalculateVoucher(context.voucherCode, subtotalNum, context);
+      const validated = await this.validateAndCalculateVoucher(
+        context.voucherCode,
+        subtotalNum,
+        context,
+      );
       discountAmount = validated.discountAmount;
       appliedVoucher = {
         voucherId: validated.voucher.id,
         code: validated.voucher.code,
         type: validated.promotion.discountType,
         value: validated.promotion.discountValue.toNumber(),
-        amount: discountAmount
+        amount: discountAmount,
       };
     }
 
@@ -186,17 +207,22 @@ export default class PricingSvc {
     let appliedRule = null;
 
     if (resolvedRule) {
-      const percentageNum = resolvedRule.percentage ? resolvedRule.percentage.toNumber() : 0;
-      const fixedAmountNum = resolvedRule.fixedAmount ? resolvedRule.fixedAmount.toNumber() : 0;
-      
-      platformFeeAmount = (discountedSubtotal * percentageNum) / 100 + fixedAmountNum;
-      
+      const percentageNum = resolvedRule.percentage
+        ? resolvedRule.percentage.toNumber()
+        : 0;
+      const fixedAmountNum = resolvedRule.fixedAmount
+        ? resolvedRule.fixedAmount.toNumber()
+        : 0;
+
+      platformFeeAmount =
+        (discountedSubtotal * percentageNum) / 100 + fixedAmountNum;
+
       appliedRule = {
         ruleId: resolvedRule.id,
         name: resolvedRule.name,
         percentage: percentageNum,
         fixedAmount: fixedAmountNum,
-        amount: platformFeeAmount
+        amount: platformFeeAmount,
       };
     }
 
@@ -208,7 +234,7 @@ export default class PricingSvc {
       discount: appliedVoucher,
       discountedSubtotal,
       platformFee: appliedRule,
-      finalAmount
+      finalAmount,
     };
   }
 }
