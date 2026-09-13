@@ -73,6 +73,10 @@ const SUPPLY_ONLY = [
   "service:manage",
   "template:manage",
   "payouts:onboard",
+  "bid:manage",
+  "bid:submit-service",
+  "bid:submit-asset",
+  "partnership:propose",
 ] as const;
 
 const ADMIN_HOLDS = PERMISSIONS.filter(
@@ -160,12 +164,30 @@ describe("the supply side", () => {
     expect(can(host, "venue:manage")).toBe(false);
   });
 
-  it("gives every foxer type payouts:onboard, and investor nothing", () => {
+  it("gives every foxer type payouts:onboard, and investor none of it", () => {
     for (const r of ["venueFoxer", "eventFoxer", "gearFoxer", "serviceFoxer"]) {
       expect(can({ roleType: [r] }, "payouts:onboard")).toBe(true);
     }
     expect(can({ roleType: ["investor"] }, "payouts:onboard")).toBe(false);
-    expect(permissionsForUser({ roleType: ["investor"] })).toEqual([]);
+  });
+
+  it("gives investor only partnership:propose, no supply capability", () => {
+    expect(permissionsForUser({ roleType: ["investor"] })).toEqual([
+      "partnership:propose",
+    ]);
+  });
+
+  it("gives service/gear foxers their own bid-submission permission only", () => {
+    expect(can({ roleType: ["serviceFoxer"] }, "bid:submit-service")).toBe(
+      true,
+    );
+    expect(can({ roleType: ["serviceFoxer"] }, "bid:submit-asset")).toBe(false);
+    expect(can({ roleType: ["gearFoxer"] }, "bid:submit-asset")).toBe(true);
+    expect(can({ roleType: ["gearFoxer"] }, "bid:submit-service")).toBe(false);
+  });
+
+  it("gives eventFoxer bid:manage for both bid types", () => {
+    expect(can({ roleType: ["eventFoxer"] }, "bid:manage")).toBe(true);
   });
 
   it("holds a multi-role user's union", () => {

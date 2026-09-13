@@ -1,6 +1,9 @@
 import express from "express";
 import BiddingCtrl from "./bidding.controller";
-import { authenticate, requireRole } from "../../middleware/auth.middleware";
+import {
+  authenticate,
+  requirePermission,
+} from "../../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -9,29 +12,68 @@ router.get("/open-slots", BiddingCtrl.getOpenSlots);
 
 // --- SERVICE BIDS ---
 // GET /v1/bids/service/event/:eventId (Host seeing their own event's service bids)
-router.get("/service/event/:eventId", authenticate, requireRole(["eventFoxer"]), BiddingCtrl.getServiceBidsForEvent);
+router.get(
+  "/service/event/:eventId",
+  authenticate,
+  requirePermission("bid:manage"),
+  BiddingCtrl.getServiceBidsForEvent,
+);
 
 // POST /v1/bids/service (Talent Foxer submits a bid)
-router.post("/service", authenticate, requireRole(["serviceFoxer"]), BiddingCtrl.submitServiceBid);
+router.post(
+  "/service",
+  authenticate,
+  requirePermission("bid:submit-service"),
+  BiddingCtrl.submitServiceBid,
+);
 
 // PATCH /v1/bids/service/:id/accept (Host accepts a service bid)
-router.patch("/service/:id/accept", authenticate, requireRole(["eventFoxer"]), BiddingCtrl.acceptServiceBid);
+router.patch(
+  "/service/:id/accept",
+  authenticate,
+  requirePermission("bid:manage"),
+  BiddingCtrl.acceptServiceBid,
+);
 
 // PATCH /v1/bids/service/:id/reject (Host manually rejects a service bid)
-router.patch("/service/:id/reject", authenticate, requireRole(["eventFoxer"]), BiddingCtrl.rejectServiceBid);
-
+router.patch(
+  "/service/:id/reject",
+  authenticate,
+  requirePermission("bid:manage"),
+  BiddingCtrl.rejectServiceBid,
+);
 
 // --- ASSET BIDS ---
 // GET /v1/bids/asset/event/:eventId (Host seeing their own event's asset bids)
-router.get("/asset/event/:eventId", authenticate, requireRole(["eventFoxer"]), BiddingCtrl.getAssetBidsForEvent);
+router.get(
+  "/asset/event/:eventId",
+  authenticate,
+  requirePermission("bid:manage"),
+  BiddingCtrl.getAssetBidsForEvent,
+);
 
 // POST /v1/bids/asset (Gear Foxer submits a bid)
-router.post("/asset", authenticate, requireRole(["gearFoxer"]), BiddingCtrl.submitAssetBid);
+router.post(
+  "/asset",
+  authenticate,
+  requirePermission("bid:submit-asset"),
+  BiddingCtrl.submitAssetBid,
+);
 
 // PATCH /v1/bids/asset/:id/accept (Host accepts an asset bid)
-router.patch("/asset/:id/accept", authenticate, requireRole(["eventFoxer"]), BiddingCtrl.acceptAssetBid);
+router.patch(
+  "/asset/:id/accept",
+  authenticate,
+  requirePermission("bid:manage"),
+  BiddingCtrl.acceptAssetBid,
+);
 
 // PATCH /v1/bids/asset/:id/reject (Host manually rejects an asset bid)
-router.patch("/asset/:id/reject", authenticate, requireRole(["eventFoxer"]), BiddingCtrl.rejectAssetBid);
+router.patch(
+  "/asset/:id/reject",
+  authenticate,
+  requirePermission("bid:manage"),
+  BiddingCtrl.rejectAssetBid,
+);
 
 export default router;

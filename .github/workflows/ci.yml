@@ -73,6 +73,9 @@ jobs:
       - name: Validate architecture boundaries
         run: pnpm validate
 
+      - name: Validate RBAC guards
+        run: pnpm validate:rbac
+
       - name: Build
         run: pnpm build
 

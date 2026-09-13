@@ -66,6 +66,14 @@ export const PERMISSIONS = [
   "booking:check-in",
   /** May start Stripe Connect onboarding to receive payouts. */
   "payouts:onboard",
+  /** May view and accept/reject bids submitted against one's own event. */
+  "bid:manage",
+  /** May submit a service bid against an event's open slot. */
+  "bid:submit-service",
+  /** May submit an asset (gear) bid against an event's open slot. */
+  "bid:submit-asset",
+  /** May propose a partnership (sponsorship, investment, etc.). */
+  "partnership:propose",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -133,11 +141,17 @@ const GRANTS: Record<SystemRole, readonly Permission[]> = {
  */
 const ROLE_TYPE_GRANTS: Record<RoleType, readonly Permission[]> = {
   venueFoxer: ["venue:manage", "payouts:onboard"],
-  gearFoxer: ["asset:manage", "payouts:onboard"],
-  serviceFoxer: ["service:manage", "payouts:onboard"],
-  eventFoxer: ["template:manage", "booking:check-in", "payouts:onboard"],
-  // Applies and is approved, and has nothing to manage yet.
-  investor: [],
+  gearFoxer: ["asset:manage", "payouts:onboard", "bid:submit-asset"],
+  serviceFoxer: ["service:manage", "payouts:onboard", "bid:submit-service"],
+  eventFoxer: [
+    "template:manage",
+    "booking:check-in",
+    "payouts:onboard",
+    "bid:manage",
+  ],
+  // No longer "nothing to manage" — proposing a partnership was previously
+  // gated with `requireRole(["investor"])` on the route directly.
+  investor: ["partnership:propose"],
 };
 
 /**

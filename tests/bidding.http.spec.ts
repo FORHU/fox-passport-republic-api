@@ -62,9 +62,13 @@ describe('Bidding API (Supertest)', () => {
         proposedPrice: 100
       });
 
-    // The validation passes but the service layer should throw an error regarding capabilities
+    // The route itself now gates on the bid:submit-service capability
+    // (requirePermission), rather than the controller/service layer catching
+    // a missing role after the fact.
     expect([400, 403, 500]).toContain(res.status);
-    expect(res.body.message || res.body.error).toContain('Insufficient permissions');
+    expect(res.body.message || res.body.error).toContain(
+      'You do not have permission to do that',
+    );
   });
 
   it('PATCH /api/v1/bids/service/:id/accept - enforces auth token', async () => {

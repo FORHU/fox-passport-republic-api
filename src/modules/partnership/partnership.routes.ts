@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { PartnershipController } from './partnership.controller';
-import { authenticate, requireRole } from '../../middleware/auth.middleware';
+import {
+  authenticate,
+  requirePermission,
+} from '../../middleware/auth.middleware';
 
 const router = Router();
 
@@ -10,7 +13,7 @@ router.get('/proposals/:id', PartnershipController.getProposal);
 router.post(
   '/proposals',
   authenticate,
-  requireRole(['investor']),
+  requirePermission('partnership:propose'),
   PartnershipController.createProposal
 );
 
