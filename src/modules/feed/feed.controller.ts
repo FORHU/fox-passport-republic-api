@@ -88,6 +88,11 @@ export default class FeedController {
         )
         .max(50)
         .optional(),
+      pollOptions: Joi.array()
+        .items(Joi.string().trim().min(1).max(120))
+        .min(2)
+        .max(10)
+        .optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -212,6 +217,27 @@ export default class FeedController {
     }
   }
 
+  static async voteOnPoll(req: Request, res: Response) {
+    const schema = Joi.object({
+      optionId: Joi.string().required(),
+    });
+    const { error, value } = schema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    try {
+      const { id } = req.params;
+      const poll = await FeedService.voteOnPoll(id, value.optionId, req.user!);
+      return res.status(200).json({ success: true, data: poll });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res
+        .status(statusForError(err.message))
+        .json({ success: false, message: err.message });
+    }
+  }
+
   static async toggleSave(req: Request, res: Response) {
     try {
       const { id } = req.params;
@@ -228,12 +254,12 @@ export default class FeedController {
   static async getSavedPosts(req: Request, res: Response) {
     try {
       const { limit, cursor } = req.query;
-      const posts = await FeedService.getSavedPosts(
+      const { posts, nextCursor } = await FeedService.getSavedPosts(
         req.user!,
         limit ? parseInt(limit as string, 10) : undefined,
         cursor as string | undefined,
       );
-      return res.status(200).json({ success: true, data: posts });
+      return res.status(200).json({ success: true, data: posts, nextCursor });
     } catch (e: unknown) {
       const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
@@ -305,6 +331,32 @@ export default class FeedController {
         value.parentId,
       );
       return res.status(201).json({ success: true, data: comment });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res
+        .status(statusForError(err.message))
+        .json({ success: false, message: err.message });
+    }
+  }
+
+  static async editComment(req: Request, res: Response) {
+    const schema = Joi.object({
+      content: Joi.string().trim().min(1).max(1000).required(),
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    try {
+      const { commentId } = req.params;
+      const comment = await FeedService.editComment(
+        commentId,
+        req.user!,
+        value.content,
+      );
+      return res.status(200).json({ success: true, data: comment });
     } catch (e: unknown) {
       const err = e as Error;
       return res

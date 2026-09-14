@@ -80,6 +80,9 @@ function fakeReq(query: Record<string, string>, cookieHeader?: string) {
   return {
     query,
     headers: cookieHeader ? { cookie: cookieHeader } : {},
+    protocol: "https",
+    get: (name: string) =>
+      name.toLowerCase() === "host" ? "api.example.com" : undefined,
   } as unknown as Request;
 }
 
@@ -96,9 +99,15 @@ describe("googleRedirect", () => {
 
     expect(recorded.cookies).toHaveLength(1);
     const cookie = recorded.cookies[0];
-    expect(cookie.value).toBe("state-from-service");
-    expect(svc.getAuthUrl).toHaveBeenCalledWith("state-from-service");
-    expect(recorded.redirect).toContain("state=state-from-service");
+    // The frontend origin rides along inside `state`, base64url-encoded
+    // after a `|`, so it survives the round trip to Google and back — see
+    // `originFromState`.
+    expect(cookie.value).toMatch(/^state-from-service\|/);
+    expect(svc.getAuthUrl).toHaveBeenCalledWith(
+      cookie.value,
+      "https://api.example.com/api/v1/auth/google/callback",
+    );
+    expect(recorded.redirect).toContain(`state=${cookie.value}`);
   });
 
   it("stores the state in a cookie the page's JavaScript cannot read", () => {
@@ -155,7 +164,10 @@ describe("googleCallback state validation", () => {
       res,
     );
 
-    expect(svc.handleCallback).toHaveBeenCalledWith("abc");
+    expect(svc.handleCallback).toHaveBeenCalledWith(
+      "abc",
+      "https://api.example.com/api/v1/auth/google/callback",
+    );
     expect(recorded.redirect).toBe(
       "https://app.example.com/auth/google/callback?xc=exchange-code",
     );
@@ -171,7 +183,10 @@ describe("googleCallback state validation", () => {
       res,
     );
 
-    expect(svc.handleCallback).toHaveBeenCalledWith("abc");
+    expect(svc.handleCallback).toHaveBeenCalledWith(
+      "abc",
+      "https://api.example.com/api/v1/auth/google/callback",
+    );
   });
 
   it("clears the state cookie so one round trip cannot be replayed", async () => {

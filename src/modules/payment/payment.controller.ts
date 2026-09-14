@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import Joi from "joi";
+import { Prisma } from "@prisma/client";
 import PaymentSvc from "./payment.service";
 import WebhookSvc from "./webhook.service";
 import Stripe from "stripe";
@@ -306,7 +307,7 @@ export default class PaymentController {
         "stripe",
         event.id,
         event.type,
-        event.data.object,
+        event.data.object as unknown as Prisma.InputJsonValue,
         async () => {
           const providerReference =
             typeof session.payment_intent === "string"
@@ -329,7 +330,7 @@ export default class PaymentController {
         "stripe",
         event.id,
         event.type,
-        event.data.object,
+        event.data.object as unknown as Prisma.InputJsonValue,
         async () => {
           await WebhookSvc.handleCheckoutExpired(session.id);
         },

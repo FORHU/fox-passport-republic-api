@@ -239,6 +239,71 @@ export default class ConversationRepository {
     return messages.reverse();
   }
 
+  // Case-insensitive substring match, same style as the feed's own content
+  // search — capped rather than paginated since jumping to a hit is a
+  // one-shot lookup, not a browsable list.
+  static async searchMessages(
+    conversationId: string,
+    term: string,
+    limit = 50,
+  ) {
+    return prisma.message.findMany({
+      where: {
+        conversationId,
+        type: { not: "system" },
+        content: { contains: term, mode: "insensitive" },
+      },
+      include: {
+        sharedPost: { select: SHARED_POST_SELECT },
+        replyTo: { select: REPLY_TO_SELECT },
+        reactions: REACTIONS_SELECT,
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
+  }
+
+  // Only one pinned message per conversation — clearing whatever was
+  // previously pinned (if anything) happens in the same transaction as
+  // setting the new one, so there's never a moment with two pinned rows.
+  static async setPinnedMessage(
+    conversationId: string,
+    messageId: string,
+    pinned: boolean,
+  ) {
+    return prisma.$transaction(async (tx) => {
+      await tx.message.updateMany({
+        where: { conversationId, pinnedAt: { not: null } },
+        data: { pinnedAt: null },
+      });
+      if (pinned) {
+        await tx.message.update({
+          where: { id: messageId },
+          data: { pinnedAt: new Date() },
+        });
+      }
+      return tx.message.findUnique({
+        where: { id: messageId },
+        include: {
+          sharedPost: { select: SHARED_POST_SELECT },
+          replyTo: { select: REPLY_TO_SELECT },
+          reactions: REACTIONS_SELECT,
+        },
+      });
+    });
+  }
+
+  static async findPinnedMessage(conversationId: string) {
+    return prisma.message.findFirst({
+      where: { conversationId, pinnedAt: { not: null } },
+      include: {
+        sharedPost: { select: SHARED_POST_SELECT },
+        replyTo: { select: REPLY_TO_SELECT },
+        reactions: REACTIONS_SELECT,
+      },
+    });
+  }
+
   static async createMessage(data: {
     conversationId: string;
     senderId: string;

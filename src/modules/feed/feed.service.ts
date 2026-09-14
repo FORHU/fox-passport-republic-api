@@ -30,6 +30,7 @@ export interface CreatePostInput {
   reviewId?: string;
   stampId?: string;
   mediaTags?: MediaTagInput[];
+  pollOptions?: string[];
 }
 
 // Matches @handle tokens in post/comment text — letters, digits, underscore,
@@ -150,6 +151,7 @@ export default class FeedService {
       reviewId,
       stampId,
       mediaTags,
+      pollOptions,
     } = input;
 
     if (mediaTags && mediaTags.length > 0) {
@@ -157,6 +159,7 @@ export default class FeedService {
     }
 
     let tab: FeedTab = FeedTab.community;
+    let trimmedPollOptions: string[] = [];
 
     // 1. Role-based authorization & entity verification per post type
     switch (type) {
@@ -307,6 +310,27 @@ export default class FeedService {
         break;
       }
 
+      case PostType.poll: {
+        tab = FeedTab.community;
+        const trimmedOptions = (pollOptions ?? [])
+          .map((o) => o.trim())
+          .filter((o) => o.length > 0);
+        if (trimmedOptions.length < 2) {
+          throw new Error("A poll needs at least 2 options");
+        }
+        if (trimmedOptions.length > 10) {
+          throw new Error("A poll can have at most 10 options");
+        }
+        if (
+          new Set(trimmedOptions.map((o) => o.toLowerCase())).size !==
+          trimmedOptions.length
+        ) {
+          throw new Error("Poll options must be unique");
+        }
+        trimmedPollOptions = trimmedOptions;
+        break;
+      }
+
       default:
         throw new Error(`Unsupported post type: ${type}`);
     }
@@ -326,6 +350,7 @@ export default class FeedService {
       reviewId,
       stampId,
       mediaTags,
+      pollOptions: trimmedPollOptions,
     });
 
     notifyMentions(content, user.userId, { postId: post.id }).catch(() => {});
@@ -385,6 +410,27 @@ export default class FeedService {
     }
 
     return post;
+  }
+
+  static async voteOnPoll(
+    postId: string,
+    optionId: string,
+    user: AuthenticatedUser,
+  ) {
+    const post = await FeedRepo.findPostById(postId, user.userId);
+    if (!post) {
+      throw new Error("Post not found");
+    }
+    if (post.type !== PostType.poll || !post.poll) {
+      throw new Error("This post is not a poll");
+    }
+
+    const option = await FeedRepo.findPollOption(optionId);
+    if (!option || option.pollId !== post.poll.id) {
+      throw new Error("Poll option not found");
+    }
+
+    return FeedRepo.voteOnPoll(post.poll.id, optionId, user.userId);
   }
 
   static async deletePost(postId: string, user: AuthenticatedUser) {
@@ -617,6 +663,27 @@ export default class FeedService {
     }
 
     return comment;
+  }
+
+  static async editComment(
+    commentId: string,
+    user: AuthenticatedUser,
+    content: string,
+  ) {
+    const comment = await FeedRepo.findCommentById(commentId);
+    if (!comment) {
+      throw new Error("Comment not found");
+    }
+    if (comment.authorId !== user.userId) {
+      throw new Error("Unauthorized to edit this comment");
+    }
+
+    const trimmed = content.trim();
+    if (trimmed.length === 0) {
+      throw new Error("Comment cannot be empty");
+    }
+
+    return FeedRepo.updateComment(commentId, trimmed);
   }
 
   static async deleteComment(commentId: string, user: AuthenticatedUser) {

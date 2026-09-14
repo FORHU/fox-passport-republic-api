@@ -1,7 +1,12 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import VenueSvc from "./venue.service";
-import { VenueStatus, VenueCategory, BillingRate } from "@prisma/client";
+import {
+  VenueStatus,
+  VenueCategory,
+  BillingRate,
+  Prisma,
+} from "@prisma/client";
 import {
   MIN_POLYGON_VERTICES,
   MAX_POLYGON_VERTICES,
@@ -35,7 +40,7 @@ interface CreateVenuePayload {
   seatingArrangements?: string[];
   stageConfig?: string;
   setupOptions?: string[];
-  operatingHours?: any;
+  operatingHours?: Prisma.InputJsonValue;
   blockedDates?: Date[];
   minBookingTime?: number;
   depositRequirements?: string;

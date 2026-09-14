@@ -20,6 +20,7 @@ router.post("/:id/share", optionalAuth, FeedController.trackShare);
 router.post("/:id/reaction", authenticate, FeedController.setReaction);
 router.get("/:id/reactions", FeedController.getReactionBreakdown);
 router.post("/:id/save", authenticate, FeedController.toggleSave);
+router.post("/:id/poll/vote", authenticate, FeedController.voteOnPoll);
 router.post("/:id/hide", authenticate, FeedController.hidePost);
 router.post("/:id/media-tags", authenticate, FeedController.addMediaTag);
 router.delete(
@@ -31,6 +32,11 @@ router.delete(
 // Comments
 router.get("/:id/comments", optionalAuth, FeedController.getComments);
 router.post("/:id/comments", authenticate, FeedController.addComment);
+router.patch(
+  "/:id/comments/:commentId",
+  authenticate,
+  FeedController.editComment,
+);
 router.delete(
   "/:id/comments/:commentId",
   authenticate,
