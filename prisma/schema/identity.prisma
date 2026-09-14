@@ -95,11 +95,12 @@ model RoleRequest {
   rejectionReason         String?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
-  gearFoxerApplication    GearFoxerApplication?
-  serviceFoxerApplication ServiceFoxerApplication?
-  eventFoxerApplication   EventFoxerApplication?
-  investorApplication     InvestorApplication?
-  venueFoxerApplication   VenueFoxerApplication?
+  gearFoxerApplication      GearFoxerApplication?
+  serviceFoxerApplication   ServiceFoxerApplication?
+  performerFoxerApplication PerformerFoxerApplication?
+  eventFoxerApplication     EventFoxerApplication?
+  investorApplication       InvestorApplication?
+  venueFoxerApplication     VenueFoxerApplication?
   reviewer                User?                    @relation("Reviewer", fields: [reviewedBy], references: [id])
   user                    User                     @relation("Applicant", fields: [userId], references: [id], onDelete: Cascade)
 
@@ -195,6 +196,32 @@ model ServiceFoxerApplication {
   validId1             File?       @relation("ServiceFoxerValidId1", fields: [validId1FileId], references: [id])
 
   @@map("service_foxer_applications")
+}
+
+model PerformerFoxerApplication {
+  id                   String      @id @default(uuid())
+  requestId            String      @unique
+  performerTypes       String[]
+  specializations      String[]
+  portfolioUrls        String[]
+  experience           Int
+  nbiClearanceIdNumber String
+  tinNumber            String?
+  validId1FileId       String?
+  nbiFileId            String?
+  tinIdFileId          String?
+  birPermitFileId      String?
+  selfieFileId         String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  birPermitFile        File?       @relation("PerformerFoxerBirPermit", fields: [birPermitFileId], references: [id])
+  nbiFile              File?       @relation("PerformerFoxerNBI", fields: [nbiFileId], references: [id])
+  request              RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  selfieFile           File?       @relation("PerformerFoxerSelfie", fields: [selfieFileId], references: [id])
+  tinIdFile            File?       @relation("PerformerFoxerTinId", fields: [tinIdFileId], references: [id])
+  validId1             File?       @relation("PerformerFoxerValidId1", fields: [validId1FileId], references: [id])
+
+  @@map("performer_foxer_applications")
 }
 
 model InvestorApplication {

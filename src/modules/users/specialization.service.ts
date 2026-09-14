@@ -86,6 +86,45 @@ export default class SpecializationSvc {
     );
   }
 
+  // Called after a service booking completes for a performer-category
+  // listing — checks PerformerFoxer specialization. Same shape as
+  // checkServiceFoxer, keyed to RoleType.performerFoxer instead; the two are
+  // kept separate (not category-branched inside one method) so each role's
+  // specialization count stays scoped to bookings/reviews of *that* role's
+  // listings, matching the pattern the other three check* methods use.
+  static async checkPerformerFoxer(serviceId: string, ownerId: string) {
+    const service = await prisma.service.findUnique({
+      where: { id: serviceId },
+      select: { category: true },
+    });
+    if (!service) return;
+
+    await SpecializationSvc.maybeGrant(
+      ownerId,
+      RoleType.performerFoxer,
+      service.category,
+      async () => {
+        const count = await prisma.serviceBooking.count({
+          where: {
+            service: { ownerId, category: service.category },
+            status: "completed",
+          },
+        });
+        if (count < EARNED_THRESHOLD) return false;
+
+        const reviewAgg = await prisma.review.aggregate({
+          where: { entityId: serviceId, entityType: "service" },
+          _avg: { rating: true },
+          _count: { id: true },
+        });
+        return (
+          (reviewAgg._count.id ?? 0) >= EARNED_THRESHOLD &&
+          (reviewAgg._avg.rating ?? 0) >= EARNED_MIN_RATING
+        );
+      },
+    );
+  }
+
   // Called after an asset booking completes — checks GearFoxer specialization
   static async checkGearFoxer(assetId: string, ownerId: string) {
     const asset = await prisma.asset.findUnique({

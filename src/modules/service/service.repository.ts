@@ -1,6 +1,11 @@
 import { prisma } from "../../utils/prisma";
 import { serviceCache } from "../../utils/cache-namespaces";
-import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
+import {
+  BillingRate,
+  ServiceStatus,
+  ServiceCategory,
+  RoleType,
+} from "@prisma/client";
 
 export default class ServiceRepo {
   /** Retires the cached service reads. `AdminRepo` retires the same namespace on approval. */
@@ -77,7 +82,11 @@ export default class ServiceRepo {
         price: { lte: filters.maxPrice },
       }),
       owner: {
-        roleType: { has: "serviceFoxer" as const },
+        // performerFoxer owns performer-category rows of this same model —
+        // see PERFORMER_SERVICE_CATEGORIES in src/types/permissions.ts.
+        roleType: {
+          hasSome: ["serviceFoxer", "performerFoxer"] as RoleType[],
+        },
         ...(filters.ownerCity && {
           city: { contains: filters.ownerCity, mode: "insensitive" as const },
         }),

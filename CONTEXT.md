@@ -37,7 +37,7 @@ Role-holder (`gearFoxer`) who supplies physical Assets (equipment, furniture, de
 _Avoid_: FoxerAsset (old name)
 
 **ServiceFoxer**:
-Role-holder (`serviceFoxer`) who supplies Services (catering, entertainment, design, staffing, etc.) into the marketplace for standalone booking or attachment to Event Templates.
+Role-holder (`serviceFoxer`) who supplies Services (catering, entertainment, design, staffing, etc.) into the marketplace for standalone booking or attachment to Event Templates. Public-facing name is **Talent Foxer** — decided 14 Sep 2026, see `fox-passport-republic-app/docs/BUSINESS-STRATEGY-MASTER.md` §11.5. `ServiceFoxer`/`serviceFoxer` remains the code-level term.
 _Avoid_: FoxerService (old name)
 
 **Investor**:

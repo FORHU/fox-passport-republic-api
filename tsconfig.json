@@ -107,6 +107,7 @@
     "include": [
         "src",
         "prisma/**/*.ts",
-        "types/**/*.d.ts"
+        "types/**/*.d.ts",
+        "tools/**/*.ts"
 , "prisma.config.ts"    ],
 }

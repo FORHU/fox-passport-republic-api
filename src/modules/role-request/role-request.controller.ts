@@ -93,7 +93,10 @@ export default class RoleRequestController {
         });
       }
 
-      if (roleType === RoleType.serviceFoxer) {
+      if (
+        roleType === RoleType.serviceFoxer ||
+        roleType === RoleType.performerFoxer
+      ) {
         const experience = Number(data.experience);
         if (
           !Number.isInteger(experience) ||
@@ -121,6 +124,7 @@ export default class RoleRequestController {
           RoleType.serviceFoxer,
           RoleType.gearFoxer,
           RoleType.venueFoxer,
+          RoleType.performerFoxer,
         ].includes(roleType) &&
         typeof data.tinNumber === "string" &&
         data.tinNumber.length > 0 &&

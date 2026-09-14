@@ -127,6 +127,7 @@ enum UserPath {
   serviceFoxer
   eventFoxer
   venueFoxer
+  performerFoxer
   investor
 }
 

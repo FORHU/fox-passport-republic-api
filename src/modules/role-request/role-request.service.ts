@@ -43,6 +43,7 @@ export default class RoleRequestService {
       [RoleType.eventFoxer]: "eventFoxerApplication",
       [RoleType.gearFoxer]: "gearFoxerApplication",
       [RoleType.serviceFoxer]: "serviceFoxerApplication",
+      [RoleType.performerFoxer]: "performerFoxerApplication",
       [RoleType.investor]: "investorApplication",
     };
 

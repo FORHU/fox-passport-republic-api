@@ -2,6 +2,7 @@ import { prisma } from "../../utils/prisma";
 import { versionedCache } from "../../utils/cache.util";
 import BookingRepo from "../booking/booking.repository";
 import ReviewRepo from "./review.repository";
+import { isPerformerServiceCategory } from "../../types/permissions";
 
 /**
  * Reviews are read far more often than they are written - every venue page,
@@ -159,10 +160,13 @@ export default class ReviewSvc {
           } else if (data.entityType === "service") {
             const service = await prisma.service.findUnique({
               where: { id: data.entityId },
-              select: { ownerId: true },
+              select: { ownerId: true, category: true },
             });
             providerId = service?.ownerId ?? null;
-            providerPath = UserPath.serviceFoxer;
+            providerPath =
+              service && isPerformerServiceCategory(service.category)
+                ? UserPath.performerFoxer
+                : UserPath.serviceFoxer;
           } else if (data.entityType === "event") {
             const event = await prisma.event.findUnique({
               where: { id: data.entityId },

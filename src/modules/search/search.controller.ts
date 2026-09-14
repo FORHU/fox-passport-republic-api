@@ -33,15 +33,21 @@ export default class SearchCtrl {
           totalEventTemplates: result.totalEventTemplates,
           totalGearFoxers: result.totalGearFoxers,
           totalServiceFoxers: result.totalServiceFoxers,
+          totalPerformerFoxers: result.totalPerformerFoxers,
           totalPagesEventTemplates: totalPages(
             result.totalEventTemplates,
             limit,
           ),
           totalPagesGearFoxers: totalPages(result.totalGearFoxers, limit),
           totalPagesServiceFoxers: totalPages(result.totalServiceFoxers, limit),
+          totalPagesPerformerFoxers: totalPages(
+            result.totalPerformerFoxers,
+            limit,
+          ),
           eventTemplates: result.eventTemplates,
           gearFoxers: result.gearFoxers,
           serviceFoxers: result.serviceFoxers,
+          performerFoxers: result.performerFoxers,
         },
       });
     } catch (e: unknown) {

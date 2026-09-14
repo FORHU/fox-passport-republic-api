@@ -2,7 +2,7 @@ import express from "express";
 import ServiceCtrl from "./service.controller";
 import {
   authenticate,
-  requirePermission,
+  requirePermissionAny,
 } from "../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -12,23 +12,27 @@ router.get("/", ServiceCtrl.getServices);
 router.get("/browse", ServiceCtrl.browseServices);
 router.get("/:id", ServiceCtrl.getServiceById);
 
-// Protected routes
+// Protected routes. `performer:manage` sits alongside `service:manage` since
+// performer-category Service rows are owned by performerFoxer — the
+// category-specific check (which of the two a given `category` requires)
+// happens in the controller, once `category` is known; this route-level
+// gate only asks "does the caller hold either."
 router.post(
   "/create",
   authenticate,
-  requirePermission("service:manage"),
+  requirePermissionAny(["service:manage", "performer:manage"]),
   ServiceCtrl.createService,
 );
 router.put(
   "/:id",
   authenticate,
-  requirePermission("service:manage"),
+  requirePermissionAny(["service:manage", "performer:manage"]),
   ServiceCtrl.updateService,
 );
 router.delete(
   "/:id",
   authenticate,
-  requirePermission("service:manage"),
+  requirePermissionAny(["service:manage", "performer:manage"]),
   ServiceCtrl.deleteService,
 );
 

@@ -16,7 +16,8 @@
     "build": "prisma generate && tsc",
     "start": "node ./dist/src/server.js",
     "db:setup": "pnpm exec prisma generate && pnpm exec prisma migrate dev",
-    "kill": "pnpm dlx kill-port 6002"
+    "kill": "pnpm dlx kill-port 6002",
+    "notify:paused-entertainment-owners": "ts-node --files tools/notify-paused-entertainment-owners.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.998.0",

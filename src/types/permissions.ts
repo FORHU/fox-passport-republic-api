@@ -1,4 +1,4 @@
-import { RoleType, SystemRole } from "@prisma/client";
+import { RoleType, ServiceCategory, SystemRole } from "@prisma/client";
 
 /**
  * What a caller is allowed to do, named by the action rather than by who they
@@ -60,6 +60,8 @@ export const PERMISSIONS = [
   "asset:manage",
   /** May create, edit or delete a service listing. */
   "service:manage",
+  /** May create, edit or delete a performer-category service listing (photography, DJ, live band, MC, etc). */
+  "performer:manage",
   /** May build, submit, match and edit an event template. */
   "template:manage",
   /** May scan a ticket at the door. Held by event hosts *and* admins. */
@@ -77,6 +79,41 @@ export const PERMISSIONS = [
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
+
+/**
+ * Which `ServiceCategory` values are owned by `performerFoxer` rather than
+ * `serviceFoxer`. This list — not a schema flag — is what answers "is this
+ * category performer-owned," at every ownership/XP/review call site that
+ * used to hardcode `serviceFoxer` for every `Service` row.
+ *
+ * `entertainment` is included for the sake of existing rows (paused by the
+ * `20260914120000_add_performer_foxer_role` migration until their owner is
+ * approved as `performerFoxer`) but is not offered as a category for new
+ * listings — new performer supply uses the granular values below.
+ */
+export const PERFORMER_SERVICE_CATEGORIES: readonly ServiceCategory[] = [
+  "entertainment",
+  "photography",
+  "videography",
+  "dj",
+  "live_band",
+  "mc",
+] as const;
+
+export const isPerformerServiceCategory = (
+  category: ServiceCategory,
+): boolean =>
+  (PERFORMER_SERVICE_CATEGORIES as readonly string[]).includes(category);
+
+/** The `RoleType`/`UserPath` a `Service` row's provider should resolve to,
+ * given its category — `performerFoxer` for performer categories,
+ * `serviceFoxer` otherwise. Centralizes the branch used by ownership checks,
+ * XP awards on approval/booking-completion, and review-bonus resolution, so
+ * it isn't reimplemented at each call site. */
+export const resolveServiceProviderRole = (
+  category: ServiceCategory,
+): Extract<RoleType, "serviceFoxer" | "performerFoxer"> =>
+  isPerformerServiceCategory(category) ? "performerFoxer" : "serviceFoxer";
 
 /**
  * Permissions an Event Foxer may delegate to someone else for a single event,
@@ -143,6 +180,11 @@ const ROLE_TYPE_GRANTS: Record<RoleType, readonly Permission[]> = {
   venueFoxer: ["venue:manage", "payouts:onboard"],
   gearFoxer: ["asset:manage", "payouts:onboard", "bid:submit-asset"],
   serviceFoxer: ["service:manage", "payouts:onboard", "bid:submit-service"],
+  // Owns performer-category Service rows (see PERFORMER_SERVICE_CATEGORIES
+  // below) — a subset of the same `Service` model serviceFoxer owns, not a
+  // separate catalog entity. Shares `bid:submit-service` since performer
+  // items ride the same EventTemplateService/EventServiceBid path.
+  performerFoxer: ["performer:manage", "payouts:onboard", "bid:submit-service"],
   eventFoxer: [
     "template:manage",
     "booking:check-in",

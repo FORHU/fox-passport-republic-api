@@ -4,6 +4,7 @@ import { ItemBookingStatus } from "@prisma/client";
 import { calculateItemsTotal } from "../../utils/pricing";
 import { PLATFORM_FEE_PERCENT } from "../../config";
 import PayoutSvc from "../payout/payout.service";
+import { isPerformerServiceCategory } from "../../types/permissions";
 import {
   announceToAdmins,
   announceToUser,
@@ -142,6 +143,9 @@ export default class ServiceBookingSvc {
       } catch (err) {
         console.error(`Payout failed for service booking ${id}`, err);
       }
+      const isPerformerListing = booking.service?.category
+        ? isPerformerServiceCategory(booking.service.category)
+        : false;
       import("../passport/passport.service")
         .then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
           const ownerId =
@@ -149,7 +153,9 @@ export default class ServiceBookingSvc {
           if (ownerId)
             return PassportSvc.awardXP(
               ownerId,
-              UserPath.serviceFoxer,
+              isPerformerListing
+                ? UserPath.performerFoxer
+                : UserPath.serviceFoxer,
               XP_REWARDS.listingBooked,
             );
         })
@@ -160,7 +166,9 @@ export default class ServiceBookingSvc {
           const ownerId =
             booking.service?.ownerId ?? booking.service?.owner?.id;
           if (serviceId && ownerId)
-            return SpecializationSvc.checkServiceFoxer(serviceId, ownerId);
+            return isPerformerListing
+              ? SpecializationSvc.checkPerformerFoxer(serviceId, ownerId)
+              : SpecializationSvc.checkServiceFoxer(serviceId, ownerId);
         })
         .catch(() => {});
     }

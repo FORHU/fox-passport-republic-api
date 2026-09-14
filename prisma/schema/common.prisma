@@ -29,6 +29,7 @@ enum RoleType {
   eventFoxer
   gearFoxer
   serviceFoxer
+  performerFoxer
   investor
 }
 

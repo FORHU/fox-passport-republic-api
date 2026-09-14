@@ -6,6 +6,7 @@ import {
   ServiceCategory,
 } from "@prisma/client";
 import { toEnum } from "../../utils/enums";
+import { PERFORMER_SERVICE_CATEGORIES } from "../../types/permissions";
 
 export default class SearchRepo {
   // Aggregate discovery search: given a location (city) and optional category,
@@ -40,14 +41,26 @@ export default class SearchRepo {
       roleType: { has: "serviceFoxer" as RoleType },
       ...(cityFilter && { city: cityFilter }),
     };
+    const performerFoxerWhere = {
+      roleType: { has: "performerFoxer" as RoleType },
+      ...(cityFilter && { city: cityFilter }),
+    };
+    // A performer-category `category` param narrows the performer section to
+    // that specific category; otherwise it shows the full performer set.
+    const performerListingCategory =
+      serviceCategory && PERFORMER_SERVICE_CATEGORIES.includes(serviceCategory)
+        ? serviceCategory
+        : undefined;
 
     const [
       eventTemplates,
       gearFoxers,
       serviceFoxers,
+      performerFoxers,
       totalEventTemplates,
       totalGearFoxers,
       totalServiceFoxers,
+      totalPerformerFoxers,
     ] = await Promise.all([
       prisma.eventTemplate.findMany({
         where: templateWhere,
@@ -129,18 +142,58 @@ export default class SearchRepo {
         take: limit,
         skip,
       }),
+      prisma.user.findMany({
+        where: performerFoxerWhere,
+        select: {
+          id: true,
+          name: true,
+          imgId: true,
+          city: true,
+          state: true,
+          roleType: true,
+          foxerSpecializations: {
+            select: { roleType: true, category: true, source: true },
+            orderBy: { source: "asc" },
+          },
+          services: {
+            where: {
+              status: "available",
+              deletedAt: null,
+              category: performerListingCategory
+                ? performerListingCategory
+                : { in: [...PERFORMER_SERVICE_CATEGORIES] },
+            },
+            take: 3,
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              name: true,
+              category: true,
+              price: true,
+              billingRate: true,
+              images: { take: 1, select: { url: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip,
+      }),
       prisma.eventTemplate.count({ where: templateWhere }),
       prisma.user.count({ where: gearFoxerWhere }),
       prisma.user.count({ where: serviceFoxerWhere }),
+      prisma.user.count({ where: performerFoxerWhere }),
     ]);
 
     return {
       eventTemplates,
       gearFoxers,
       serviceFoxers,
+      performerFoxers,
       totalEventTemplates,
       totalGearFoxers,
       totalServiceFoxers,
+      totalPerformerFoxers,
     };
   }
 }

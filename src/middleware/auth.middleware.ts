@@ -147,6 +147,31 @@ export const requirePermission = (permission: Permission) => {
 };
 
 /**
+ * `requirePermission`'s sibling for a route two different capabilities can
+ * satisfy — e.g. `service.routes.ts`'s create/update/delete, which
+ * `service:manage` (serviceFoxer) or `performer:manage` (performerFoxer) both
+ * unlock, since both own rows of the same `Service` model. Kept separate from
+ * `requirePermission` rather than adding a second overload, so its ~15
+ * existing single-permission call sites are untouched.
+ */
+export const requirePermissionAny = (permissions: Permission[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Not authenticated" });
+    }
+    if (!permissions.some((permission) => can(req.user, permission))) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to do that",
+      });
+    }
+    next();
+  };
+};
+
+/**
  * @deprecated Prefer `requirePermission`. Kept for routes not yet converted;
  * note that it excludes `admin_secretary` by design, so a queue route guarded
  * with this will lock the secretary out.

@@ -152,9 +152,14 @@ model Venue {
 enum ServiceCategory {
   design
   catering
-  entertainment
+  entertainment // legacy — performerFoxer-eligible, but no longer used for new listings; see photography/videography/dj/live_band/mc
   service_staff
   other
+  photography
+  videography
+  dj
+  live_band
+  mc
 }
 
 enum AssetCondition {

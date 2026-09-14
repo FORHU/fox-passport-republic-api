@@ -119,6 +119,7 @@ export default class UsersRepo {
   ) {
     const allFoxerRoles: RoleType[] = [
       "serviceFoxer",
+      "performerFoxer",
       "gearFoxer",
       "eventFoxer",
       "venueFoxer",
@@ -282,6 +283,7 @@ export default class UsersRepo {
         roleType: {
           hasSome: [
             "serviceFoxer",
+            "performerFoxer",
             "gearFoxer",
             "eventFoxer",
             "venueFoxer",

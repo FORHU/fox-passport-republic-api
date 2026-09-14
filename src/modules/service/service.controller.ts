@@ -5,6 +5,29 @@ import ServiceSvc from "./service.service";
 import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 import { toEnum } from "../../utils/enums";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
+import { can, isPerformerServiceCategory } from "../../types/permissions";
+
+/**
+ * The route-level gate (`requirePermissionAny(["service:manage",
+ * "performer:manage"])`) only asks whether the caller holds *either*
+ * permission. This asks the specific one `category` requires — a
+ * serviceFoxer-only caller must not create/retarget a listing into a
+ * performer category, and vice versa.
+ */
+function assertCanManageCategory(
+  req: Request,
+  category: ServiceCategory,
+): string | null {
+  const required = isPerformerServiceCategory(category)
+    ? "performer:manage"
+    : "service:manage";
+  if (!can(req.user, required)) {
+    return isPerformerServiceCategory(category)
+      ? "You must be an approved Performer Foxer to manage this category"
+      : "You must be an approved Service Foxer to manage this category";
+  }
+  return null;
+}
 
 interface CreateServicePayload {
   category: ServiceCategory;
@@ -62,6 +85,11 @@ export default class ServiceCtrl {
       const ownerId = req.user?.userId;
       if (!ownerId) {
         return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const categoryError = assertCanManageCategory(req, value.category);
+      if (categoryError) {
+        return res.status(403).json({ message: categoryError });
       }
 
       const service = await ServiceSvc.createService({
@@ -187,6 +215,13 @@ export default class ServiceCtrl {
       const ownerId = req.user?.userId;
       if (!ownerId) {
         return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (value.category) {
+        const categoryError = assertCanManageCategory(req, value.category);
+        if (categoryError) {
+          return res.status(403).json({ message: categoryError });
+        }
       }
 
       const service = await ServiceSvc.updateService(

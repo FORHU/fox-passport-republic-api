@@ -71,6 +71,7 @@ const SUPPLY_ONLY = [
   "venue:manage",
   "asset:manage",
   "service:manage",
+  "performer:manage",
   "template:manage",
   "payouts:onboard",
   "bid:manage",
@@ -157,15 +158,28 @@ describe("the supply side", () => {
     expect(can(mayor, "venue:manage")).toBe(true);
     expect(can({ roleType: ["gearFoxer"] }, "asset:manage")).toBe(true);
     expect(can({ roleType: ["serviceFoxer"] }, "service:manage")).toBe(true);
+    expect(can({ roleType: ["performerFoxer"] }, "performer:manage")).toBe(
+      true,
+    );
   });
 
   it("does not leak one foxer's capability to another", () => {
     expect(can(mayor, "template:manage")).toBe(false);
     expect(can(host, "venue:manage")).toBe(false);
+    // performerFoxer and serviceFoxer own different subsets of the same
+    // Service model, so this pair is the one most likely to leak.
+    expect(can({ roleType: ["serviceFoxer"] }, "performer:manage")).toBe(false);
+    expect(can({ roleType: ["performerFoxer"] }, "service:manage")).toBe(false);
   });
 
   it("gives every foxer type payouts:onboard, and investor none of it", () => {
-    for (const r of ["venueFoxer", "eventFoxer", "gearFoxer", "serviceFoxer"]) {
+    for (const r of [
+      "venueFoxer",
+      "eventFoxer",
+      "gearFoxer",
+      "serviceFoxer",
+      "performerFoxer",
+    ]) {
       expect(can({ roleType: [r] }, "payouts:onboard")).toBe(true);
     }
     expect(can({ roleType: ["investor"] }, "payouts:onboard")).toBe(false);
@@ -184,6 +198,14 @@ describe("the supply side", () => {
     expect(can({ roleType: ["serviceFoxer"] }, "bid:submit-asset")).toBe(false);
     expect(can({ roleType: ["gearFoxer"] }, "bid:submit-asset")).toBe(true);
     expect(can({ roleType: ["gearFoxer"] }, "bid:submit-service")).toBe(false);
+    // performerFoxer items ride the same EventTemplateService/EventServiceBid
+    // path as serviceFoxer items, so it shares bid:submit-service.
+    expect(can({ roleType: ["performerFoxer"] }, "bid:submit-service")).toBe(
+      true,
+    );
+    expect(can({ roleType: ["performerFoxer"] }, "bid:submit-asset")).toBe(
+      false,
+    );
   });
 
   it("gives eventFoxer bid:manage for both bid types", () => {

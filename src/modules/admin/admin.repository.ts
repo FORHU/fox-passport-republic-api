@@ -371,7 +371,7 @@ export default class AdminRepo {
     const row = await prisma.service.update({
       where: { id },
       data: { status: ServiceStatus.available },
-      select: { id: true, ownerId: true },
+      select: { id: true, ownerId: true, category: true },
     });
     await serviceCache.invalidateAll();
     return row;

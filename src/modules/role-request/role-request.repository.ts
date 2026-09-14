@@ -89,6 +89,15 @@ export default class RoleRequestRepo {
             selfieFile: true,
           },
         },
+        performerFoxerApplication: {
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+          },
+        },
         investorApplication: true,
       },
       orderBy: {
@@ -105,6 +114,7 @@ export default class RoleRequestRepo {
         eventFoxerApplication: true,
         gearFoxerApplication: true,
         serviceFoxerApplication: true,
+        performerFoxerApplication: true,
         investorApplication: true,
       },
       orderBy: { createdAt: "desc" },
@@ -148,6 +158,15 @@ export default class RoleRequestRepo {
           },
         },
         serviceFoxerApplication: {
+          include: {
+            validId1: true,
+            nbiFile: true,
+            tinIdFile: true,
+            birPermitFile: true,
+            selfieFile: true,
+          },
+        },
+        performerFoxerApplication: {
           include: {
             validId1: true,
             nbiFile: true,

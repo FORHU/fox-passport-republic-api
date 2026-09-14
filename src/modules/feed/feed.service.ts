@@ -253,10 +253,11 @@ export default class FeedService {
           user.systemRole === "admin" ||
           user.systemRole === "admin_secretary" ||
           user.roleType.includes("serviceFoxer") ||
+          user.roleType.includes("performerFoxer") ||
           user.roleType.includes("investor");
         if (!isAuthorized) {
           throw new Error(
-            "Unauthorized: Talent Foxer or Partner role required",
+            "Unauthorized: Talent Foxer, Performer Foxer, or Partner role required",
           );
         }
         const service = await prisma.service.findUnique({
@@ -353,7 +354,16 @@ export default class FeedService {
         } else if (type === PostType.gear_offering) {
           await PassportSvc.awardXP(user.userId, UserPath.gearFoxer, 25);
         } else if (type === PostType.service_offering) {
-          await PassportSvc.awardXP(user.userId, UserPath.serviceFoxer, 25);
+          // Poster already passed the case-block ownership check above, so
+          // their own roleType (not the listing's category) is enough to
+          // resolve which path earns the XP.
+          await PassportSvc.awardXP(
+            user.userId,
+            user.roleType.includes("performerFoxer")
+              ? UserPath.performerFoxer
+              : UserPath.serviceFoxer,
+            25,
+          );
         } else if (type === PostType.event_announcement) {
           await PassportSvc.awardXP(user.userId, UserPath.eventFoxer, 25);
         } else if (type === PostType.partner_announcement) {
