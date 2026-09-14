@@ -1,5 +1,9 @@
 import type { Attachment } from "nodemailer/lib/mailer";
-import { SendMailOptions, createTransport, getTestMessageUrl } from "nodemailer";
+import {
+  SendMailOptions,
+  createTransport,
+  getTestMessageUrl,
+} from "nodemailer";
 import {
   MAILER_EMAIL,
   MAILER_PASSWORD,
