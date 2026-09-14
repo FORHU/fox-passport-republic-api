@@ -80,6 +80,9 @@ function fakeReq(query: Record<string, string>, cookieHeader?: string) {
   return {
     query,
     headers: cookieHeader ? { cookie: cookieHeader } : {},
+    protocol: "https",
+    get: (name: string) =>
+      name.toLowerCase() === "host" ? "api.example.com" : undefined,
   } as unknown as Request;
 }
 
@@ -155,7 +158,10 @@ describe("googleCallback state validation", () => {
       res,
     );
 
-    expect(svc.handleCallback).toHaveBeenCalledWith("abc");
+    expect(svc.handleCallback).toHaveBeenCalledWith(
+      "abc",
+      "https://api.example.com/api/v1/auth/google/callback",
+    );
     expect(recorded.redirect).toBe(
       "https://app.example.com/auth/google/callback?xc=exchange-code",
     );
@@ -171,7 +177,10 @@ describe("googleCallback state validation", () => {
       res,
     );
 
-    expect(svc.handleCallback).toHaveBeenCalledWith("abc");
+    expect(svc.handleCallback).toHaveBeenCalledWith(
+      "abc",
+      "https://api.example.com/api/v1/auth/google/callback",
+    );
   });
 
   it("clears the state cookie so one round trip cannot be replayed", async () => {
