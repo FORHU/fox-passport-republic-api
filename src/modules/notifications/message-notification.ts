@@ -29,6 +29,24 @@ export function notifyMessageRequest(input: {
   });
 }
 
+export function notifyGroupMention(input: {
+  targetUserId: string;
+  mentionerName: string;
+  conversationId: string;
+  groupName: string;
+}): void {
+  fireAndForget({
+    userId: input.targetUserId,
+    type: "message:mention",
+    title: `You were mentioned in ${input.groupName}`,
+    message: `${input.mentionerName} mentioned you.`,
+    metadata: {
+      link: `/messages?conversationId=${input.conversationId}`,
+      conversationId: input.conversationId,
+    },
+  });
+}
+
 export function notifyMessageRequestAccepted(input: {
   requesterUserId: string;
   accepterId: string;

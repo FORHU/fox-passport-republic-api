@@ -69,7 +69,18 @@ export default class GoogleAuthSvc {
     return crypto.randomBytes(32).toString("hex");
   }
 
-  static getAuthUrl(state: string): string {
+  /**
+   * `redirectUri` overrides the client's constructor default on this one call
+   * — it must be whatever host the browser actually reached this server on
+   * (see `resolveRedirectUri` in auth.controller.ts), not always the same
+   * fixed `GOOGLE_CALLBACK_URL`. A phone on the LAN reaches this API at its
+   * LAN IP, not `localhost`, so a hardcoded callback would send Google's
+   * redirect to a host the phone can't resolve. Google still requires every
+   * value ever passed here to be pre-registered as an Authorized redirect URI
+   * in Cloud Console — this doesn't bypass that, it just picks between
+   * several registered ones per-request.
+   */
+  static getAuthUrl(state: string, redirectUri: string): string {
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
       throw new Error("Google OAuth is not configured on this server");
     }
@@ -78,6 +89,7 @@ export default class GoogleAuthSvc {
       scope: ["openid", "email", "profile"],
       prompt: "select_account",
       state,
+      redirect_uri: redirectUri,
     });
   }
 
@@ -85,12 +97,18 @@ export default class GoogleAuthSvc {
    * Exchanges the authorization code for tokens, verifies the ID token, and
    * finds-or-creates the local user. Mirrors AuthSvc.login's token issuance so
    * the two flows are interchangeable to the rest of the app.
+   *
+   * `redirectUri` must be byte-identical to the one passed to `getAuthUrl` for
+   * this same round trip — Google's token endpoint rejects a mismatch.
    */
-  static async handleCallback(code: string) {
+  static async handleCallback(code: string, redirectUri: string) {
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
       throw new Error("Google OAuth is not configured on this server");
     }
-    const { tokens } = await client.getToken(code);
+    const { tokens } = await client.getToken({
+      code,
+      redirect_uri: redirectUri,
+    });
     if (!tokens.id_token) {
       throw new Error("Google did not return an ID token");
     }

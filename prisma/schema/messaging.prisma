@@ -150,6 +150,11 @@ model Message {
   // Set on edit — null means never edited. Editing is content-only; a
   // message that started with attachments/a shared post keeps them.
   editedAt       DateTime?
+  // Shared across the whole thread (not per-user, unlike
+  // ConversationSettings.pinnedAt on the thread itself) — anyone in the
+  // conversation can pin/unpin, and everyone sees the same pinned message.
+  // Only one message pinned at a time: setting a new one clears the old.
+  pinnedAt       DateTime?
   conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
   sharedPost     Post?             @relation(fields: [sharedPostId], references: [id], onDelete: SetNull)
