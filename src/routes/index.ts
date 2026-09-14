@@ -38,6 +38,7 @@ import reportsRoutes from "../modules/reports/reports.routes";
 import biddingRoutes from "../modules/bidding/bidding.routes";
 import partnershipRoutes from "../modules/partnership/partnership.routes";
 import checkoutRoutes from "../modules/checkout/checkout.routes";
+import platformFeeConfigRoutes from "../modules/platform-fee-config/platform-fee-config.routes";
 
 const router = express.Router();
 
@@ -79,6 +80,7 @@ router.use("/v1/favorites", favoriteRoutes);
 router.use("/v1/matches", matchRoutes);
 router.use("/v1/bookings", bookingRoutes);
 router.use("/v1/cancellation-policies", cancellationPolicyRoutes);
+router.use("/v1/admin/platform-fee-configs", platformFeeConfigRoutes);
 router.use("/v1/waitlist", waitlistRoutes);
 router.use("/v1/locations", locationsRoutes);
 router.use("/v1/passport", passportRoutes);
