@@ -5,7 +5,7 @@ Started 8 Sep 2026. Branch: `feat/redis-backed-rate-limiting`, off `main`
 
 **Resume at §2c.** Everything in §1 is written and green; §2 is the queue.
 
-`TOMORROW.md` is the running order and is shorter than this. Read that first if
+`NEXT.md` is the running order and is shorter than this. Read that first if
 you are picking the work up; this file is the reasoning behind it.
 
 ---
