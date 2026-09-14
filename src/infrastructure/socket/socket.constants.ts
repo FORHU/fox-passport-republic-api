@@ -74,6 +74,11 @@ export const SOCKET_EVENTS = {
    * and the new cursor, so a group's "Seen by ..." line can update live
    * without a REST refetch (see ConversationRead). */
   READ_RECEIPT: "read:receipt",
+  /** The conversation's pinned message changed — carries the conversation
+   * and the now-pinned message's id (or null if unpinned), so the client
+   * can clear `pinnedAt` off whatever it thought was pinned before and set
+   * it on the new one without a REST refetch. */
+  MESSAGE_PINNED: "message:pinned",
 } as const;
 
 export type SocketEvent = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];

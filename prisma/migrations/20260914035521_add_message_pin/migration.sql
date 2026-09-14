@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "messages" ADD COLUMN     "pinnedAt" TIMESTAMP(3);

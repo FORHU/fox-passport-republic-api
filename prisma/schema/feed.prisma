@@ -8,6 +8,7 @@ enum PostType {
   service_offering
   event_announcement
   partner_announcement
+  poll
 }
 
 enum FeedTab {
@@ -87,11 +88,56 @@ model Post {
   hiddenFor HiddenPost[]
   messages  Message[]
   mediaTags PostMediaTag[]
+  poll      Poll?
 
   @@index([tab, createdAt(sort: Desc)])
   @@index([authorId, createdAt(sort: Desc)])
   @@index([type])
   @@map("feed_posts")
+}
+
+// One-to-one with a `type: poll` Post — the poll's question is just that
+// post's `content` (same as how venue_spotlight etc. use content as the
+// caption alongside their own linked entity), so this only models the
+// options and votes. Single-choice only for now, not Facebook's
+// multi-select — a user's existing vote is replaced rather than stacked.
+model Poll {
+  id        String   @id @default(uuid())
+  postId    String   @unique
+  createdAt DateTime @default(now())
+
+  post    Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  options PollOption[]
+
+  @@map("feed_polls")
+}
+
+model PollOption {
+  id         String @id @default(uuid())
+  pollId     String
+  label      String
+  position   Int    @default(0)
+  // Denormalized counter, same pattern as PostComment.likesCount — avoids a
+  // COUNT(*) over votes on every poll render.
+  votesCount Int    @default(0)
+
+  poll  Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes PollVote[]
+
+  @@index([pollId])
+  @@map("feed_poll_options")
+}
+
+model PollVote {
+  pollOptionId String
+  userId       String
+  createdAt    DateTime @default(now())
+
+  option PollOption @relation(fields: [pollOptionId], references: [id], onDelete: Cascade)
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([pollOptionId, userId])
+  @@map("feed_poll_votes")
 }
 
 // Pins a citizen to an (x, y) spot on one photo/video within a post's

@@ -38,6 +38,11 @@ router.post(
   ConversationController.declineRequest,
 );
 router.get("/:id/messages", authenticate, ConversationController.getMessages);
+router.get(
+  "/:id/messages/search",
+  authenticate,
+  ConversationController.searchMessages,
+);
 router.post("/:id/messages", authenticate, ConversationController.sendMessage);
 router.delete(
   "/:id/messages/:messageId",
@@ -53,6 +58,16 @@ router.patch(
   "/:id/messages/:messageId",
   authenticate,
   ConversationController.editMessage,
+);
+router.patch(
+  "/:id/messages/:messageId/pin",
+  authenticate,
+  ConversationController.setPinnedMessage,
+);
+router.get(
+  "/:id/pinned-message",
+  authenticate,
+  ConversationController.getPinnedMessage,
 );
 router.patch("/:id/read", authenticate, ConversationController.markRead);
 router.get(

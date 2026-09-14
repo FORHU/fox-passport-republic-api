@@ -16,6 +16,7 @@ app.set("trust proxy", 1);
 const allowedOrigins = [
   "http://localhost:6001", // front-end (6000 is unusable: browsers block it as the x11 port)
   "http://localhost:6002", // this API
+  "192.168.1.34:6001",
   ...CORS_ORIGINS,
 ];
 

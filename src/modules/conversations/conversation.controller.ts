@@ -5,6 +5,7 @@ import ConversationService from "./conversation.service";
 function statusForError(message: string): number {
   if (message === "Unauthorized") return 403;
   if (message === "Only the group creator can remove members") return 403;
+  if (message === "You can't message this citizen") return 403;
   if (message === "Conversation not found") return 404;
   if (message === "Message not found") return 404;
   if (message.startsWith("No pending message request")) return 404;
@@ -102,6 +103,62 @@ export default class ConversationController {
         req.params.id,
         req.user!.userId,
         { limit: Number(req.query.limit) || undefined, before },
+      );
+      res.json({ success: true, data: messages });
+    } catch (e: unknown) {
+      const err = e as Error;
+      res
+        .status(statusForError(err.message))
+        .json({ success: false, message: err.message });
+    }
+  }
+
+  static async setPinnedMessage(req: Request, res: Response) {
+    const schema = Joi.object({
+      pinned: Joi.boolean().required(),
+    });
+    const { error, value } = schema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    try {
+      const message = await ConversationService.setPinnedMessage(
+        req.params.id,
+        req.params.messageId,
+        req.user!.userId,
+        value.pinned,
+      );
+      res.json({ success: true, data: message });
+    } catch (e: unknown) {
+      const err = e as Error;
+      res
+        .status(statusForError(err.message))
+        .json({ success: false, message: err.message });
+    }
+  }
+
+  static async getPinnedMessage(req: Request, res: Response) {
+    try {
+      const message = await ConversationService.getPinnedMessage(
+        req.params.id,
+        req.user!.userId,
+      );
+      res.json({ success: true, data: message });
+    } catch (e: unknown) {
+      const err = e as Error;
+      res
+        .status(statusForError(err.message))
+        .json({ success: false, message: err.message });
+    }
+  }
+
+  static async searchMessages(req: Request, res: Response) {
+    try {
+      const q = (req.query.q as string) || "";
+      const messages = await ConversationService.searchMessages(
+        req.params.id,
+        req.user!.userId,
+        q,
       );
       res.json({ success: true, data: messages });
     } catch (e: unknown) {
