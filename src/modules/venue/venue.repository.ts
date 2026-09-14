@@ -62,7 +62,7 @@ export default class VenueRepo {
     seatingArrangements: string[];
     stageConfig?: string;
     setupOptions: string[];
-    operatingHours?: any;
+    operatingHours?: Prisma.InputJsonValue;
     blockedDates: Date[];
     minBookingTime?: number;
     depositRequirements?: string;
@@ -71,8 +71,8 @@ export default class VenueRepo {
     parkingInformation?: string;
     accessibilityInformation?: string;
     entranceInstructions?: string;
-    recommendedAssets?: any;
-    recommendedServices?: any;
+    recommendedAssets?: Prisma.VenueCreateInput["recommendedAssets"];
+    recommendedServices?: Prisma.VenueCreateInput["recommendedServices"];
   }) {
     const { imgIds, ...venueScalars } = data;
     return this.retiring(
@@ -180,7 +180,7 @@ export default class VenueRepo {
         : {}),
     };
 
-    const queryArgs: any = {
+    const queryArgs: Prisma.VenueFindManyArgs = {
       where,
       orderBy: { createdAt: "desc" },
       skip,

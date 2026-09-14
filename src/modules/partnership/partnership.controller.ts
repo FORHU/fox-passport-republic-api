@@ -10,7 +10,8 @@ export class PartnershipController {
 
       const proposal = await PartnershipSvc.createProposal(user.userId, data);
       res.status(201).json({ success: true, data: proposal });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -20,7 +21,8 @@ export class PartnershipController {
       const { id } = req.params;
       const proposal = await PartnershipSvc.getProposal(id);
       res.status(200).json({ success: true, data: proposal });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       res.status(404).json({ success: false, message: error.message });
     }
   }
@@ -34,7 +36,8 @@ export class PartnershipController {
         targetVenueId: targetVenueId as string,
       });
       res.status(200).json({ success: true, data: proposals });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -45,7 +48,8 @@ export class PartnershipController {
       const { id } = req.params;
       const proposal = await PartnershipSvc.acceptProposal(id, user);
       res.status(200).json({ success: true, data: proposal });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       const status = error.message.includes("Unauthorized") ? 403 : 400;
       res.status(status).json({ success: false, message: error.message });
     }
@@ -57,7 +61,8 @@ export class PartnershipController {
       const { id } = req.params;
       const proposal = await PartnershipSvc.rejectProposal(id, user);
       res.status(200).json({ success: true, data: proposal });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       const status = error.message.includes("Unauthorized") ? 403 : 400;
       res.status(status).json({ success: false, message: error.message });
     }
@@ -69,7 +74,8 @@ export class PartnershipController {
       const { id } = req.params;
       const proposal = await PartnershipSvc.withdrawProposal(id, user.userId);
       res.status(200).json({ success: true, data: proposal });
-    } catch (error: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       const status = error.message.includes("Unauthorized") ? 403 : 400;
       res.status(status).json({ success: false, message: error.message });
     }

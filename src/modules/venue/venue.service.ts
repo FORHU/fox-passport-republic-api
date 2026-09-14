@@ -87,7 +87,7 @@ export default class VenueSvc {
     seatingArrangements?: string[];
     stageConfig?: string;
     setupOptions?: string[];
-    operatingHours?: any;
+    operatingHours?: Prisma.InputJsonValue;
     blockedDates?: Date[];
     minBookingTime?: number;
     depositRequirements?: string;
@@ -141,7 +141,7 @@ export default class VenueSvc {
       centroid = polygonCentroid(data.boundary);
     }
 
-    const { boundary, ...rest } = data;
+    const { boundary, recommendedAssets, recommendedServices, ...rest } = data;
     const venue = await VenueRepo.createVenue({
       ...rest,
       state: data.state ?? undefined,
@@ -175,14 +175,14 @@ export default class VenueSvc {
       accessibilityInformation: data.accessibilityInformation,
       entranceInstructions: data.entranceInstructions,
 
-      ...(data.recommendedAssets?.length && {
+      ...(recommendedAssets?.length && {
         recommendedAssets: {
-          connect: data.recommendedAssets.map((id) => ({ id })),
+          connect: recommendedAssets.map((id) => ({ id })),
         },
       }),
-      ...(data.recommendedServices?.length && {
+      ...(recommendedServices?.length && {
         recommendedServices: {
-          connect: data.recommendedServices.map((id) => ({ id })),
+          connect: recommendedServices.map((id) => ({ id })),
         },
       }),
     });
@@ -421,7 +421,7 @@ export default class VenueSvc {
       seatingArrangements: string[];
       stageConfig: string;
       setupOptions: string[];
-      operatingHours: any;
+      operatingHours: Prisma.InputJsonValue;
       blockedDates: Date[];
       minBookingTime: number;
       depositRequirements: string;

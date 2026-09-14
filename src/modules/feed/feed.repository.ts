@@ -303,7 +303,9 @@ export default class FeedRepo {
 
     if (isTopMode) {
       const now = Date.now();
-      formatted.forEach((p: any) => {
+      type ScoredPost = (typeof formatted)[number] & { _score?: number };
+      const scored = formatted as ScoredPost[];
+      scored.forEach((p) => {
         let score = 0;
 
         // Affinity
@@ -326,22 +328,24 @@ export default class FeedRepo {
       });
 
       // Sort by score
-      formatted.sort((a: any, b: any) => {
+      scored.sort((a, b) => {
         if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-        return b._score - a._score;
+        return (b._score ?? 0) - (a._score ?? 0);
       });
 
       // Paginate in-memory array
       const cursorIndex = cursor
-        ? formatted.findIndex((p) => p.id === cursor)
+        ? scored.findIndex((p) => p.id === cursor)
         : -1;
       const startIndex = cursorIndex !== -1 ? cursorIndex + 1 : 0;
 
-      const paged = formatted.slice(startIndex, startIndex + limit);
+      const paged = scored.slice(startIndex, startIndex + limit);
       nextCursor =
-        startIndex + limit < formatted.length
-          ? formatted[startIndex + limit - 1].id
+        startIndex + limit < scored.length
+          ? scored[startIndex + limit - 1].id
           : null;
+      // Clean up the temporary score property before it reaches the response.
+      paged.forEach((p) => delete p._score);
       formatted = paged;
     } else {
       const hasNextPage = posts.length > limit;
@@ -349,9 +353,6 @@ export default class FeedRepo {
       nextCursor = hasNextPage ? items[items.length - 1].id : null;
       formatted = items;
     }
-
-    // Clean up temporary score property
-    formatted.forEach((p: any) => delete p._score);
 
     return {
       posts: formatted,
@@ -772,13 +773,13 @@ export default class FeedRepo {
       },
     });
 
-    const withLikeFlag = (c: any) => {
+    function withLikeFlag<T extends { likes?: unknown[] | null }>(c: T) {
       const isLikedByMe = viewerId ? (c.likes?.length ?? 0) > 0 : false;
       const { likes: _likes, ...rest } = c;
       return { ...rest, isLikedByMe };
-    };
+    }
 
-    return comments.map((c: any) => ({
+    return comments.map((c) => ({
       ...withLikeFlag(c),
       replies: c.replies.map(withLikeFlag),
     }));
