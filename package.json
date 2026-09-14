@@ -5,7 +5,8 @@
   "license": "MIT",
   "packageManager": "pnpm@10.34.5",
   "scripts": {
-    "dev": "pnpm dlx kill-port 6002 && nodemon --watch src --ext ts --exec ts-node --files ./src/server.ts",
+    "predev": "prisma generate",
+    "dev": "pnpm dlx kill-port 6002 && nodemon --watch src --watch prisma/schema --watch .env --ext ts,prisma,env --exec \"prisma generate && ts-node --files ./src/server.ts\"",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "validate": "node tools/validate-architecture.mjs",
@@ -16,7 +17,8 @@
     "build": "prisma generate && tsc",
     "start": "node ./dist/src/server.js",
     "db:setup": "pnpm exec prisma generate && pnpm exec prisma migrate dev",
-    "kill": "pnpm dlx kill-port 6002"
+    "kill": "pnpm dlx kill-port 6002",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.998.0",

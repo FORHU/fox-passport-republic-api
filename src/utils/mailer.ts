@@ -1,5 +1,5 @@
 import type { Attachment } from "nodemailer/lib/mailer";
-import { SendMailOptions, createTransport } from "nodemailer";
+import { SendMailOptions, createTransport, getTestMessageUrl } from "nodemailer";
 import {
   MAILER_EMAIL,
   MAILER_PASSWORD,
@@ -31,15 +31,8 @@ export async function sendEmail({
     },
   });
 
-  console.log(
-    MAILER_EMAIL,
-    MAILER_PASSWORD,
-    MAILER_TRANSPORT_HOST,
-    MAILER_TRANSPORT_PORT,
-  );
-
   const mailOptions: SendMailOptions = {
-    from: `Chumme <${MAILER_EMAIL}>`,
+    from: `Fox Passport Republic <${MAILER_EMAIL}>`,
     to,
     subject,
   };
@@ -57,8 +50,15 @@ export async function sendEmail({
   }
 
   try {
-    await transporter.sendMail(mailOptions);
+    const info = await transporter.sendMail(mailOptions);
     console.log("Email sent successfully to", to);
+    // Ethereal never delivers anywhere real — this is the only way to see
+    // what was sent. getTestMessageUrl returns false for a non-Ethereal
+    // transport, so this is a no-op against a real provider.
+    const previewUrl = getTestMessageUrl(info);
+    if (previewUrl) {
+      console.log("Ethereal preview:", previewUrl);
+    }
     return Promise.resolve("Email sent successfully");
   } catch (error) {
     console.error("Error sending email:", error);
