@@ -17,16 +17,17 @@ export default class FileCtrl {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // 1. Upload to S3 from backend
-      const { key } = await S3Svc.uploadFile(userId, file);
+      // 1. Upload to S3 from backend (images are resized/re-encoded to WebP)
+      const { key, contentType } = await S3Svc.uploadFile(userId, file);
 
       // 2. Generate Public URL
       const { url } = await S3Svc.generateDownloadUrl(key);
 
-      // 3. Register in DB
+      // 3. Register in DB — contentType reflects what's actually stored,
+      // not the original upload's mimetype, since images get transcoded.
       const dbFile = await FileSvc.createFile({
         name: file.originalname,
-        type: file.mimetype,
+        type: contentType,
         url: url,
         uploadedBy: userId,
       });

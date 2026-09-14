@@ -73,6 +73,7 @@ model User {
   savedPosts               SavedPost[]
   hiddenPosts              HiddenPost[]
   postMediaTags            PostMediaTag[]
+  pollVotes                PollVote[]
   reportsFiled             Report[]
   groupConversations       ConversationParticipant[]
   messageReactions         MessageReaction[]

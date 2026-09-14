@@ -8,8 +8,9 @@ export default class BiddingCtrl {
       const categoryId = req.query.categoryId as string | undefined;
       const slots = await BiddingSvc.getOpenSlots(categoryId);
       res.status(200).json({ success: true, data: slots });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      const error = err as Error;
+      res.status(400).json({ success: false, message: error.message });
     }
   }
 
@@ -33,8 +34,9 @@ export default class BiddingCtrl {
       });
 
       res.status(201).json({ success: true, data: bid });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      const error = err as Error;
+      res.status(400).json({ success: false, message: error.message });
     }
   }
 
@@ -43,8 +45,9 @@ export default class BiddingCtrl {
       const { id } = req.params;
       const result = await BiddingSvc.acceptServiceBid(id, req.user!.userId);
       res.status(200).json({ success: true, data: result });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      const error = err as Error;
+      res.status(400).json({ success: false, message: error.message });
     }
   }
 
@@ -53,8 +56,9 @@ export default class BiddingCtrl {
       const { id } = req.params;
       const result = await BiddingSvc.rejectServiceBid(id, req.user!.userId);
       res.status(200).json({ success: true, data: result });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      const error = err as Error;
+      res.status(400).json({ success: false, message: error.message });
     }
   }
 
@@ -63,8 +67,9 @@ export default class BiddingCtrl {
       const { eventId } = req.params;
       const bids = await BiddingSvc.getServiceBidsForEvent(eventId);
       res.status(200).json({ success: true, data: bids });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      const error = err as Error;
+      res.status(400).json({ success: false, message: error.message });
     }
   }
 
@@ -90,8 +95,9 @@ export default class BiddingCtrl {
       });
 
       res.status(201).json({ success: true, data: bid });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      const error = err as Error;
+      res.status(400).json({ success: false, message: error.message });
     }
   }
 
@@ -100,8 +106,9 @@ export default class BiddingCtrl {
       const { id } = req.params;
       const result = await BiddingSvc.acceptAssetBid(id, req.user!.userId);
       res.status(200).json({ success: true, data: result });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      const error = err as Error;
+      res.status(400).json({ success: false, message: error.message });
     }
   }
 
@@ -110,8 +117,9 @@ export default class BiddingCtrl {
       const { id } = req.params;
       const result = await BiddingSvc.rejectAssetBid(id, req.user!.userId);
       res.status(200).json({ success: true, data: result });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      const error = err as Error;
+      res.status(400).json({ success: false, message: error.message });
     }
   }
 
@@ -120,8 +128,9 @@ export default class BiddingCtrl {
       const { eventId } = req.params;
       const bids = await BiddingSvc.getAssetBidsForEvent(eventId);
       res.status(200).json({ success: true, data: bids });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      const error = err as Error;
+      res.status(400).json({ success: false, message: error.message });
     }
   }
 }

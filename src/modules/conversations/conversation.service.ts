@@ -1,4 +1,5 @@
 import { prisma } from "../../utils/prisma";
+import BlockRepo from "../block/block.repository";
 import ConversationRepository from "./conversation.repository";
 import {
   CreateGroupInput,
@@ -11,6 +12,7 @@ import { SOCKET_EVENTS } from "../../infrastructure/socket/socket.constants";
 import {
   notifyMessageRequest,
   notifyMessageRequestAccepted,
+  notifyGroupMention,
 } from "../notifications/message-notification";
 
 // Sorting the pair means the same two users always land on the same row
@@ -19,6 +21,52 @@ import {
 // OR'd lookup plus a race-prone create.
 function canonicalPair(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a];
+}
+
+// Group chat has no username field to key off of like the feed's
+// @handle mentions do — it matches literal display names instead, longest
+// first so "John Smith" wins over "John", same rule the frontend's
+// renderNamedMentions uses to render them as links in the first place.
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function notifyGroupMentions(
+  content: string,
+  senderId: string,
+  senderName: string,
+  conversation: { id: string; name: string | null },
+  memberIds: string[],
+) {
+  const others = memberIds.filter((id) => id !== senderId);
+  if (others.length === 0) return;
+
+  const members = await prisma.user.findMany({
+    where: { id: { in: others } },
+    select: { id: true, name: true },
+  });
+  const byName = new Map(members.map((m) => [m.name, m.id]));
+  const sortedNames = [...byName.keys()].sort((a, b) => b.length - a.length);
+  if (sortedNames.length === 0) return;
+
+  const pattern = new RegExp(
+    `@(${sortedNames.map(escapeRegExp).join("|")})\\b`,
+    "g",
+  );
+  const mentionedIds = new Set(
+    [...content.matchAll(pattern)].map((m) => byName.get(m[1])!),
+  );
+  if (mentionedIds.size === 0) return;
+
+  const groupName = conversation.name ?? "a group chat";
+  for (const userId of mentionedIds) {
+    notifyGroupMention({
+      targetUserId: userId,
+      mentionerName: senderName,
+      conversationId: conversation.id,
+      groupName,
+    });
+  }
 }
 
 export default class ConversationService {
@@ -135,19 +183,23 @@ export default class ConversationService {
     return !!(rule1 || rule2 || rule3);
   }
 
-  // No more gate on *creating* a conversation — anyone can message anyone.
-  // Used only to decide the *starting* status: a real booking/match
-  // relationship (or an existing thread) starts a new conversation already
-  // `accepted`; everyone else starts a `pending` request (see
-  // startConversation/sendMessage below).
+  // Gates both *starting* a new thread and *sending* into an existing one —
+  // a block in either direction shuts down messaging completely, same as
+  // Messenger (unlike the old comment here claimed, this was never actually
+  // checked; the Block model existed but nothing consulted it).
   static async canMessage(a: string, b: string) {
-    return a !== b;
+    if (a === b) return false;
+    const blocked = await BlockRepo.isBlockedEitherWay(a, b);
+    return !blocked;
   }
 
   static async startConversation(input: StartConversationInput) {
     const { requesterId, otherUserId } = input;
     if (requesterId === otherUserId) {
       throw new Error("Cannot start a conversation with yourself");
+    }
+    if (!(await ConversationService.canMessage(requesterId, otherUserId))) {
+      throw new Error("You can't message this citizen");
     }
 
     const [userAId, userBId] = canonicalPair(requesterId, otherUserId);
@@ -608,6 +660,23 @@ export default class ConversationService {
       senderId,
     );
 
+    // A block that happens *after* a 1:1 thread already exists must still
+    // shut down new sends into it — canMessage above only stops a fresh
+    // thread from being started. Groups are exempt: Messenger doesn't pull
+    // someone out of a group over an unrelated 1:1 block either.
+    if (!conversation.isGroup) {
+      const otherId =
+        conversation.userAId === senderId
+          ? conversation.userBId
+          : conversation.userAId;
+      if (
+        otherId &&
+        !(await ConversationService.canMessage(senderId, otherId))
+      ) {
+        throw new Error("You can't message this citizen");
+      }
+    }
+
     if (sharedPostId) {
       const post = await prisma.post.findUnique({
         where: { id: sharedPostId },
@@ -673,6 +742,25 @@ export default class ConversationService {
       emitToUser(io, id, SOCKET_EVENTS.NEW_MESSAGE, message);
     }
 
+    if (conversation.isGroup && trimmed) {
+      const sender = await prisma.user.findUnique({
+        where: { id: senderId },
+        select: { name: true },
+      });
+      notifyGroupMentions(
+        trimmed,
+        senderId,
+        sender?.name ?? "Someone",
+        conversation,
+        ConversationService.getMemberIds(conversation),
+      ).catch((err) =>
+        console.warn(
+          "[ConversationService] Best-effort mention notification failed:",
+          err,
+        ),
+      );
+    }
+
     return message;
   }
 
@@ -705,6 +793,17 @@ export default class ConversationService {
   static async getReadReceipts(conversationId: string, userId: string) {
     await ConversationService.assertParticipant(conversationId, userId);
     return ConversationRepository.getReadReceipts(conversationId);
+  }
+
+  static async searchMessages(
+    conversationId: string,
+    userId: string,
+    query: string,
+  ) {
+    await ConversationService.assertParticipant(conversationId, userId);
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+    return ConversationRepository.searchMessages(conversationId, trimmed);
   }
 
   static async editMessage(
@@ -743,6 +842,48 @@ export default class ConversationService {
       emitToUser(io, id, SOCKET_EVENTS.MESSAGE_EDITED, updated);
     }
     return updated;
+  }
+
+  // Anyone in the thread can pin/unpin — same "shared, not per-user" model
+  // as a Messenger pinned message, unlike conversation mute/pin which are
+  // each viewer's own setting.
+  static async setPinnedMessage(
+    conversationId: string,
+    messageId: string,
+    userId: string,
+    pinned: boolean,
+  ) {
+    const conversation = await ConversationService.assertParticipant(
+      conversationId,
+      userId,
+    );
+
+    const message = await ConversationRepository.findMessageById(messageId);
+    if (!message || message.conversationId !== conversationId) {
+      throw new Error("Message not found");
+    }
+    if (message.type === "system") {
+      throw new Error("Cannot pin a system message");
+    }
+
+    const updated = await ConversationRepository.setPinnedMessage(
+      conversationId,
+      messageId,
+      pinned,
+    );
+
+    for (const id of ConversationService.getMemberIds(conversation)) {
+      emitToUser(io, id, SOCKET_EVENTS.MESSAGE_PINNED, {
+        conversationId,
+        messageId: pinned ? messageId : null,
+      });
+    }
+    return updated;
+  }
+
+  static async getPinnedMessage(conversationId: string, userId: string) {
+    await ConversationService.assertParticipant(conversationId, userId);
+    return ConversationRepository.findPinnedMessage(conversationId);
   }
 
   static async setGroupPhoto(

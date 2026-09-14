@@ -9,7 +9,7 @@ import {
   RefreshTokenError,
   RefreshTokenReuseError,
 } from "./refresh-token.service";
-import { FRONTEND_URL, isDev } from "../../config";
+import { FRONTEND_URL, CORS_ORIGINS, isDev } from "../../config";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
 
 /**
@@ -52,6 +52,63 @@ function statesMatch(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
   const bufB = Buffer.from(b);
   return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+}
+
+// Mirrors the dev-mode LAN allowance in app.ts's CORS origin check — kept as
+// its own small copy rather than imported, so this module doesn't reach into
+// the top-level app composition file for one regex.
+const LOCAL_ORIGIN =
+  /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?$/;
+
+function isAllowedOrigin(origin: string): boolean {
+  return CORS_ORIGINS.includes(origin) || (isDev && LOCAL_ORIGIN.test(origin));
+}
+
+/**
+ * The redirect_uri sent to Google, and later re-sent when exchanging the
+ * code, must be whatever host+port the browser actually used to reach this
+ * server — a phone on the LAN reaches the API at its LAN IP, not
+ * `localhost`, and Google rejects a token exchange whose redirect_uri
+ * doesn't byte-match the one used to start the flow. Every value this can
+ * produce must be pre-registered as an Authorized redirect URI in Google
+ * Cloud Console (e.g. both the localhost and LAN-IP variants for local dev).
+ */
+function resolveRedirectUri(req: Request): string {
+  return `${req.protocol}://${req.get("host")}/api/v1/auth/google/callback`;
+}
+
+/**
+ * Where to send the browser back to once sign-in completes — the frontend
+ * origin that started the flow (passed as `?origin=`), so a phone that
+ * opened the app at the LAN IP lands back on the LAN IP, not `localhost`
+ * (which the phone can't reach). Falls back to FRONTEND_URL when the query
+ * param is absent or isn't a recognized origin, so this never redirects
+ * somewhere arbitrary.
+ */
+function resolveFrontendOrigin(req: Request): string {
+  const requested = req.query.origin;
+  if (typeof requested === "string" && isAllowedOrigin(requested)) {
+    return requested;
+  }
+  return FRONTEND_URL;
+}
+
+/**
+ * Recovers the frontend origin `googleRedirect` packed into `state` (see
+ * there), so every redirect in `googleCallback` — including the error
+ * paths — lands back on whichever host actually started the flow, instead
+ * of unconditionally on FRONTEND_URL.
+ */
+function originFromState(state: string | undefined): string {
+  if (!state) return FRONTEND_URL;
+  const encoded = state.split("|")[1];
+  if (!encoded) return FRONTEND_URL;
+  try {
+    const decoded = Buffer.from(encoded, "base64url").toString("utf8");
+    return isAllowedOrigin(decoded) ? decoded : FRONTEND_URL;
+  } catch {
+    return FRONTEND_URL;
+  }
 }
 
 /**
@@ -279,9 +336,18 @@ export default class AuthCtrl {
   }
 
   static googleRedirect(req: Request, res: Response) {
-    const state = GoogleAuthSvc.createState();
+    // The frontend origin travels inside `state` (not a second cookie/param)
+    // so it survives the round trip to Google and back automatically, and
+    // the existing CSRF equality check on `state` covers it for free — the
+    // callback only accepts the exact combined string this cookie holds.
+    const csrf = GoogleAuthSvc.createState();
+    const frontendOrigin = resolveFrontendOrigin(req);
+    const state = `${csrf}|${Buffer.from(frontendOrigin).toString("base64url")}`;
+
     res.cookie(GOOGLE_STATE_COOKIE, state, GOOGLE_STATE_COOKIE_OPTIONS);
-    return res.redirect(GoogleAuthSvc.getAuthUrl(state));
+    return res.redirect(
+      GoogleAuthSvc.getAuthUrl(state, resolveRedirectUri(req)),
+    );
   }
 
   static async googleCallback(req: Request, res: Response) {
@@ -297,8 +363,14 @@ export default class AuthCtrl {
       path: "/api/v1/auth/google",
     });
 
+    // Recovered from the cookie rather than the (unauthenticated,
+    // Google-echoed) query `state` — this is the value this same server
+    // handed out, so it's the one worth trusting for "where do I send this
+    // browser back to" even before the CSRF equality check below runs.
+    const frontendOrigin = originFromState(expectedState);
+
     if (googleError || typeof code !== "string") {
-      return res.redirect(`${FRONTEND_URL}/?googleAuthError=1`);
+      return res.redirect(`${frontendOrigin}/?googleAuthError=1`);
     }
 
     // Without this the callback is not tied to the browser that started the
@@ -311,11 +383,14 @@ export default class AuthCtrl {
       !statesMatch(state, expectedState)
     ) {
       console.warn("Google sign-in rejected: state mismatch");
-      return res.redirect(`${FRONTEND_URL}/?googleAuthError=1`);
+      return res.redirect(`${frontendOrigin}/?googleAuthError=1`);
     }
 
     try {
-      const result = await GoogleAuthSvc.handleCallback(code);
+      const result = await GoogleAuthSvc.handleCallback(
+        code,
+        resolveRedirectUri(req),
+      );
 
       // Only a reference travels in the URL. The tokens stay server-side until
       // the app collects them over POST and puts them straight into httpOnly
@@ -333,11 +408,11 @@ export default class AuthCtrl {
       });
 
       return res.redirect(
-        `${FRONTEND_URL}/auth/google/callback?xc=${exchangeCode}`,
+        `${frontendOrigin}/auth/google/callback?xc=${exchangeCode}`,
       );
     } catch (e: unknown) {
       console.error("Google sign-in error:", e);
-      return res.redirect(`${FRONTEND_URL}/?googleAuthError=1`);
+      return res.redirect(`${frontendOrigin}/?googleAuthError=1`);
     }
   }
 

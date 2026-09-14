@@ -172,6 +172,26 @@ const ENTITY_INCLUDE = {
       },
     },
   },
+  // Voter ids are included rather than gated behind a viewerId-conditional
+  // (unlike PostLike above) so this one const can be spread as-is into every
+  // existing query site — the frontend derives "did I vote" from the ids
+  // itself. A community feed's vote lists are small enough that this is a
+  // non-issue, unlike a public platform's polls.
+  poll: {
+    select: {
+      id: true,
+      options: {
+        orderBy: { position: "asc" as const },
+        select: {
+          id: true,
+          label: true,
+          position: true,
+          votesCount: true,
+          votes: { select: { userId: true } },
+        },
+      },
+    },
+  },
 } as const;
 
 export interface QueryFeedOptions {
@@ -283,7 +303,9 @@ export default class FeedRepo {
 
     if (isTopMode) {
       const now = Date.now();
-      formatted.forEach((p: any) => {
+      type ScoredPost = (typeof formatted)[number] & { _score?: number };
+      const scored = formatted as ScoredPost[];
+      scored.forEach((p) => {
         let score = 0;
 
         // Affinity
@@ -306,22 +328,24 @@ export default class FeedRepo {
       });
 
       // Sort by score
-      formatted.sort((a: any, b: any) => {
+      scored.sort((a, b) => {
         if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-        return b._score - a._score;
+        return (b._score ?? 0) - (a._score ?? 0);
       });
 
       // Paginate in-memory array
       const cursorIndex = cursor
-        ? formatted.findIndex((p) => p.id === cursor)
+        ? scored.findIndex((p) => p.id === cursor)
         : -1;
       const startIndex = cursorIndex !== -1 ? cursorIndex + 1 : 0;
 
-      const paged = formatted.slice(startIndex, startIndex + limit);
+      const paged = scored.slice(startIndex, startIndex + limit);
       nextCursor =
-        startIndex + limit < formatted.length
-          ? formatted[startIndex + limit - 1].id
+        startIndex + limit < scored.length
+          ? scored[startIndex + limit - 1].id
           : null;
+      // Clean up the temporary score property before it reaches the response.
+      paged.forEach((p) => delete p._score);
       formatted = paged;
     } else {
       const hasNextPage = posts.length > limit;
@@ -329,9 +353,6 @@ export default class FeedRepo {
       nextCursor = hasNextPage ? items[items.length - 1].id : null;
       formatted = items;
     }
-
-    // Clean up temporary score property
-    formatted.forEach((p: any) => delete p._score);
 
     return {
       posts: formatted,
@@ -429,6 +450,7 @@ export default class FeedRepo {
     stampId?: string | null;
     originalPostId?: string | null;
     mediaTags?: { mediaUrl: string; userId: string; x: number; y: number }[];
+    pollOptions?: string[];
   }) {
     return prisma.$transaction(async (tx) => {
       const post = await tx.post.create({
@@ -461,6 +483,20 @@ export default class FeedRepo {
         });
       }
 
+      if (data.pollOptions && data.pollOptions.length > 0) {
+        await tx.poll.create({
+          data: {
+            postId: post.id,
+            options: {
+              create: data.pollOptions.map((label, position) => ({
+                label,
+                position,
+              })),
+            },
+          },
+        });
+      }
+
       return tx.post.findUniqueOrThrow({
         where: { id: post.id },
         include: {
@@ -470,6 +506,75 @@ export default class FeedRepo {
           mediaTags: MEDIA_TAG_INCLUDE,
         },
       });
+    });
+  }
+
+  // Single-choice: casting a new vote first removes whichever option (if
+  // any) this user had already voted for on the same poll, so a user is
+  // never counted against two options at once.
+  static async voteOnPoll(pollId: string, optionId: string, userId: string) {
+    return prisma.$transaction(async (tx) => {
+      const previous = await tx.pollVote.findFirst({
+        where: { userId, option: { pollId } },
+        select: { pollOptionId: true },
+      });
+
+      if (previous?.pollOptionId === optionId) {
+        // Voting for the option you already picked is a toggle-off.
+        await tx.pollVote.delete({
+          where: {
+            pollOptionId_userId: { pollOptionId: optionId, userId },
+          },
+        });
+        await tx.pollOption.update({
+          where: { id: optionId },
+          data: { votesCount: { decrement: 1 } },
+        });
+      } else {
+        if (previous) {
+          await tx.pollVote.delete({
+            where: {
+              pollOptionId_userId: {
+                pollOptionId: previous.pollOptionId,
+                userId,
+              },
+            },
+          });
+          await tx.pollOption.update({
+            where: { id: previous.pollOptionId },
+            data: { votesCount: { decrement: 1 } },
+          });
+        }
+        await tx.pollVote.create({ data: { pollOptionId: optionId, userId } });
+        await tx.pollOption.update({
+          where: { id: optionId },
+          data: { votesCount: { increment: 1 } },
+        });
+      }
+
+      return tx.poll.findUniqueOrThrow({
+        where: { id: pollId },
+        select: {
+          id: true,
+          options: {
+            orderBy: { position: "asc" },
+            select: {
+              id: true,
+              label: true,
+              position: true,
+              votesCount: true,
+              votes: { select: { userId: true } },
+            },
+          },
+        },
+      });
+    });
+  }
+
+  static async findPollOption(optionId: string) {
+    return prisma.pollOption.findUnique({
+      where: { id: optionId },
+      include: { poll: true },
     });
   }
 
@@ -602,7 +707,7 @@ export default class FeedRepo {
   static async findSavedPosts(userId: string, limit = 20, cursor?: string) {
     const saved = await prisma.savedPost.findMany({
       where: { userId },
-      take: limit,
+      take: limit + 1,
       skip: cursor ? 1 : 0,
       cursor: cursor
         ? { postId_userId: { postId: cursor, userId } }
@@ -618,7 +723,10 @@ export default class FeedRepo {
         },
       },
     });
-    return saved.map((s) => s.post);
+    const hasNextPage = saved.length > limit;
+    const items = hasNextPage ? saved.slice(0, limit) : saved;
+    const nextCursor = hasNextPage ? items[items.length - 1].postId : null;
+    return { posts: items.map((s) => s.post), nextCursor };
   }
 
   static async hidePost(postId: string, userId: string) {
@@ -665,13 +773,13 @@ export default class FeedRepo {
       },
     });
 
-    const withLikeFlag = (c: any) => {
+    function withLikeFlag<T extends { likes?: unknown[] | null }>(c: T) {
       const isLikedByMe = viewerId ? (c.likes?.length ?? 0) > 0 : false;
       const { likes: _likes, ...rest } = c;
       return { ...rest, isLikedByMe };
-    };
+    }
 
-    return comments.map((c: any) => ({
+    return comments.map((c) => ({
       ...withLikeFlag(c),
       replies: c.replies.map(withLikeFlag),
     }));
@@ -701,6 +809,14 @@ export default class FeedRepo {
   static async findCommentById(id: string) {
     return prisma.postComment.findUnique({
       where: { id },
+    });
+  }
+
+  static async updateComment(id: string, content: string) {
+    return prisma.postComment.update({
+      where: { id },
+      data: { content },
+      include: { author: COMMENT_AUTHOR_SELECT },
     });
   }
 
