@@ -99,9 +99,15 @@ describe("googleRedirect", () => {
 
     expect(recorded.cookies).toHaveLength(1);
     const cookie = recorded.cookies[0];
-    expect(cookie.value).toBe("state-from-service");
-    expect(svc.getAuthUrl).toHaveBeenCalledWith("state-from-service");
-    expect(recorded.redirect).toContain("state=state-from-service");
+    // The frontend origin rides along inside `state`, base64url-encoded
+    // after a `|`, so it survives the round trip to Google and back — see
+    // `originFromState`.
+    expect(cookie.value).toMatch(/^state-from-service\|/);
+    expect(svc.getAuthUrl).toHaveBeenCalledWith(
+      cookie.value,
+      "https://api.example.com/api/v1/auth/google/callback",
+    );
+    expect(recorded.redirect).toContain(`state=${cookie.value}`);
   });
 
   it("stores the state in a cookie the page's JavaScript cannot read", () => {
