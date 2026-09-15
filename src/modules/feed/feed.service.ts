@@ -154,6 +154,10 @@ export default class FeedService {
       pollOptions,
     } = input;
 
+    if (!content.trim() && mediaUrls.length === 0) {
+      throw new Error("Post must include text or media");
+    }
+
     if (mediaTags && mediaTags.length > 0) {
       await validateMediaTags(mediaTags, mediaUrls);
     }

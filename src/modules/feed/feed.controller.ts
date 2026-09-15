@@ -66,7 +66,7 @@ export default class FeedController {
       type: Joi.string()
         .valid(...Object.values(PostType))
         .required(),
-      content: Joi.string().trim().min(1).max(5000).required(),
+      content: Joi.string().trim().allow("").max(5000).required(),
       mediaUrls: Joi.array().items(Joi.string().uri()).max(10).optional(),
       visibility: Joi.string()
         .valid(...Object.values(PostVisibility))
