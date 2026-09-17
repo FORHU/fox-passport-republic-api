@@ -200,16 +200,32 @@ export default class RoleRequestController {
           .status(401)
           .json({ success: false, message: "Unauthorized" });
       const { id } = req.params;
-      const { status, rejectionReason } = req.body;
+      const { status, rejectionReason, flaggedDocuments, revisionNote } =
+        req.body;
 
       if (!id)
         return res
           .status(400)
           .json({ success: false, message: "Request ID required" });
-      if (![RequestStatus.approved, RequestStatus.rejected].includes(status)) {
+      if (
+        ![
+          RequestStatus.approved,
+          RequestStatus.rejected,
+          RequestStatus.revision_requested,
+        ].includes(status)
+      ) {
         return res
           .status(400)
           .json({ success: false, message: "Invalid status" });
+      }
+      if (
+        status === RequestStatus.revision_requested &&
+        (!Array.isArray(flaggedDocuments) || flaggedDocuments.length === 0)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Flag at least one document to request revision",
+        });
       }
 
       const updatedRequest = await RoleRequestService.reviewApplication(
@@ -217,6 +233,8 @@ export default class RoleRequestController {
         adminId,
         status,
         rejectionReason,
+        flaggedDocuments,
+        revisionNote,
       );
 
       announceAdminQueueChanged();
@@ -229,6 +247,54 @@ export default class RoleRequestController {
     } catch (e: unknown) {
       const error = e as Error;
       console.error("Review error:", error);
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  /**
+   * Applicant: resubmit just the documents flagged on their own
+   * revision_requested application. Files are already-uploaded fileIds
+   * (same direct-to-S3 flow the initial apply form uses), keyed by the same
+   * field names admins flag (validId1, nbiFile, tinIdFile, birPermitFile,
+   * selfieFile, portfolioFile).
+   */
+  static async resubmitDocuments(req: Request, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
+      const { id } = req.params;
+      const { documents } = req.body;
+
+      if (!id)
+        return res
+          .status(400)
+          .json({ success: false, message: "Request ID required" });
+      if (!documents || typeof documents !== "object") {
+        return res
+          .status(400)
+          .json({ success: false, message: "Documents are required" });
+      }
+
+      const { updated, reopened } = await RoleRequestService.resubmitDocuments(
+        id,
+        userId,
+        documents,
+      );
+
+      if (reopened) announceAdminQueueChanged();
+      return res.status(200).json({
+        success: true,
+        message: reopened
+          ? "Documents resubmitted — your application is back in the review queue"
+          : "Documents resubmitted",
+        data: updated,
+      });
+    } catch (e: unknown) {
+      const error = e as Error;
+      console.error("Resubmit error:", error);
       return res.status(400).json({ success: false, message: error.message });
     }
   }

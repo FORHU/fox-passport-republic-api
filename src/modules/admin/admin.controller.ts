@@ -323,6 +323,39 @@ export default class AdminCtrl {
     }
   }
 
+  // Itemized refund for a single asset/service transaction — distinct from
+  // the whole-booking `manualRefund` above. Requires an Idempotency-Key so
+  // a double-click can't submit two refunds for the same item.
+  static async itemizedRefund(req: Request, res: Response) {
+    try {
+      const idempotencyKey = req.header("Idempotency-Key");
+      if (!idempotencyKey) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Idempotency-Key header is required" });
+      }
+
+      const schema = Joi.object({
+        kind: Joi.string().valid("asset", "service").required(),
+        amount: Joi.number().greater(0).required(),
+        reason: Joi.string().required(),
+      });
+      const { error, value } = schema.validate(req.body);
+      if (error) return res.status(400).json({ message: error.message });
+
+      const refund = await AdminSvc.createItemizedRefund({
+        transactionId: req.params.id,
+        adminId: req.user!.userId,
+        idempotencyKey,
+        ...value,
+      });
+      return res.status(201).json({ success: true, data: refund });
+    } catch (e: unknown) {
+      const error = e as Error;
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
   // STATS
   static async getStats(req: Request, res: Response) {
     try {

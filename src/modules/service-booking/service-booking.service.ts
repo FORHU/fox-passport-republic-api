@@ -10,6 +10,7 @@ import PricingSvc from "../pricing/pricing.service";
 import PromotionSvc from "../promotion/promotion.service";
 import RefundSvc from "../refund/refund.service";
 import { isPerformerServiceCategory } from "../../types/permissions";
+import AvailabilitySvc from "../availability/availability.service";
 import {
   announceToAdmins,
   announceToUser,
@@ -169,18 +170,31 @@ export default class ServiceBookingSvc {
       data.voucherCode,
     );
 
-    const booking = await ServiceBookingRepo.create({
-      serviceId: data.serviceId,
-      userId: data.userId,
-      scheduledDate,
-      endDate: data.endDate ? endDate : undefined,
-      guestCount: data.guestCount,
-      location: data.location,
-      notes: data.notes,
-      totalAmount: pricing.totalAmount,
-      platformFeeAmount: pricing.platformFeeAmount,
-      discountAmount: pricing.discountAmount,
-      voucherId: pricing.voucherId,
+    const booking = await prisma.$transaction(async (tx) => {
+      await AvailabilitySvc.reserve(tx, [
+        {
+          kind: "service",
+          itemId: data.serviceId,
+          dateRange: { start: scheduledDate, end: endDate },
+        },
+      ]);
+
+      return ServiceBookingRepo.create(
+        {
+          serviceId: data.serviceId,
+          userId: data.userId,
+          scheduledDate,
+          endDate: data.endDate ? endDate : undefined,
+          guestCount: data.guestCount,
+          location: data.location,
+          notes: data.notes,
+          totalAmount: pricing.totalAmount,
+          platformFeeAmount: pricing.platformFeeAmount,
+          discountAmount: pricing.discountAmount,
+          voucherId: pricing.voucherId,
+        },
+        tx,
+      );
     });
 
     announceBookingChanged(data.userId, service.ownerId);

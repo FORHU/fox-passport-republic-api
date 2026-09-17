@@ -1,5 +1,5 @@
 import { MatchConstraint, InvoiceSourceType } from "@prisma/client";
-import { eventTemplateCache } from "../../utils/cache-namespaces";
+import { eventTemplateCache, bookingCache } from "../../utils/cache-namespaces";
 import EventTransactionSvc from "../event-transaction/event-transaction.service";
 import EventRequestSvc from "../event-request/event-request.service";
 import EventTemplateRepo from "../event-template/event-template.repository";
@@ -21,48 +21,60 @@ export default class MatchSvc {
     totalAmount: number;
     venueId?: string;
   }) {
-    let templateId: string | null = null;
+    // Read-only lookups that decide WHICH template to use — safe to do ahead
+    // of the transaction below, since nothing else concurrently modifies
+    // these specific rows within this flow.
+    let venue: Awaited<ReturnType<typeof prisma.venue.findUnique>> = null;
+    let existingTemplateId: string | null = null;
 
     if (data.venueId) {
-      const venue = await prisma.venue.findUnique({
-        where: { id: data.venueId },
-      });
+      venue = await prisma.venue.findUnique({ where: { id: data.venueId } });
       if (!venue) throw new Error("Venue not found");
-
-      const newTemplate = await prisma.eventTemplate.create({
-        data: {
-          ownerId: data.foxerId,
-          name: "Venue Match",
-          description: `Venue-only match request for ${venue.name}`,
-          category: "other",
-          isPublic: false,
-          targetCity: venue.city,
-          targetState: venue.state ?? undefined,
-          targetCountry: venue.country,
-        },
-      });
-      await eventTemplateCache.invalidateAll();
-
-      templateId = newTemplate.id;
-
-      await EventTemplateRepo.attachVenue(
-        templateId,
-        data.venueId,
-        { matched: true, matchConstraint: MatchConstraint.SAME_STATE },
-        `Matched venue ${venue.name} for request`,
-        new Date(),
-        venue.price.toNumber(),
-        false,
-      );
     } else {
       const { templates: foxerTemplates } =
-        await EventTemplateRepo.findAllTemplates({
-          ownerId: data.foxerId,
-        });
-      templateId = foxerTemplates.length > 0 ? foxerTemplates[0].id : null;
+        await EventTemplateRepo.findAllTemplates({ ownerId: data.foxerId });
+      existingTemplateId =
+        foxerTemplates.length > 0 ? foxerTemplates[0].id : null;
+    }
 
-      if (!templateId) {
-        const newTemplate = await prisma.eventTemplate.create({
+    // Template creation/venue-attach, event-request creation, booking
+    // creation, and supplier-transaction creation are now one atomic unit —
+    // previously these were four separate top-level operations, so a
+    // failure partway (e.g. an availability conflict on step 4) could leave
+    // a real Booking row with no transactions behind it. `tx` is threaded
+    // through every write below; each repo/service accepts it as an
+    // optional parameter and uses the bare `prisma` client when called from
+    // elsewhere that doesn't need this atomicity.
+    const { eventRequest, booking } = await prisma.$transaction(async (tx) => {
+      let templateId = existingTemplateId;
+
+      if (data.venueId && venue) {
+        const newTemplate = await tx.eventTemplate.create({
+          data: {
+            ownerId: data.foxerId,
+            name: "Venue Match",
+            description: `Venue-only match request for ${venue.name}`,
+            category: "other",
+            isPublic: false,
+            targetCity: venue.city,
+            targetState: venue.state ?? undefined,
+            targetCountry: venue.country,
+          },
+        });
+        templateId = newTemplate.id;
+
+        await EventTemplateRepo.attachVenue(
+          templateId,
+          data.venueId,
+          { matched: true, matchConstraint: MatchConstraint.SAME_STATE },
+          `Matched venue ${venue.name} for request`,
+          new Date(),
+          venue.price.toNumber(),
+          false,
+          tx,
+        );
+      } else if (!templateId) {
+        const newTemplate = await tx.eventTemplate.create({
           data: {
             ownerId: data.foxerId,
             name: "Custom Vibe Match",
@@ -71,43 +83,64 @@ export default class MatchSvc {
             isPublic: false,
           },
         });
-        await eventTemplateCache.invalidateAll();
         templateId = newTemplate.id;
       }
-    }
 
-    // 2. Create the Event request from the template.
-    const eventRequest = await EventRequestSvc.spawnRequestFromTemplate({
-      clientId: data.clientId,
-      templateId,
-      name: `Match with ${data.style}`,
-      description: data.requestContent || `Custom match for ${data.style}`,
-      startAt: data.date,
-      endAt: data.endDate ?? new Date(data.date.getTime() + 4 * 60 * 60 * 1000),
-      guestCount: data.guestCount,
-      totalAmount: data.totalAmount,
+      // 2. Create the Event request from the template.
+      const eventRequest = await EventRequestSvc.spawnRequestFromTemplate(
+        {
+          clientId: data.clientId,
+          templateId,
+          name: `Match with ${data.style}`,
+          description: data.requestContent || `Custom match for ${data.style}`,
+          startAt: data.date,
+          endAt:
+            data.endDate ?? new Date(data.date.getTime() + 4 * 60 * 60 * 1000),
+          guestCount: data.guestCount,
+          totalAmount: data.totalAmount,
+        },
+        tx,
+      );
+
+      // 3. Create a Booking in 'pending' status using server-computed event totals.
+      const booking = await BookingRepo.createWithIds(
+        {
+          eventId: eventRequest.id,
+          userId: data.clientId,
+          guestCount: data.guestCount,
+          totalAmount: eventRequest.totalAmount,
+          hostMarkup: eventRequest.hostMarkupAmount,
+          platformFee: eventRequest.platformFeeAmount,
+          status: "pending",
+          startAt: eventRequest.startAt,
+          endAt: eventRequest.endAt,
+        },
+        tx,
+      );
+
+      // 4. Build event-level supplier transactions from any matched template
+      // items — now availability-checked (AvailabilitySvc.reserve) inside
+      // this same transaction, so an availability conflict here rolls back
+      // the template/event/booking rows created above too, instead of
+      // leaving an orphaned booking with no transactions.
+      await EventTransactionSvc.createTransactionsFromTemplate(
+        eventRequest.id,
+        booking.id,
+        tx,
+      );
+
+      return { eventRequest, booking };
     });
 
-    // 3. Create a Booking in 'pending' status using server-computed event totals.
-    const booking = await BookingRepo.createWithIds({
-      eventId: eventRequest.id,
-      userId: data.clientId,
-      guestCount: data.guestCount,
-      totalAmount: eventRequest.totalAmount,
-      hostMarkup: eventRequest.hostMarkupAmount,
-      platformFee: eventRequest.platformFeeAmount,
-      status: "pending",
-      startAt: eventRequest.startAt,
-      endAt: eventRequest.endAt,
-    });
+    // Cache invalidation only after commit — acting on state that might
+    // still roll back would be wrong, same principle as the Stripe call in
+    // the Phase B checkout design being placed after commit, not inside.
+    await eventTemplateCache.invalidateAll();
+    await bookingCache.invalidateAll();
 
-    // 4. Build event-level supplier transactions from any matched template items.
-    await EventTransactionSvc.createTransactionsFromTemplate(
-      eventRequest.id,
-      booking.id,
-    );
-
-    // 5. Let the foxer know a client is waiting on their match request.
+    // 5. Let the foxer know a client is waiting on their match request —
+    // also after commit; an external notification for a booking that didn't
+    // actually get created would be worse than a slightly-delayed one.
     const client = await prisma.user.findUnique({
       where: { id: data.clientId },
       select: { name: true },

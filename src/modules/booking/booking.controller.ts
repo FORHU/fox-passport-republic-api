@@ -44,6 +44,45 @@ export default class BookingCtrl {
     }
   }
 
+  // ADD AD-HOC MARKETPLACE ITEM — pre-payment, requires provider confirmation
+  static async addAdHocItem(req: Request, res: Response) {
+    try {
+      const idempotencyKey = req.header("Idempotency-Key");
+      if (!idempotencyKey) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Idempotency-Key header is required" });
+      }
+
+      const schema = Joi.object({
+        kind: Joi.string().valid("asset", "service").required(),
+        itemId: Joi.string().required(),
+        quantity: Joi.number().integer().min(1).optional(),
+      });
+      const { error, value } = schema.validate(req.body);
+      if (error) return res.status(400).json({ message: error.message });
+
+      const result = await BookingSvc.addAdHocItem({
+        bookingId: req.params.id,
+        userId: req.user!.userId,
+        idempotencyKey,
+        ...value,
+      });
+
+      return res.status(201).json({ success: true, data: result });
+    } catch (e: unknown) {
+      if (e instanceof BookingError) {
+        return res.status(e.status).json({
+          success: false,
+          message: e.message,
+          ...(e.code ? { code: e.code } : {}),
+        });
+      }
+      const error = e as Error;
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
   // CREATE BOOKING
   static async createBooking(req: Request, res: Response) {
     try {

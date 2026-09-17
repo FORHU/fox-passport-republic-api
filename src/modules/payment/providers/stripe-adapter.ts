@@ -18,27 +18,31 @@ export class StripeAdapter implements PaymentProvider {
     currency: string,
     successUrl: string,
     cancelUrl: string,
+    idempotencyKey?: string,
   ): Promise<CheckoutSessionData> {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price_data: {
-            currency: currency.toLowerCase(),
-            product_data: {
-              name: `Invoice ${invoiceId}`,
+    const session = await stripe.checkout.sessions.create(
+      {
+        payment_method_types: ["card"],
+        line_items: [
+          {
+            price_data: {
+              currency: currency.toLowerCase(),
+              product_data: {
+                name: `Invoice ${invoiceId}`,
+              },
+              // Stripe expects amount in smallest currency unit (e.g., cents for PHP/USD)
+              unit_amount: Math.round(amount * 100),
             },
-            // Stripe expects amount in smallest currency unit (e.g., cents for PHP/USD)
-            unit_amount: Math.round(amount * 100),
+            quantity: 1,
           },
-          quantity: 1,
-        },
-      ],
-      mode: "payment",
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      client_reference_id: invoiceId,
-    });
+        ],
+        mode: "payment",
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        client_reference_id: invoiceId,
+      },
+      idempotencyKey ? { idempotencyKey } : undefined,
+    );
 
     if (!session.url) {
       throw new Error("Failed to create Stripe checkout session URL");

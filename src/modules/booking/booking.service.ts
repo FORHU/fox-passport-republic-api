@@ -17,6 +17,9 @@ import { toStripeCents, formatCurrency } from "../../utils/pricing";
 import { sendBookingCancelledEmail } from "../../utils/emails/cancellation";
 import { sendBookingConfirmationEmail } from "../../utils/emails/confirmation";
 import { prisma } from "../../utils/prisma";
+import AvailabilitySvc from "../availability/availability.service";
+import { AvailabilityConflictError } from "../availability/availability.types";
+import IdempotencySvc from "../idempotency/idempotency.service";
 import crypto from "crypto";
 import {
   BookingStatus,
@@ -1016,6 +1019,7 @@ export default class BookingSvc {
           included: !excludedVenueIds.includes(tv.id),
           status: tv.matched ? "approved" : "pending",
         })),
+      dateRange: { start: input.startAt, end: input.endAt },
     });
 
     // The one bump left in this service. `BookingRepo` retired the cache when
@@ -1025,6 +1029,163 @@ export default class BookingSvc {
     announceToUser(input.userId, "bookings");
 
     return { booking, eventId: event.id };
+  }
+
+  // Ad-hoc marketplace items always require provider confirmation (Design
+  // A — pre-attached items never do). 24 hours is a starting default, not
+  // tuned against real provider response-time data yet.
+  static readonly CONFIRMATION_DEADLINE_HOURS = 24;
+
+  /**
+   * Adds a marketplace-browsed asset or service to an existing, still-
+   * `pending` booking, ahead of payment. Requires an Idempotency-Key
+   * (double-click/retry protection — a different concern from
+   * AvailabilitySvc's partial-unique-index business rule) and goes through
+   * AvailabilitySvc.reserve inside the same transaction as the insert, same
+   * as every other creation path. The resulting row starts at
+   * `pending_provider_confirmation`, never `pending` — only
+   * TransactionStatusSvc can move it from there (see that module for the
+   * full transition table).
+   */
+  static async addAdHocItem(input: {
+    bookingId: string;
+    userId: string;
+    kind: "asset" | "service";
+    itemId: string;
+    quantity?: number;
+    idempotencyKey: string;
+  }) {
+    const claim = await IdempotencySvc.claim({
+      endpoint: "POST /bookings/:id/items",
+      idempotencyKey: input.idempotencyKey,
+      requesterId: input.userId,
+      bookingId: input.bookingId,
+      requestPayload: {
+        bookingId: input.bookingId,
+        kind: input.kind,
+        itemId: input.itemId,
+        quantity: input.quantity ?? null,
+      },
+    });
+    if (claim.status === "cached") return claim.responseBody;
+    if (claim.status === "in_progress") {
+      throw new BookingError(
+        "A request with this idempotency key is already in progress",
+        409,
+      );
+    }
+
+    try {
+      const result = await this.executeAddAdHocItem(input);
+      await IdempotencySvc.complete({
+        endpoint: "POST /bookings/:id/items",
+        idempotencyKey: input.idempotencyKey,
+        executionToken: claim.executionToken,
+        status: "succeeded",
+        responseBody: result,
+      });
+      return result;
+    } catch (err) {
+      await IdempotencySvc.complete({
+        endpoint: "POST /bookings/:id/items",
+        idempotencyKey: input.idempotencyKey,
+        executionToken: claim.executionToken,
+        status: "failed",
+      });
+      throw err;
+    }
+  }
+
+  private static async executeAddAdHocItem(input: {
+    bookingId: string;
+    userId: string;
+    kind: "asset" | "service";
+    itemId: string;
+    quantity?: number;
+  }) {
+    const booking = await prisma.booking.findUnique({
+      where: { id: input.bookingId },
+      include: { event: true },
+    });
+    if (!booking) throw new BookingError("Booking not found", 404);
+    if (booking.userId !== input.userId) {
+      throw new BookingError(
+        "Unauthorized: only the booking owner can add items to it",
+        403,
+      );
+    }
+    if (booking.status !== BookingStatus.pending) {
+      throw new BookingError(
+        "Items can only be added while the booking is still pending payment",
+        400,
+      );
+    }
+    if (booking.expiresAt && booking.expiresAt < new Date()) {
+      throw new BookingError("This booking has expired", 400);
+    }
+
+    const dateRange = { start: booking.event.startAt, end: booking.event.endAt };
+    const confirmationDeadline = new Date(
+      Date.now() + this.CONFIRMATION_DEADLINE_HOURS * 60 * 60 * 1000,
+    );
+
+    try {
+      return await prisma.$transaction(async (tx) => {
+        await AvailabilitySvc.reserve(tx, [
+          {
+            kind: input.kind,
+            itemId: input.itemId,
+            dateRange,
+            quantity: input.kind === "asset" ? (input.quantity ?? 1) : undefined,
+          },
+        ]);
+
+        if (input.kind === "asset") {
+          const asset = await tx.asset.findUnique({ where: { id: input.itemId } });
+          if (!asset || asset.deletedAt) {
+            throw new BookingError("Asset not found or unavailable", 404);
+          }
+          const quantity = input.quantity ?? 1;
+          return tx.eventAssetTransaction.create({
+            data: {
+              eventId: booking.eventId,
+              bookingId: booking.id,
+              assetId: asset.id,
+              providerId: asset.ownerId,
+              quantity,
+              agreedPrice: asset.price.toNumber() * quantity,
+              currency: asset.currency,
+              status: "pending_provider_confirmation",
+              confirmationDeadline,
+              included: true,
+            },
+          });
+        }
+
+        const service = await tx.service.findUnique({ where: { id: input.itemId } });
+        if (!service || service.deletedAt) {
+          throw new BookingError("Service not found or unavailable", 404);
+        }
+        return tx.eventServiceTransaction.create({
+          data: {
+            eventId: booking.eventId,
+            bookingId: booking.id,
+            serviceId: service.id,
+            providerId: service.ownerId,
+            agreedPrice: service.price,
+            currency: service.currency,
+            status: "pending_provider_confirmation",
+            confirmationDeadline,
+            included: true,
+          },
+        });
+      });
+    } catch (err) {
+      if (err instanceof AvailabilityConflictError) {
+        throw new BookingError(err.message, 409, "AVAILABILITY_CONFLICT");
+      }
+      throw err;
+    }
   }
 
   /**

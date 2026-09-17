@@ -41,6 +41,11 @@ describe("Central Payment checkout — HTTP layer", () => {
   let adminToken: string;
 
   const runId = Math.random().toString(36).substring(7);
+  // Bookings have a non-cascading FK to Event — leaving one behind blocks
+  // any later unscoped `event.deleteMany()` elsewhere in the suite (this
+  // was caught for real: partnership.integration.test.ts failed on exactly
+  // this FK after a different file's leftover Booking).
+  const createdEventIds: string[] = [];
 
   beforeAll(async () => {
     client = await prisma.user.create({
@@ -103,6 +108,9 @@ describe("Central Payment checkout — HTTP layer", () => {
   });
 
   afterAll(async () => {
+    await prisma.booking.deleteMany({ where: { eventId: { in: createdEventIds } } });
+    await prisma.eventVenueTransaction.deleteMany({ where: { eventId: { in: createdEventIds } } });
+    await prisma.event.deleteMany({ where: { id: { in: createdEventIds } } });
     await prisma.checkout.deleteMany({});
     await prisma.payment.deleteMany({});
     await prisma.invoiceItem.deleteMany({});
@@ -147,6 +155,21 @@ describe("Central Payment checkout — HTTP layer", () => {
         agreedPrice,
       },
     });
+    // Checkout now locks and revalidates the event's booking as part of its
+    // atomic transaction (Phase B) — a real event created via the actual
+    // booking flow always has exactly one, so this fixture needs one too.
+    await prisma.booking.create({
+      data: {
+        eventId: event.id,
+        userId: client.id,
+        guestCount: 10,
+        totalAmount: agreedPrice,
+        status: "pending",
+        startAt: event.startAt,
+        endAt: event.endAt,
+      },
+    });
+    createdEventIds.push(event.id);
     return event;
   }
 
@@ -309,6 +332,42 @@ describe("Central Payment checkout — HTTP layer", () => {
         .set("Authorization", `Bearer ${clientToken}`)
         .send({});
       expect(second.status).toBe(409);
+    });
+
+    it("409s with structured blockingItemIds when an ad-hoc item is still awaiting provider confirmation", async () => {
+      const event = await makeEventWithVenueTx(1000);
+      const asset = await prisma.asset.create({
+        data: {
+          ownerId: provider.id,
+          category: "equipment",
+          name: "HTTP blocking-item test asset",
+          description: "desc",
+          quantity: 5,
+          price: 200,
+          billingRate: "daily",
+          status: "available",
+        },
+      });
+      const blockingTx = await prisma.eventAssetTransaction.create({
+        data: {
+          eventId: event.id,
+          assetId: asset.id,
+          providerId: provider.id,
+          quantity: 1,
+          agreedPrice: 200,
+          status: "pending_provider_confirmation",
+          confirmationDeadline: new Date(Date.now() + 60 * 60 * 1000),
+        },
+      });
+
+      const res = await request(app)
+        .post(`/api/v1/events/${event.id}/checkout`)
+        .set("Authorization", `Bearer ${clientToken}`)
+        .send({});
+
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe("ITEMS_AWAITING_CONFIRMATION");
+      expect(res.body.blockingItemIds).toEqual([blockingTx.id]);
     });
   });
 

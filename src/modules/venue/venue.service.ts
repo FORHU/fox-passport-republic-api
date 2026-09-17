@@ -260,6 +260,13 @@ export default class VenueSvc {
     if (!venue) throw new Error("Venue not found");
     if (venue.status === VenueStatus.archived)
       throw new Error("Venue has been removed");
+    // This is the public, unauthenticated single-venue read (search already
+    // filters to `available` in VenueRepo.findAllVenues) — without this, a
+    // venue's direct URL made it fully viewable/bookable while still
+    // `pending` review, `draft`, or `rejected`, to anyone who had the link.
+    // The owner previewing their own unpublished venue is the one exception.
+    if (venue.status !== VenueStatus.available && venue.mayorId !== requesterId)
+      throw new Error("Venue not found");
 
     const { default: PassportSvc } =
       await import("../passport/passport.service");
@@ -517,6 +524,61 @@ export default class VenueSvc {
         },
       }),
     });
+  }
+
+  /**
+   * Either the venue's mayor, or an Event Foxer with an approved
+   * `VenueEventFoxerAffiliation` granting `calendar:block`, may add/remove a
+   * blocked date. Deliberately not a full `updateVenue` — this is the one
+   * slice of the venue an affiliate may touch; everything else (listing,
+   * pricing, packages) stays mayor-only.
+   */
+  private static async assertCanBlockCalendar(
+    venueId: string,
+    requesterId: string,
+  ) {
+    const venue = await VenueRepo.findVenueById(venueId);
+    if (!venue) throw new Error("Venue not found");
+    if (venue.mayorId === requesterId) return;
+
+    const { default: VenueAffiliationSvc } = await import(
+      "../venue-affiliation/venue-affiliation.service"
+    );
+    const affiliation =
+      await VenueAffiliationSvc.getApprovedAffiliationWithPermission(
+        venueId,
+        requesterId,
+        "calendar:block",
+      );
+    if (!affiliation) {
+      throw new Error(
+        "Unauthorized: you do not have calendar access to this venue",
+      );
+    }
+  }
+
+  static async addBlockedDate(params: {
+    venueId: string;
+    requesterId: string;
+    date: Date;
+  }) {
+    const { venueId, requesterId, date } = params;
+    await this.assertCanBlockCalendar(venueId, requesterId);
+    const venue = await VenueRepo.addBlockedDate(venueId, date);
+    if (!venue) throw new Error("Venue not found");
+    return venue;
+  }
+
+  static async removeBlockedDate(params: {
+    venueId: string;
+    requesterId: string;
+    date: Date;
+  }) {
+    const { venueId, requesterId, date } = params;
+    await this.assertCanBlockCalendar(venueId, requesterId);
+    const venue = await VenueRepo.removeBlockedDate(venueId, date);
+    if (!venue) throw new Error("Venue not found");
+    return venue;
   }
 
   static async deleteVenue(params: {

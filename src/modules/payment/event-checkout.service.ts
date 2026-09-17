@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { prisma } from "../../utils/prisma";
+import { prisma, AppTransactionClient } from "../../utils/prisma";
 import InvoiceSvc from "./invoice.service";
 import CheckoutSvc from "./checkout.service";
 import PricingSvc from "../pricing/pricing.service";
@@ -7,6 +7,7 @@ import RefundSvc from "../refund/refund.service";
 import PromotionSvc from "../promotion/promotion.service";
 import PayoutSvc from "../payout/payout.service";
 import NotificationService from "../notifications/user-notification.service";
+import AvailabilitySvc from "../availability/availability.service";
 import { STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents, formatCurrency } from "../../utils/pricing";
 import {
@@ -17,6 +18,22 @@ import {
 } from "@prisma/client";
 
 const REUSABLE_STATUSES = ["pending", "processing"] as const;
+// Both are payable: `pending` is a pre-attached item, which never required
+// confirmation (Design A); `approved` is an ad-hoc marketplace item the
+// provider has confirmed. `pending_provider_confirmation` blocks checkout
+// entirely (see BlockingItemsError below) rather than being silently
+// excluded — a citizen who selected an item should see why it isn't being
+// charged, not have it quietly vanish from the invoice.
+const PAYABLE_STATUSES = ["pending", "approved"] as const;
+
+export class BlockingItemsError extends Error {
+  constructor(public readonly blockingItemIds: string[]) {
+    super(
+      `Checkout is blocked: ${blockingItemIds.length} item(s) are still awaiting provider confirmation`,
+    );
+    this.name = "BlockingItemsError";
+  }
+}
 
 const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-08-27.basil",
@@ -28,27 +45,34 @@ export default class EventCheckoutSvc {
    * `createEventCheckout` and `getPaymentSummary` so "what counts as
    * payable" exists in exactly one place rather than drifting between the
    * endpoint that charges and the one that only previews the charge.
+   *
+   * `tx`: optional, so `createEventCheckout` can read this under its own
+   * transaction/lock rather than a separate, potentially stale read.
    */
-  private static async getPayableItems(eventId: string) {
-    const event = await prisma.event.findUnique({
+  private static async getPayableItems(
+    eventId: string,
+    tx: AppTransactionClient = prisma,
+  ) {
+    const event = await tx.event.findUnique({
       where: { id: eventId },
       include: {
+        bookings: { select: { id: true }, take: 1 },
         venueTransactions: {
-          where: { status: "pending" }, // Assuming 'pending' means accepted by provider but pending payment
+          where: { status: "pending" },
           include: {
             venue: { select: { name: true, category: true } },
             provider: { select: { name: true } },
           },
         },
         assetTransactions: {
-          where: { status: "pending" },
+          where: { status: { in: [...PAYABLE_STATUSES] } },
           include: {
             asset: { select: { name: true, category: true } },
             provider: { select: { name: true } },
           },
         },
         serviceTransactions: {
-          where: { status: "pending" },
+          where: { status: { in: [...PAYABLE_STATUSES] } },
           include: {
             service: { select: { name: true, category: true } },
             provider: { select: { name: true } },
@@ -58,6 +82,28 @@ export default class EventCheckoutSvc {
     });
 
     if (!event) throw new Error("Event not found");
+
+    // Anything still awaiting provider confirmation blocks checkout
+    // entirely, cleanly, rather than being silently dropped from the
+    // invoice — a citizen who picked an item should see why it isn't
+    // charged, not have it quietly disappear.
+    const [blockingAssets, blockingServices] = await Promise.all([
+      tx.eventAssetTransaction.findMany({
+        where: { eventId, status: "pending_provider_confirmation" },
+        select: { id: true },
+      }),
+      tx.eventServiceTransaction.findMany({
+        where: { eventId, status: "pending_provider_confirmation" },
+        select: { id: true },
+      }),
+    ]);
+    const blockingIds = [
+      ...blockingAssets.map((a) => a.id),
+      ...blockingServices.map((s) => s.id),
+    ];
+    if (blockingIds.length > 0) {
+      throw new BlockingItemsError(blockingIds);
+    }
 
     const items: Parameters<typeof InvoiceSvc.createInvoice>[0]["items"] = [];
     // Each item's own scope — feeds `PricingSvc.resolveEventLineItemDiscounts`
@@ -79,69 +125,69 @@ export default class EventCheckoutSvc {
     const toNumber = (amount: Prisma.Decimal | number) =>
       amount instanceof Prisma.Decimal ? amount.toNumber() : amount;
 
-    event.venueTransactions.forEach((tx) => {
+    event.venueTransactions.forEach((t) => {
       items.push({
-        amount: tx.agreedPrice,
-        description: `Venue Reservation: ${tx.id}`,
+        amount: t.agreedPrice,
+        description: `Venue Reservation: ${t.id}`,
         sourceType: InvoiceSourceType.event_venue_transaction,
-        sourceId: tx.id,
+        sourceId: t.id,
       });
       pricingItems.push({
-        sourceId: tx.id,
-        amount: toNumber(tx.agreedPrice),
+        sourceId: t.id,
+        amount: toNumber(t.agreedPrice),
         transactionType: "venue",
-        category: tx.venue.category,
-        venueId: tx.venueId,
+        category: t.venue.category,
+        venueId: t.venueId,
       });
       displayItems.push({
         type: "venue",
-        name: tx.venue.name,
-        providerName: tx.provider.name,
-        amount: toNumber(tx.agreedPrice),
+        name: t.venue.name,
+        providerName: t.provider.name,
+        amount: toNumber(t.agreedPrice),
       });
     });
 
-    event.assetTransactions.forEach((tx) => {
+    event.assetTransactions.forEach((t) => {
       items.push({
-        amount: tx.agreedPrice,
-        description: `Gear Rental: ${tx.id}`,
+        amount: t.agreedPrice,
+        description: `Gear Rental: ${t.id}`,
         sourceType: InvoiceSourceType.event_asset_transaction,
-        sourceId: tx.id,
+        sourceId: t.id,
       });
       pricingItems.push({
-        sourceId: tx.id,
-        amount: toNumber(tx.agreedPrice),
+        sourceId: t.id,
+        amount: toNumber(t.agreedPrice),
         transactionType: "asset",
-        category: tx.asset.category,
-        assetId: tx.assetId,
+        category: t.asset.category,
+        assetId: t.assetId,
       });
       displayItems.push({
         type: "asset",
-        name: tx.asset.name,
-        providerName: tx.provider.name,
-        amount: toNumber(tx.agreedPrice),
+        name: t.asset.name,
+        providerName: t.provider.name,
+        amount: toNumber(t.agreedPrice),
       });
     });
 
-    event.serviceTransactions.forEach((tx) => {
+    event.serviceTransactions.forEach((t) => {
       items.push({
-        amount: tx.agreedPrice,
-        description: `Talent Service: ${tx.id}`,
+        amount: t.agreedPrice,
+        description: `Talent Service: ${t.id}`,
         sourceType: InvoiceSourceType.event_service_transaction,
-        sourceId: tx.id,
+        sourceId: t.id,
       });
       pricingItems.push({
-        sourceId: tx.id,
-        amount: toNumber(tx.agreedPrice),
+        sourceId: t.id,
+        amount: toNumber(t.agreedPrice),
         transactionType: "service",
-        category: tx.service.category,
-        serviceId: tx.serviceId,
+        category: t.service.category,
+        serviceId: t.serviceId,
       });
       displayItems.push({
         type: "service",
-        name: tx.service.name,
-        providerName: tx.provider.name,
-        amount: toNumber(tx.agreedPrice),
+        name: t.service.name,
+        providerName: t.provider.name,
+        amount: toNumber(t.agreedPrice),
       });
     });
 
@@ -164,20 +210,24 @@ export default class EventCheckoutSvc {
    * across this event's different providers in one go, same as any
    * multi-seller marketplace cart.
    */
+  /**
+   * The full checkout-initiation sequence, all inside one transaction:
+   * advisory lock -> lock booking -> verify ownership/status/expiry ->
+   * lock+revalidate availability -> validate item statuses (via
+   * getPayableItems' blocking-item check) -> recompute prices/total
+   * (PricingSvc, inside InvoiceSvc.createInvoice) -> prevent duplicate
+   * checkout (findInvoiceForSource, still inside the lock) -> create
+   * Invoice + pending Checkout -> commit. The real Stripe call happens
+   * strictly AFTER this transaction returns — never inside it — so a
+   * network failure or crash talking to Stripe cannot leave a committed
+   * Invoice with an inconsistent Checkout, and holding a DB transaction
+   * open across a network round-trip is avoided entirely.
+   */
   static async createEventCheckout(
     eventId: string,
     payerId: string,
     voucherCodes: string[] = [],
   ) {
-    const { event, items, pricingItems } = await this.getPayableItems(eventId);
-
-    if (event.clientId !== payerId) {
-      throw new Error("Unauthorized: only this event's client may pay for it");
-    }
-    if (items.length === 0) {
-      throw new Error("No payable transactions found for this event.");
-    }
-
     // Two concurrent requests for the same event (not just a slow retry
     // after the first has already committed) would otherwise both pass
     // `findInvoiceForSource`'s check before either's `createInvoice` call
@@ -187,9 +237,65 @@ export default class EventCheckoutSvc {
     // on this event: the second caller blocks here until the first's whole
     // find-or-create flow below has committed, and then correctly finds
     // (and reuses) what the first one just created.
-    return prisma.$transaction(
+    const { checkout, invoice } = await prisma.$transaction(
       async (tx) => {
+        // Serializes every concurrent caller for this event — the second
+        // caller's advisory-lock acquisition blocks until the first's
+        // entire flow below (now genuinely inside this same transaction,
+        // not a separately-committing nested one) has committed or rolled
+        // back.
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`event-checkout:${eventId}`}, 0))`;
+
+        const { event, items, pricingItems } = await this.getPayableItems(
+          eventId,
+          tx,
+        );
+
+        if (event.clientId !== payerId) {
+          throw new Error(
+            "Unauthorized: only this event's client may pay for it",
+          );
+        }
+        if (items.length === 0) {
+          throw new Error("No payable transactions found for this event.");
+        }
+
+        // Lock the booking row itself — belt-and-suspenders alongside the
+        // advisory lock above, and the mechanism that actually matches the
+        // approved design's "lock booking" step in the checkout sequence.
+        const booking = event.bookings[0];
+        if (!booking) {
+          throw new Error(
+            "This event has no booking to check out — nothing to charge.",
+          );
+        }
+        await tx.$executeRaw`SELECT id FROM bookings WHERE id = ${booking.id} FOR UPDATE`;
+
+        // Re-validate availability for every payable item under the same
+        // lock used everywhere else — closes the exact race the approved
+        // design named: confirmation or availability changing between
+        // checkout-open and payment-submit must be caught here, not
+        // trusted from when the screen was opened.
+        const availabilityItems = [
+          ...event.assetTransactions.map((t) => ({
+            kind: "asset" as const,
+            itemId: t.assetId,
+            dateRange: { start: event.startAt, end: event.endAt },
+            quantity: t.quantity,
+          })),
+          ...event.serviceTransactions.map((t) => ({
+            kind: "service" as const,
+            itemId: t.serviceId,
+            dateRange: { start: event.startAt, end: event.endAt },
+          })),
+        ];
+        if (availabilityItems.length > 0) {
+          await AvailabilitySvc.validateForCheckout(
+            tx,
+            booking.id,
+            availabilityItems,
+          );
+        }
 
         // Every item here was added together from the same query, so finding
         // an invoice for any one of them means it covers all of them.
@@ -204,8 +310,11 @@ export default class EventCheckoutSvc {
           if (
             (REUSABLE_STATUSES as readonly string[]).includes(existing.status)
           ) {
-            const checkout = await CheckoutSvc.createCheckout(existing.id);
-            return { ...checkout, invoice: existing };
+            const reusedCheckout = await CheckoutSvc.createPendingCheckout(
+              tx,
+              existing.id,
+            );
+            return { checkout: reusedCheckout, invoice: existing };
           }
           // cancelled/failed/refunded — not blocking, falls through to a fresh invoice below.
         }
@@ -233,22 +342,40 @@ export default class EventCheckoutSvc {
           voucherCode: blanketCode,
         };
 
-        // Create Invoice
-        const invoice = await InvoiceSvc.createInvoice({
-          payerId,
-          pricingContext,
-          items,
-          itemDiscounts,
-          dueDate: event.startAt, // Payment due by event start
-        });
+        // Create Invoice — prices/total recomputed here from the
+        // `agreedPrice` values just re-read under lock, never from
+        // anything client-supplied.
+        const newInvoice = await InvoiceSvc.createInvoice(
+          {
+            payerId,
+            pricingContext,
+            items,
+            itemDiscounts,
+            dueDate: event.startAt, // Payment due by event start
+          },
+          tx,
+        );
 
-        // Create Checkout Session
-        const checkout = await CheckoutSvc.createCheckout(invoice.id);
+        // DB-only half of checkout creation — no Stripe call yet.
+        const newCheckout = await CheckoutSvc.createPendingCheckout(
+          tx,
+          newInvoice.id,
+        );
 
-        return { ...checkout, invoice };
+        return { checkout: newCheckout, invoice: newInvoice };
       },
-      { timeout: 15000 }, // generous — may wait behind another caller's full create flow, not just its own work
+      { timeout: 15000 }, // generous — may wait behind another caller's full flow, not just its own work
     );
+
+    // Only after the transaction above has committed: the real Stripe call.
+    const session = await CheckoutSvc.initiateProviderSession(
+      checkout.id,
+      invoice.id,
+      invoice.grossAmount.toNumber(),
+      invoice.currency,
+    );
+
+    return { ...session, invoice };
   }
 
   /**

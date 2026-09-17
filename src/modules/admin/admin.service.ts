@@ -1,9 +1,11 @@
+import Stripe from "stripe";
 import {
   AssetStatus,
   EventTemplateStatus,
   ItemBookingStatus,
   PaymentStatus,
   Prisma,
+  RefundStatus,
   ServiceStatus,
   VenueStatus,
 } from "@prisma/client";
@@ -11,6 +13,14 @@ import AdminRepo, { queuePage } from "./admin.repository";
 import EventRequestSvc from "../event-request/event-request.service";
 import RefundSvc from "../refund/refund.service";
 import PaymentRepo from "../payment/payment.repository";
+import { prisma } from "../../utils/prisma";
+import { STRIPE_SECRET_KEY } from "../../config";
+import { toStripeCents } from "../../utils/pricing";
+import IdempotencySvc from "../idempotency/idempotency.service";
+
+const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
+  apiVersion: "2025-08-27.basil",
+});
 import { cached, invalidate, versionedCache } from "../../utils/cache.util";
 import { notifyDecision } from "../notifications/decision-notification";
 import { isPerformerServiceCategory } from "../../types/permissions";
@@ -345,6 +355,180 @@ export default class AdminSvc {
     });
     await this.announceRefundChanged(refund.bookingId);
     return refund;
+  }
+
+  /**
+   * Itemized refund for a single asset/service transaction — distinct from
+   * `createManualRefund` above, which is a whole-booking bookkeeping record
+   * with no Stripe call and no remaining-balance check. This is the Phase B
+   * marketplace admin capability: refund amount validated against what's
+   * actually left refundable on this one line item, and an actual Stripe
+   * refund is issued, not just recorded.
+   *
+   * Not described as escrow or buyer-protected: this does not (and cannot)
+   * claw back a payout already made to the provider — see the module-level
+   * note on `stripe.refunds.create` below.
+   */
+  static async createItemizedRefund(data: {
+    kind: "asset" | "service";
+    transactionId: string;
+    amount: number;
+    reason: string;
+    adminId: string;
+    idempotencyKey: string;
+  }) {
+    const claim = await IdempotencySvc.claim({
+      endpoint: "POST /admin/transactions/:id/refund",
+      idempotencyKey: data.idempotencyKey,
+      requesterId: data.adminId,
+      requestPayload: {
+        kind: data.kind,
+        transactionId: data.transactionId,
+        amount: data.amount,
+      },
+    });
+    if (claim.status === "cached") return claim.responseBody;
+    if (claim.status === "in_progress") {
+      throw new Error("A refund request with this idempotency key is already in progress");
+    }
+
+    try {
+      const result = await this.executeItemizedRefund(data);
+      await IdempotencySvc.complete({
+        endpoint: "POST /admin/transactions/:id/refund",
+        idempotencyKey: data.idempotencyKey,
+        executionToken: claim.executionToken,
+        status: "succeeded",
+        responseBody: result,
+      });
+      return result;
+    } catch (err) {
+      await IdempotencySvc.complete({
+        endpoint: "POST /admin/transactions/:id/refund",
+        idempotencyKey: data.idempotencyKey,
+        executionToken: claim.executionToken,
+        status: "failed",
+      });
+      throw err;
+    }
+  }
+
+  private static async executeItemizedRefund(data: {
+    kind: "asset" | "service";
+    transactionId: string;
+    amount: number;
+    reason: string;
+    adminId: string;
+  }) {
+    if (data.amount <= 0) throw new Error("Refund amount must be greater than zero");
+
+    // Lock the transaction row (same FOR UPDATE + fresh-read pattern as
+    // TransactionStatusSvc/AvailabilitySvc) so two admins acting on the
+    // same item at once can't both approve a refund that exceeds what's
+    // actually left — the second one's own recompute, done after the first
+    // has committed, sees the reduced remaining balance.
+    const { refundId, payment, alreadyPaidOut } = await prisma.$transaction(async (tx) => {
+      if (data.kind === "asset") {
+        await tx.$executeRaw`SELECT id FROM event_asset_transactions WHERE id = ${data.transactionId} FOR UPDATE`;
+      } else {
+        await tx.$executeRaw`SELECT id FROM event_service_transactions WHERE id = ${data.transactionId} FOR UPDATE`;
+      }
+
+      const row =
+        data.kind === "asset"
+          ? await tx.eventAssetTransaction.findUnique({ where: { id: data.transactionId } })
+          : await tx.eventServiceTransaction.findUnique({ where: { id: data.transactionId } });
+      if (!row) throw new Error("Transaction not found");
+
+      // Counts `pending` refunds too, not just `succeeded` — the Stripe
+      // confirmation that flips a refund to `succeeded` happens AFTER this
+      // transaction commits (never call Stripe while holding a lock), so a
+      // refund is already committing that amount the moment its row is
+      // created here, same principle as AvailabilitySvc's reserving-status
+      // set. Counting only `succeeded` left a real window where two
+      // concurrent admin refunds could each see the full balance still
+      // available — caught by this module's own concurrency test, not
+      // assumed safe.
+      const countedStatuses: RefundStatus[] = [RefundStatus.pending, RefundStatus.succeeded];
+      const refundFilter =
+        data.kind === "asset"
+          ? { assetTransactionId: data.transactionId, status: { in: countedStatuses } }
+          : { serviceTransactionId: data.transactionId, status: { in: countedStatuses } };
+      const alreadyRefunded = await tx.refund.aggregate({
+        _sum: { amount: true },
+        where: refundFilter,
+      });
+      const remaining = row.agreedPrice.toNumber() - (alreadyRefunded._sum?.amount?.toNumber() ?? 0);
+      if (data.amount > remaining) {
+        throw new Error(
+          `Refund amount exceeds the remaining refundable balance for this item (remaining: ${remaining})`,
+        );
+      }
+
+      const invoiceItem = await tx.invoiceItem.findFirst({
+        where: {
+          sourceType: data.kind === "asset" ? "event_asset_transaction" : "event_service_transaction",
+          sourceId: data.transactionId,
+        },
+        include: {
+          invoice: {
+            include: { payments: { where: { status: "paid" }, orderBy: { paidAt: "desc" }, take: 1 } },
+          },
+        },
+      });
+      const invoicePayment = invoiceItem?.invoice.payments[0];
+      if (!invoicePayment) {
+        throw new Error("No paid payment found for this item — nothing to refund");
+      }
+
+      const refund = await tx.refund.create({
+        data: {
+          paymentId: invoicePayment.id,
+          bookingId: row.bookingId ?? undefined,
+          amount: data.amount,
+          reason: data.reason,
+          status: "pending",
+          initiatedByAdminId: data.adminId,
+          ...(data.kind === "asset"
+            ? { assetTransactionId: data.transactionId }
+            : { serviceTransactionId: data.transactionId }),
+        },
+      });
+
+      // Disclosed operational limitation, not automated here: no payout
+      // reversal exists anywhere in this codebase (confirmed by direct
+      // grep during Phase B planning). If the provider's payout for this
+      // item already fired, this refund still proceeds — the platform
+      // absorbs it or pursues the provider out-of-band; it is not clawed
+      // back automatically.
+      const alreadyPaidOut = await tx.payout.findFirst({
+        where: { sourceType: data.kind === "asset" ? "event_asset_transaction" : "event_service_transaction", sourceId: data.transactionId },
+        select: { id: true },
+      });
+
+      return { refundId: refund.id, payment: invoicePayment, alreadyPaidOut: !!alreadyPaidOut };
+    });
+
+    if (!payment.providerReference) {
+      await prisma.refund.update({ where: { id: refundId }, data: { status: "failed" } });
+      throw new Error("Payment has no provider reference — cannot issue a Stripe refund");
+    }
+
+    try {
+      const stripeRefund = await stripe.refunds.create({
+        payment_intent: payment.providerReference,
+        amount: toStripeCents(data.amount),
+      });
+      const finalStatus = stripeRefund.status === "succeeded" ? "succeeded" : "pending";
+      const updated = await prisma.refund.update({
+        where: { id: refundId },
+        data: { status: finalStatus, providerReference: stripeRefund.id },
+      });
+      return { ...updated, alreadyPaidOutWarning: alreadyPaidOut };
+    } catch (err) {
+      await prisma.refund.update({ where: { id: refundId }, data: { status: "failed" } });
+      throw err;
+    }
   }
 
   static async resolveAssetBookingDispute(

@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import EventTransactionSvc from "./event-transaction.service";
 import Joi from "joi";
-import { TransactionStatus } from "@prisma/client";
 
 export default class EventTransactionCtrl {
   static async listProviderItems(req: Request, res: Response) {
@@ -41,12 +40,12 @@ export default class EventTransactionCtrl {
   }
 
   static async reviewItem(req: Request, res: Response) {
+    // `action`, never a raw status — see TransactionStatusSvc.transition and
+    // the allow-list it enforces. This is the fix for the previously-live
+    // gap where any TransactionStatus enum value was accepted directly.
     const schema = Joi.object({
       type: Joi.string().valid("asset", "service", "venue").required(),
-      status: Joi.string()
-        .valid(...Object.values(TransactionStatus))
-        .required(),
-      agreedPrice: Joi.number().min(0).optional(),
+      action: Joi.string().valid("confirm", "reject", "cancel").required(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -54,18 +53,17 @@ export default class EventTransactionCtrl {
 
     try {
       const { id } = req.params;
-      const providerId = req.user?.userId;
-      if (!providerId) return res.status(401).json({ message: "Unauthorized" });
+      const actorId = req.user?.userId;
+      if (!actorId) return res.status(401).json({ message: "Unauthorized" });
       const updated = await EventTransactionSvc.reviewItem(
         id,
         value.type,
-        value.status,
-        value.agreedPrice,
-        providerId,
+        value.action,
+        actorId,
       );
       return res
         .status(200)
-        .json({ message: `Item ${value.status} successfully`, updated });
+        .json({ message: `Item ${value.action}ed successfully`, updated });
     } catch (e: unknown) {
       const error = e as Error;
       return res.status(400).json({ message: error.message });

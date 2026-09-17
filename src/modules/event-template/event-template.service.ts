@@ -559,6 +559,27 @@ export default class EventTemplateSvc {
     const venue = await prisma.venue.findUnique({ where: { id: venueId } });
     if (!venue) throw new Error("Venue not found");
 
+    // A venue may only be attached by its own mayor, or by an Event Foxer
+    // holding an approved VenueEventFoxerAffiliation with "template:attach"
+    // for this venue — the Studio's "Apply to host here" gate is UX only;
+    // this is the check that actually enforces it.
+    let affiliation: { agreedPrice: Amount } | null = null;
+    if (venue.mayorId !== ownerId) {
+      const { default: VenueAffiliationSvc } = await import(
+        "../venue-affiliation/venue-affiliation.service"
+      );
+      affiliation = await VenueAffiliationSvc.getApprovedAffiliationWithPermission(
+        venueId,
+        ownerId,
+        "template:attach",
+      );
+      if (!affiliation) {
+        throw new Error(
+          "Unauthorized: you need an approved affiliation with this venue's owner to attach it",
+        );
+      }
+    }
+
     if (
       venue.state &&
       template.targetState &&
@@ -574,8 +595,15 @@ export default class EventTemplateSvc {
       this.validateMatchData(true, description, matchedAt);
     }
 
-    // See attachAsset's comment — default to the venue's own listed price.
-    const finalAgreedPrice = agreedPrice ?? venue.price.toNumber();
+    // Prefer an explicit price, then the affiliation's pre-agreed package
+    // price (see attachAsset's comment for the non-affiliated default), then
+    // the venue's own listed price.
+    const finalAgreedPrice =
+      agreedPrice ??
+      (affiliation?.agreedPrice != null
+        ? toAmount(affiliation.agreedPrice)
+        : undefined) ??
+      venue.price.toNumber();
 
     return EventTemplateRepo.attachVenue(
       templateId,

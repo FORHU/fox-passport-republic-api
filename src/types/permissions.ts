@@ -143,6 +143,39 @@ export type DelegableEventPermission =
   (typeof DELEGABLE_EVENT_PERMISSIONS)[number];
 
 /**
+ * Permissions a Venue Foxer may grant an Event Foxer via an approved
+ * `VenueEventFoxerAffiliation.permissions` — not a `RoleType` grant, not
+ * visible to `can()`/`permissionsForUser()`, and scoped to that one venue.
+ * Mirrors `DELEGABLE_EVENT_PERMISSIONS`'s shape and rationale: an explicit
+ * allow-list rather than accepting any `Permission`, so a new delegable
+ * capability is a deliberate code change. Deliberately excludes editing the
+ * venue's own listing/pricing and any booking/payout authority, which stay
+ * with `Venue.mayorId` regardless of what a specific affiliation holds here.
+ *
+ * Phase A scope decision, not an oversight: every approved affiliation is
+ * granted the full list below, unconditionally and identically — there is no
+ * endpoint or code path that grants a subset, and none accepts a
+ * client-supplied permission value at all (`VenueAffiliationRepo.create`/
+ * `.reopen` always write `[...VENUE_AFFILIATION_PERMISSIONS]`, never a
+ * caller-provided array). Per-affiliation customization (e.g. granting only
+ * `calendar:block`) is deferred to a later phase, should the product need
+ * it. Every authorization check that reads this array (see
+ * `VenueAffiliationSvc.getApprovedAffiliationWithPermission`) verifies BOTH
+ * that the affiliation's `status` is `approved` AND that the specific
+ * permission is present — status alone is never sufficient.
+ */
+export const VENUE_AFFILIATION_PERMISSIONS = [
+  /** May attach this venue into one of their own event templates without
+   * the mayor approving each individual attach. */
+  "template:attach",
+  /** May add/remove entries on this venue's own `blockedDates` calendar for
+   * the events they run there. */
+  "calendar:block",
+] as const;
+export type VenueAffiliationPermission =
+  (typeof VENUE_AFFILIATION_PERMISSIONS)[number];
+
+/**
  * The grant table.
  *
  * `admin_secretary` exists to work the approval queues without seeing who

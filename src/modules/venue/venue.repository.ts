@@ -300,6 +300,39 @@ export default class VenueRepo {
     );
   }
 
+  /**
+   * Adds one date to `blockedDates`, atomically and idempotently.
+   *
+   * A read-then-write (`findVenueById` → `updateVenue({ blockedDates })`)
+   * would lose an affiliate's block if two people block different dates on
+   * the same venue at the same time — the second write's array wouldn't
+   * contain the first's addition yet. This does the append inside the
+   * `UPDATE` itself, so Postgres's per-row write lock serializes concurrent
+   * calls instead of one silently overwriting the other. `DISTINCT` makes a
+   * duplicate block a no-op rather than growing the array.
+   */
+  static async addBlockedDate(venueId: string, date: Date) {
+    return this.retiring(
+      prisma
+        .$queryRaw<
+          { id: string; blockedDates: Date[] }[]
+        >`UPDATE venues SET "blockedDates" = (SELECT ARRAY(SELECT DISTINCT unnest("blockedDates" || ARRAY[${date}::timestamp]) ORDER BY 1)), "updatedAt" = now() WHERE id = ${venueId} RETURNING id, "blockedDates"`
+        .then((rows) => rows[0] ?? null),
+    );
+  }
+
+  /** Same atomicity rationale as addBlockedDate. array_remove is a no-op if
+   * the date isn't present, so unblocking an already-unblocked date is safe. */
+  static async removeBlockedDate(venueId: string, date: Date) {
+    return this.retiring(
+      prisma
+        .$queryRaw<
+          { id: string; blockedDates: Date[] }[]
+        >`UPDATE venues SET "blockedDates" = array_remove("blockedDates", ${date}::timestamp), "updatedAt" = now() WHERE id = ${venueId} RETURNING id, "blockedDates"`
+        .then((rows) => rows[0] ?? null),
+    );
+  }
+
   static async archiveVenue(id: string) {
     return this.retiring(
       prisma.venue.update({

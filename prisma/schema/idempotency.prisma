@@ -1,0 +1,28 @@
+// Request-level idempotency for Phase B marketplace mutations (ad-hoc item
+// add, checkout initiation, manual admin refunds). Deliberately generic —
+// keyed by endpoint + client-supplied key, not tied to one domain model —
+// so it can be reused across the several endpoints that need double-submit
+// protection without a bespoke dedup table per endpoint.
+//
+// Claiming is done via a single atomic INSERT ... ON CONFLICT ... DO UPDATE
+// (never read-then-write) in the repository layer; executionToken/leaseExpiresAt
+// exist specifically so a stale reclaimed key can't let two workers both
+// believe they hold it — see IdempotencySvc.
+
+model RequestIdempotencyKey {
+  id             String   @id @default(uuid())
+  endpoint       String
+  idempotencyKey String
+  requesterId    String
+  bookingId      String?
+  requestHash    String
+  status         String // in_progress | succeeded | failed
+  executionToken String
+  leaseExpiresAt DateTime
+  responseBody   Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([endpoint, idempotencyKey])
+  @@map("request_idempotency_keys")
+}

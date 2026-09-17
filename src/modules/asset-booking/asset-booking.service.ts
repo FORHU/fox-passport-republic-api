@@ -9,6 +9,7 @@ import NotificationService from "../notifications/user-notification.service";
 import PricingSvc from "../pricing/pricing.service";
 import PromotionSvc from "../promotion/promotion.service";
 import RefundSvc from "../refund/refund.service";
+import AvailabilitySvc from "../availability/availability.service";
 import {
   announceToAdmins,
   announceToUser,
@@ -192,19 +193,37 @@ export default class AssetBookingSvc {
       data.voucherCode,
     );
 
-    const booking = await AssetBookingRepo.create({
-      assetId: data.assetId,
-      userId: data.userId,
-      startDate,
-      endDate,
-      quantity: data.quantity,
-      fulfillmentType: data.fulfillmentType,
-      deliveryAddress: data.deliveryAddress,
-      notes: data.notes,
-      totalAmount: pricing.totalAmount,
-      platformFeeAmount: pricing.platformFeeAmount,
-      discountAmount: pricing.discountAmount,
-      voucherId: pricing.voucherId,
+    // The lock-then-check-then-insert sequence must be one transaction: see
+    // AvailabilitySvc's doc comment. The quantity>asset.quantity check above
+    // is only a fast, non-authoritative pre-check (an obviously-invalid
+    // request); this is the real, concurrency-safe availability guarantee.
+    const booking = await prisma.$transaction(async (tx) => {
+      await AvailabilitySvc.reserve(tx, [
+        {
+          kind: "asset",
+          itemId: data.assetId,
+          dateRange: { start: startDate, end: endDate },
+          quantity: data.quantity,
+        },
+      ]);
+
+      return AssetBookingRepo.create(
+        {
+          assetId: data.assetId,
+          userId: data.userId,
+          startDate,
+          endDate,
+          quantity: data.quantity,
+          fulfillmentType: data.fulfillmentType,
+          deliveryAddress: data.deliveryAddress,
+          notes: data.notes,
+          totalAmount: pricing.totalAmount,
+          platformFeeAmount: pricing.platformFeeAmount,
+          discountAmount: pricing.discountAmount,
+          voucherId: pricing.voucherId,
+        },
+        tx,
+      );
     });
 
     announceBookingChanged(data.userId, asset.ownerId);
