@@ -49,6 +49,16 @@ export const PERMISSIONS = [
   "event:manage-organizers",
   /** May create, edit, deactivate and preview platform fee rules (`PlatformFeeConfig`). */
   "fees:manage",
+  /** May create, edit, deactivate promotions and generate voucher codes. */
+  "promotions:manage",
+  /**
+   * May create, edit, deactivate a voucher/promo code scoped to one of the
+   * caller's own listings, and fund its discount out of their own payout.
+   * Narrower than `promotions:manage`: the service layer still checks the
+   * promotion's `assetId`/`serviceId` against the caller, the same way
+   * `asset:manage`/`service:manage` check `ownerId`.
+   */
+  "promotions:manage-own",
 
   // ── The supply side ───────────────────────────────────────────────────
   // Held through `RoleType`, not through `SystemRole`. Deliberately *not*
@@ -159,6 +169,7 @@ const GRANTS: Record<SystemRole, readonly Permission[]> = {
     "refunds:manage",
     "event:manage-organizers",
     "fees:manage",
+    "promotions:manage",
     // The only supply-side permission an admin holds, because the guard it
     // replaces — `requireHost` — was `["eventFoxer", "admin"]`. Every other
     // `venue:` / `asset:` / `service:` / `template:` / `payouts:` capability
@@ -180,14 +191,29 @@ const GRANTS: Record<SystemRole, readonly Permission[]> = {
  * `RoleType` fails to compile until someone decides what it may do.
  */
 const ROLE_TYPE_GRANTS: Record<RoleType, readonly Permission[]> = {
-  venueFoxer: ["venue:manage", "payouts:onboard"],
-  gearFoxer: ["asset:manage", "payouts:onboard", "bid:submit-asset"],
-  serviceFoxer: ["service:manage", "payouts:onboard", "bid:submit-service"],
+  venueFoxer: ["venue:manage", "payouts:onboard", "promotions:manage-own"],
+  gearFoxer: [
+    "asset:manage",
+    "payouts:onboard",
+    "bid:submit-asset",
+    "promotions:manage-own",
+  ],
+  serviceFoxer: [
+    "service:manage",
+    "payouts:onboard",
+    "bid:submit-service",
+    "promotions:manage-own",
+  ],
   // Owns performer-category Service rows (see PERFORMER_SERVICE_CATEGORIES
   // below) — a subset of the same `Service` model serviceFoxer owns, not a
   // separate catalog entity. Shares `bid:submit-service` since performer
   // items ride the same EventTemplateService/EventServiceBid path.
-  performerFoxer: ["performer:manage", "payouts:onboard", "bid:submit-service"],
+  performerFoxer: [
+    "performer:manage",
+    "payouts:onboard",
+    "bid:submit-service",
+    "promotions:manage-own",
+  ],
   eventFoxer: [
     "template:manage",
     "booking:check-in",
@@ -196,7 +222,11 @@ const ROLE_TYPE_GRANTS: Record<RoleType, readonly Permission[]> = {
   ],
   // No longer "nothing to manage" — proposing a partnership was previously
   // gated with `requireRole(["investor"])` on the route directly.
-  investor: ["partnership:propose"],
+  // `payouts:onboard` was added once `PartnerInvestment.revenueSharePercent`
+  // started producing real `investor_revenue_share` Payouts/Stripe transfers
+  // (see PayoutSvc.resolveInvestorSplit) — an investor now needs a Connect
+  // account to actually receive that money, same as any other payout role.
+  investor: ["partnership:propose", "payouts:onboard"],
 };
 
 /**

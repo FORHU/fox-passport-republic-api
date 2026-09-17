@@ -95,6 +95,7 @@ export default class BookingCtrl {
         guestCount: Joi.number().min(1).optional(),
         totalAmount: Joi.number().min(0).optional(),
         specialRequests: Joi.string().optional(),
+        voucherCode: Joi.string().trim().uppercase().allow("").optional(),
       }).xor("venueId", "eventId");
 
       const { error, value } = schema.validate(req.body);
@@ -114,6 +115,30 @@ export default class BookingCtrl {
 
   // GET ALL BOOKINGS
   // GET AVAILABILITY — returns booked dates for a given templateId
+  // Mirrors AssetBookingCtrl.previewPrice/ServiceBookingCtrl.previewPrice —
+  // must be registered before the generic /:id routes.
+  static async previewVenuePrice(req: Request, res: Response) {
+    try {
+      const schema = Joi.object({
+        venueId: Joi.string().required(),
+        startDate: Joi.date().iso().required(),
+        endDate: Joi.date().iso().required(),
+        voucherCode: Joi.string().trim().uppercase().allow("").optional(),
+      });
+      const { error, value } = schema.validate(req.query);
+      if (error) return res.status(400).json({ message: error.message });
+
+      const pricing = await BookingSvc.previewVenuePrice({
+        ...value,
+        userId: req.user!.userId,
+      });
+      return res.status(200).json({ success: true, data: pricing });
+    } catch (e: unknown) {
+      const error = e as Error;
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
   static async getAvailability(req: Request, res: Response) {
     try {
       const { templateId } = req.query;

@@ -227,13 +227,14 @@ export default class RefundSvc {
     if (refund.status !== "failed")
       throw new Error("Only failed refunds can be retried");
 
-    if (!refund.payment?.providerReference?.startsWith("pi_")) {
+    const providerReference = refund.payment?.providerReference;
+    if (!providerReference?.startsWith("pi_")) {
       throw new Error("No Stripe PaymentIntent to refund");
     }
 
     try {
       const sr = await stripe.refunds.create({
-        payment_intent: refund.payment.providerReference,
+        payment_intent: providerReference,
         amount: toStripeCents(refund.amount.toNumber()),
       });
 
@@ -299,6 +300,88 @@ export default class RefundSvc {
     return updated;
   }
 
+  /**
+   * A `Refund` row can now come from any of five places (the venue/event
+   * `Booking` flow, provider- or citizen-cancelled Asset/Service bookings,
+   * or an Invoice-item refund from `EventCheckoutSvc.cancelEvent`/
+   * `PartnershipCheckoutSvc.cancelSponsorship`) — this fetches whichever
+   * one applies so the two webhook handlers below don't need to know which
+   * kind they're looking at.
+   */
+  private static async findEnrichedRefund(providerReference: string) {
+    return prisma.refund.findFirst({
+      where: { providerReference },
+      include: {
+        booking: {
+          include: {
+            user: { select: { id: true, email: true } },
+            event: { select: { name: true } },
+          },
+        },
+        assetBooking: {
+          include: {
+            user: { select: { id: true, email: true } },
+            asset: { select: { name: true } },
+          },
+        },
+        serviceBooking: {
+          include: {
+            user: { select: { id: true, email: true } },
+            service: { select: { name: true } },
+          },
+        },
+        invoiceItem: {
+          include: {
+            invoice: {
+              include: { payer: { select: { id: true, email: true } } },
+            },
+          },
+        },
+        payment: true,
+      },
+    });
+  }
+
+  private static resolveRefundRecipient(
+    existing: NonNullable<
+      Awaited<ReturnType<typeof RefundSvc.findEnrichedRefund>>
+    >,
+  ): { userId: string; email: string; label: string; link: string } | null {
+    if (existing.booking?.user) {
+      return {
+        userId: existing.booking.user.id,
+        email: existing.booking.user.email,
+        label: existing.booking.event?.name ?? "your booking",
+        link: `/bookings/${existing.bookingId}`,
+      };
+    }
+    if (existing.assetBooking?.user) {
+      return {
+        userId: existing.assetBooking.user.id,
+        email: existing.assetBooking.user.email,
+        label: existing.assetBooking.asset?.name ?? "your booking",
+        link: `/booking/fulfillment/asset/${existing.assetBookingId}`,
+      };
+    }
+    if (existing.serviceBooking?.user) {
+      return {
+        userId: existing.serviceBooking.user.id,
+        email: existing.serviceBooking.user.email,
+        label: existing.serviceBooking.service?.name ?? "your booking",
+        link: `/booking/fulfillment/service/${existing.serviceBookingId}`,
+      };
+    }
+    if (existing.invoiceItem?.invoice?.payer) {
+      return {
+        userId: existing.invoiceItem.invoice.payer.id,
+        email: existing.invoiceItem.invoice.payer.email,
+        label: "your payment",
+        link: `/invoices/${existing.invoiceItem.invoiceId}`,
+      };
+    }
+    return null;
+  }
+
   static async handleWebhookRefundFailed(event: Stripe.Event) {
     const refund = event.data.object as Stripe.Refund;
     if (!refund.id) return;
@@ -315,59 +398,34 @@ export default class RefundSvc {
       },
     });
 
-    const existing = await prisma.refund.findFirst({
-      where: { providerReference: refund.id },
-      include: {
-        booking: {
-          include: {
-            user: { select: { id: true, email: true } },
-            event: { select: { name: true } },
-          },
-        },
-        payment: true,
-      },
+    const existing = await this.findEnrichedRefund(refund.id);
+    if (!existing) return;
+    const recipient = this.resolveRefundRecipient(existing);
+    if (!recipient) return;
+
+    sendRefundUpdateEmail({
+      to: recipient.email,
+      eventName: recipient.label,
+      bookingId: existing.id,
+      refundAmount: formatCurrency(existing.amount),
+      status: "failed",
+      failureReason: refund.failure_reason ?? undefined,
     });
 
-    if (existing?.booking?.user?.email && existing.bookingId) {
-      sendRefundUpdateEmail({
-        to: existing.booking.user.email,
-        eventName: existing.booking.event?.name ?? "Unknown Event",
-        bookingId: existing.bookingId,
-        refundAmount: formatCurrency(existing.amount),
-        status: "failed",
-        failureReason: refund.failure_reason ?? undefined,
-      });
-    }
-
-    if (existing?.booking?.user?.id && existing.bookingId) {
-      NotificationService.create({
-        userId: existing.booking.user.id,
-        type: "PAYOUT",
-        title: "Refund failed",
-        message: `Your refund of ${formatCurrency(existing.amount)} for ${
-          existing.booking.event?.name ?? "your booking"
-        } failed.`,
-        metadata: { link: `/bookings/${existing.bookingId}` },
-      }).catch((e) => console.error("Failed to create refund notification", e));
-    }
+    NotificationService.create({
+      userId: recipient.userId,
+      type: "PAYOUT",
+      title: "Refund failed",
+      message: `Your refund of ${formatCurrency(existing.amount)} for ${recipient.label} failed.`,
+      metadata: { link: recipient.link },
+    }).catch((e) => console.error("Failed to create refund notification", e));
   }
 
   static async handleWebhookRefundSucceeded(event: Stripe.Event) {
     const refund = event.data.object as Stripe.Refund;
     if (!refund.id) return;
 
-    const existing = await prisma.refund.findFirst({
-      where: { providerReference: refund.id },
-      include: {
-        booking: {
-          include: {
-            user: { select: { id: true, email: true } },
-            event: { select: { name: true } },
-          },
-        },
-        payment: true,
-      },
-    });
+    const existing = await this.findEnrichedRefund(refund.id);
     if (!existing) return;
 
     await prisma.refund.update({
@@ -379,26 +437,23 @@ export default class RefundSvc {
       await PaymentRepo.markRefunded(existing.payment.id);
     }
 
-    if (existing.booking?.user?.email && existing.bookingId) {
-      sendRefundUpdateEmail({
-        to: existing.booking.user.email,
-        eventName: existing.booking.event?.name ?? "Unknown Event",
-        bookingId: existing.bookingId,
-        refundAmount: formatCurrency(existing.amount),
-        status: "succeeded",
-      });
-    }
+    const recipient = this.resolveRefundRecipient(existing);
+    if (!recipient) return;
 
-    if (existing.booking?.user?.id && existing.bookingId) {
-      NotificationService.create({
-        userId: existing.booking.user.id,
-        type: "PAYOUT",
-        title: "Refund succeeded",
-        message: `Your refund of ${formatCurrency(existing.amount)} for ${
-          existing.booking.event?.name ?? "your booking"
-        } has been processed.`,
-        metadata: { link: `/bookings/${existing.bookingId}` },
-      }).catch((e) => console.error("Failed to create refund notification", e));
-    }
+    sendRefundUpdateEmail({
+      to: recipient.email,
+      eventName: recipient.label,
+      bookingId: existing.id,
+      refundAmount: formatCurrency(existing.amount),
+      status: "succeeded",
+    });
+
+    NotificationService.create({
+      userId: recipient.userId,
+      type: "PAYOUT",
+      title: "Refund succeeded",
+      message: `Your refund of ${formatCurrency(existing.amount)} for ${recipient.label} has been processed.`,
+      metadata: { link: recipient.link },
+    }).catch((e) => console.error("Failed to create refund notification", e));
   }
 }

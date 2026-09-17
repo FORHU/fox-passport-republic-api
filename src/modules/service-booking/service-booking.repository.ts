@@ -12,6 +12,8 @@ export default class ServiceBookingRepo {
     notes?: string;
     totalAmount: number;
     platformFeeAmount: number;
+    discountAmount?: number;
+    voucherId?: string | null;
   }) {
     return prisma.serviceBooking.create({
       data: {
@@ -24,6 +26,8 @@ export default class ServiceBookingRepo {
         notes: data.notes,
         totalAmount: data.totalAmount,
         platformFeeAmount: data.platformFeeAmount,
+        discountAmount: data.discountAmount ?? 0,
+        voucherId: data.voucherId ?? null,
       },
       include: {
         service: { include: { images: true } },
@@ -59,6 +63,7 @@ export default class ServiceBookingRepo {
           include: {
             images: true,
             owner: { select: { id: true, name: true, email: true } },
+            cancellationPolicy: { include: { rules: true } },
           },
         },
         user: { select: { id: true, name: true, email: true } },
@@ -137,6 +142,43 @@ export default class ServiceBookingRepo {
         disputeReason: reason ?? null,
         disputeAt: new Date(),
       },
+      include: {
+        service: {
+          include: {
+            images: true,
+            owner: { select: { id: true, name: true, email: true } },
+          },
+        },
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+  }
+
+  static async providerCancel(id: string, reason: string) {
+    return prisma.serviceBooking.update({
+      where: { id },
+      data: {
+        status: ItemBookingStatus.cancelled,
+        providerCancelledAt: new Date(),
+        providerCancelReason: reason,
+      },
+      include: {
+        service: {
+          include: {
+            images: true,
+            owner: { select: { id: true, name: true, email: true } },
+          },
+        },
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+  }
+
+  /** The citizen's own cancellation — see ServiceBookingSvc.cancelWithRefund. */
+  static async cancel(id: string) {
+    return prisma.serviceBooking.update({
+      where: { id },
+      data: { status: ItemBookingStatus.cancelled },
       include: {
         service: {
           include: {

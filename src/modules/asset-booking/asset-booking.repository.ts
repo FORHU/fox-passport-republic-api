@@ -13,6 +13,8 @@ export default class AssetBookingRepo {
     notes?: string;
     totalAmount: number;
     platformFeeAmount: number;
+    discountAmount?: number;
+    voucherId?: string | null;
   }) {
     return prisma.assetBooking.create({
       data: {
@@ -26,6 +28,8 @@ export default class AssetBookingRepo {
         notes: data.notes,
         totalAmount: data.totalAmount,
         platformFeeAmount: data.platformFeeAmount,
+        discountAmount: data.discountAmount ?? 0,
+        voucherId: data.voucherId ?? null,
       },
       include: {
         asset: { include: { images: true } },
@@ -61,6 +65,7 @@ export default class AssetBookingRepo {
           include: {
             images: true,
             owner: { select: { id: true, name: true, email: true } },
+            cancellationPolicy: { include: { rules: true } },
           },
         },
         user: { select: { id: true, name: true, email: true } },
@@ -153,6 +158,43 @@ export default class AssetBookingRepo {
         disputeReason: reason ?? null,
         disputeAt: new Date(),
       },
+      include: {
+        asset: {
+          include: {
+            images: true,
+            owner: { select: { id: true, name: true, email: true } },
+          },
+        },
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+  }
+
+  static async providerCancel(id: string, reason: string) {
+    return prisma.assetBooking.update({
+      where: { id },
+      data: {
+        status: ItemBookingStatus.cancelled,
+        providerCancelledAt: new Date(),
+        providerCancelReason: reason,
+      },
+      include: {
+        asset: {
+          include: {
+            images: true,
+            owner: { select: { id: true, name: true, email: true } },
+          },
+        },
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+  }
+
+  /** The citizen's own cancellation — see AssetBookingSvc.cancelWithRefund. */
+  static async cancel(id: string) {
+    return prisma.assetBooking.update({
+      where: { id },
+      data: { status: ItemBookingStatus.cancelled },
       include: {
         asset: {
           include: {

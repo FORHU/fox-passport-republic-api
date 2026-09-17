@@ -78,6 +78,7 @@ const SUPPLY_ONLY = [
   "bid:submit-service",
   "bid:submit-asset",
   "partnership:propose",
+  "promotions:manage-own",
 ] as const;
 
 const ADMIN_HOLDS = PERMISSIONS.filter(
@@ -172,23 +173,24 @@ describe("the supply side", () => {
     expect(can({ roleType: ["performerFoxer"] }, "service:manage")).toBe(false);
   });
 
-  it("gives every foxer type payouts:onboard, and investor none of it", () => {
+  it("gives every foxer type payouts:onboard, and investor too since revenue-share payouts", () => {
     for (const r of [
       "venueFoxer",
       "eventFoxer",
       "gearFoxer",
       "serviceFoxer",
       "performerFoxer",
+      "investor",
     ]) {
       expect(can({ roleType: [r] }, "payouts:onboard")).toBe(true);
     }
-    expect(can({ roleType: ["investor"] }, "payouts:onboard")).toBe(false);
   });
 
-  it("gives investor only partnership:propose, no supply capability", () => {
-    expect(permissionsForUser({ roleType: ["investor"] })).toEqual([
-      "partnership:propose",
-    ]);
+  it("gives investor partnership:propose and payouts:onboard, no other supply capability", () => {
+    // Order-insensitive: permissionsForUser doesn't promise an ordering.
+    expect(permissionsForUser({ roleType: ["investor"] }).sort()).toEqual(
+      ["partnership:propose", "payouts:onboard"].sort(),
+    );
   });
 
   it("gives service/gear foxers their own bid-submission permission only", () => {

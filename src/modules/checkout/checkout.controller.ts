@@ -20,10 +20,22 @@ function statusForCheckoutError(message: string): number {
   if (message.includes("not found")) return 404;
   if (message.startsWith("Unauthorized")) return 403;
   if (message.includes("already been paid")) return 409;
+  if (message.includes("already cancelled")) return 409;
+  if (message.includes("already been refunded")) return 409;
   return 400;
 }
 
+// Any number of codes — a multi-provider Event checkout lets a citizen
+// redeem every voucher they're eligible for (one per matching line item)
+// rather than being capped at a single code. See
+// PricingSvc.resolveEventLineItemDiscounts for how they're matched.
 const voucherSchema = Joi.object({
+  voucherCodes: Joi.array().items(Joi.string().trim()).optional(),
+});
+
+// Sponsorships are single-provider — no per-item scoping to resolve, so
+// this keeps the original single-code shape rather than the array above.
+const sponsorshipVoucherSchema = Joi.object({
   voucherCode: Joi.string().trim().optional(),
 });
 
@@ -39,7 +51,7 @@ export default class CheckoutController {
       const result = await EventCheckoutSvc.createEventCheckout(
         req.params.eventId,
         req.user!.userId,
-        value.voucherCode,
+        value.voucherCodes ?? [],
       );
       return res.status(201).json({
         invoiceId: result.invoice.id,
@@ -57,7 +69,16 @@ export default class CheckoutController {
 
   // GET /v1/events/:eventId/payment-summary
   static async getEventPaymentSummary(req: Request, res: Response) {
-    const schema = Joi.object({ voucherCode: Joi.string().trim().optional() });
+    const schema = Joi.object({
+      // `.single(true)`: a query string with exactly one `voucherCodes=`
+      // parses as a bare string, not a 1-element array — this coerces it
+      // into one either way, so the caller can always send `voucherCodes`
+      // as either shape.
+      voucherCodes: Joi.array()
+        .items(Joi.string().trim())
+        .single(true)
+        .optional(),
+    });
     const { error, value } = schema.validate(req.query);
     if (error) {
       return res.status(400).json({ success: false, message: error.message });
@@ -67,7 +88,7 @@ export default class CheckoutController {
       const summary = await EventCheckoutSvc.getPaymentSummary(
         req.params.eventId,
         req.user!.userId,
-        value.voucherCode,
+        value.voucherCodes ?? [],
       );
       return res.status(200).json(summary);
     } catch (e: unknown) {
@@ -78,9 +99,28 @@ export default class CheckoutController {
     }
   }
 
+  // POST /v1/events/:eventId/cancel
+  static async cancelEvent(req: Request, res: Response) {
+    try {
+      const result = await EventCheckoutSvc.cancelEvent(
+        req.params.eventId,
+        req.user!.userId,
+      );
+      return res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res
+        .status(statusForCheckoutError(err.message))
+        .json({ success: false, message: err.message });
+    }
+  }
+
   // POST /v1/partnerships/:proposalId/checkout
   static async createSponsorshipCheckout(req: Request, res: Response) {
-    const { error, value } = voucherSchema.validate(req.body ?? {});
+    const { error, value } = sponsorshipVoucherSchema.validate(req.body ?? {});
     if (error) {
       return res.status(400).json({ success: false, message: error.message });
     }
@@ -96,6 +136,25 @@ export default class CheckoutController {
         checkoutId: result.checkoutId,
         url: result.url,
         status: result.status,
+      });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res
+        .status(statusForCheckoutError(err.message))
+        .json({ success: false, message: err.message });
+    }
+  }
+
+  // POST /v1/partnerships/:proposalId/cancel
+  static async cancelSponsorship(req: Request, res: Response) {
+    try {
+      const result = await PartnershipCheckoutSvc.cancelSponsorship(
+        req.params.proposalId,
+        req.user!.userId,
+      );
+      return res.status(200).json({
+        success: true,
+        data: result,
       });
     } catch (e: unknown) {
       const err = e as Error;

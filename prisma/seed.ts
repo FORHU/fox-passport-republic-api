@@ -18,6 +18,7 @@ import {
   seedCancellationPolicies,
   seedPartners,
   seedFeed,
+  seedPromotions,
 } from "./seeder";
 
 /**
@@ -141,6 +142,9 @@ async function main() {
 
   // 13. Seed Republic Foxer Feed (posts, spotlights, reviews, partner announcements)
   await seedFeed(prisma);
+
+  // 14. Seed Promotions & Vouchers (fixed, memorable test codes)
+  await seedPromotions(prisma);
 
   console.log("Seeding completed successfully!");
 }

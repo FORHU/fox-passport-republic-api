@@ -12,6 +12,7 @@ const router = express.Router();
 // ========== MULTI-STEP BOOKING ROUTES ==========
 router.post("/from-template", authenticate, BookingCtrl.bookFromTemplate); // Book directly from an approved template
 router.post("/draft", authenticate, BookingCtrl.createDraftBooking); // Step 1: Create draft
+router.get("/venue-price-preview", authenticate, BookingCtrl.previewVenuePrice); // must be before /:id
 
 // ========== CANCELLATION & REFUND ROUTES ==========
 router.post("/:id/cancel/check", authenticate, BookingCtrl.cancelCheck);
