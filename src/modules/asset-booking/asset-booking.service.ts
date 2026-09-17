@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import AssetBookingRepo from "./asset-booking.repository";
 import { prisma } from "../../utils/prisma";
-import { ItemBookingStatus, RefundStatus } from "@prisma/client";
+import { BillingRate, ItemBookingStatus, RefundStatus } from "@prisma/client";
 import { calculateItemsTotal, toStripeCents } from "../../utils/pricing";
 import { PLATFORM_FEE_PERCENT, STRIPE_SECRET_KEY } from "../../config";
 import PayoutSvc from "../payout/payout.service";
@@ -58,7 +58,7 @@ export default class AssetBookingSvc {
     asset: {
       id: string;
       price: { toNumber(): number };
-      billingRate: any;
+      billingRate: BillingRate;
       ownerId: string;
       category: string;
     },

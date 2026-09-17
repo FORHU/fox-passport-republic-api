@@ -35,9 +35,10 @@ export default class BookingEditRequestCtrl {
   static async getForBooking(req: Request, res: Response) {
     const { bookingKind, bookingId } = req.query as Record<string, string>;
     if (bookingKind !== "asset" && bookingKind !== "service") {
-      return res
-        .status(400)
-        .json({ success: false, message: "bookingKind must be asset or service" });
+      return res.status(400).json({
+        success: false,
+        message: "bookingKind must be asset or service",
+      });
     }
     if (!bookingId) {
       return res

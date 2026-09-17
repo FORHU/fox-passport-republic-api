@@ -46,9 +46,8 @@ export default class BookingEditRequestSvc {
     startDate: Date,
     endDate: Date,
   ): Promise<number> {
-    const { default: PassportSvc } = await import(
-      "../passport/passport.service"
-    );
+    const { default: PassportSvc } =
+      await import("../passport/passport.service");
 
     if (bookingKind === "asset") {
       const asset = await prisma.asset.findUnique({
@@ -231,7 +230,9 @@ export default class BookingEditRequestSvc {
         title: "A citizen requested a change to their booking",
         message: `${booking.user?.name ?? "A citizen"} requested a change to their booking of ${booking.asset.name}.`,
         metadata: { link: `/booking/fulfillment/asset/${bookingId}` },
-      }).catch((e) => console.error("Failed to notify owner of edit request", e));
+      }).catch((e) =>
+        console.error("Failed to notify owner of edit request", e),
+      );
 
       return request;
     }
@@ -247,7 +248,7 @@ export default class BookingEditRequestSvc {
       : booking.scheduledDate;
     const endDate = proposedEndDate
       ? new Date(proposedEndDate)
-      : booking.endDate ?? startDate;
+      : (booking.endDate ?? startDate);
 
     if (proposedStartDate || proposedEndDate) {
       await this.assertAvailable(
@@ -476,9 +477,7 @@ export default class BookingEditRequestSvc {
         ? "The provider approved your requested change. Pay the price difference to confirm it."
         : "The provider approved your requested change — it's already been applied.",
       metadata: { link: `/booking/fulfillment/${bookingKind}/${bookingId}` },
-    }).catch((e) =>
-      console.error("Failed to notify citizen of approval", e),
-    );
+    }).catch((e) => console.error("Failed to notify citizen of approval", e));
   }
 
   private static async applyChange(

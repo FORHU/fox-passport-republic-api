@@ -8,11 +8,7 @@ const router = express.Router();
 router.get("/availability", ServiceBookingCtrl.getAvailability);
 
 // Protected — live price preview for checkout, incl. voucher validation (must be before /:id)
-router.get(
-  "/price-preview",
-  authenticate,
-  ServiceBookingCtrl.previewPrice,
-);
+router.get("/price-preview", authenticate, ServiceBookingCtrl.previewPrice);
 
 // Public — list bookings (filtered by ?userId or ?ownerId)
 router.get("/", optionalAuth, ServiceBookingCtrl.getAll);
