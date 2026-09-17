@@ -341,6 +341,18 @@ describe("Central Payment checkout — HTTP layer", () => {
       expect(res.body).toEqual({
         eventId: event.id,
         currency: "PHP",
+        // Per-item breakdown — the payment panel reads this to show "what
+        // you're paying for" and each line's own discount, if any (see
+        // PricingSvc.resolveEventLineItemDiscounts).
+        items: [
+          {
+            type: "venue",
+            name: "HTTP Test Venue",
+            providerName: "Checkout Provider",
+            amount: 2000,
+            discountAmount: 0,
+          },
+        ],
         subtotalAmount: 2000,
         discountAmount: 0,
         platformFeeAmount: 0,

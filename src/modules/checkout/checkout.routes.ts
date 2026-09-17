@@ -25,10 +25,16 @@ router.get(
   authenticate,
   CheckoutCtrl.getEventPaymentSummary,
 );
+router.post("/events/:eventId/cancel", authenticate, CheckoutCtrl.cancelEvent);
 router.post(
   "/partnerships/:proposalId/checkout",
   authenticate,
   CheckoutCtrl.createSponsorshipCheckout,
+);
+router.post(
+  "/partnerships/:proposalId/cancel",
+  authenticate,
+  CheckoutCtrl.cancelSponsorship,
 );
 router.get("/invoices/:id", authenticate, CheckoutCtrl.getInvoiceStatus);
 

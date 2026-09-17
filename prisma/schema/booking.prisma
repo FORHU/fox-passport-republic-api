@@ -58,58 +58,123 @@ model BookingAttendee {
 }
 
 model ServiceBooking {
-  id                   String            @id @default(uuid())
+  id                   String               @id @default(uuid())
   serviceId            String
   userId               String
   scheduledDate        DateTime
   endDate              DateTime?
-  guestCount           Int               @default(1)
+  guestCount           Int                  @default(1)
   location             String
   notes                String?
-  totalAmount          Decimal           @db.Decimal(12, 2)
-  platformFee          Decimal           @default(0) @db.Decimal(12, 2)
-  platformFeeAmount    Decimal           @default(0) @db.Decimal(12, 2)
-  status               ItemBookingStatus @default(pending)
-  paymentStatus        PaymentStatus     @default(pending)
+  totalAmount          Decimal              @db.Decimal(12, 2)
+  platformFee          Decimal              @default(0) @db.Decimal(12, 2)
+  platformFeeAmount    Decimal              @default(0) @db.Decimal(12, 2)
+  discountAmount       Decimal              @default(0) @db.Decimal(12, 2)
+  voucherId            String?
+  status               ItemBookingStatus    @default(pending)
+  paymentStatus        PaymentStatus        @default(pending)
   paymentTransactionId String?
-  stripePaymentId      String?           @unique
+  stripePaymentId      String?              @unique
   paymentMethod        String?
   disputeReason        String?
   disputeAt            DateTime?
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
-  service              Service           @relation(fields: [serviceId], references: [id])
-  user                 User              @relation(fields: [userId], references: [id])
+  providerCancelledAt  DateTime?
+  providerCancelReason String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  service              Service              @relation(fields: [serviceId], references: [id])
+  user                 User                 @relation(fields: [userId], references: [id])
+  editRequests         BookingEditRequest[]
+  refunds              Refund[]
+  voucherRedemption    VoucherRedemption?
 
   @@map("service_bookings")
 }
 
 model AssetBooking {
-  id                   String            @id @default(uuid())
+  id                   String               @id @default(uuid())
   assetId              String
   userId               String
   startDate            DateTime
   endDate              DateTime
-  quantity             Int               @default(1)
-  fulfillmentType      String            @default("pickup")
+  quantity             Int                  @default(1)
+  fulfillmentType      String               @default("pickup")
   deliveryAddress      String?
   notes                String?
-  totalAmount          Decimal           @db.Decimal(12, 2)
-  platformFee          Decimal           @default(0) @db.Decimal(12, 2)
-  platformFeeAmount    Decimal           @default(0) @db.Decimal(12, 2)
-  status               ItemBookingStatus @default(pending)
-  paymentStatus        PaymentStatus     @default(pending)
+  totalAmount          Decimal              @db.Decimal(12, 2)
+  platformFee          Decimal              @default(0) @db.Decimal(12, 2)
+  platformFeeAmount    Decimal              @default(0) @db.Decimal(12, 2)
+  discountAmount       Decimal              @default(0) @db.Decimal(12, 2)
+  voucherId            String?
+  status               ItemBookingStatus    @default(pending)
+  paymentStatus        PaymentStatus        @default(pending)
   paymentTransactionId String?
-  stripePaymentId      String?           @unique
+  stripePaymentId      String?              @unique
   paymentMethod        String?
   disputeReason        String?
   disputeAt            DateTime?
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
-  asset                Asset             @relation(fields: [assetId], references: [id])
-  user                 User              @relation(fields: [userId], references: [id])
+  providerCancelledAt  DateTime?
+  providerCancelReason String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  asset                Asset                @relation(fields: [assetId], references: [id])
+  user                 User                 @relation(fields: [userId], references: [id])
+  editRequests         BookingEditRequest[]
+  refunds              Refund[]
+  voucherRedemption    VoucherRedemption?
 
   @@map("asset_bookings")
+}
+
+enum BookingEditRequestStatus {
+  pending
+  approved
+  declined
+  withdrawn
+  expired
+}
+
+// A citizen's proposed change (guest count/quantity, dates) to an existing
+// paid AssetBooking/ServiceBooking, subject to the owner's approval. Exactly
+// one of assetBookingId/serviceBookingId is set. See
+// docs/adr/0003-booking-edit-requests.md.
+model BookingEditRequest {
+  id               String                   @id @default(uuid())
+  assetBookingId   String?
+  serviceBookingId String?
+  requestedById    String
+  status           BookingEditRequestStatus @default(pending)
+
+  proposedQuantity   Int? // AssetBooking only — a real price multiplier there
+  proposedGuestCount Int? // ServiceBooking only — capacity, not a price input
+  proposedStartDate  DateTime?
+  proposedEndDate    DateTime?
+
+  currentTotalAmount  Decimal @db.Decimal(12, 2)
+  proposedTotalAmount Decimal @db.Decimal(12, 2)
+  priceDelta          Decimal @db.Decimal(12, 2) // proposedTotalAmount - currentTotalAmount
+
+  reason        String?
+  declineReason String?
+  respondedById String?
+  respondedAt   DateTime?
+  expiresAt     DateTime
+
+  // Set once the change actually takes effect on the booking: immediately on
+  // approval when priceDelta is 0 or negative (refund fires synchronously),
+  // or once the delta PaymentIntent below is confirmed when priceDelta > 0.
+  appliedAt            DateTime?
+  deltaPaymentIntentId String?
+  deltaRefundId        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assetBooking   AssetBooking?   @relation(fields: [assetBookingId], references: [id])
+  serviceBooking ServiceBooking? @relation(fields: [serviceBookingId], references: [id])
+  requestedBy    User            @relation(fields: [requestedById], references: [id])
+
+  @@map("booking_edit_requests")
 }
 
 model Waitlist {

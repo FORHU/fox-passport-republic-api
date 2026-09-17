@@ -15,7 +15,6 @@ enum InvoiceSourceType {
   event_asset_transaction
   event_service_transaction
   event_venue_transaction
-  partner_investment
   sponsorship
 }
 
@@ -44,6 +43,7 @@ enum PayoutSourceType {
   event_venue_transaction
   event_host_markup
   sponsorship
+  investor_revenue_share
 }
 
 model PlatformFeeConfig {
@@ -84,6 +84,21 @@ model Promotion {
   category        String?
   subcategory     String?
 
+  // Null on all four: an admin-created, platform-wide promotion (its
+  // discount is absorbed by the platform — see PayoutSvc). Non-null
+  // providerId with exactly one of assetId/serviceId/venueId set: a Foxer's
+  // own promo on their own listing, funded out of that Foxer's own payout
+  // rather than the platform's. Enforced in PromotionSvc, not the schema.
+  // Matches a *direct* asset/service/venue booking (see Event.voucherId's
+  // comment) AND a matching line item inside a multi-provider Event
+  // checkout (see PricingSvc.resolveEventLineItemDiscounts /
+  // InvoiceItem.discountAmount) — the same code works either way a citizen
+  // buys that exact listing.
+  providerId String?
+  assetId    String?
+  serviceId  String?
+  venueId    String?
+
   discountType  String // "percentage" or "fixed"
   discountValue Decimal  @db.Decimal(12, 2)
   minSubtotal   Decimal? @db.Decimal(12, 2)
@@ -93,6 +108,14 @@ model Promotion {
   startDate DateTime?
   endDate   DateTime?
 
+  // When true, this promotion applies automatically at checkout to anyone
+  // whose purchase matches its scope — no code to type. Still redeemed
+  // through the ordinary Voucher/VoucherRedemption machinery: turning this
+  // on gets the promotion exactly one system-generated, never-shown Voucher
+  // (see PromotionSvc.ensureAutoApplyVoucher), so usageLimit/perUserLimit
+  // are enforced identically to a code-based promotion.
+  autoApply Boolean @default(false)
+
   usageLimit   Int?
   perUserLimit Int?
 
@@ -100,7 +123,9 @@ model Promotion {
   updatedAt DateTime @updatedAt
 
   vouchers Voucher[]
+  provider User?     @relation(fields: [providerId], references: [id])
 
+  @@index([providerId])
   @@map("promotions")
 }
 
@@ -114,8 +139,9 @@ model Voucher {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  promotion   Promotion           @relation(fields: [promotionId], references: [id], onDelete: Cascade)
-  redemptions VoucherRedemption[]
+  promotion    Promotion           @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  redemptions  VoucherRedemption[]
+  invoiceItems InvoiceItem[]
 
   @@map("vouchers")
 }
@@ -124,14 +150,40 @@ model VoucherRedemption {
   id             String  @id @default(uuid())
   voucherId      String
   userId         String
-  invoiceId      String  @unique
   discountAmount Decimal @db.Decimal(12, 2)
+
+  // Nullable: an Asset/Service booking has no Invoice row (it settles
+  // through its own `paymentTransactionId`, not the generic Payment/Invoice
+  // model) — same generalization as `Refund` above. Exactly one of
+  // invoiceId/invoiceItemId/assetBookingId/serviceBookingId/eventId is set
+  // on any given row.
+  //
+  // `invoiceId` alone (no `invoiceItemId`) is a *blanket* platform-wide
+  // discount against the whole invoice — the pre-existing single-code
+  // behavior. `invoiceItemId` set is a Foxer-owned discount scoped to one
+  // line item inside a multi-provider Event checkout (see PricingSvc.
+  // resolveEventLineItemDiscounts) — an Invoice can carry one blanket
+  // redemption *and* one per-item redemption per item, which is why
+  // `invoiceId` is no longer `@unique`; `invoiceItemId` still is, since a
+  // given item can only ever be discounted once.
+  invoiceId        String?
+  invoiceItemId    String? @unique
+  assetBookingId   String? @unique
+  serviceBookingId String? @unique
+  // A direct venue booking's redemption — see Event.voucherId's comment.
+  // Never set for a template-based Event (those redeem through
+  // invoiceId/invoiceItemId).
+  eventId          String? @unique
 
   redeemedAt DateTime @default(now())
 
-  voucher Voucher @relation(fields: [voucherId], references: [id])
-  user    User    @relation(fields: [userId], references: [id])
-  invoice Invoice @relation(fields: [invoiceId], references: [id])
+  voucher        Voucher         @relation(fields: [voucherId], references: [id])
+  user           User            @relation(fields: [userId], references: [id])
+  invoice        Invoice?        @relation(fields: [invoiceId], references: [id])
+  invoiceItem    InvoiceItem?    @relation(fields: [invoiceItemId], references: [id])
+  assetBooking   AssetBooking?   @relation(fields: [assetBookingId], references: [id])
+  serviceBooking ServiceBooking? @relation(fields: [serviceBookingId], references: [id])
+  event          Event?          @relation(fields: [eventId], references: [id])
 
   @@map("voucher_redemptions")
 }
@@ -156,11 +208,11 @@ model Invoice {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  payer      User               @relation(fields: [payerId], references: [id])
-  items      InvoiceItem[]
-  checkouts  Checkout[]
-  payments   Payment[]
-  redemption VoucherRedemption?
+  payer       User                @relation(fields: [payerId], references: [id])
+  items       InvoiceItem[]
+  checkouts   Checkout[]
+  payments    Payment[]
+  redemptions VoucherRedemption[]
 
   @@map("invoices")
 }
@@ -173,7 +225,20 @@ model InvoiceItem {
   sourceType  InvoiceSourceType
   sourceId    String
 
-  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  // Per-item discount for a multi-provider Event checkout — see
+  // PricingSvc.resolveEventLineItemDiscounts and
+  // PaymentPayoutSvc.allocatePayouts. Zero/null on every item this never
+  // applies to (single-item invoices like a sponsorship, or an Event item
+  // nobody discounted). `voucherId` names which code did it, purely so the
+  // payout webhook doesn't have to join back through VoucherRedemption to
+  // find out — the actual redemption bookkeeping still lives there.
+  discountAmount Decimal @default(0) @db.Decimal(12, 2)
+  voucherId      String?
+
+  invoice    Invoice            @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  voucher    Voucher?           @relation(fields: [voucherId], references: [id])
+  redemption VoucherRedemption?
+  refunds    Refund[]
 
   @@map("invoice_items")
 }
@@ -237,7 +302,11 @@ model Payout {
 
 model Refund {
   id                String       @id @default(uuid())
-  paymentId         String
+  // Nullable: an Asset/Service booking refund settles against that booking's
+  // own `stripePaymentId` field directly, not a generic Payment row — see
+  // assetBookingId/serviceBookingId below. Exactly one of paymentId/
+  // assetBookingId/serviceBookingId is set on any given row.
+  paymentId         String?
   amount            Decimal      @db.Decimal(12, 2)
   reason            String?
   providerReference String?      @unique
@@ -245,9 +314,22 @@ model Refund {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
-  payment   Payment  @relation(fields: [paymentId], references: [id])
+  payment   Payment? @relation(fields: [paymentId], references: [id])
   booking   Booking? @relation(fields: [bookingId], references: [id])
   bookingId String?
+
+  assetBooking     AssetBooking?   @relation(fields: [assetBookingId], references: [id])
+  assetBookingId   String?
+  serviceBooking   ServiceBooking? @relation(fields: [serviceBookingId], references: [id])
+  serviceBookingId String?
+
+  // A multi-provider Event checkout's per-item refund (see
+  // EventCheckoutSvc.cancelEvent) — `paymentId` still names the one shared
+  // Stripe PaymentIntent (all providers on one Event share a single
+  // payment), this just says which line item this particular refund
+  // covers. Null for every other refund kind above.
+  invoiceItem   InvoiceItem? @relation(fields: [invoiceItemId], references: [id])
+  invoiceItemId String?
 
   @@map("refunds")
 }

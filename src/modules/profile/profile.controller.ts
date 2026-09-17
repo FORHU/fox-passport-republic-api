@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import ProfileSvc from "./profile.service";
+import { SUPPORTED_CURRENCIES } from "../fx/fx.service";
 
 export default class ProfileCtrl {
   // Get current user profile
@@ -48,6 +49,9 @@ export default class ProfileCtrl {
         profileImage: Joi.string().uri().optional(),
         city: Joi.string().optional(),
         isPrivate: Joi.boolean().optional(),
+        preferredCurrency: Joi.string()
+          .valid(...SUPPORTED_CURRENCIES)
+          .optional(),
       });
 
       const { error, value } = schema.validate(req.body);

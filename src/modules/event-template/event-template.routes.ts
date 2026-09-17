@@ -121,6 +121,6 @@ router.patch(
 
 // Approve/reject moved to admin.routes.ts (AdminCtrl) — this pair had
 // diverged from it (no socket announce) and this app only ever called the
-// admin path. See docs/TOMORROW.md.
+// admin path. See docs/NEXT.md.
 
 export default router;

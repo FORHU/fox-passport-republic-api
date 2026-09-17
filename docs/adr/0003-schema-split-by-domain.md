@@ -127,7 +127,7 @@ it has never applied, tries to run it, and fails because every table already
 exists — at container *startup*, not at a moment anyone is watching.
 
 Two signals this is not hypothetical: both repositories have a `staging` branch,
-and `TOMORROW.md` records that staging and prod still owe a `migrate deploy` for
+and `NEXT.md` records that staging and prod still owe a `migrate deploy` for
 `add_audit_log`. At least one environment is already behind, which is exactly
 the case that breaks.
 

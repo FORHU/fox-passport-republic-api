@@ -7,6 +7,9 @@ const router = express.Router();
 // Public — availability check (must be before /:id)
 router.get("/availability", AssetBookingCtrl.getAvailability);
 
+// Protected — live price preview for checkout, incl. voucher validation (must be before /:id)
+router.get("/price-preview", authenticate, AssetBookingCtrl.previewPrice);
+
 // Public — list bookings (filtered by ?userId or ?ownerId)
 router.get("/", optionalAuth, AssetBookingCtrl.getAll);
 
@@ -34,5 +37,12 @@ router.patch(
 
 // Protected — client reports no-show / problem (disputes escrow)
 router.patch("/:id/dispute", authenticate, AssetBookingCtrl.dispute);
+
+// Protected — owner cancels because they can't deliver; always a full refund
+router.patch(
+  "/:id/provider-cancel",
+  authenticate,
+  AssetBookingCtrl.providerCancel,
+);
 
 export default router;

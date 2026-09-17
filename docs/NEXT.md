@@ -1,4 +1,4 @@
-# Tomorrow — the API
+# Next — the API
 
 **What to do next. Nothing else.** Written 9 Sep 2026, when `REDIS-PLAN.md` had
 grown into both the plan and the status of the whole repository and stopped
@@ -6,10 +6,12 @@ being either. This file is the running order; everything else is lookup.
 
 | Document                 | Role                                                        |
 | ------------------------ | ----------------------------------------------------------- |
-| `TOMORROW.md` (this file)| **What to do next.**                                        |
+| `NEXT.md` (this file)| **What to do next.**                                        |
 | `REDIS-PLAN.md`          | The caching and layering work: decisions, what landed, flags.|
 | `GOTCHAS.md`             | Ten things that fail quietly. Read before touching migrations, the schema, or moving files. |
 | `adr/`                   | Decisions that outlived their pull request.                 |
+| `PAYMENTS.md`            | How money actually moves today — pricing, Stripe Connect, the two parallel checkout systems, refunds, disputes, vouchers, and six live gaps between them. Written 15 Sep 2026. |
+| `PRICING-ADMINISTRATION-PRODUCT.md` | Product Management position on the platform-fee/promotion/voucher gap `PAYMENTS.md` found: schema + pricing-engine support exists, admin CRUD doesn't. Sets Platform Fee Administration as Priority 1. Written 14 Sep 2026. |
 
 ---
 

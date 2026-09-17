@@ -97,29 +97,61 @@ export default class WebhookSvc {
       const invoice = await tx.invoice.update({
         where: { id: checkout.invoiceId },
         data: { status: "paid" },
+        include: { items: true },
       });
 
-      // 5. Confirm Voucher Redemption if a discount was applied
-      if (invoice.discountAmount.toNumber() > 0 && invoice.discountSnapshot) {
-        const snapshot = invoice.discountSnapshot as { voucherId?: string };
-        if (snapshot.voucherId) {
-          // Verify if it hasn't been redeemed yet (should be unique per invoice)
-          const existingRedemption = await tx.voucherRedemption.findUnique({
-            where: { invoiceId: invoice.id },
+      // 5. Confirm Voucher Redemption(s) if a discount was applied. Two
+      // independent kinds, both only recorded now (payment actually
+      // succeeded), never at invoice creation — an abandoned/cancelled
+      // invoice must not consume a limited voucher's usage count:
+      //
+      //  - Blanket: a platform-wide code against the whole invoice.
+      //    `invoice.discountAmount` is the *combined* total (blanket +
+      //    every line item's own discount, see InvoiceSvc.createInvoice),
+      //    so the blanket row's own amount must come from the snapshot,
+      //    not that combined field, or the blanket voucher's analytics
+      //    would double-count line-item discounts that aren't its own.
+      //  - Per-item: a Foxer-owned code scoped to one line item in a
+      //    multi-provider Event checkout (see InvoiceItem.discountAmount).
+      const snapshot = invoice.discountSnapshot as {
+        voucherId?: string;
+        amount?: number;
+      } | null;
+      if (snapshot?.voucherId && (snapshot.amount ?? 0) > 0) {
+        const existingBlanket = await tx.voucherRedemption.findFirst({
+          where: { invoiceId: invoice.id, invoiceItemId: null },
+        });
+        if (!existingBlanket) {
+          await tx.voucherRedemption.create({
+            data: {
+              voucherId: snapshot.voucherId,
+              userId: invoice.payerId,
+              invoiceId: invoice.id,
+              discountAmount: snapshot.amount ?? 0,
+              redeemedAt: new Date(),
+            },
           });
-
-          if (!existingRedemption) {
-            await tx.voucherRedemption.create({
-              data: {
-                voucherId: snapshot.voucherId,
-                userId: invoice.payerId,
-                invoiceId: invoice.id,
-                discountAmount: invoice.discountAmount,
-                redeemedAt: new Date(),
-              },
-            });
-          }
         }
+      }
+
+      for (const item of invoice.items) {
+        if (!item.voucherId || item.discountAmount.toNumber() <= 0) continue;
+
+        const existingItemRedemption = await tx.voucherRedemption.findUnique({
+          where: { invoiceItemId: item.id },
+        });
+        if (existingItemRedemption) continue;
+
+        await tx.voucherRedemption.create({
+          data: {
+            voucherId: item.voucherId,
+            userId: invoice.payerId,
+            invoiceId: invoice.id,
+            invoiceItemId: item.id,
+            discountAmount: item.discountAmount,
+            redeemedAt: new Date(),
+          },
+        });
       }
 
       // (Later: Emit a domain event or call business modules to transition their state based on Invoice paid)

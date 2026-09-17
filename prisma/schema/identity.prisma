@@ -46,7 +46,12 @@ model User {
   stripeChargesEnabled     Boolean                    @default(false)
   stripePayoutsEnabled     Boolean                    @default(false)
   isEmailVerified          Boolean                    @default(false)
+  // Display-only — never used for pricing/charging, which always stays in
+  // whatever currency the underlying row (Invoice, PlatformFeeConfig, etc)
+  // was created in. Purely so the UI can show converted amounts.
+  preferredCurrency        String                     @default("PHP")
   payouts                  Payout[]
+  ownPromotions            Promotion[]
   stripeAccountId          String?                    @unique
   stripeOnboardingComplete Boolean                    @default(false)
   foxerSpecializations     FoxerSpecialization[]
@@ -82,28 +87,29 @@ model User {
   eventServiceBids         EventServiceBid[]
   eventAssetBids           EventAssetBid[]
   invoices                 Invoice[]
+  bookingEditRequests      BookingEditRequest[]
 
   @@map("users")
 }
 
 model RoleRequest {
-  id                      String                   @id @default(uuid())
-  userId                  String
-  roleType                RoleType
-  status                  RequestStatus            @default(pending)
-  reviewedBy              String?
-  reviewedAt              DateTime?
-  rejectionReason         String?
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
+  id                        String                     @id @default(uuid())
+  userId                    String
+  roleType                  RoleType
+  status                    RequestStatus              @default(pending)
+  reviewedBy                String?
+  reviewedAt                DateTime?
+  rejectionReason           String?
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
   gearFoxerApplication      GearFoxerApplication?
   serviceFoxerApplication   ServiceFoxerApplication?
   performerFoxerApplication PerformerFoxerApplication?
   eventFoxerApplication     EventFoxerApplication?
   investorApplication       InvestorApplication?
   venueFoxerApplication     VenueFoxerApplication?
-  reviewer                User?                    @relation("Reviewer", fields: [reviewedBy], references: [id])
-  user                    User                     @relation("Applicant", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer                  User?                      @relation("Reviewer", fields: [reviewedBy], references: [id])
+  user                      User                       @relation("Applicant", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, roleType])
   @@map("role_requests")

@@ -2,6 +2,11 @@ import { prisma } from "../../utils/prisma";
 import { PayoutSourceType } from "@prisma/client";
 import PayoutSvc from "../payout/payout.service";
 
+/**
+ * See docs/adr/0002-stripe-connect-payouts.md's "Addendum: why there are two
+ * payout-computing services" for why this exists alongside
+ * `payout/payout.service.ts` rather than being merged into it.
+ */
 export default class PaymentPayoutSvc {
   /**
    * Distributes funds for a paid invoice to the respective providers.
@@ -55,21 +60,40 @@ export default class PaymentPayoutSvc {
         // Mock Gateway Fee for Stripe (e.g., 2.9% + $0.30/Php15)
         const gatewayFee = itemAmount * 0.029 + 15 * itemRatio;
 
-        const payoutAmount = itemAmount - itemPlatformFee - gatewayFee;
+        // A Foxer-owned voucher scoped to this exact line item (see
+        // PricingSvc.resolveEventLineItemDiscounts / InvoiceItem.
+        // discountAmount) is always provider-funded by construction — only
+        // an admin's platform-wide promotion can lack that scope, and a
+        // platform-wide discount is never recorded per item, only against
+        // the invoice as a whole (the "we do not subtract the discount"
+        // rule above). So unlike that rule, an item's own discountAmount
+        // always comes out of that item's own provider, never the platform.
+        const itemDiscountAmount = item.discountAmount.toNumber();
+
+        const payoutAmount =
+          itemAmount - itemDiscountAmount - itemPlatformFee - gatewayFee;
 
         // Find recipient ID based on source type. `sourceType` can also be
-        // `booking` or `partner_investment` (InvoiceSourceType, not
-        // PayoutSourceType) — those aren't payable here and fall through to
-        // the `!recipientId` skip below.
+        // `booking` (InvoiceSourceType, not PayoutSourceType) — that isn't
+        // payable here and falls through to the `!recipientId` skip below.
         let recipientId = "";
         let payoutSourceType: PayoutSourceType | null = null;
+        // Only a venue transaction can be split with an investor here — an
+        // investor's `revenueSharePercent` targets a Venue or Event, and a
+        // Venue is the only one of those two reachable from this invoice's
+        // line items (an Event's own cut is the host markup, which never
+        // appears as an invoice line item — see payout/payout.service.ts).
+        let venueIdForInvestorSplit: string | null = null;
 
         switch (item.sourceType) {
           case PayoutSourceType.event_venue_transaction: {
             const venueTx = await tx.eventVenueTransaction.findUnique({
               where: { id: item.sourceId },
             });
-            if (venueTx) recipientId = venueTx.providerId;
+            if (venueTx) {
+              recipientId = venueTx.providerId;
+              venueIdForInvestorSplit = venueTx.venueId;
+            }
             payoutSourceType = PayoutSourceType.event_venue_transaction;
             break;
           }
@@ -106,6 +130,44 @@ export default class PaymentPayoutSvc {
 
         if (!recipientId || !payoutSourceType) continue; // Unable to resolve recipient
 
+        // Revenue-share split: any active investor(s) who pledged capital
+        // against this venue get their percentage carved out of the mayor's
+        // own payoutAmount (not the citizen's total or the platform's fee —
+        // this is an agreement between the investor and the venue owner).
+        // The arithmetic itself lives in `PayoutSvc.resolveInvestorSplit`,
+        // shared with payout/payout.service.ts's `createPayoutsForEventBooking`
+        // — this caller just writes the result through the same `tx`
+        // transaction client the rest of this loop already uses, since
+        // firing Stripe transfers happens later, outside it.
+        let ownerPayoutAmount = payoutAmount;
+        if (venueIdForInvestorSplit) {
+          const split = await PayoutSvc.resolveInvestorSplit(tx, payoutAmount, {
+            targetVenueId: venueIdForInvestorSplit,
+          });
+          ownerPayoutAmount = split.ownerAmount;
+
+          for (const cut of split.investorCuts) {
+            const investorPayout = await tx.payout.upsert({
+              where: {
+                sourceType_sourceId_providerId: {
+                  sourceType: PayoutSourceType.investor_revenue_share,
+                  sourceId: item.sourceId,
+                  providerId: cut.partnerId,
+                },
+              },
+              create: {
+                providerId: cut.partnerId,
+                sourceType: PayoutSourceType.investor_revenue_share,
+                sourceId: item.sourceId,
+                allocationAmount: cut.amount,
+                payoutAmount: cut.amount,
+              },
+              update: {},
+            });
+            ids.push(investorPayout.id);
+          }
+        }
+
         // Idempotency guard: the @@unique([sourceType, sourceId, providerId])
         // constraint means calling this twice for the same provider/source
         // is a no-op the second time, so a retried webhook never double-pays.
@@ -124,7 +186,7 @@ export default class PaymentPayoutSvc {
             allocationAmount: itemAmount,
             platformFeeAmount: itemPlatformFee,
             gatewayFeeAmount: gatewayFee,
-            payoutAmount: payoutAmount,
+            payoutAmount: ownerPayoutAmount,
           },
           update: {}, // already exists — no-op, this is the idempotency guard
         });

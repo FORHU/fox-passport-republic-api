@@ -12,7 +12,7 @@ import {
 /**
  * Pure geometry backing venue service-area polygons: `assertNoOverlap` and
  * the create/update Joi schemas both go through these functions before a
- * boundary is persisted. Flagged as untested in docs/TOMORROW.md's 5 Sep map
+ * boundary is persisted. Flagged as untested in docs/NEXT.md's 5 Sep map
  * audit — this closes that gap for the API side.
  */
 
