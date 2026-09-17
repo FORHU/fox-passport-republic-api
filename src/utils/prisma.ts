@@ -50,6 +50,21 @@ const createPrismaClient = () =>
 // discard that narrowing and let an omitted field look present again.
 type AppPrismaClient = ReturnType<typeof createPrismaClient>;
 
+/**
+ * The type every `tx: ???` parameter across the Phase B availability/
+ * transaction-status/atomicity work must use — NOT the generic
+ * `Prisma.TransactionClient` from `@prisma/client`. That generic type
+ * describes the vanilla, un-narrowed client; this project's `prisma` export
+ * carries the `omit: { user: { password: true } }` narrowing above, so a
+ * function typed to accept the generic client rejects this project's actual
+ * client as a default value (TypeScript caught this for real — see the
+ * commit that introduced this type for the exact error).
+ */
+export type AppTransactionClient = Omit<
+  AppPrismaClient,
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+>;
+
 const globalForPrisma = globalThis as unknown as { prisma?: AppPrismaClient };
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();

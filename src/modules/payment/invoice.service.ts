@@ -1,4 +1,4 @@
-import { prisma } from "../../utils/prisma";
+import { prisma, AppTransactionClient } from "../../utils/prisma";
 import PricingSvc, { PricingContext } from "../pricing/pricing.service";
 import { Prisma, InvoiceSourceType } from "@prisma/client";
 type Decimal = Prisma.Decimal;
@@ -28,13 +28,24 @@ export interface CreateInvoiceParams {
 export default class InvoiceSvc {
   /**
    * Creates an invoice safely. Ensures no duplicate transactions are invoiced.
+   *
+   * `externalTx`: when supplied (the Phase B checkout atomicity work), this
+   * participates in the caller's own transaction instead of opening a new
+   * one — see the identical pattern on EventTransactionSvc.createTransactionsFromTemplate.
+   * The event-checkout flow needs the double-invoicing guard, the pricing
+   * calculation, and the actual Invoice row all inside the SAME transaction
+   * as its booking lock and availability revalidation, not a separate,
+   * independently-committing one.
    */
-  static async createInvoice(data: CreateInvoiceParams) {
+  static async createInvoice(
+    data: CreateInvoiceParams,
+    externalTx?: AppTransactionClient,
+  ) {
     if (!data.items || data.items.length === 0) {
       throw new Error("Cannot create an invoice without items.");
     }
 
-    return prisma.$transaction(async (tx) => {
+    const run = async (tx: AppTransactionClient) => {
       // 1. Prevent Double Invoicing
       // Check if any of the provided sourceIds are already in an active invoice.
       for (const item of data.items) {
@@ -133,7 +144,10 @@ export default class InvoiceSvc {
       });
 
       return invoice;
-    });
+    };
+
+    if (externalTx) return run(externalTx);
+    return prisma.$transaction(run);
   }
 
   static async getInvoice(invoiceId: string) {

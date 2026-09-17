@@ -177,52 +177,59 @@ model EventOrganizerAssignment {
 }
 
 model EventAssetTransaction {
-  id               String            @id @default(uuid())
-  eventId          String
-  bookingId        String?
-  assetId          String
-  providerId       String
-  quantity         Int               @default(1)
-  status           TransactionStatus @default(pending)
-  agreedPrice      Decimal           @db.Decimal(12, 2)
-  included         Boolean           @default(true)
-  currency         String            @default("PHP")
-  stripeTransferId String?           @unique
-  disputeReason    String?
-  disputeAt        DateTime?
-  lockedAt         DateTime?
-  releasedAt       DateTime?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  asset            Asset             @relation(fields: [assetId], references: [id])
-  event            Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  booking          Booking?          @relation(fields: [bookingId], references: [id])
-  provider         User              @relation("AssetProvider", fields: [providerId], references: [id])
+  id                   String            @id @default(uuid())
+  eventId              String
+  bookingId            String?
+  assetId              String
+  providerId           String
+  quantity             Int               @default(1)
+  status               TransactionStatus @default(pending)
+  agreedPrice          Decimal           @db.Decimal(12, 2)
+  included             Boolean           @default(true)
+  currency             String            @default("PHP")
+  stripeTransferId     String?           @unique
+  disputeReason        String?
+  disputeAt            DateTime?
+  lockedAt             DateTime?
+  releasedAt           DateTime?
+  // Ad-hoc marketplace items only (Design A); null for pre-attached items,
+  // which never enter pending_provider_confirmation. Enforced by a DB CHECK
+  // — see the Phase B marketplace migration.
+  confirmationDeadline DateTime?
+  rejectionReason      String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  asset                Asset             @relation(fields: [assetId], references: [id])
+  event                Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  booking              Booking?          @relation(fields: [bookingId], references: [id])
+  provider             User              @relation("AssetProvider", fields: [providerId], references: [id])
 
   @@map("event_asset_transactions")
 }
 
 model EventServiceTransaction {
-  id               String            @id @default(uuid())
-  eventId          String
-  bookingId        String?
-  serviceId        String
-  providerId       String
-  status           TransactionStatus @default(pending)
-  agreedPrice      Decimal           @db.Decimal(12, 2)
-  included         Boolean           @default(true)
-  currency         String            @default("PHP")
-  stripeTransferId String?           @unique
-  disputeReason    String?
-  disputeAt        DateTime?
-  lockedAt         DateTime?
-  releasedAt       DateTime?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  event            Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  booking          Booking?          @relation(fields: [bookingId], references: [id])
-  provider         User              @relation("ServiceProvider", fields: [providerId], references: [id])
-  service          Service           @relation(fields: [serviceId], references: [id])
+  id                   String            @id @default(uuid())
+  eventId              String
+  bookingId            String?
+  serviceId            String
+  providerId           String
+  status               TransactionStatus @default(pending)
+  agreedPrice          Decimal           @db.Decimal(12, 2)
+  included             Boolean           @default(true)
+  currency             String            @default("PHP")
+  stripeTransferId     String?           @unique
+  disputeReason        String?
+  disputeAt            DateTime?
+  lockedAt             DateTime?
+  releasedAt           DateTime?
+  confirmationDeadline DateTime?
+  rejectionReason      String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  event                Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  booking              Booking?          @relation(fields: [bookingId], references: [id])
+  provider             User              @relation("ServiceProvider", fields: [providerId], references: [id])
+  service              Service           @relation(fields: [serviceId], references: [id])
 
   @@map("event_service_transactions")
 }
@@ -276,6 +283,7 @@ enum EventStatus {
 
 enum TransactionStatus {
   pending
+  pending_provider_confirmation
   approved
   rejected
   cancelled

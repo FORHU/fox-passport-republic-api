@@ -1,4 +1,4 @@
-import { prisma } from "../../utils/prisma";
+import { prisma, AppTransactionClient } from "../../utils/prisma";
 import { eventTemplateCache } from "../../utils/cache-namespaces";
 import {
   Prisma,
@@ -423,6 +423,13 @@ export default class EventTemplateRepo {
   }
 
   // VENUES
+  /**
+   * `tx`: when supplied (the match-flow atomicity refactor), this participates
+   * in the caller's own transaction and deliberately skips `retiring`'s cache
+   * invalidation — invalidating mid-transaction would act on state that might
+   * still roll back. The caller is responsible for invalidating
+   * eventTemplateCache itself, once, after its transaction commits.
+   */
   static async attachVenue(
     templateId: string,
     venueId?: string,
@@ -431,9 +438,10 @@ export default class EventTemplateRepo {
     matchedAt?: Date,
     agreedPrice?: number,
     isOptional?: boolean,
+    tx?: AppTransactionClient,
   ) {
-    return this.retiring(
-      prisma.eventTemplateVenue.create({
+    const create = (client: AppTransactionClient) =>
+      client.eventTemplateVenue.create({
         data: {
           templateId,
           venueId,
@@ -444,8 +452,10 @@ export default class EventTemplateRepo {
           ...(matchData || {}),
         },
         include: { venue: true },
-      }),
-    );
+      });
+
+    if (tx) return create(tx);
+    return this.retiring(create(prisma));
   }
 
   static async updateVenueMatch(

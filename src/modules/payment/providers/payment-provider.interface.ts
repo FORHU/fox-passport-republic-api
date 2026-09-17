@@ -25,6 +25,7 @@ export interface PaymentProvider {
     currency: string,
     successUrl: string,
     cancelUrl: string,
+    idempotencyKey?: string,
   ): Promise<CheckoutSessionData>;
 
   /**

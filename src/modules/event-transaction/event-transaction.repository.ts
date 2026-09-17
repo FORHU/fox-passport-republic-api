@@ -1,4 +1,4 @@
-import { prisma } from "../../utils/prisma";
+import { prisma, AppTransactionClient } from "../../utils/prisma";
 import { Prisma, TransactionStatus } from "@prisma/client";
 
 export default class EventTransactionRepo {
@@ -21,8 +21,9 @@ export default class EventTransactionRepo {
 
   static async createAssetTransaction(
     data: Prisma.EventAssetTransactionUncheckedCreateInput,
+    tx: AppTransactionClient = prisma,
   ) {
-    return prisma.eventAssetTransaction.create({ data });
+    return tx.eventAssetTransaction.create({ data });
   }
 
   static async updateAssetStatus(
@@ -56,8 +57,9 @@ export default class EventTransactionRepo {
 
   static async createServiceTransaction(
     data: Prisma.EventServiceTransactionUncheckedCreateInput,
+    tx: AppTransactionClient = prisma,
   ) {
-    return prisma.eventServiceTransaction.create({ data });
+    return tx.eventServiceTransaction.create({ data });
   }
 
   static async updateServiceStatus(
@@ -91,8 +93,9 @@ export default class EventTransactionRepo {
 
   static async createVenueTransaction(
     data: Prisma.EventVenueTransactionUncheckedCreateInput,
+    tx: AppTransactionClient = prisma,
   ) {
-    return prisma.eventVenueTransaction.create({ data });
+    return tx.eventVenueTransaction.create({ data });
   }
 
   static async updateVenueStatus(

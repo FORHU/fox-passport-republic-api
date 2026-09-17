@@ -116,6 +116,7 @@ export default class UsersRepo {
     specialization?: string,
     city?: string,
     maxPrice?: number,
+    search?: string,
   ) {
     const allFoxerRoles: RoleType[] = [
       "serviceFoxer",
@@ -153,6 +154,9 @@ export default class UsersRepo {
       ...(city
         ? { city: { contains: city, mode: "insensitive" as const } }
         : {}),
+      ...(search
+        ? { name: { contains: search, mode: "insensitive" as const } }
+        : {}),
       ...(maxPrice !== undefined
         ? {
             OR: [
@@ -173,6 +177,7 @@ export default class UsersRepo {
     specialization?: string,
     city?: string,
     maxPrice?: number,
+    search?: string,
   ) {
     const skip = (page - 1) * limit;
     const where = this.buildFoxerWhere(
@@ -180,6 +185,7 @@ export default class UsersRepo {
       specialization,
       city,
       maxPrice,
+      search,
     );
     const priceCap = maxPrice !== undefined ? { lte: maxPrice } : undefined;
     const [foxers, total] = await Promise.all([

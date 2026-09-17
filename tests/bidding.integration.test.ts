@@ -89,8 +89,14 @@ describe('Bidding Lifecycle Integration Tests', () => {
     });
     serviceId = service.id;
 
+    // quantity: 4 — matches the template requirement and the "Correct
+    // Transaction Creation" test's proposedQuantity below. Before
+    // AvailabilitySvc existed, bid-quantity was only checked against the
+    // template requirement, never against actual asset inventory, so this
+    // fixture's implicit quantity: 1 default silently never mattered; now
+    // that real inventory checking exists, the fixture needs to be accurate.
     const asset = await prisma.asset.create({
-      data: { ownerId: gearFoxerId, category: 'sound_system', name: 'Speakers', description: 'desc', price: 100, billingRate: 'daily', status: 'available' }
+      data: { ownerId: gearFoxerId, category: 'sound_system', name: 'Speakers', description: 'desc', quantity: 4, price: 100, billingRate: 'daily', status: 'available' }
     });
     assetId = asset.id;
 

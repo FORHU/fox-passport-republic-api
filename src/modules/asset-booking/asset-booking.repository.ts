@@ -1,22 +1,25 @@
-import { prisma } from "../../utils/prisma";
+import { prisma, AppTransactionClient } from "../../utils/prisma";
 import { ItemBookingStatus, PaymentStatus } from "@prisma/client";
 
 export default class AssetBookingRepo {
-  static async create(data: {
-    assetId: string;
-    userId: string;
-    startDate: Date;
-    endDate: Date;
-    quantity: number;
-    fulfillmentType: string;
-    deliveryAddress?: string;
-    notes?: string;
-    totalAmount: number;
-    platformFeeAmount: number;
-    discountAmount?: number;
-    voucherId?: string | null;
-  }) {
-    return prisma.assetBooking.create({
+  static async create(
+    data: {
+      assetId: string;
+      userId: string;
+      startDate: Date;
+      endDate: Date;
+      quantity: number;
+      fulfillmentType: string;
+      deliveryAddress?: string;
+      notes?: string;
+      totalAmount: number;
+      platformFeeAmount: number;
+      discountAmount?: number;
+      voucherId?: string | null;
+    },
+    tx: AppTransactionClient = prisma,
+  ) {
+    return tx.assetBooking.create({
       data: {
         assetId: data.assetId,
         userId: data.userId,

@@ -220,6 +220,14 @@ router.post(
   requirePermission("refunds:manage"),
   AdminCtrl.resolveManualRefund,
 );
+// Itemized (single asset/service transaction) refund — Phase B marketplace
+// admin capability, distinct from the whole-booking /refunds/manual above.
+router.post(
+  "/transactions/:id/refund",
+  authenticate,
+  requirePermission("refunds:manage"),
+  AdminCtrl.itemizedRefund,
+);
 
 // Events (booking requests)
 router.get(

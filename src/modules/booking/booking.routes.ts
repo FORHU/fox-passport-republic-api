@@ -14,6 +14,15 @@ router.post("/from-template", authenticate, BookingCtrl.bookFromTemplate); // Bo
 router.post("/draft", authenticate, BookingCtrl.createDraftBooking); // Step 1: Create draft
 router.get("/venue-price-preview", authenticate, BookingCtrl.previewVenuePrice); // must be before /:id
 
+// ========== MARKETPLACE (PHASE B) ROUTES ==========
+// Ad-hoc item add. Remove/confirm/reject reuse the existing, centralized
+// PATCH /event-transactions/:id/review endpoint (action: confirm|reject|
+// cancel) — TransactionStatusSvc already authorizes each action against the
+// actual actor (provider for confirm/reject, booking owner for cancel), so
+// a second, booking-scoped "remove" route would just be a thinner
+// duplicate of the same call.
+router.post("/:id/items", authenticate, BookingCtrl.addAdHocItem);
+
 // ========== CANCELLATION & REFUND ROUTES ==========
 router.post("/:id/cancel/check", authenticate, BookingCtrl.cancelCheck);
 router.post("/:id/cancel", authenticate, BookingCtrl.cancelBooking);

@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { prisma } from "../../utils/prisma";
+import { prisma, AppTransactionClient } from "../../utils/prisma";
 
 export default class EventRepo {
   /**
@@ -52,29 +52,35 @@ export default class EventRepo {
    * service and venue.
    *
    * They are created together because they are one decision: the booking exists
-   * with all of its partners attached, or it does not exist.
-   *
-   * `$transaction` rather than the `Promise.all` the controller used. That
-   * version could leave a booking holding some of its escrow rows and no record
-   * that the rest were meant to be there - which nothing downstream checks for,
-   * because a partner that is simply absent looks exactly like a partner that
-   * was never included.
+   * with all of its partners attached, or it does not exist. Takes an
+   * already-open `tx` rather than opening its own transaction: the caller
+   * (BookingSvc) is where AvailabilitySvc.reserve runs — under its own row
+   * lock, in the same transaction as these inserts — because a repository
+   * (data access layer) isn't allowed to depend on a service; see the
+   * layer-boundary check in tools/validate-architecture.mjs. Sequential, not
+   * Promise.all: an interactive transaction shares one underlying
+   * connection, and concurrent queries against the same `tx` are not safe
+   * to issue in parallel.
    */
-  static async createEscrowTransactions(rows: {
-    assets: Prisma.EventAssetTransactionUncheckedCreateInput[];
-    services: Prisma.EventServiceTransactionUncheckedCreateInput[];
-    venues: Prisma.EventVenueTransactionUncheckedCreateInput[];
-  }) {
-    return prisma.$transaction([
-      ...rows.assets.map((data) =>
-        prisma.eventAssetTransaction.create({ data }),
-      ),
-      ...rows.services.map((data) =>
-        prisma.eventServiceTransaction.create({ data }),
-      ),
-      ...rows.venues.map((data) =>
-        prisma.eventVenueTransaction.create({ data }),
-      ),
-    ]);
+  static async createEscrowTransactions(
+    tx: AppTransactionClient,
+    rows: {
+      assets: Prisma.EventAssetTransactionUncheckedCreateInput[];
+      services: Prisma.EventServiceTransactionUncheckedCreateInput[];
+      venues: Prisma.EventVenueTransactionUncheckedCreateInput[];
+    },
+  ) {
+    const created: unknown[] = [];
+    for (const data of rows.assets) {
+      created.push(await tx.eventAssetTransaction.create({ data }));
+    }
+    for (const data of rows.services) {
+      created.push(await tx.eventServiceTransaction.create({ data }));
+    }
+    for (const data of rows.venues) {
+      created.push(await tx.eventVenueTransaction.create({ data }));
+    }
+
+    return created;
   }
 }

@@ -1,4 +1,5 @@
 import { EventCategory } from "@prisma/client";
+import { prisma, AppTransactionClient } from "../../utils/prisma";
 import { toEnum } from "../../utils/enums";
 import EventRequestRepo from "./event-request.repository";
 import EventTemplateRepo from "../event-template/event-template.repository";
@@ -36,16 +37,19 @@ export default class EventRequestSvc {
     });
   }
 
-  static async spawnRequestFromTemplate(data: {
-    clientId: string;
-    templateId: string;
-    name: string;
-    description: string;
-    startAt: Date;
-    endAt: Date;
-    guestCount: number;
-    totalAmount?: number;
-  }) {
+  static async spawnRequestFromTemplate(
+    data: {
+      clientId: string;
+      templateId: string;
+      name: string;
+      description: string;
+      startAt: Date;
+      endAt: Date;
+      guestCount: number;
+      totalAmount?: number;
+    },
+    tx: AppTransactionClient = prisma,
+  ) {
     // 1. Fetch Template
     const template = await EventTemplateRepo.findTemplateById(data.templateId);
     if (!template) throw new Error("Template not found");
@@ -68,24 +72,27 @@ export default class EventRequestSvc {
       : 0;
 
     // 2. Create Event without transactions (will be created after confirmation)
-    return EventRequestRepo.create({
-      client: { connect: { id: data.clientId } },
-      host: { connect: { id: template.ownerId } },
-      template: { connect: { id: data.templateId } },
-      name: data.name,
-      description: data.description,
-      eventCategory: template.category,
-      startAt: data.startAt,
-      endAt: data.endAt,
-      guestCount: data.guestCount,
-      totalAmount,
-      itemsTotal,
-      hostMarkupAmount,
-      platformFeeAmount,
-      targetCity: template.targetCity ?? undefined,
-      targetState: template.targetState ?? undefined,
-      targetCountry: template.targetCountry ?? undefined,
-    });
+    return EventRequestRepo.create(
+      {
+        client: { connect: { id: data.clientId } },
+        host: { connect: { id: template.ownerId } },
+        template: { connect: { id: data.templateId } },
+        name: data.name,
+        description: data.description,
+        eventCategory: template.category,
+        startAt: data.startAt,
+        endAt: data.endAt,
+        guestCount: data.guestCount,
+        totalAmount,
+        itemsTotal,
+        hostMarkupAmount,
+        platformFeeAmount,
+        targetCity: template.targetCity ?? undefined,
+        targetState: template.targetState ?? undefined,
+        targetCountry: template.targetCountry ?? undefined,
+      },
+      tx,
+    );
   }
 
   static async approveRequest(id: string, userId: string, systemRole: string) {

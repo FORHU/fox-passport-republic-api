@@ -12,6 +12,28 @@ export type RoleApplicationData = Record<string, unknown> & {
   specializations?: string[];
 };
 
+// Maps roleType -> the Prisma application model name nested under a RoleRequest.
+const APPLICATION_MODEL_BY_ROLE: Record<RoleType, string> = {
+  [RoleType.venueFoxer]: "venueFoxerApplication",
+  [RoleType.eventFoxer]: "eventFoxerApplication",
+  [RoleType.gearFoxer]: "gearFoxerApplication",
+  [RoleType.serviceFoxer]: "serviceFoxerApplication",
+  [RoleType.performerFoxer]: "performerFoxerApplication",
+  [RoleType.investor]: "investorApplication",
+};
+
+// Maps the document field names admins flag (and applicants resubmit) to the
+// application row's file FK column. Mirrors RoleRequestController's
+// FILE_FIELD_TO_DB_COLUMN, which the initial /apply upload uses.
+const DOCUMENT_FIELD_TO_DB_COLUMN: Record<string, string> = {
+  validId1: "validId1FileId",
+  nbiFile: "nbiFileId",
+  tinIdFile: "tinIdFileId",
+  birPermitFile: "birPermitFileId",
+  selfieFile: "selfieFileId",
+  portfolioFile: "portfolioFileId",
+};
+
 export default class RoleRequestService {
   /**
    * Submit an application for a specific role
@@ -37,16 +59,6 @@ export default class RoleRequestService {
       );
     }
 
-    // 3. Map roleType to the correct application model name in Prisma
-    const modelMapping: Record<RoleType, string> = {
-      [RoleType.venueFoxer]: "venueFoxerApplication",
-      [RoleType.eventFoxer]: "eventFoxerApplication",
-      [RoleType.gearFoxer]: "gearFoxerApplication",
-      [RoleType.serviceFoxer]: "serviceFoxerApplication",
-      [RoleType.performerFoxer]: "performerFoxerApplication",
-      [RoleType.investor]: "investorApplication",
-    };
-
     // Convert empty strings to null so optional FK fields don't violate constraints
     const cleanedData = Object.fromEntries(
       Object.entries(applicationData).map(([k, v]) => [k, v === "" ? null : v]),
@@ -56,18 +68,24 @@ export default class RoleRequestService {
       userId,
       roleType,
       cleanedData,
-      modelMapping[roleType],
+      APPLICATION_MODEL_BY_ROLE[roleType],
     );
   }
 
   /**
-   * Admin review of an application
+   * Admin review of an application. `revision_requested` is a softer
+   * rejection: `flaggedDocuments` names which uploads are the problem (keys
+   * matching DOCUMENT_FIELD_TO_DB_COLUMN) and `revisionNote` explains why —
+   * everything else on the application stands, and the applicant fixes just
+   * those documents via resubmitDocuments instead of reapplying from scratch.
    */
   static async reviewApplication(
     requestId: string,
     adminId: string,
     status: RequestStatus,
     rejectionReason?: string,
+    flaggedDocuments?: string[],
+    revisionNote?: string,
   ) {
     const result = await prisma.$transaction(async (tx) => {
       // 1. Fetch request
@@ -86,6 +104,14 @@ export default class RoleRequestService {
           reviewedAt: new Date(),
           rejectionReason:
             status === RequestStatus.rejected ? rejectionReason : undefined,
+          flaggedDocuments:
+            status === RequestStatus.revision_requested
+              ? (flaggedDocuments ?? [])
+              : [],
+          revisionNote:
+            status === RequestStatus.revision_requested
+              ? (revisionNote ?? null)
+              : null,
         },
       );
 
@@ -121,26 +147,97 @@ export default class RoleRequestService {
 
     console.log("About to create notification for userId:", result.userId);
 
-    await NotificationService.create({
-      userId: result.userId,
-      type:
-        status === RequestStatus.approved
-          ? "role_request_approved"
-          : "role_request_rejected",
-      title:
-        status === RequestStatus.approved
-          ? "Application approved"
-          : "Application rejected",
-      message:
-        status === RequestStatus.approved
-          ? `Your ${result.roleType} application has been approved!`
-          : `Your ${result.roleType} application was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`,
-      metadata: { requestId, roleType: result.roleType, status },
-    });
+    const notificationByStatus = {
+      [RequestStatus.approved]: {
+        type: "role_request_approved",
+        title: "Application approved",
+        message: `Your ${result.roleType} application has been approved!`,
+      },
+      [RequestStatus.rejected]: {
+        type: "role_request_rejected",
+        title: "Application rejected",
+        message: `Your ${result.roleType} application was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`,
+      },
+      [RequestStatus.revision_requested]: {
+        type: "role_request_revision_requested",
+        title: "Documents need a fix",
+        message: `Your ${result.roleType} application needs revised documents before it can be approved.${revisionNote ? ` Note: ${revisionNote}` : ""}`,
+      },
+    } as const;
+    const notification =
+      notificationByStatus[status as keyof typeof notificationByStatus];
+
+    if (notification) {
+      await NotificationService.create({
+        userId: result.userId,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        metadata: { requestId, roleType: result.roleType, status },
+      });
+    }
 
     console.log("Notification created successfully");
 
     return result.updatedRequest;
+  }
+
+  /**
+   * Applicant resubmits only the documents an admin flagged on a
+   * revision_requested application — not a fresh application. Any document
+   * not flagged stays as originally uploaded and is never re-requested.
+   */
+  static async resubmitDocuments(
+    requestId: string,
+    userId: string,
+    documents: Record<string, string>,
+  ) {
+    const request = await RoleRequestRepo.findRequestById(requestId);
+    if (!request) throw new Error("Application not found");
+    if (request.userId !== userId) {
+      throw new Error("This application does not belong to you");
+    }
+    if (request.status !== RequestStatus.revision_requested) {
+      throw new Error(
+        "Only an application awaiting document revision can be resubmitted",
+      );
+    }
+
+    const flagged = request.flaggedDocuments ?? [];
+    const submittedKeys = Object.keys(documents);
+    if (submittedKeys.length === 0) {
+      throw new Error("No documents were provided");
+    }
+    const unflagged = submittedKeys.filter((key) => !flagged.includes(key));
+    if (unflagged.length > 0) {
+      throw new Error(
+        `These documents were not flagged for resubmission: ${unflagged.join(", ")}`,
+      );
+    }
+
+    const fileColumns: Record<string, string> = {};
+    for (const key of submittedKeys) {
+      const column = DOCUMENT_FIELD_TO_DB_COLUMN[key];
+      if (!column) throw new Error(`Unknown document field: ${key}`);
+      fileColumns[column] = documents[key];
+    }
+
+    const applicationModel = APPLICATION_MODEL_BY_ROLE[request.roleType];
+    await RoleRequestRepo.updateApplicationFiles(
+      applicationModel,
+      requestId,
+      fileColumns,
+    );
+
+    const remainingFlagged = flagged.filter(
+      (key) => !submittedKeys.includes(key),
+    );
+    const updated = await RoleRequestRepo.applyResubmission(
+      requestId,
+      remainingFlagged,
+    );
+
+    return { updated, reopened: remainingFlagged.length === 0 };
   }
 
   /**
