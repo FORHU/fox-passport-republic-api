@@ -7,6 +7,8 @@ import EventTemplateSvc from "../event-template/event-template.service";
 import PaymentSvc from "../payment/payment.service";
 import PaymentRepo from "../payment/payment.repository";
 import PayoutSvc from "../payout/payout.service";
+import PricingSvc from "../pricing/pricing.service";
+import PromotionSvc from "../promotion/promotion.service";
 import RefundSvc from "../refund/refund.service";
 import WaitlistSvc from "../waitlist/waitlist.service";
 import NotificationService from "../notifications/user-notification.service";
@@ -139,6 +141,8 @@ export interface CreateBookingInput {
   currency?: string;
   specialRequests?: string;
   attendees?: AttendeeInput[];
+  /** Direct venue booking only — see the `venueId && !eventId` branch. */
+  voucherCode?: string;
 }
 
 /** Caller identity used for role-based visibility filtering. */
@@ -165,9 +169,125 @@ export default class BookingSvc {
     await bookingCache.invalidateAll();
   }
 
+  /**
+   * Shared by `createBooking`'s direct-venue-booking branch and
+   * `previewVenuePrice` — mirrors AssetBookingSvc.priceAssetBooking's split
+   * so the checkout screen's live total can never drift from what actually
+   * gets charged. Voucher discount applies to the pre-fee subtotal.
+   */
+  private static async priceVenueBooking(
+    venue: {
+      id: string;
+      price: Prisma.Decimal;
+      billingRate: string;
+      category: string;
+    },
+    startAt: Date,
+    endAt: Date,
+    userId: string,
+    voucherCode?: string,
+  ) {
+    const days = Math.max(
+      1,
+      Math.ceil((endAt.getTime() - startAt.getTime()) / (1000 * 60 * 60 * 24)),
+    );
+    const rateMultiplier =
+      venue.billingRate === "hourly"
+        ? days * 24
+        : venue.billingRate === "daily"
+          ? days
+          : venue.billingRate === "weekly"
+            ? Math.ceil(days / 7)
+            : venue.billingRate === "monthly"
+              ? Math.ceil(days / 30)
+              : 1;
+    const itemsTotal = venue.price.mul(rateMultiplier);
+
+    let discountAmount = new Prisma.Decimal(0);
+    let voucherId: string | null = null;
+    let voucherCodeResolved: string | null = null;
+    const voucherContext = {
+      transactionType: "venue",
+      category: venue.category,
+      userId,
+      venueId: venue.id,
+    };
+    if (voucherCode) {
+      const validated = await PricingSvc.validateAndCalculateVoucher(
+        voucherCode,
+        itemsTotal.toNumber(),
+        voucherContext,
+      );
+      discountAmount = new Prisma.Decimal(validated.discountAmount);
+      voucherId = validated.voucher.id;
+      voucherCodeResolved = validated.voucher.code;
+    } else {
+      const auto = await PricingSvc.findAutoApplyDiscount(
+        itemsTotal.toNumber(),
+        voucherContext,
+      );
+      if (auto) {
+        discountAmount = new Prisma.Decimal(auto.discountAmount);
+        voucherId = auto.voucher.id;
+        voucherCodeResolved = auto.voucher.code;
+      }
+    }
+    const discountedItemsTotal = itemsTotal.sub(discountAmount);
+    const platformFeeAmount = discountedItemsTotal.mul(0.05);
+    const totalAmount = discountedItemsTotal.add(platformFeeAmount);
+
+    return {
+      itemsTotal,
+      discountAmount,
+      voucherId,
+      voucherCode: voucherCodeResolved,
+      discountedItemsTotal,
+      platformFeeAmount,
+      totalAmount,
+    };
+  }
+
+  /** Live price preview for the direct-venue-booking checkout screen — computes but never persists. */
+  static async previewVenuePrice(data: {
+    venueId: string;
+    userId: string;
+    startDate: string | Date;
+    endDate: string | Date;
+    voucherCode?: string;
+  }) {
+    const venue = await prisma.venue.findUnique({
+      where: { id: data.venueId },
+    });
+    if (!venue) throw new Error("Venue not found");
+
+    const pricing = await this.priceVenueBooking(
+      venue,
+      new Date(data.startDate),
+      new Date(data.endDate),
+      data.userId,
+      data.voucherCode,
+    );
+    return {
+      itemsTotal: pricing.itemsTotal.toNumber(),
+      discountAmount: pricing.discountAmount.toNumber(),
+      voucherId: pricing.voucherId,
+      voucherCode: pricing.voucherCode,
+      platformFeeAmount: pricing.platformFeeAmount.toNumber(),
+      totalAmount: pricing.totalAmount.toNumber(),
+    };
+  }
+
   static async createBooking(data: CreateBookingInput) {
-    const { attendees, eventId, venueId, startDate, endDate, userId, ...rest } =
-      data;
+    const {
+      attendees,
+      eventId,
+      venueId,
+      startDate,
+      endDate,
+      userId,
+      voucherCode: _voucherCode,
+      ...rest
+    } = data;
 
     // ── Venue direct booking path ────────────────────────────────────────
     if (venueId && !eventId) {
@@ -185,25 +305,27 @@ export default class BookingSvc {
 
       const startAt = new Date(startDate);
       const endAt = new Date(endDate);
-      const days = Math.max(
-        1,
-        Math.ceil(
-          (endAt.getTime() - startAt.getTime()) / (1000 * 60 * 60 * 24),
-        ),
+
+      // A client-supplied `data.totalAmount` is only trusted when there's no
+      // voucher — once a voucher is involved, the server total is the only
+      // one anyone can check against.
+      const pricing = await this.priceVenueBooking(
+        venue,
+        startAt,
+        endAt,
+        userId,
+        data.voucherCode,
       );
-      const rateMultiplier =
-        venue.billingRate === "hourly"
-          ? days * 24
-          : venue.billingRate === "daily"
-            ? days
-            : venue.billingRate === "weekly"
-              ? Math.ceil(days / 7)
-              : venue.billingRate === "monthly"
-                ? Math.ceil(days / 30)
-                : 1;
-      const itemsTotal = venue.price.mul(rateMultiplier);
-      const platformFeeAmount = itemsTotal.mul(0.05);
-      const totalAmount = data.totalAmount || itemsTotal.add(platformFeeAmount);
+      const itemsTotal = pricing.itemsTotal;
+      const discountAmount = pricing.discountAmount;
+      const voucherId = pricing.voucherId;
+      const discountedItemsTotal = pricing.discountedItemsTotal;
+      const platformFeeAmount = pricing.platformFeeAmount;
+      const totalAmount = data.voucherCode
+        ? pricing.totalAmount
+        : data.totalAmount
+          ? new Prisma.Decimal(data.totalAmount)
+          : pricing.totalAmount;
 
       // Create a minimal Event (no template — direct venue booking)
       const event = await prisma.event.create({
@@ -220,6 +342,8 @@ export default class BookingSvc {
           itemsTotal,
           hostMarkupAmount: 0,
           platformFeeAmount,
+          discountAmount,
+          voucherId,
           requestStatus: "approved",
           eventStatus: "pending",
           targetCity: venue.city,
@@ -228,13 +352,17 @@ export default class BookingSvc {
         },
       });
 
-      // Create EventVenueTransaction
+      // Create EventVenueTransaction — agreedPrice is already net of the
+      // voucher discount, same as AssetBooking/ServiceBooking's totalAmount:
+      // the payout logic (PayoutSvc.createPayoutsForEventBooking) adds the
+      // discount back only when the voucher was platform-funded, restoring
+      // the venue owner's undiscounted cut in that case.
       await prisma.eventVenueTransaction.create({
         data: {
           eventId: event.id,
           venueId: venue.id,
           providerId: venue.mayorId,
-          agreedPrice: itemsTotal,
+          agreedPrice: discountedItemsTotal,
           status: "pending",
           currency: "PHP",
         },
@@ -258,6 +386,16 @@ export default class BookingSvc {
         ticketCode: `BKG-${crypto.randomBytes(5).toString("hex").toUpperCase()}`,
         event: { connect: { id: event.id } },
         user: { connect: { id: userId } },
+      });
+
+      // The EventVenueTransaction above was created before this Booking
+      // existed, so it couldn't be linked at creation time — link it now.
+      // Without this, PayoutSvc.createPayoutsForEventBooking's
+      // `booking.venueTransactions` (filtered through this FK) never finds
+      // it, and the venue owner is never paid for a direct venue booking.
+      await prisma.eventVenueTransaction.updateMany({
+        where: { eventId: event.id },
+        data: { bookingId: booking.id },
       });
 
       await PaymentSvc.createPayment({
@@ -954,6 +1092,12 @@ export default class BookingSvc {
 
     if (completedPayments.length === 0) {
       const updated = await BookingRepo.cancel(id);
+      PromotionSvc.releaseRedemption({ eventId: booking.eventId }).catch((e) =>
+        console.error(
+          `Failed to release voucher redemption for event ${booking.eventId}`,
+          e,
+        ),
+      );
 
       if (userEmail) {
         sendBookingCancelledEmail({
@@ -1052,6 +1196,12 @@ export default class BookingSvc {
     }
 
     const updated = await BookingRepo.cancel(id);
+    PromotionSvc.releaseRedemption({ eventId: booking.eventId }).catch((e) =>
+      console.error(
+        `Failed to release voucher redemption for event ${booking.eventId}`,
+        e,
+      ),
+    );
 
     const totalPaid = completedPayments.reduce(
       (sum, p) => sum.add(p.amount),
@@ -1224,6 +1374,35 @@ export default class BookingSvc {
     // invalidation moved to the write - this is the one place a stale answer is
     // worst, and it used to depend on remembering a line.
     const booking = await this.getBookingById(bookingId, viewer);
+
+    // Record the voucher redemption once payment actually clears — mirrors
+    // AssetBookingSvc/ServiceBookingSvc's confirmPayment. Only ever set by
+    // the direct-venue-booking path (Event.voucherId's schema comment), so
+    // this is a no-op for every template-based Event booking.
+    if (booking.eventId) {
+      prisma.event
+        .findUnique({
+          where: { id: booking.eventId },
+          select: { voucherId: true, discountAmount: true },
+        })
+        .then((event) => {
+          if (!event?.voucherId || event.discountAmount.toNumber() <= 0) return;
+          return prisma.voucherRedemption.create({
+            data: {
+              voucherId: event.voucherId,
+              userId: viewer.userId,
+              eventId: booking.eventId!,
+              discountAmount: event.discountAmount,
+            },
+          });
+        })
+        .catch((e) =>
+          console.error(
+            `Failed to record voucher redemption for booking ${bookingId}`,
+            e,
+          ),
+        );
+    }
 
     // Send booking confirmation email (fire-and-forget)
     try {

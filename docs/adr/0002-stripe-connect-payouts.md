@@ -40,3 +40,34 @@ asset/service/event has even happened, creating refund/clawback exposure); carvi
 the platform fee out of providers' shares instead of adding it on top (would make
 the citizen-facing total match what's quoted today, but silently reduces what
 Mayor/Foxer/Host actually receive).
+
+## Addendum: why there are two payout-computing services
+
+`src/modules/payout/payout.service.ts` (`PayoutSvc`) and
+`src/modules/payment/payout.service.ts` (`PaymentPayoutSvc`) both end up calling
+`PayoutSvc.fireTransfer` — the one and only place `stripe.transfers.create` is
+called — but they compute the amount to transfer differently, because they answer
+to two different payment paths that both existed before Central Payment unified
+anything:
+
+- **`PayoutSvc`** fires the moment a `Booking`/`AssetBooking`/`ServiceBooking`
+  reaches `completed` (the flow this ADR was written for). Each recipient gets
+  their full `agreedPrice`/`totalAmount - platformFeeAmount` — the platform fee is
+  additive, per the decision above, so there's no fee math to do per-payout here.
+- **`PaymentPayoutSvc`** fires from `webhook.service.ts` the moment a Central
+  Payment `Invoice` is marked `paid` — the newer, invoice-based checkout flow
+  (`EventCheckoutSvc`, `PartnershipCheckoutSvc`). It has to derive each line item's
+  share of the invoice's already-computed `platformFeeAmount` proportionally, plus
+  a modeled gateway fee, because an Invoice's fee is computed once for the whole
+  invoice, not per line item.
+
+Both are real, live entry points — a booking can be paid through either the old
+direct-PaymentIntent flow or the newer Invoice/Checkout flow depending on which
+frontend flow reaches it (see `docs/CENTRAL-PAYMENT-FRONTEND-PLAN.md` in the app
+repo) — so this isn't dead duplication to delete, but it is legitimately two
+implementations of "how much does this fee model leave for the recipient." Logic
+that doesn't depend on which fee model was used — splitting a resolved amount with
+an investor's `revenueSharePercent` — is factored into one shared, pure function
+both call: `PayoutSvc.resolveInvestorSplit`. If a third payout-computing path is
+ever added, put its investor-split logic through that same function rather than
+copying the loop again.

@@ -7,8 +7,11 @@ import {
 
 const router = express.Router();
 
-// Only payout-recipient roles can onboard — investor is excluded (investors fund the
-// platform, they don't receive operational payouts in this domain model).
+// Only payout-recipient roles can onboard, per ROLE_TYPE_GRANTS in
+// types/permissions.ts. Investors are no longer excluded from this: once a
+// PartnerInvestment carries a revenueSharePercent, its holder receives real
+// investor_revenue_share transfers (PayoutSvc.resolveInvestorSplit) and needs
+// a Connect account like any other payout-recipient role.
 router.post(
   "/onboard",
   authenticate,

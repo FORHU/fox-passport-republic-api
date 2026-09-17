@@ -22,6 +22,7 @@ export default class ProfileRepo {
         systemRole: true,
         roleType: true,
         isPrivate: true,
+        preferredCurrency: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -60,6 +61,7 @@ export default class ProfileRepo {
       imgId?: string;
       city?: string;
       isPrivate?: boolean;
+      preferredCurrency?: string;
     },
   ) {
     return this.retiring(
@@ -77,6 +79,7 @@ export default class ProfileRepo {
           systemRole: true,
           roleType: true,
           isPrivate: true,
+          preferredCurrency: true,
           updatedAt: true,
         },
       }),

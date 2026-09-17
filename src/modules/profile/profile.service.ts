@@ -29,6 +29,7 @@ export default class ProfileSvc {
       profileImage?: string;
       city?: string;
       isPrivate?: boolean;
+      preferredCurrency?: string;
     },
   ) {
     // Check if username is already taken (if updating username)

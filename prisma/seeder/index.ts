@@ -12,3 +12,4 @@ export * from "./passport.seeder";
 export * from "./specialization.seeder";
 export * from "./partner.seeder";
 export * from "./feed.seeder";
+export * from "./promotion.seeder";

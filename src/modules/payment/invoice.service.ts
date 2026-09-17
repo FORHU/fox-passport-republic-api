@@ -13,6 +13,16 @@ export interface CreateInvoiceParams {
     sourceId: string;
   }[];
   dueDate?: Date;
+  // Pre-resolved per-item discounts, keyed by `sourceId` — only a
+  // multi-provider Event checkout passes this (see
+  // PricingSvc.resolveEventLineItemDiscounts / EventCheckoutSvc). Every
+  // other caller (sponsorship, etc) omits it and behaves exactly as
+  // before: one blended discount against the whole subtotal via
+  // `pricingContext.voucherCode`.
+  itemDiscounts?: Map<
+    string,
+    { voucherId: string; promotionId: string; discountAmount: number }
+  >;
 }
 
 export default class InvoiceSvc {
@@ -48,7 +58,9 @@ export default class InvoiceSvc {
         }
       }
 
-      // 2. Calculate Subtotal
+      // 2. Calculate Subtotal — the original, un-reduced total across every
+      // item. `subtotalAmount` on the Invoice keeps meaning exactly that
+      // ("Sum of items"), regardless of any per-item discount below.
       const subtotalNum = data.items.reduce((sum, item) => {
         const amt =
           item.amount instanceof Prisma.Decimal
@@ -57,28 +69,43 @@ export default class InvoiceSvc {
         return sum + amt;
       }, 0);
 
-      // 3. Resolve Pricing Rule, Validate Voucher & Calculate Complete Breakdown
+      const itemDiscounts = data.itemDiscounts ?? new Map();
+      let itemDiscountsTotal = 0;
+      for (const { discountAmount } of itemDiscounts.values()) {
+        itemDiscountsTotal += discountAmount;
+      }
+
+      // 3. Resolve Pricing Rule, Validate Voucher & Calculate Complete
+      // Breakdown — against whatever's left after per-item discounts, so a
+      // blanket platform-wide code (if any) and the platform fee are both
+      // computed off the truly-discounted amount rather than double-
+      // counting what individual items already took off.
       const pricingContext = {
         ...data.pricingContext,
         userId: data.pricingContext?.userId || data.payerId,
       };
       const pricingBreakdown = await PricingSvc.calculatePrice(
-        subtotalNum,
+        subtotalNum - itemDiscountsTotal,
         pricingContext,
       );
+
+      const totalDiscountAmount =
+        itemDiscountsTotal + (pricingBreakdown.discount?.amount || 0);
 
       // 4. Create Invoice & Items
       const invoice = await tx.invoice.create({
         data: {
           payerId: data.payerId,
-          subtotalAmount: pricingBreakdown.subtotal,
+          subtotalAmount: subtotalNum,
 
-          discountAmount: pricingBreakdown.discount?.amount || 0,
+          discountAmount: totalDiscountAmount,
           // Prisma's `Json?` wants its own null sentinel, not a plain `null`,
-          // to write SQL NULL rather than the JSON literal `null`.
+          // to write SQL NULL rather than the JSON literal `null`. Carries
+          // only the *blanket* discount — see WebhookSvc.handlePaymentSuccess
+          // for why that distinction matters once a discount is redeemed.
           discountSnapshot: pricingBreakdown.discount ?? Prisma.JsonNull,
 
-          discountedSubtotal: pricingBreakdown.discountedSubtotal,
+          discountedSubtotal: subtotalNum - totalDiscountAmount,
 
           platformFeeAmount: pricingBreakdown.platformFee?.amount || 0,
           platformFeeSnapshot: pricingBreakdown.platformFee ?? Prisma.JsonNull,
@@ -87,12 +114,17 @@ export default class InvoiceSvc {
 
           dueDate: data.dueDate,
           items: {
-            create: data.items.map((item) => ({
-              amount: item.amount,
-              description: item.description,
-              sourceType: item.sourceType,
-              sourceId: item.sourceId,
-            })),
+            create: data.items.map((item) => {
+              const itemDiscount = itemDiscounts.get(item.sourceId);
+              return {
+                amount: item.amount,
+                description: item.description,
+                sourceType: item.sourceType,
+                sourceId: item.sourceId,
+                discountAmount: itemDiscount?.discountAmount ?? 0,
+                voucherId: itemDiscount?.voucherId,
+              };
+            }),
           },
         },
         include: {

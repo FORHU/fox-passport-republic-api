@@ -22,6 +22,7 @@ import matchRoutes from "../modules/match/match.routes";
 import bookingRoutes from "../modules/booking/booking.routes";
 import notificationRoutes from "../modules/notifications/user-notification.routes";
 import stripeConnectRoutes from "../modules/stripe-connect/stripe-connect.routes";
+import payoutRoutes from "../modules/payout/payout.routes";
 import cancellationPolicyRoutes from "../modules/cancellation-policy/cancellation-policy.routes";
 import waitlistRoutes from "../modules/waitlist/waitlist.routes";
 import locationsRoutes from "../modules/locations/locations.routes";
@@ -37,8 +38,12 @@ import blockRoutes from "../modules/block/block.routes";
 import reportsRoutes from "../modules/reports/reports.routes";
 import biddingRoutes from "../modules/bidding/bidding.routes";
 import partnershipRoutes from "../modules/partnership/partnership.routes";
+import bookingEditRequestRoutes from "../modules/booking-edit-request/booking-edit-request.routes";
 import checkoutRoutes from "../modules/checkout/checkout.routes";
 import platformFeeConfigRoutes from "../modules/platform-fee-config/platform-fee-config.routes";
+import promotionRoutes from "../modules/promotion/promotion.routes";
+import promotionOwnRoutes from "../modules/promotion/promotion-own.routes";
+import fxRoutes from "../modules/fx/fx.routes";
 
 const router = express.Router();
 
@@ -81,17 +86,22 @@ router.use("/v1/matches", matchRoutes);
 router.use("/v1/bookings", bookingRoutes);
 router.use("/v1/cancellation-policies", cancellationPolicyRoutes);
 router.use("/v1/admin/platform-fee-configs", platformFeeConfigRoutes);
+router.use("/v1/admin/promotions", promotionRoutes);
+router.use("/v1/promotions/mine", promotionOwnRoutes);
+router.use("/v1/fx", fxRoutes);
 router.use("/v1/waitlist", waitlistRoutes);
 router.use("/v1/locations", locationsRoutes);
 router.use("/v1/passport", passportRoutes);
 router.use("/v1/analytics", analyticsRoutes);
 router.use("/v1/search", searchRoutes);
 router.use("/v1/stripe-connect", stripeConnectRoutes);
+router.use("/v1/payouts", payoutRoutes);
 router.use("/v1/feed", feedRoutes);
 router.use("/v1/investments", investmentRoutes);
 router.use("/v1/events", eventRoutes);
 router.use("/v1/bids", biddingRoutes);
 router.use("/v1/partnerships", partnershipRoutes);
+router.use("/v1/booking-edit-requests", bookingEditRequestRoutes);
 // Central Payment checkout — mounted at bare /v1, not nested under events/
 // partnerships, so it stays a self-contained module. See checkout.routes.ts.
 router.use("/v1", checkoutRoutes);

@@ -17,6 +17,7 @@ export default class AssetBookingCtrl {
         otherwise: Joi.optional().allow(""),
       }),
       notes: Joi.string().allow("").optional(),
+      voucherCode: Joi.string().trim().uppercase().allow("").optional(),
       // NOTE: totalAmount intentionally not accepted — always server-computed.
     });
 
@@ -28,6 +29,29 @@ export default class AssetBookingCtrl {
       const userId = req.user!.userId;
       const booking = await AssetBookingSvc.create({ ...value, userId });
       return res.status(201).json({ success: true, data: booking });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res.status(400).json({ success: false, message: err.message });
+    }
+  }
+
+  // GET /asset/bookings/price-preview?assetId=&startDate=&endDate=&quantity=&voucherCode=
+  static async previewPrice(req: Request, res: Response) {
+    const schema = Joi.object({
+      assetId: Joi.string().required(),
+      startDate: Joi.string().isoDate().required(),
+      endDate: Joi.string().isoDate().required(),
+      quantity: Joi.number().integer().min(1).required(),
+      voucherCode: Joi.string().trim().uppercase().allow("").optional(),
+    });
+    const { error, value } = schema.validate(req.query);
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
+
+    try {
+      const userId = req.user!.userId;
+      const pricing = await AssetBookingSvc.previewPrice({ ...value, userId });
+      return res.status(200).json({ success: true, data: pricing });
     } catch (e: unknown) {
       const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
@@ -131,11 +155,11 @@ export default class AssetBookingCtrl {
   // DELETE /asset/bookings/:id
   static async cancel(req: Request, res: Response) {
     try {
-      const booking = await AssetBookingSvc.cancel(
+      const result = await AssetBookingSvc.cancelWithRefund(
         req.params.id,
         req.user!.userId,
       );
-      return res.status(200).json({ success: true, data: booking });
+      return res.status(200).json({ success: true, data: result });
     } catch (e: unknown) {
       const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
@@ -164,6 +188,29 @@ export default class AssetBookingCtrl {
         req.params.id,
         req.user!.userId,
         reason,
+      );
+      return res.status(200).json({ success: true, data: booking });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res.status(400).json({ success: false, message: err.message });
+    }
+  }
+
+  // PATCH /asset/bookings/:id/provider-cancel
+  static async providerCancel(req: Request, res: Response) {
+    const schema = Joi.object({
+      reason: Joi.string().min(1).required(),
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
+
+    try {
+      const booking = await AssetBookingSvc.providerCancel(
+        req.params.id,
+        req.user!.userId,
+        value.reason,
       );
       return res.status(200).json({ success: true, data: booking });
     } catch (e: unknown) {

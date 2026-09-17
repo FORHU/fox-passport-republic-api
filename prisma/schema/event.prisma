@@ -114,6 +114,15 @@ model Event {
   itemsTotal           Decimal                    @default(0) @db.Decimal(12, 2)
   hostMarkupAmount     Decimal                    @default(0) @db.Decimal(12, 2)
   platformFeeAmount    Decimal                    @default(0) @db.Decimal(12, 2)
+  // Only ever set by the direct-venue-booking path (BookingSvc.createBooking's
+  // `venueId && !eventId` branch). A template-based Event's discount lives
+  // per line item instead — InvoiceItem.discountAmount, via
+  // PricingSvc.resolveEventLineItemDiscounts — plus optionally one blanket
+  // platform-wide discount at the aggregate Invoice level; neither is
+  // mirrored onto this field.
+  discountAmount       Decimal                    @default(0) @db.Decimal(12, 2)
+  voucherId            String?
+  voucherRedemption    VoucherRedemption?
   eventStatus          EventStatus                @default(pending)
   requestStatus        RequestStatus              @default(pending)
   rejectionReason      String?

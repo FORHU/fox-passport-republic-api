@@ -1,10 +1,26 @@
+import Stripe from "stripe";
 import { prisma } from "../../utils/prisma";
 import InvoiceSvc from "./invoice.service";
 import CheckoutSvc from "./checkout.service";
 import PricingSvc from "../pricing/pricing.service";
-import { InvoiceSourceType, Prisma } from "@prisma/client";
+import RefundSvc from "../refund/refund.service";
+import PromotionSvc from "../promotion/promotion.service";
+import PayoutSvc from "../payout/payout.service";
+import NotificationService from "../notifications/user-notification.service";
+import { STRIPE_SECRET_KEY } from "../../config";
+import { toStripeCents, formatCurrency } from "../../utils/pricing";
+import {
+  InvoiceSourceType,
+  Prisma,
+  RefundStatus,
+  TransactionStatus,
+} from "@prisma/client";
 
 const REUSABLE_STATUSES = ["pending", "processing"] as const;
+
+const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
+  apiVersion: "2025-08-27.basil",
+});
 
 export default class EventCheckoutSvc {
   /**
@@ -19,12 +35,24 @@ export default class EventCheckoutSvc {
       include: {
         venueTransactions: {
           where: { status: "pending" }, // Assuming 'pending' means accepted by provider but pending payment
+          include: {
+            venue: { select: { name: true, category: true } },
+            provider: { select: { name: true } },
+          },
         },
         assetTransactions: {
           where: { status: "pending" },
+          include: {
+            asset: { select: { name: true, category: true } },
+            provider: { select: { name: true } },
+          },
         },
         serviceTransactions: {
           where: { status: "pending" },
+          include: {
+            service: { select: { name: true, category: true } },
+            provider: { select: { name: true } },
+          },
         },
       },
     });
@@ -32,6 +60,24 @@ export default class EventCheckoutSvc {
     if (!event) throw new Error("Event not found");
 
     const items: Parameters<typeof InvoiceSvc.createInvoice>[0]["items"] = [];
+    // Each item's own scope — feeds `PricingSvc.resolveEventLineItemDiscounts`
+    // so a Foxer-owned voucher can match the exact listing it was scoped to,
+    // the same way it would on a direct asset/service/venue booking.
+    const pricingItems: Parameters<
+      typeof PricingSvc.resolveEventLineItemDiscounts
+    >[0] = [];
+    // Citizen-facing breakdown for the payment panel — which venue/gear/
+    // talent this payment actually covers, unlike `items` above whose
+    // `description` is just an internal transaction id.
+    const displayItems: Array<{
+      type: "venue" | "asset" | "service";
+      name: string;
+      providerName: string;
+      amount: number;
+    }> = [];
+
+    const toNumber = (amount: Prisma.Decimal | number) =>
+      amount instanceof Prisma.Decimal ? amount.toNumber() : amount;
 
     event.venueTransactions.forEach((tx) => {
       items.push({
@@ -39,6 +85,19 @@ export default class EventCheckoutSvc {
         description: `Venue Reservation: ${tx.id}`,
         sourceType: InvoiceSourceType.event_venue_transaction,
         sourceId: tx.id,
+      });
+      pricingItems.push({
+        sourceId: tx.id,
+        amount: toNumber(tx.agreedPrice),
+        transactionType: "venue",
+        category: tx.venue.category,
+        venueId: tx.venueId,
+      });
+      displayItems.push({
+        type: "venue",
+        name: tx.venue.name,
+        providerName: tx.provider.name,
+        amount: toNumber(tx.agreedPrice),
       });
     });
 
@@ -49,6 +108,19 @@ export default class EventCheckoutSvc {
         sourceType: InvoiceSourceType.event_asset_transaction,
         sourceId: tx.id,
       });
+      pricingItems.push({
+        sourceId: tx.id,
+        amount: toNumber(tx.agreedPrice),
+        transactionType: "asset",
+        category: tx.asset.category,
+        assetId: tx.assetId,
+      });
+      displayItems.push({
+        type: "asset",
+        name: tx.asset.name,
+        providerName: tx.provider.name,
+        amount: toNumber(tx.agreedPrice),
+      });
     });
 
     event.serviceTransactions.forEach((tx) => {
@@ -58,9 +130,22 @@ export default class EventCheckoutSvc {
         sourceType: InvoiceSourceType.event_service_transaction,
         sourceId: tx.id,
       });
+      pricingItems.push({
+        sourceId: tx.id,
+        amount: toNumber(tx.agreedPrice),
+        transactionType: "service",
+        category: tx.service.category,
+        serviceId: tx.serviceId,
+      });
+      displayItems.push({
+        type: "service",
+        name: tx.service.name,
+        providerName: tx.provider.name,
+        amount: toNumber(tx.agreedPrice),
+      });
     });
 
-    return { event, items };
+    return { event, items, pricingItems, displayItems };
   }
 
   /**
@@ -71,13 +156,20 @@ export default class EventCheckoutSvc {
    * this twice in a row must not throw `InvoiceSvc.createInvoice`'s
    * double-invoicing guard — it reuses whatever invoice is already open for
    * this event's items instead of trying to create a second one.
+   *
+   * `voucherCodes` may mix any number of Foxer-owned codes (each matched to
+   * its own line item — see `PricingSvc.resolveEventLineItemDiscounts`) with
+   * at most one platform-wide code. There's no "one code per checkout"
+   * limit here: a citizen can redeem every voucher they're eligible for
+   * across this event's different providers in one go, same as any
+   * multi-seller marketplace cart.
    */
   static async createEventCheckout(
     eventId: string,
     payerId: string,
-    voucherCode?: string,
+    voucherCodes: string[] = [],
   ) {
-    const { event, items } = await this.getPayableItems(eventId);
+    const { event, items, pricingItems } = await this.getPayableItems(eventId);
 
     if (event.clientId !== payerId) {
       throw new Error("Unauthorized: only this event's client may pay for it");
@@ -118,14 +210,27 @@ export default class EventCheckoutSvc {
           // cancelled/failed/refunded — not blocking, falls through to a fresh invoice below.
         }
 
-        // Build Pricing Context
+        // Resolve every voucher code up front — a bad code (invalid,
+        // matches nothing in this cart, two codes aimed at one item) must
+        // fail the whole checkout attempt rather than silently create an
+        // undiscounted invoice.
+        const { itemDiscounts, blanketCode } =
+          await PricingSvc.resolveEventLineItemDiscounts(
+            pricingItems,
+            voucherCodes,
+            payerId,
+          );
+
+        // Build Pricing Context — only the blanket (platform-wide) code, if
+        // any, flows through here; per-item discounts were already resolved
+        // above and are passed to InvoiceSvc directly.
         const pricingContext = {
           transactionType: "event",
           // `Event` has no `type` field — `eventCategory` is the enum that
           // carries this (corporate/birthday/wedding/social/other), and it's
           // required, so there's nothing to fall back from.
           category: event.eventCategory,
-          voucherCode,
+          voucherCode: blanketCode,
         };
 
         // Create Invoice
@@ -133,6 +238,7 @@ export default class EventCheckoutSvc {
           payerId,
           pricingContext,
           items,
+          itemDiscounts,
           dueDate: event.startAt, // Payment due by event start
         });
 
@@ -155,9 +261,10 @@ export default class EventCheckoutSvc {
   static async getPaymentSummary(
     eventId: string,
     callerId: string,
-    voucherCode?: string,
+    voucherCodes: string[] = [],
   ) {
-    const { event, items } = await this.getPayableItems(eventId);
+    const { event, items, pricingItems, displayItems } =
+      await this.getPayableItems(eventId);
 
     if (event.clientId !== callerId) {
       throw new Error(
@@ -176,21 +283,309 @@ export default class EventCheckoutSvc {
       return sum + amt;
     }, 0);
 
+    // Same resolution `createEventCheckout` will run, so the preview always
+    // matches what Pay Now actually charges.
+    const { itemDiscounts, blanketCode } =
+      await PricingSvc.resolveEventLineItemDiscounts(
+        pricingItems,
+        voucherCodes,
+        callerId,
+      );
+
+    let itemDiscountsTotal = 0;
+    for (const { discountAmount } of itemDiscounts.values()) {
+      itemDiscountsTotal += discountAmount;
+    }
+
+    const itemsWithDiscount = displayItems.map((display, i) => ({
+      ...display,
+      discountAmount:
+        itemDiscounts.get(pricingItems[i].sourceId)?.discountAmount ?? 0,
+    }));
+
     const pricingContext = {
       transactionType: "event",
       category: event.eventCategory,
-      voucherCode,
+      voucherCode: blanketCode,
       userId: callerId,
     };
-    const breakdown = await PricingSvc.calculatePrice(subtotal, pricingContext);
+    const breakdown = await PricingSvc.calculatePrice(
+      subtotal - itemDiscountsTotal,
+      pricingContext,
+    );
 
     return {
       eventId,
       currency: "PHP",
-      subtotalAmount: breakdown.subtotal,
-      discountAmount: breakdown.discount?.amount ?? 0,
+      items: itemsWithDiscount,
+      subtotalAmount: subtotal,
+      discountAmount: itemDiscountsTotal + (breakdown.discount?.amount ?? 0),
       platformFeeAmount: breakdown.platformFee?.amount ?? 0,
       grossAmount: breakdown.finalAmount,
     };
+  }
+
+  /**
+   * Cancels a whole multi-provider Event booking and refunds it — the
+   * Invoice-based counterpart to `BookingSvc.cancelWithRefunds` (which
+   * covers the older, single-`Booking` model). There's no partial-item
+   * cancellation here: the citizen cancels the whole Event in one action,
+   * same as the Booking flow cancels the whole booking.
+   *
+   * Each line item gets its own refund percentage from *its own* provider's
+   * cancellation policy (a Strict venue and a Flexible gear rental on the
+   * same Event can refund differently), a separate Stripe refund against
+   * the invoice's one shared PaymentIntent, and — if that item's payout
+   * already transferred — a best-effort transfer reversal so the provider
+   * doesn't keep money that was refunded to the citizen.
+   */
+  static async cancelEvent(eventId: string, requesterId: string) {
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      include: {
+        venueTransactions: {
+          include: {
+            venue: {
+              include: { cancellationPolicy: { include: { rules: true } } },
+            },
+          },
+        },
+        assetTransactions: {
+          include: {
+            asset: {
+              include: { cancellationPolicy: { include: { rules: true } } },
+            },
+          },
+        },
+        serviceTransactions: {
+          include: {
+            service: {
+              include: { cancellationPolicy: { include: { rules: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!event) throw new Error("Event not found");
+    if (event.clientId !== requesterId) {
+      throw new Error("Unauthorized: only this event's client may cancel it");
+    }
+    if (event.eventStatus === "cancelled") {
+      throw new Error("Event is already cancelled");
+    }
+    if (event.startAt.getTime() <= Date.now()) {
+      throw new Error(
+        "Event has already started — cancellation is no longer allowed",
+      );
+    }
+
+    type CancellableTx = {
+      id: string;
+      status: TransactionStatus;
+      sourceType: InvoiceSourceType;
+      policy: {
+        rules: { hoursBeforeEvent: number; refundPercent: number }[];
+      } | null;
+    };
+    const allTx: CancellableTx[] = [
+      ...event.venueTransactions.map((tx) => ({
+        id: tx.id,
+        status: tx.status,
+        sourceType: InvoiceSourceType.event_venue_transaction,
+        policy: tx.venue.cancellationPolicy,
+      })),
+      ...event.assetTransactions.map((tx) => ({
+        id: tx.id,
+        status: tx.status,
+        sourceType: InvoiceSourceType.event_asset_transaction,
+        policy: tx.asset.cancellationPolicy,
+      })),
+      ...event.serviceTransactions.map((tx) => ({
+        id: tx.id,
+        status: tx.status,
+        sourceType: InvoiceSourceType.event_service_transaction,
+        policy: tx.service.cancellationPolicy,
+      })),
+    ].filter((tx) => tx.status !== "cancelled");
+
+    if (allTx.length === 0) {
+      throw new Error("Nothing to cancel for this event.");
+    }
+
+    const invoice = await InvoiceSvc.findInvoiceForSource(
+      allTx[0].sourceType,
+      allTx[0].id,
+    );
+
+    // No invoice, or one that was never paid: nothing was charged, so
+    // there's nothing to refund and nothing was ever redeemed (redemptions
+    // are only recorded once payment succeeds — see WebhookSvc.
+    // handlePaymentSuccess) — just cancel everything.
+    if (!invoice || invoice.status !== "paid") {
+      if (invoice && invoice.status === "pending") {
+        await InvoiceSvc.cancelInvoice(invoice.id);
+      }
+      await prisma.$transaction([
+        ...event.venueTransactions.map((tx) =>
+          prisma.eventVenueTransaction.update({
+            where: { id: tx.id },
+            data: { status: TransactionStatus.cancelled },
+          }),
+        ),
+        ...event.assetTransactions.map((tx) =>
+          prisma.eventAssetTransaction.update({
+            where: { id: tx.id },
+            data: { status: TransactionStatus.cancelled },
+          }),
+        ),
+        ...event.serviceTransactions.map((tx) =>
+          prisma.eventServiceTransaction.update({
+            where: { id: tx.id },
+            data: { status: TransactionStatus.cancelled },
+          }),
+        ),
+        prisma.event.update({
+          where: { id: eventId },
+          data: { eventStatus: "cancelled" },
+        }),
+      ]);
+      return { refunds: [], totalRefunded: 0 };
+    }
+
+    const fullInvoice = await prisma.invoice.findUnique({
+      where: { id: invoice.id },
+      include: { items: true, payments: { where: { status: "paid" } } },
+    });
+    const payment = fullInvoice?.payments[0];
+    if (!fullInvoice || !payment) {
+      throw new Error("No successful payment found for this event's invoice.");
+    }
+
+    const refunds = [];
+    let totalRefunded = new Prisma.Decimal(0);
+
+    for (const tx of allTx) {
+      const invoiceItem = fullInvoice.items.find((i) => i.sourceId === tx.id);
+      if (!invoiceItem) continue; // every transaction here was invoiced together — should always be found
+
+      const { refundPercent, matchedRule } = RefundSvc.computeRefund(
+        event.startAt,
+        tx.policy,
+      );
+      const refundAmount = invoiceItem.amount.mul(refundPercent).div(100);
+
+      let stripeRefundId: string | null = null;
+      let status: RefundStatus = RefundStatus.succeeded;
+
+      if (refundAmount.toNumber() > 0) {
+        try {
+          const stripeRefund = await stripe.refunds.create({
+            payment_intent: payment.providerReference!,
+            amount: toStripeCents(refundAmount.toNumber()),
+          });
+          status =
+            stripeRefund.status === "succeeded"
+              ? RefundStatus.succeeded
+              : stripeRefund.status === "failed"
+                ? RefundStatus.failed
+                : RefundStatus.pending;
+          stripeRefundId = stripeRefund.id;
+        } catch (e: unknown) {
+          const err = e as Error;
+          status = RefundStatus.failed;
+          console.error(
+            `Event cancellation refund failed for invoice item ${invoiceItem.id} (event ${eventId}): ${err.message}`,
+          );
+        }
+      }
+
+      const refundRow = await prisma.refund.create({
+        data: {
+          paymentId: payment.id,
+          invoiceItemId: invoiceItem.id,
+          amount: refundAmount,
+          providerReference: stripeRefundId,
+          status,
+          reason: matchedRule
+            ? `${matchedRule.hoursBeforeEvent}h before = ${matchedRule.refundPercent}% refund`
+            : "No cancellation policy matched — 0% refund",
+        },
+      });
+      refunds.push(refundRow);
+      if (status === RefundStatus.succeeded) {
+        totalRefunded = totalRefunded.add(refundAmount);
+      }
+
+      await PayoutSvc.reversePayoutForSource(tx.id, refundAmount).catch((e) =>
+        console.error(
+          `Payout reversal failed for ${tx.id} (event ${eventId})`,
+          e,
+        ),
+      );
+    }
+
+    await prisma.$transaction([
+      ...event.venueTransactions.map((tx) =>
+        prisma.eventVenueTransaction.update({
+          where: { id: tx.id },
+          data: { status: TransactionStatus.cancelled },
+        }),
+      ),
+      ...event.assetTransactions.map((tx) =>
+        prisma.eventAssetTransaction.update({
+          where: { id: tx.id },
+          data: { status: TransactionStatus.cancelled },
+        }),
+      ),
+      ...event.serviceTransactions.map((tx) =>
+        prisma.eventServiceTransaction.update({
+          where: { id: tx.id },
+          data: { status: TransactionStatus.cancelled },
+        }),
+      ),
+      prisma.invoice.update({
+        where: { id: invoice.id },
+        data: {
+          status:
+            totalRefunded.toNumber() >= fullInvoice.grossAmount.toNumber()
+              ? "refunded"
+              : "partially_refunded",
+        },
+      }),
+      prisma.event.update({
+        where: { id: eventId },
+        data: { eventStatus: "cancelled" },
+      }),
+    ]);
+
+    // Voucher slots only free up once the cancellation itself has committed
+    // — releasing first and having the transaction above fail would let a
+    // citizen re-redeem a limited code against a booking that, from their
+    // perspective, never actually got cancelled.
+    await PromotionSvc.releaseInvoiceRedemptions(invoice.id).catch((e) =>
+      console.error(
+        `Failed to release voucher redemptions for invoice ${invoice.id} (event ${eventId})`,
+        e,
+      ),
+    );
+
+    // Immediate ack — the per-refund succeeded/failed follow-up (email +
+    // this same in-app channel) fires later from RefundSvc's webhook
+    // handlers once Stripe confirms each one, same as every other
+    // cancellation flow in this codebase.
+    NotificationService.create({
+      userId: requesterId,
+      type: "event_cancelled",
+      title: "Event cancelled",
+      message:
+        totalRefunded.toNumber() > 0
+          ? `${event.name} was cancelled. ${formatCurrency(totalRefunded.toNumber())} is being refunded.`
+          : `${event.name} was cancelled.`,
+      metadata: { link: `/event/${eventId}` },
+    }).catch((e) =>
+      console.error("Failed to create event-cancellation notification", e),
+    );
+
+    return { refunds, totalRefunded: totalRefunded.toNumber() };
   }
 }

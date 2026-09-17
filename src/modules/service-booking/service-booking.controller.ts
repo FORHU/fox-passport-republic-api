@@ -12,6 +12,7 @@ export default class ServiceBookingCtrl {
       guestCount: Joi.number().integer().min(1).optional(),
       location: Joi.string().required(),
       notes: Joi.string().allow("").optional(),
+      voucherCode: Joi.string().trim().uppercase().allow("").optional(),
       // NOTE: totalAmount intentionally not accepted — always server-computed.
     });
 
@@ -23,6 +24,31 @@ export default class ServiceBookingCtrl {
       const userId = req.user!.userId;
       const booking = await ServiceBookingSvc.create({ ...value, userId });
       return res.status(201).json({ success: true, data: booking });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res.status(400).json({ success: false, message: err.message });
+    }
+  }
+
+  // GET /service/bookings/price-preview?serviceId=&scheduledDate=&endDate=&voucherCode=
+  static async previewPrice(req: Request, res: Response) {
+    const schema = Joi.object({
+      serviceId: Joi.string().required(),
+      scheduledDate: Joi.string().isoDate().required(),
+      endDate: Joi.string().isoDate().optional(),
+      voucherCode: Joi.string().trim().uppercase().allow("").optional(),
+    });
+    const { error, value } = schema.validate(req.query);
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
+
+    try {
+      const userId = req.user!.userId;
+      const pricing = await ServiceBookingSvc.previewPrice({
+        ...value,
+        userId,
+      });
+      return res.status(200).json({ success: true, data: pricing });
     } catch (e: unknown) {
       const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
@@ -126,11 +152,11 @@ export default class ServiceBookingCtrl {
   // DELETE /service/bookings/:id
   static async cancel(req: Request, res: Response) {
     try {
-      const booking = await ServiceBookingSvc.cancel(
+      const result = await ServiceBookingSvc.cancelWithRefund(
         req.params.id,
         req.user!.userId,
       );
-      return res.status(200).json({ success: true, data: booking });
+      return res.status(200).json({ success: true, data: result });
     } catch (e: unknown) {
       const err = e as Error;
       return res.status(400).json({ success: false, message: err.message });
@@ -159,6 +185,29 @@ export default class ServiceBookingCtrl {
         req.params.id,
         req.user!.userId,
         reason,
+      );
+      return res.status(200).json({ success: true, data: booking });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res.status(400).json({ success: false, message: err.message });
+    }
+  }
+
+  // PATCH /service/bookings/:id/provider-cancel
+  static async providerCancel(req: Request, res: Response) {
+    const schema = Joi.object({
+      reason: Joi.string().min(1).required(),
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
+
+    try {
+      const booking = await ServiceBookingSvc.providerCancel(
+        req.params.id,
+        req.user!.userId,
+        value.reason,
       );
       return res.status(200).json({ success: true, data: booking });
     } catch (e: unknown) {
