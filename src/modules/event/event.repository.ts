@@ -1,6 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { prisma } from "../../utils/prisma";
-import AvailabilitySvc from "../availability/availability.service";
+import { prisma, AppTransactionClient } from "../../utils/prisma";
 
 export default class EventRepo {
   /**
@@ -53,59 +52,35 @@ export default class EventRepo {
    * service and venue.
    *
    * They are created together because they are one decision: the booking exists
-   * with all of its partners attached, or it does not exist.
-   *
-   * Rewritten from the array-of-promises `$transaction` this used to be (which
-   * ran every insert concurrently with no ordering guarantee, so it could not
-   * host a lock-then-check) to the callback form, specifically so
-   * AvailabilitySvc.reserve can run — under its own row lock — before each
-   * asset/service insert, in the same transaction. Venues are not passed
-   * through AvailabilitySvc: venue access is already gated by the Phase A
-   * affiliation approval at attach time, not by this date/quantity mechanism.
-   * Excluded items (included: false) never consume inventory — the customer
-   * chose not to include them, so nothing is reserved on their behalf.
+   * with all of its partners attached, or it does not exist. Takes an
+   * already-open `tx` rather than opening its own transaction: the caller
+   * (BookingSvc) is where AvailabilitySvc.reserve runs — under its own row
+   * lock, in the same transaction as these inserts — because a repository
+   * (data access layer) isn't allowed to depend on a service; see the
+   * layer-boundary check in tools/validate-architecture.mjs. Sequential, not
+   * Promise.all: an interactive transaction shares one underlying
+   * connection, and concurrent queries against the same `tx` are not safe
+   * to issue in parallel.
    */
-  static async createEscrowTransactions(rows: {
-    assets: Prisma.EventAssetTransactionUncheckedCreateInput[];
-    services: Prisma.EventServiceTransactionUncheckedCreateInput[];
-    venues: Prisma.EventVenueTransactionUncheckedCreateInput[];
-    dateRange: { start: Date; end: Date };
-  }) {
-    return prisma.$transaction(async (tx) => {
-      const includedAssets = rows.assets.filter((a) => a.included !== false);
-      const includedServices = rows.services.filter(
-        (s) => s.included !== false,
-      );
+  static async createEscrowTransactions(
+    tx: AppTransactionClient,
+    rows: {
+      assets: Prisma.EventAssetTransactionUncheckedCreateInput[];
+      services: Prisma.EventServiceTransactionUncheckedCreateInput[];
+      venues: Prisma.EventVenueTransactionUncheckedCreateInput[];
+    },
+  ) {
+    const created: unknown[] = [];
+    for (const data of rows.assets) {
+      created.push(await tx.eventAssetTransaction.create({ data }));
+    }
+    for (const data of rows.services) {
+      created.push(await tx.eventServiceTransaction.create({ data }));
+    }
+    for (const data of rows.venues) {
+      created.push(await tx.eventVenueTransaction.create({ data }));
+    }
 
-      await AvailabilitySvc.reserve(tx, [
-        ...includedAssets.map((a) => ({
-          kind: "asset" as const,
-          itemId: a.assetId,
-          dateRange: rows.dateRange,
-          quantity: a.quantity ?? 1,
-        })),
-        ...includedServices.map((s) => ({
-          kind: "service" as const,
-          itemId: s.serviceId,
-          dateRange: rows.dateRange,
-        })),
-      ]);
-
-      // Sequential, not Promise.all: an interactive transaction shares one
-      // underlying connection, and concurrent queries against the same `tx`
-      // are not safe to issue in parallel.
-      const created: unknown[] = [];
-      for (const data of rows.assets) {
-        created.push(await tx.eventAssetTransaction.create({ data }));
-      }
-      for (const data of rows.services) {
-        created.push(await tx.eventServiceTransaction.create({ data }));
-      }
-      for (const data of rows.venues) {
-        created.push(await tx.eventVenueTransaction.create({ data }));
-      }
-
-      return created;
-    });
+    return created;
   }
 }

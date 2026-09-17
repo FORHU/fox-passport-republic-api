@@ -984,7 +984,7 @@ export default class BookingSvc {
     });
 
     // Per-partner escrow transactions for all matched template items
-    await EventRepo.createEscrowTransactions({
+    const escrowRows = {
       assets: template.templateAssets
         .filter((ta) => ta.assetId && ta.asset?.ownerId)
         .map((ta) => ({
@@ -995,7 +995,7 @@ export default class BookingSvc {
           quantity: ta.quantity,
           agreedPrice: ta.agreedPrice,
           included: !excludedAssetIds.includes(ta.id),
-          status: "pending",
+          status: "pending" as const,
         })),
       services: template.templateServices
         .filter((ts) => ts.serviceId && ts.service?.ownerId)
@@ -1006,7 +1006,7 @@ export default class BookingSvc {
           providerId: ts.service!.ownerId,
           agreedPrice: ts.agreedPrice,
           included: !excludedServiceIds.includes(ts.id),
-          status: "pending",
+          status: "pending" as const,
         })),
       venues: template.templateVenues
         .filter((tv) => tv.venueId && tv.venue?.mayorId)
@@ -1017,9 +1017,36 @@ export default class BookingSvc {
           providerId: tv.venue!.mayorId,
           agreedPrice: tv.agreedPrice,
           included: !excludedVenueIds.includes(tv.id),
-          status: tv.matched ? "approved" : "pending",
+          status: tv.matched ? ("approved" as const) : ("pending" as const),
         })),
-      dateRange: { start: input.startAt, end: input.endAt },
+    };
+    const escrowDateRange = { start: input.startAt, end: input.endAt };
+
+    // AvailabilitySvc.reserve runs under its own row lock, in the same
+    // transaction as the inserts below — venues are excluded (Phase A
+    // affiliation approval already gates venue access, not this date/
+    // quantity mechanism), and excluded items (included: false) never
+    // consume inventory since the customer chose not to include them.
+    await prisma.$transaction(async (tx) => {
+      await AvailabilitySvc.reserve(tx, [
+        ...escrowRows.assets
+          .filter((a) => a.included)
+          .map((a) => ({
+            kind: "asset" as const,
+            itemId: a.assetId,
+            dateRange: escrowDateRange,
+            quantity: a.quantity ?? 1,
+          })),
+        ...escrowRows.services
+          .filter((s) => s.included)
+          .map((s) => ({
+            kind: "service" as const,
+            itemId: s.serviceId,
+            dateRange: escrowDateRange,
+          })),
+      ]);
+
+      return EventRepo.createEscrowTransactions(tx, escrowRows);
     });
 
     // The one bump left in this service. `BookingRepo` retired the cache when
