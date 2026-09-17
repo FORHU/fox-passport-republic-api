@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
+import AvailabilitySvc from "../availability/availability.service";
 
 export default class EventRepo {
   /**
@@ -54,27 +55,57 @@ export default class EventRepo {
    * They are created together because they are one decision: the booking exists
    * with all of its partners attached, or it does not exist.
    *
-   * `$transaction` rather than the `Promise.all` the controller used. That
-   * version could leave a booking holding some of its escrow rows and no record
-   * that the rest were meant to be there - which nothing downstream checks for,
-   * because a partner that is simply absent looks exactly like a partner that
-   * was never included.
+   * Rewritten from the array-of-promises `$transaction` this used to be (which
+   * ran every insert concurrently with no ordering guarantee, so it could not
+   * host a lock-then-check) to the callback form, specifically so
+   * AvailabilitySvc.reserve can run — under its own row lock — before each
+   * asset/service insert, in the same transaction. Venues are not passed
+   * through AvailabilitySvc: venue access is already gated by the Phase A
+   * affiliation approval at attach time, not by this date/quantity mechanism.
+   * Excluded items (included: false) never consume inventory — the customer
+   * chose not to include them, so nothing is reserved on their behalf.
    */
   static async createEscrowTransactions(rows: {
     assets: Prisma.EventAssetTransactionUncheckedCreateInput[];
     services: Prisma.EventServiceTransactionUncheckedCreateInput[];
     venues: Prisma.EventVenueTransactionUncheckedCreateInput[];
+    dateRange: { start: Date; end: Date };
   }) {
-    return prisma.$transaction([
-      ...rows.assets.map((data) =>
-        prisma.eventAssetTransaction.create({ data }),
-      ),
-      ...rows.services.map((data) =>
-        prisma.eventServiceTransaction.create({ data }),
-      ),
-      ...rows.venues.map((data) =>
-        prisma.eventVenueTransaction.create({ data }),
-      ),
-    ]);
+    return prisma.$transaction(async (tx) => {
+      const includedAssets = rows.assets.filter((a) => a.included !== false);
+      const includedServices = rows.services.filter(
+        (s) => s.included !== false,
+      );
+
+      await AvailabilitySvc.reserve(tx, [
+        ...includedAssets.map((a) => ({
+          kind: "asset" as const,
+          itemId: a.assetId,
+          dateRange: rows.dateRange,
+          quantity: a.quantity ?? 1,
+        })),
+        ...includedServices.map((s) => ({
+          kind: "service" as const,
+          itemId: s.serviceId,
+          dateRange: rows.dateRange,
+        })),
+      ]);
+
+      // Sequential, not Promise.all: an interactive transaction shares one
+      // underlying connection, and concurrent queries against the same `tx`
+      // are not safe to issue in parallel.
+      const created: unknown[] = [];
+      for (const data of rows.assets) {
+        created.push(await tx.eventAssetTransaction.create({ data }));
+      }
+      for (const data of rows.services) {
+        created.push(await tx.eventServiceTransaction.create({ data }));
+      }
+      for (const data of rows.venues) {
+        created.push(await tx.eventVenueTransaction.create({ data }));
+      }
+
+      return created;
+    });
   }
 }

@@ -1,5 +1,6 @@
 import BiddingRepo from "./bidding.repository";
 import { prisma } from "../../utils/prisma";
+import AvailabilitySvc from "../availability/availability.service";
 
 export default class BiddingSvc {
   static async getServiceBidsForEvent(eventId: string) {
@@ -147,6 +148,19 @@ export default class BiddingSvc {
         data: { status: "rejected" },
       });
 
+      // Real, date/overlap-aware availability check — replaces the coarse
+      // status === "available" flag check above, which said nothing about
+      // whether this provider was already committed elsewhere for these
+      // dates. Locks and checks against both this flow and every other
+      // creation path for the same service.
+      await AvailabilitySvc.reserve(tx, [
+        {
+          kind: "service",
+          itemId: bid.proposedServiceId,
+          dateRange: { start: bid.event.startAt, end: bid.event.endAt },
+        },
+      ]);
+
       // Automatically create EventServiceTransaction
       const transaction = await tx.eventServiceTransaction.create({
         data: {
@@ -293,6 +307,17 @@ export default class BiddingSvc {
         },
         data: { status: "rejected" },
       });
+
+      // Real, date/quantity-aware availability check — replaces the coarse
+      // status === "available" flag check above.
+      await AvailabilitySvc.reserve(tx, [
+        {
+          kind: "asset",
+          itemId: bid.proposedAssetId,
+          dateRange: { start: bid.event.startAt, end: bid.event.endAt },
+          quantity: bid.proposedQuantity,
+        },
+      ]);
 
       // Automatically create EventAssetTransaction
       const transaction = await tx.eventAssetTransaction.create({

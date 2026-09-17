@@ -1,9 +1,12 @@
 import { Request, Response } from "express";
 import Joi from "joi";
-import EventCheckoutSvc from "../payment/event-checkout.service";
+import EventCheckoutSvc, {
+  BlockingItemsError,
+} from "../payment/event-checkout.service";
 import PartnershipCheckoutSvc from "../payment/partnership-checkout.service";
 import InvoiceSvc from "../payment/invoice.service";
 import { can } from "../../types/permissions";
+import { AvailabilityConflictError } from "../availability/availability.types";
 
 /**
  * The HTTP layer for Central Payment's checkout flow. Deliberately thin —
@@ -23,6 +26,50 @@ function statusForCheckoutError(message: string): number {
   if (message.includes("already cancelled")) return 409;
   if (message.includes("already been refunded")) return 409;
   return 400;
+}
+
+/**
+ * Phase B added two error types the frontend needs structured data from, not
+ * just a message string: which items are blocking checkout
+ * (BlockingItemsError), and which specific item lost availability
+ * (AvailabilityConflictError). Both are real, distinct conditions the
+ * checkout screen must render specifically ("these items need your
+ * attention" / "this item is no longer available") — falling through to the
+ * generic { success: false, message } shape below would lose the ids/kind
+ * the frontend needs to do that, even though the HTTP status would still be
+ * technically correct.
+ */
+function checkoutErrorResponse(err: Error): {
+  status: number;
+  body: Record<string, unknown>;
+} {
+  if (err instanceof BlockingItemsError) {
+    return {
+      status: 409,
+      body: {
+        success: false,
+        message: err.message,
+        code: "ITEMS_AWAITING_CONFIRMATION",
+        blockingItemIds: err.blockingItemIds,
+      },
+    };
+  }
+  if (err instanceof AvailabilityConflictError) {
+    return {
+      status: 409,
+      body: {
+        success: false,
+        message: err.message,
+        code: "AVAILABILITY_CONFLICT",
+        kind: err.kind,
+        itemId: err.itemId,
+      },
+    };
+  }
+  return {
+    status: statusForCheckoutError(err.message),
+    body: { success: false, message: err.message },
+  };
 }
 
 // Any number of codes — a multi-provider Event checkout lets a citizen
@@ -60,10 +107,8 @@ export default class CheckoutController {
         status: result.status,
       });
     } catch (e: unknown) {
-      const err = e as Error;
-      return res
-        .status(statusForCheckoutError(err.message))
-        .json({ success: false, message: err.message });
+      const { status, body } = checkoutErrorResponse(e as Error);
+      return res.status(status).json(body);
     }
   }
 
@@ -92,10 +137,8 @@ export default class CheckoutController {
       );
       return res.status(200).json(summary);
     } catch (e: unknown) {
-      const err = e as Error;
-      return res
-        .status(statusForCheckoutError(err.message))
-        .json({ success: false, message: err.message });
+      const { status, body } = checkoutErrorResponse(e as Error);
+      return res.status(status).json(body);
     }
   }
 

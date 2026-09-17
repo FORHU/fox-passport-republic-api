@@ -190,11 +190,51 @@ export default class RoleRequestRepo {
       reviewedBy: string;
       reviewedAt: Date;
       rejectionReason?: string;
+      flaggedDocuments?: string[];
+      revisionNote?: string | null;
     },
   ) {
     return prisma.roleRequest.update({
       where: { id },
       data,
+    });
+  }
+
+  /**
+   * Update the file columns on a request's application row (used when an
+   * applicant resubmits just the documents an admin flagged).
+   */
+  static async updateApplicationFiles(
+    applicationModel: string,
+    requestId: string,
+    fileColumns: Record<string, string>,
+  ) {
+    return (prisma[applicationModel as keyof typeof prisma] as any).update({
+      where: { requestId },
+      data: fileColumns,
+    });
+  }
+
+  /**
+   * Persist the remaining (unresolved) flaggedDocuments after a partial
+   * resubmission, reopening the request for review once none are left.
+   */
+  static async applyResubmission(id: string, remainingFlagged: string[]) {
+    const reopened = remainingFlagged.length === 0;
+    return prisma.roleRequest.update({
+      where: { id },
+      data: {
+        flaggedDocuments: remainingFlagged,
+        ...(reopened
+          ? {
+              status: RequestStatus.pending,
+              rejectionReason: null,
+              revisionNote: null,
+              reviewedBy: null,
+              reviewedAt: null,
+            }
+          : {}),
+      },
     });
   }
 }

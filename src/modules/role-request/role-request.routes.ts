@@ -31,6 +31,11 @@ router.post(
   applicationFiles,
   RoleRequestController.apply,
 );
+router.patch(
+  "/:id/resubmit-documents",
+  authenticate,
+  RoleRequestController.resubmitDocuments,
+);
 
 // Admin routes
 router.get(

@@ -32,6 +32,14 @@ vi.mock("stripe", () => {
 
 describe("Central Payment & Checkout Integration Tests", () => {
   let testUser: any;
+  let testPromo: any;
+  let testVoucher: any;
+  // Bookings have a non-cascading FK to Event (bookings_eventId_fkey), so
+  // leaving one behind blocks ANY later unscoped `event.deleteMany()` in
+  // this suite (partnership.integration.test.ts has exactly that) — this
+  // was caught for real by the full-suite run, not assumed.
+  const createdBookingIds: string[] = [];
+  const createdEventIds: string[] = [];
 
   beforeAll(async () => {
     // Basic setup for integration tests
@@ -58,6 +66,13 @@ describe("Central Payment & Checkout Integration Tests", () => {
 
   afterAll(async () => {
     // Teardown
+    await prisma.booking.deleteMany({
+      where: { id: { in: createdBookingIds } },
+    });
+    await prisma.eventVenueTransaction.deleteMany({
+      where: { eventId: { in: createdEventIds } },
+    });
+    await prisma.event.deleteMany({ where: { id: { in: createdEventIds } } });
     await prisma.checkout.deleteMany({});
     await prisma.payment.deleteMany({});
     await prisma.invoiceItem.deleteMany({});
@@ -197,6 +212,24 @@ describe("Central Payment & Checkout Integration Tests", () => {
           eventCategory: "corporate",
         },
       });
+      createdEventIds.push(mockEvent.id);
+
+      // Checkout now locks and validates the event's booking as part of the
+      // atomic checkout transaction (Phase B) — a real event created via
+      // the actual booking flow always has exactly one, so the fixture
+      // needs one too, not because checkout requires it as a formality.
+      const mockBooking = await prisma.booking.create({
+        data: {
+          eventId: mockEvent.id,
+          userId: testUser.id,
+          guestCount: 50,
+          totalAmount: 15000,
+          status: "pending",
+          startAt: mockEvent.startAt,
+          endAt: mockEvent.endAt,
+        },
+      });
+      createdBookingIds.push(mockBooking.id);
 
       const provider = await prisma.user.upsert({
         where: { email: "provider@example.com" },

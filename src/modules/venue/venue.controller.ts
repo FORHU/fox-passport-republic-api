@@ -375,6 +375,67 @@ export default class VenueCtrl {
     }
   }
 
+  // Normalizes an incoming date to UTC midnight so "block Dec 25" always
+  // compares equal to itself regardless of what time of day the request
+  // carried — blockedDates is a calendar of days, not timestamps.
+  private static toUtcMidnight(date: Date): Date {
+    return new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+    );
+  }
+
+  static async blockDate(req: Request, res: Response) {
+    const schema = Joi.object({ date: Joi.date().iso().required() });
+    const { error, value } = schema.validate(req.body);
+    if (error) return res.status(400).json({ message: error.message });
+
+    try {
+      const requesterId = req.user?.userId;
+      if (!requesterId)
+        return res.status(401).json({ message: "Unauthorized" });
+      const venue = await VenueSvc.addBlockedDate({
+        venueId: req.params.id,
+        requesterId,
+        date: VenueCtrl.toUtcMidnight(value.date),
+      });
+      return res.status(200).json({ message: "Date blocked", venue });
+    } catch (e: unknown) {
+      const err = e as Error;
+      const status = err.message.includes("Unauthorized")
+        ? 403
+        : err.message.includes("not found")
+          ? 404
+          : 400;
+      return res.status(status).json({ message: err.message });
+    }
+  }
+
+  static async unblockDate(req: Request, res: Response) {
+    const schema = Joi.object({ date: Joi.date().iso().required() });
+    const { error, value } = schema.validate({ date: req.params.date });
+    if (error) return res.status(400).json({ message: error.message });
+
+    try {
+      const requesterId = req.user?.userId;
+      if (!requesterId)
+        return res.status(401).json({ message: "Unauthorized" });
+      const venue = await VenueSvc.removeBlockedDate({
+        venueId: req.params.id,
+        requesterId,
+        date: VenueCtrl.toUtcMidnight(value.date),
+      });
+      return res.status(200).json({ message: "Date unblocked", venue });
+    } catch (e: unknown) {
+      const err = e as Error;
+      const status = err.message.includes("Unauthorized")
+        ? 403
+        : err.message.includes("not found")
+          ? 404
+          : 400;
+      return res.status(status).json({ message: err.message });
+    }
+  }
+
   static getCatalog(_req: Request, res: Response) {
     return res.status(200).json({
       tech: [

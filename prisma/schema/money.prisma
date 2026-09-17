@@ -331,6 +331,17 @@ model Refund {
   invoiceItem   InvoiceItem? @relation(fields: [invoiceItemId], references: [id])
   invoiceItemId String?
 
+  // Manual/admin-reviewed itemized refunds only (Phase B marketplace scope).
+  // A refund with either of these set is scoped to one line item, not the
+  // whole booking; whole-booking refunds via the existing automated path
+  // leave both null. Deliberately plain scalars (no Prisma relation object)
+  // to avoid widening the Asset/Service-transaction models' back-relations
+  // for what is an admin-tooling concern — FK constraints are still enforced
+  // at the database level in the migration.
+  assetTransactionId   String?
+  serviceTransactionId String?
+  initiatedByAdminId   String?
+
   @@map("refunds")
 }
 

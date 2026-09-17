@@ -146,6 +146,11 @@ model Venue {
   // 6. Packages
   packages VenuePackage[]
 
+  // 10. Event Foxer affiliations — who may attach this venue to a template
+  // and manage its blockedDates on the mayor's behalf. See
+  // VenueEventFoxerAffiliation in venue-affiliation.prisma.
+  affiliations VenueEventFoxerAffiliation[]
+
   @@map("venues")
 }
 

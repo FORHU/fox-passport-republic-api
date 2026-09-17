@@ -37,6 +37,10 @@ enum RequestStatus {
   pending
   approved
   rejected
+  // Distinct from rejected: specific documents were flagged (see
+  // RoleRequest.flaggedDocuments/revisionNote) and the applicant can fix
+  // just those instead of resubmitting the whole application.
+  revision_requested
 }
 
 enum PaymentStatus {

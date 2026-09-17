@@ -1,0 +1,57 @@
+// Venue Foxer <-> Event Foxer affiliations: who may host events at a venue.
+
+enum AffiliationInitiator {
+  eventFoxer
+  venueFoxer
+}
+
+enum AffiliationStatus {
+  pending
+  approved
+  rejected
+  revoked
+}
+
+/// A durable, bilateral relationship between a Venue Foxer's venue and an Event
+/// Foxer — distinct from RoleRequest, which grants a RoleType platform-wide via
+/// KYC review and is not a relationship between two specific Foxers. Either
+/// side may initiate (`initiatedBy`); the other party approves or rejects.
+///
+/// Once `approved`, `permissions` grants the Event Foxer standing rights at
+/// this one venue — a fixed allow-list enforced in code
+/// (`VENUE_AFFILIATION_PERMISSIONS` in src/types/permissions.ts), the same
+/// pattern as `EventOrganizerAssignment.permissions`. Deliberately excludes
+/// editing the venue's own listing and any booking/payout authority, which
+/// stay with `Venue.mayorId` regardless of what is granted here.
+///
+/// `agreedPrice` is an optional reference figure for attach-time defaults only
+/// — no currency is stored here. Actual charge currency is resolved at
+/// payment time from the Stripe integration, not fixed on this relationship.
+///
+/// `@@unique([venueId, eventFoxerId])` means there is exactly one relationship
+/// row per venue+organizer pair for its whole lifecycle — a rejected or
+/// revoked affiliation is re-applied for by updating this same row back to
+/// `pending`, never by inserting a second row.
+model VenueEventFoxerAffiliation {
+  id              String               @id @default(uuid())
+  venueId         String
+  eventFoxerId    String
+  initiatedBy     AffiliationInitiator
+  status          AffiliationStatus    @default(pending)
+  permissions     String[]             @default(["template:attach", "calendar:block"])
+  agreedPrice     Decimal?             @db.Decimal(12, 2)
+  reviewedById    String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  venue      Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  eventFoxer User  @relation("VenueAffiliationEventFoxer", fields: [eventFoxerId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("VenueAffiliationReviewer", fields: [reviewedById], references: [id])
+
+  @@unique([venueId, eventFoxerId])
+  @@index([eventFoxerId, status])
+  @@index([venueId, status])
+  @@map("venue_event_foxer_affiliations")
+}

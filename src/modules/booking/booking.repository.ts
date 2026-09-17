@@ -1,4 +1,4 @@
-import { prisma } from "../../utils/prisma";
+import { prisma, AppTransactionClient } from "../../utils/prisma";
 import { Prisma, BookingStatus, PaymentStatus } from "@prisma/client";
 import { BookingWithRelations } from "../../types/prisma.d";
 import { bookingCache } from "../../utils/cache-namespaces";
@@ -49,7 +49,17 @@ export default class BookingRepo {
    * booking so that a review has something to hang off. See the flag in
    * `docs/REDIS-PLAN.md` §3 about that second one.
    */
-  static async createWithIds(data: Prisma.BookingUncheckedCreateInput) {
+  /**
+   * `tx`: when supplied (the match-flow atomicity refactor), participates in
+   * the caller's own transaction and skips `retiring`'s cache invalidation —
+   * see the identical note on EventTemplateRepo.attachVenue. The caller
+   * invalidates bookingCache itself, once, after its transaction commits.
+   */
+  static async createWithIds(
+    data: Prisma.BookingUncheckedCreateInput,
+    tx?: AppTransactionClient,
+  ) {
+    if (tx) return tx.booking.create({ data });
     return this.retiring(prisma.booking.create({ data }));
   }
 

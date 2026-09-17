@@ -3,6 +3,7 @@ import VenueCtrl from "./venue.controller";
 import {
   authenticate,
   requirePermission,
+  requirePermissionAny,
 } from "../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -32,6 +33,21 @@ router.delete(
   authenticate,
   requirePermission("venue:manage"),
   VenueCtrl.deleteVenue,
+);
+
+// Calendar — mayor or an approved affiliate with `calendar:block`; exact
+// identity is checked in VenueSvc, this only requires *a* supply-side role.
+router.post(
+  "/:id/blocked-dates",
+  authenticate,
+  requirePermissionAny(["venue:manage", "template:manage"]),
+  VenueCtrl.blockDate,
+);
+router.delete(
+  "/:id/blocked-dates/:date",
+  authenticate,
+  requirePermissionAny(["venue:manage", "template:manage"]),
+  VenueCtrl.unblockDate,
 );
 
 // Approve/reject moved to admin.routes.ts (AdminCtrl) — this pair had

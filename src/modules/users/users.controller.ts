@@ -67,6 +67,7 @@ export default class UsersCtrl {
       const maxPrice = req.query.maxPrice
         ? Number(req.query.maxPrice)
         : undefined;
+      const search = req.query.q as string | undefined;
       const result = await UsersSvc.getFoxers(
         limit,
         page,
@@ -74,6 +75,7 @@ export default class UsersCtrl {
         specialization,
         city,
         maxPrice,
+        search,
       );
       return res.status(200).json({
         success: true,

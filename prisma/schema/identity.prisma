@@ -1,63 +1,63 @@
 // Identity, roles and the applications that grant them.
 
 model User {
-  id                       String                     @id @default(uuid())
-  email                    String                     @unique
+  id                       String                       @id @default(uuid())
+  email                    String                       @unique
   password                 String
   name                     String
   address                  String?
   city                     String?
   state                    String?
-  country                  String?                    @default("Philippines")
-  username                 String?                    @unique
-  googleId                 String?                    @unique
+  country                  String?                      @default("Philippines")
+  username                 String?                      @unique
+  googleId                 String?                      @unique
   phone                    String?
   imgId                    String?
-  systemRole               SystemRole                 @default(user)
+  systemRole               SystemRole                   @default(user)
   roleType                 RoleType[]
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime                   @updatedAt
+  createdAt                DateTime                     @default(now())
+  updatedAt                DateTime                     @updatedAt
   bookings                 Booking[]
   serviceBookings          ServiceBooking[]
   assetBookings            AssetBooking[]
-  assetTransactions        EventAssetTransaction[]    @relation("AssetProvider")
-  clientEvents             Event[]                    @relation("EventClient")
-  organizedEvents          Event[]                    @relation("EventOrganizer")
-  organizerAssignments     EventOrganizerAssignment[] @relation("EventOrganizerAssignmentDelegate")
-  organizerAssignmentsMade EventOrganizerAssignment[] @relation("EventOrganizerAssignmentAssignedBy")
-  serviceTransactions      EventServiceTransaction[]  @relation("ServiceProvider")
+  assetTransactions        EventAssetTransaction[]      @relation("AssetProvider")
+  clientEvents             Event[]                      @relation("EventClient")
+  organizedEvents          Event[]                      @relation("EventOrganizer")
+  organizerAssignments     EventOrganizerAssignment[]   @relation("EventOrganizerAssignmentDelegate")
+  organizerAssignmentsMade EventOrganizerAssignment[]   @relation("EventOrganizerAssignmentAssignedBy")
+  serviceTransactions      EventServiceTransaction[]    @relation("ServiceProvider")
   eventTemplates           EventTemplate[]
-  venueTransactions        EventVenueTransaction[]    @relation("VenueProvider")
+  venueTransactions        EventVenueTransaction[]      @relation("VenueProvider")
   favorites                Favorite[]
   files                    File[]
   passport                 Passport?
   reviews                  Review[]
   reviewReplies            ReviewReply[]
   assets                   Asset[]
-  reviewsGiven             RoleRequest[]              @relation("Reviewer")
-  roleRequests             RoleRequest[]              @relation("Applicant")
+  reviewsGiven             RoleRequest[]                @relation("Reviewer")
+  roleRequests             RoleRequest[]                @relation("Applicant")
   services                 Service[]
   venues                   Venue[]
   bookingAttendees         BookingAttendee[]
-  invitedAttendees         BookingAttendee[]          @relation("Inviter")
+  invitedAttendees         BookingAttendee[]            @relation("Inviter")
   notifications            Notification[]
   waitlistEntries          Waitlist[]
-  stripeCustomerId         String?                    @unique
-  stripeChargesEnabled     Boolean                    @default(false)
-  stripePayoutsEnabled     Boolean                    @default(false)
-  isEmailVerified          Boolean                    @default(false)
+  stripeCustomerId         String?                      @unique
+  stripeChargesEnabled     Boolean                      @default(false)
+  stripePayoutsEnabled     Boolean                      @default(false)
+  isEmailVerified          Boolean                      @default(false)
   // Display-only — never used for pricing/charging, which always stays in
   // whatever currency the underlying row (Invoice, PlatformFeeConfig, etc)
   // was created in. Purely so the UI can show converted amounts.
-  preferredCurrency        String                     @default("PHP")
+  preferredCurrency        String                       @default("PHP")
   payouts                  Payout[]
   ownPromotions            Promotion[]
-  stripeAccountId          String?                    @unique
-  stripeOnboardingComplete Boolean                    @default(false)
+  stripeAccountId          String?                      @unique
+  stripeOnboardingComplete Boolean                      @default(false)
   foxerSpecializations     FoxerSpecialization[]
   refreshTokens            RefreshToken[]
-  conversationsAsA         Conversation[]             @relation("ConversationUserA")
-  conversationsAsB         Conversation[]             @relation("ConversationUserB")
+  conversationsAsA         Conversation[]               @relation("ConversationUserA")
+  conversationsAsB         Conversation[]               @relation("ConversationUserB")
   messagesSent             Message[]
   posts                    Post[]
   postComments             PostComment[]
@@ -65,12 +65,12 @@ model User {
   partnerInvestments       PartnerInvestment[]
   partnerProfile           PartnerProfile?
   partnershipProposals     PartnershipProposal[]
-  followers                Follow[]                   @relation("Following")
-  following                Follow[]                   @relation("Follower")
-  isPrivate                Boolean                    @default(false)
+  followers                Follow[]                     @relation("Following")
+  following                Follow[]                     @relation("Follower")
+  isPrivate                Boolean                      @default(false)
   voucherRedemptions       VoucherRedemption[]
-  blockedUsers             Block[]                    @relation("Blocker")
-  blockedByUsers           Block[]                    @relation("Blocked")
+  blockedUsers             Block[]                      @relation("Blocker")
+  blockedByUsers           Block[]                      @relation("Blocked")
   // Last time this user's socket fully disconnected — used to render
   // "Active {time} ago" once they're offline (see socket.gateway.ts).
   lastActiveAt             DateTime?
@@ -88,6 +88,8 @@ model User {
   eventAssetBids           EventAssetBid[]
   invoices                 Invoice[]
   bookingEditRequests      BookingEditRequest[]
+  venueAffiliations        VenueEventFoxerAffiliation[] @relation("VenueAffiliationEventFoxer")
+  venueAffiliationReviews  VenueEventFoxerAffiliation[] @relation("VenueAffiliationReviewer")
 
   @@map("users")
 }
@@ -100,6 +102,13 @@ model RoleRequest {
   reviewedBy                String?
   reviewedAt                DateTime?
   rejectionReason           String?
+  // Set only when status is revision_requested: the specific document field
+  // names (validId1, nbiFile, tinIdFile, birPermitFile, selfieFile,
+  // portfolioFile) an admin flagged as the problem, plus one note explaining
+  // why. Everything else on the application stands — the applicant only
+  // needs to replace what's flagged, via resubmitDocuments.
+  flaggedDocuments          String[]                   @default([])
+  revisionNote              String?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
   gearFoxerApplication      GearFoxerApplication?

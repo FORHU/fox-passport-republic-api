@@ -53,6 +53,7 @@ export default class UsersSvc {
     specialization?: string,
     city?: string,
     maxPrice?: number,
+    search?: string,
   ) {
     const roleTypes = roleType
       ? (roleType
@@ -61,7 +62,7 @@ export default class UsersSvc {
           .filter(Boolean) as RoleType[])
       : undefined;
     return userCache.cached(
-      `foxers:${fingerprint({ limit, page, roleTypes, specialization, city, maxPrice })}`,
+      `foxers:${fingerprint({ limit, page, roleTypes, specialization, city, maxPrice, search })}`,
       USER_TTL,
       () =>
         UsersRepo.findFoxers(
@@ -71,6 +72,7 @@ export default class UsersSvc {
           specialization,
           city,
           maxPrice,
+          search,
         ),
     );
   }

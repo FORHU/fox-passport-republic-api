@@ -1,10 +1,13 @@
-import { prisma } from "../../utils/prisma";
+import { prisma, AppTransactionClient } from "../../utils/prisma";
 import { EventStatus, Prisma, RequestStatus } from "@prisma/client";
 import { toEnum } from "../../utils/enums";
 
 export default class EventRequestRepo {
-  static async create(data: Prisma.EventCreateInput) {
-    return prisma.event.create({
+  static async create(
+    data: Prisma.EventCreateInput,
+    tx: AppTransactionClient = prisma,
+  ) {
+    return tx.event.create({
       data,
       include: {
         assetTransactions: true,
