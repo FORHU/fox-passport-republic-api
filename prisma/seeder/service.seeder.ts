@@ -493,6 +493,138 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
             },
           ]
         : []),
+
+      // ── Performer Foxer Alvarez (performerFoxer@example.com) ─────────────
+      // These use the granular performer categories (photography, videography,
+      // dj, live_band, mc) so they land in the talent bucket of the event
+      // builder and appear in the Performer Foxer dashboard section.
+      ...(() => {
+        const performer = users.find(
+          (u) => u.email === "performerfoxer@example.com",
+        );
+        if (!performer) return [];
+        return [
+          {
+            id: "seed-service-performer-dj-cebu",
+            ownerId: performer.id,
+            category: ServiceCategory.entertainment,
+            name: "DJ Set — Open Format (Cebu)",
+            description:
+              "High-energy open format DJ set covering house, hip-hop, and OPM. Includes CDJs, mixer, and sound system for up to 200 pax.",
+            price: 18000,
+            currency: "PHP",
+            billingRate: BillingRate.one_time,
+            status: ServiceStatus.available,
+            city: "Cebu City",
+            state: "Cebu",
+            country: "Philippines",
+            tags: ["dj", "open format", "house", "hip-hop", "OPM"],
+            isWillingToTravel: true,
+          },
+          {
+            id: "seed-service-performer-photography-events",
+            ownerId: performer.id,
+            category: ServiceCategory.entertainment,
+            name: "Event Photography Package",
+            description:
+              "Full-event photography coverage with same-day highlights delivered digitally. Ideal for corporate events, debuts, and social gatherings.",
+            price: 12000,
+            currency: "PHP",
+            billingRate: BillingRate.one_time,
+            status: ServiceStatus.available,
+            city: "Cebu City",
+            state: "Cebu",
+            country: "Philippines",
+            tags: ["photography", "events", "same-day highlights"],
+            isWillingToTravel: true,
+          },
+          {
+            id: "seed-service-performer-videography-cinematic",
+            ownerId: performer.id,
+            category: ServiceCategory.entertainment,
+            name: "Cinematic Videography Coverage",
+            description:
+              "Cinematic-style event video coverage. Includes a short-film highlight reel (3–5 min) and full-length recording. Colour-graded and delivered within 7 days.",
+            price: 22000,
+            currency: "PHP",
+            billingRate: BillingRate.one_time,
+            status: ServiceStatus.available,
+            city: "Cebu City",
+            state: "Cebu",
+            country: "Philippines",
+            tags: ["videography", "cinematic", "highlight reel", "colour grade"],
+            isWillingToTravel: true,
+          },
+          {
+            id: "seed-service-performer-mc-bilingual",
+            ownerId: performer.id,
+            category: ServiceCategory.entertainment,
+            name: "Bilingual MC / Host",
+            description:
+              "Experienced bilingual MC (English & Filipino) for weddings, corporate events, debuts, and socials. Brings energy and keeps the program flowing.",
+            price: 15000,
+            currency: "PHP",
+            billingRate: BillingRate.one_time,
+            status: ServiceStatus.available,
+            city: "Cebu City",
+            state: "Cebu",
+            country: "Philippines",
+            tags: ["mc", "host", "bilingual", "emcee"],
+            isWillingToTravel: true,
+          },
+          {
+            id: "seed-service-performer-live-band-acoustic",
+            ownerId: performer.id,
+            category: ServiceCategory.entertainment,
+            name: "Live Acoustic Band (4-piece)",
+            description:
+              "4-piece live acoustic band — guitar, bass, keys, drums — covering OPM, pop, and acoustic originals. Perfect for ceremonies, cocktail hours, and intimate events.",
+            price: 28000,
+            currency: "PHP",
+            billingRate: BillingRate.one_time,
+            status: ServiceStatus.available,
+            city: "Cebu City",
+            state: "Cebu",
+            country: "Philippines",
+            tags: ["live band", "acoustic", "4-piece", "OPM", "ceremony"],
+            isWillingToTravel: false,
+          },
+          {
+            id: "seed-service-performer-photo-video-bundle",
+            ownerId: performer.id,
+            category: ServiceCategory.entertainment,
+            name: "Photo + Video Bundle",
+            description:
+              "Combined photography and videography package at a discounted rate. One team, full coverage — same-day highlights photo dump + cinematic reel.",
+            price: 30000,
+            currency: "PHP",
+            billingRate: BillingRate.one_time,
+            status: ServiceStatus.available,
+            city: "Cebu City",
+            state: "Cebu",
+            country: "Philippines",
+            tags: ["photography", "videography", "bundle", "full coverage"],
+            isWillingToTravel: true,
+          },
+          {
+            id: "seed-service-performer-dj-pending",
+            ownerId: performer.id,
+            category: ServiceCategory.entertainment,
+            name: "DJ Set — Deep House & Techno",
+            description:
+              "Specialist deep house and techno set for after-parties and underground events. Pending approval.",
+            price: 25000,
+            currency: "PHP",
+            billingRate: BillingRate.one_time,
+            status: ServiceStatus.pending,
+            city: "Cebu City",
+            state: "Cebu",
+            country: "Philippines",
+            tags: ["dj", "deep house", "techno", "after-party"],
+            isWillingToTravel: true,
+          },
+        ];
+      })(),
     ];
 
     // ── Bulk services for pagination-testing foxers ──────────────────────────

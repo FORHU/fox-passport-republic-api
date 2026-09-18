@@ -14,14 +14,16 @@ export default class BookingEditRequestRepo {
   // decides what "latest" means for its own UI (e.g. only show it if still
   // pending, or show the most recent resolved one too).
   static async findLatestForBooking(
-    bookingKind: "asset" | "service",
+    bookingKind: "asset" | "service" | "booking",
     bookingId: string,
   ) {
     return prisma.bookingEditRequest.findFirst({
       where:
         bookingKind === "asset"
           ? { assetBookingId: bookingId }
-          : { serviceBookingId: bookingId },
+          : bookingKind === "service"
+            ? { serviceBookingId: bookingId }
+            : { bookingId },
       orderBy: { createdAt: "desc" },
     });
   }

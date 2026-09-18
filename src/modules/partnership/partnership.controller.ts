@@ -19,7 +19,11 @@ export class PartnershipController {
   static async getProposal(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const proposal = await PartnershipSvc.getProposal(id);
+      // Neither of these two routes sits behind `authenticate` (they're
+      // public reads), so the viewer may be signed out — `computeActions`
+      // treats an undefined viewerId as "no actions available", not a crash.
+      const viewerId = (req.user as AuthenticatedUser | undefined)?.userId;
+      const proposal = await PartnershipSvc.getProposal(id, viewerId);
       res.status(200).json({ success: true, data: proposal });
     } catch (e: unknown) {
       const error = e as Error;
@@ -30,11 +34,15 @@ export class PartnershipController {
   static async listProposals(req: Request, res: Response) {
     try {
       const { partnerId, targetEventId, targetVenueId } = req.query;
-      const proposals = await PartnershipSvc.listProposals({
-        partnerId: partnerId as string,
-        targetEventId: targetEventId as string,
-        targetVenueId: targetVenueId as string,
-      });
+      const viewerId = (req.user as AuthenticatedUser | undefined)?.userId;
+      const proposals = await PartnershipSvc.listProposals(
+        {
+          partnerId: partnerId as string,
+          targetEventId: targetEventId as string,
+          targetVenueId: targetVenueId as string,
+        },
+        viewerId,
+      );
       res.status(200).json({ success: true, data: proposals });
     } catch (e: unknown) {
       const error = e as Error;

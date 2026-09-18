@@ -175,4 +175,25 @@ export default class InvestmentCtrl {
       return res.status(404).json({ success: false, message: err.message });
     }
   }
+
+  // PATCH /v1/investments/:id/cancel
+  static async cancelInvestment(req: Request, res: Response) {
+    try {
+      const requesterId = req.user?.userId;
+      if (!requesterId) {
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
+      }
+      const investment = await InvestmentSvc.cancelInvestment(
+        req.params.id,
+        requesterId,
+      );
+      return res.status(200).json({ success: true, data: investment });
+    } catch (e: unknown) {
+      const err = e as Error;
+      const status = err.message.includes("Only the investor") ? 403 : 400;
+      return res.status(status).json({ success: false, message: err.message });
+    }
+  }
 }

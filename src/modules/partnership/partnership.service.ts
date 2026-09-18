@@ -4,6 +4,8 @@ import {
   PartnershipProposalStatus,
   PartnershipType,
   InvoiceSourceType,
+  Event,
+  Venue,
 } from "@prisma/client";
 import { AuthenticatedUser } from "../../types/auth";
 import InvoiceSvc from "../payment/invoice.service";
@@ -14,8 +16,16 @@ export interface ProposalPayment {
   status?: string;
 }
 
+type ProposalWithRelations = PartnershipProposal & {
+  targetEvent?: Event | null;
+  targetVenue?: Venue | null;
+};
+
 export type ProposalWithPayment = PartnershipProposal & {
   payment: ProposalPayment;
+  canAccept: boolean;
+  canReject: boolean;
+  canWithdraw: boolean;
 };
 
 export interface CreateProposalDto {
@@ -43,7 +53,7 @@ export class PartnershipSvc {
    */
   private static async attachPayment(
     proposal: PartnershipProposal,
-  ): Promise<ProposalWithPayment> {
+  ): Promise<PartnershipProposal & { payment: ProposalPayment }> {
     const required =
       proposal.partnershipType === PartnershipType.sponsorship &&
       proposal.status === PartnershipProposalStatus.accepted;
@@ -66,6 +76,45 @@ export class PartnershipSvc {
           // rather than branching on whether it exists at all.
           { required: true, invoiceId: null, status: "pending" },
     };
+  }
+
+  // Computed server-side, per viewer, the same way BookingEditRequestSvc's
+  // canApprove/canDecline/canWithdraw are — never left as client-trusted
+  // optional fields. The pre-existing bug this replaces: the frontend's
+  // ProposalActions.tsx has always gated its Accept/Reject/Withdraw buttons
+  // on these exact field names, but nothing here ever set them, so `payment
+  // required` aside, those buttons have never rendered for anyone.
+  private static computeActions(
+    proposal: ProposalWithRelations,
+    viewerId?: string,
+  ): { canAccept: boolean; canReject: boolean; canWithdraw: boolean } {
+    const isPending = proposal.status === PartnershipProposalStatus.pending;
+    const ownerId =
+      proposal.targetEvent?.organizerId ??
+      proposal.targetVenue?.mayorId ??
+      null;
+    // Mirrors acceptProposal's own "a Partner cannot accept their own
+    // proposal" guard, in case a proposal ever targets something the
+    // proposing partner also owns.
+    const isOwner =
+      !!viewerId &&
+      !!ownerId &&
+      viewerId === ownerId &&
+      viewerId !== proposal.partnerId;
+
+    return {
+      canAccept: isPending && isOwner,
+      canReject: isPending && isOwner,
+      canWithdraw: isPending && !!viewerId && viewerId === proposal.partnerId,
+    };
+  }
+
+  private static async attachViewerFields(
+    proposal: ProposalWithRelations,
+    viewerId?: string,
+  ): Promise<ProposalWithPayment> {
+    const withPayment = await this.attachPayment(proposal);
+    return { ...withPayment, ...this.computeActions(proposal, viewerId) };
   }
 
   static async createProposal(
@@ -108,25 +157,34 @@ export class PartnershipSvc {
     });
   }
 
-  static async getProposal(id: string): Promise<ProposalWithPayment> {
+  static async getProposal(
+    id: string,
+    viewerId?: string,
+  ): Promise<ProposalWithPayment> {
     const proposal = await prisma.partnershipProposal.findUnique({
       where: { id },
       include: { targetEvent: true, targetVenue: true },
     });
     if (!proposal) throw new Error("Proposal not found");
-    return this.attachPayment(proposal);
+    return this.attachViewerFields(proposal, viewerId);
   }
 
-  static async listProposals(params: {
-    partnerId?: string;
-    targetEventId?: string;
-    targetVenueId?: string;
-  }): Promise<ProposalWithPayment[]> {
+  static async listProposals(
+    params: {
+      partnerId?: string;
+      targetEventId?: string;
+      targetVenueId?: string;
+    },
+    viewerId?: string,
+  ): Promise<ProposalWithPayment[]> {
     const proposals = await prisma.partnershipProposal.findMany({
       where: params,
       orderBy: { createdAt: "desc" },
+      include: { targetEvent: true, targetVenue: true },
     });
-    return Promise.all(proposals.map((p) => this.attachPayment(p)));
+    return Promise.all(
+      proposals.map((p) => this.attachViewerFields(p, viewerId)),
+    );
   }
 
   static async acceptProposal(
