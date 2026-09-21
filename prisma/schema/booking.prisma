@@ -29,6 +29,7 @@ model Booking {
   venueTransactions     EventVenueTransaction[]
   reviews               Review[]
   refunds               Refund[]
+  editRequests          BookingEditRequest[]
   stamp                 PassportStamp?
 
   @@map("bookings")
@@ -135,18 +136,23 @@ enum BookingEditRequestStatus {
 }
 
 // A citizen's proposed change (guest count/quantity, dates) to an existing
-// paid AssetBooking/ServiceBooking, subject to the owner's approval. Exactly
-// one of assetBookingId/serviceBookingId is set. See
-// docs/adr/0003-booking-edit-requests.md.
+// paid AssetBooking/ServiceBooking/direct-venue Booking, subject to the
+// owner's approval. Exactly one of assetBookingId/serviceBookingId/bookingId
+// is set. `bookingId` only ever targets a *direct* venue Booking (created via
+// BookingSvc.createBooking's `venueId && !eventId` path, single provider,
+// priced by `priceVenueBooking`) — a template-based, multi-provider Event
+// Booking has no per-booking price formula to reprice against and is
+// deliberately out of scope here. See docs/adr/0003-booking-edit-requests.md.
 model BookingEditRequest {
   id               String                   @id @default(uuid())
   assetBookingId   String?
   serviceBookingId String?
+  bookingId        String?
   requestedById    String
   status           BookingEditRequestStatus @default(pending)
 
   proposedQuantity   Int? // AssetBooking only — a real price multiplier there
-  proposedGuestCount Int? // ServiceBooking only — capacity, not a price input
+  proposedGuestCount Int? // ServiceBooking/Booking — capacity, not a price input
   proposedStartDate  DateTime?
   proposedEndDate    DateTime?
 
@@ -172,6 +178,7 @@ model BookingEditRequest {
 
   assetBooking   AssetBooking?   @relation(fields: [assetBookingId], references: [id])
   serviceBooking ServiceBooking? @relation(fields: [serviceBookingId], references: [id])
+  booking        Booking?        @relation(fields: [bookingId], references: [id])
   requestedBy    User            @relation(fields: [requestedById], references: [id])
 
   @@map("booking_edit_requests")

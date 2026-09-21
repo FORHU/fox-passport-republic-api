@@ -169,4 +169,31 @@ export default class InvestmentSvc {
     if (!investment) throw new Error("Investment not found");
     return investment;
   }
+
+  /**
+   * An investor's exit from a revenue-share/inventory pledge. Previously
+   * there was no way to end one at all — `resolveInvestorSplit` only ever
+   * matches `status: "active"` investments, so flipping this to
+   * "cancelled" is the whole mechanism: the next payout on that venue/event
+   * simply stops seeing it, no other code needs to change.
+   */
+  static async cancelInvestment(id: string, requesterId: string) {
+    const investment = await InvestmentRepo.findById(id);
+    if (!investment) throw new Error("Investment not found");
+
+    const requester = await UsersRepo.findUserById(requesterId);
+    const isOwner = investment.partnerId === requesterId;
+    const isAdmin = requester?.systemRole === "admin";
+    if (!isOwner && !isAdmin) {
+      throw new Error("Only the investor who made this pledge can cancel it");
+    }
+
+    if (investment.status !== "active") {
+      throw new Error(
+        `Cannot cancel an investment that is ${investment.status}`,
+      );
+    }
+
+    return InvestmentRepo.updateInvestment(id, { status: "cancelled" });
+  }
 }

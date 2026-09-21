@@ -6,7 +6,7 @@ export default class BookingEditRequestCtrl {
   // POST /booking-edit-requests
   static async create(req: Request, res: Response) {
     const schema = Joi.object({
-      bookingKind: Joi.string().valid("asset", "service").required(),
+      bookingKind: Joi.string().valid("asset", "service", "booking").required(),
       bookingId: Joi.string().required(),
       proposedQuantity: Joi.number().integer().min(1).optional(),
       proposedGuestCount: Joi.number().integer().min(1).optional(),
@@ -34,10 +34,14 @@ export default class BookingEditRequestCtrl {
   // GET /booking-edit-requests?bookingKind=&bookingId=
   static async getForBooking(req: Request, res: Response) {
     const { bookingKind, bookingId } = req.query as Record<string, string>;
-    if (bookingKind !== "asset" && bookingKind !== "service") {
+    if (
+      bookingKind !== "asset" &&
+      bookingKind !== "service" &&
+      bookingKind !== "booking"
+    ) {
       return res.status(400).json({
         success: false,
-        message: "bookingKind must be asset or service",
+        message: "bookingKind must be asset, service, or booking",
       });
     }
     if (!bookingId) {

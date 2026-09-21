@@ -1,9 +1,16 @@
 import Stripe from "stripe";
 import { prisma } from "../../utils/prisma";
-import { BookingEditRequestStatus, Prisma, RefundStatus } from "@prisma/client";
+import {
+  BookingEditRequestStatus,
+  Prisma,
+  RefundStatus,
+  PaymentStatus,
+} from "@prisma/client";
 import BookingEditRequestRepo from "./booking-edit-request.repository";
 import AssetBookingRepo from "../asset-booking/asset-booking.repository";
 import ServiceBookingRepo from "../service-booking/service-booking.repository";
+import BookingRepo from "../booking/booking.repository";
+import PaymentRepo from "../payment/payment.repository";
 import { calculateItemsTotal, toStripeCents } from "../../utils/pricing";
 import { PLATFORM_FEE_PERCENT, STRIPE_SECRET_KEY } from "../../config";
 import NotificationService from "../notifications/user-notification.service";
@@ -19,7 +26,12 @@ const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
 const EXPIRY_HOURS = 48;
 const ACTIVE_STATUSES = ["pending", "confirmed", "active"];
 
-type BookingKind = "asset" | "service";
+// "booking" only ever targets a direct-venue Booking (BookingSvc.createBooking's
+// `venueId && !eventId` path) — single provider, one venue, priced by the same
+// rate-multiplier formula as `priceVenueBooking`. A template-based, multi-
+// provider Event Booking has no per-booking price to reprice and stays out of
+// scope, per docs/adr/0003-booking-edit-requests.md.
+type BookingKind = "asset" | "service" | "booking";
 
 interface CreateInput {
   bookingKind: BookingKind;
@@ -83,6 +95,50 @@ export default class BookingEditRequestSvc {
     );
     const feePercent = hasLowerFees ? 0 : PLATFORM_FEE_PERCENT;
     return itemsTotal + itemsTotal * (feePercent / 100);
+  }
+
+  // Mirrors BookingSvc.priceVenueBooking's rate-multiplier formula exactly,
+  // minus the voucher lookup — same precedent as `reprice` above, which
+  // ignores AssetBooking/ServiceBooking's original voucher too. Only a
+  // direct-venue Booking ever calls this; a template-based Event Booking has
+  // no per-booking price formula at all (see the `BookingKind` comment).
+  private static async repriceVenue(
+    venueId: string,
+    startAt: Date,
+    endAt: Date,
+  ): Promise<number> {
+    const venue = await prisma.venue.findUnique({ where: { id: venueId } });
+    if (!venue) throw new Error("Venue not found");
+    const days = Math.max(
+      1,
+      Math.ceil((endAt.getTime() - startAt.getTime()) / (1000 * 60 * 60 * 24)),
+    );
+    const rateMultiplier =
+      venue.billingRate === "hourly"
+        ? days * 24
+        : venue.billingRate === "daily"
+          ? days
+          : venue.billingRate === "weekly"
+            ? Math.ceil(days / 7)
+            : venue.billingRate === "monthly"
+              ? Math.ceil(days / 30)
+              : 1;
+    const itemsTotal = venue.price.toNumber() * rateMultiplier;
+    const platformFeeAmount = itemsTotal * 0.05;
+    return itemsTotal + platformFeeAmount;
+  }
+
+  // The Payment row's own `providerReference`, not a field on Booking itself
+  // — a direct-venue Booking's money reference lives on the generic Payment
+  // model (see BookingSvc.cancelWithRefunds, which reads the same way),
+  // unlike AssetBooking/ServiceBooking which each carry their own
+  // `paymentTransactionId` column directly.
+  private static async getBookingPaymentIntentId(
+    bookingId: string,
+  ): Promise<string | null> {
+    const payments = await PaymentRepo.getBookingPayments(bookingId);
+    const paid = payments.find((p) => p.status === PaymentStatus.paid);
+    return paid?.providerReference ?? null;
   }
 
   // Queries other bookings directly (excluding this one by id) rather than
@@ -171,6 +227,65 @@ export default class BookingEditRequestSvc {
           "There's already a pending edit request on this booking",
         );
       }
+    }
+
+    if (bookingKind === "booking") {
+      const booking = await BookingRepo.findById(bookingId);
+      if (!booking) throw new Error("Booking not found");
+      if (booking.userId !== requestedById) throw new Error("Unauthorized");
+      if (!ACTIVE_STATUSES.includes(booking.status))
+        throw new Error("This booking can no longer be edited");
+
+      const venueTx = booking.venueTransactions?.[0];
+      if (
+        !venueTx ||
+        booking.venueTransactions.length !== 1 ||
+        (booking.assetTransactions?.length ?? 0) > 0 ||
+        (booking.serviceTransactions?.length ?? 0) > 0
+      ) {
+        throw new Error(
+          "Only single-provider venue bookings support edit requests",
+        );
+      }
+
+      const startDate = proposedStartDate
+        ? new Date(proposedStartDate)
+        : booking.startAt;
+      const endDate = proposedEndDate
+        ? new Date(proposedEndDate)
+        : booking.endAt;
+
+      const proposedTotalAmount = await this.repriceVenue(
+        venueTx.venueId,
+        startDate,
+        endDate,
+      );
+
+      const request = await BookingEditRequestRepo.create({
+        bookingId,
+        requestedById,
+        proposedGuestCount: proposedGuestCount ?? null,
+        proposedStartDate: proposedStartDate ? startDate : null,
+        proposedEndDate: proposedEndDate ? endDate : null,
+        currentTotalAmount: booking.totalAmount,
+        proposedTotalAmount,
+        priceDelta: proposedTotalAmount - booking.totalAmount.toNumber(),
+        reason,
+        expiresAt: new Date(Date.now() + EXPIRY_HOURS * 60 * 60 * 1000),
+      });
+
+      announceToUser(venueTx.providerId, "bookings");
+      NotificationService.create({
+        userId: venueTx.providerId,
+        type: "booking_edit_requested",
+        title: "A citizen requested a change to their booking",
+        message: `${booking.user?.name ?? "A citizen"} requested a change to their venue booking.`,
+        metadata: { link: `/booking/${bookingId}` },
+      }).catch((e) =>
+        console.error("Failed to notify owner of edit request", e),
+      );
+
+      return request;
     }
 
     if (bookingKind === "asset") {
@@ -298,7 +413,19 @@ export default class BookingEditRequestSvc {
   private static async loadBookingAndOwner(request: {
     assetBookingId: string | null;
     serviceBookingId: string | null;
+    bookingId: string | null;
   }) {
+    if (request.bookingId) {
+      const booking = await BookingRepo.findById(request.bookingId);
+      if (!booking) throw new Error("Booking not found");
+      const venueTx = booking.venueTransactions?.[0];
+      return {
+        bookingKind: "booking" as BookingKind,
+        booking,
+        ownerId: venueTx?.providerId ?? "",
+        citizenId: booking.userId,
+      };
+    }
     if (request.assetBookingId) {
       const booking = await AssetBookingRepo.findById(request.assetBookingId);
       if (!booking) throw new Error("Asset booking not found");
@@ -339,6 +466,15 @@ export default class BookingEditRequestSvc {
       await this.loadBookingAndOwner(request);
     if (ownerId !== respondedById) throw new Error("Unauthorized");
 
+    // The booking may have been cancelled (by either party, with its own
+    // refund already fired) after this request was submitted — approving it
+    // anyway would re-activate a cancelled booking's quantity/dates, or try
+    // to refund/charge a payment intent that's already been settled by the
+    // cancellation. `create` guards this at submission time; this is the
+    // same guard at approval time, since state can change in between.
+    if (!ACTIVE_STATUSES.includes(booking.status))
+      throw new Error("This booking is no longer active");
+
     if (this.expireIfPast(request)) {
       await BookingEditRequestRepo.updateStatus(
         id,
@@ -369,7 +505,7 @@ export default class BookingEditRequestSvc {
         request.proposedStartDate ?? assetBooking.startDate,
         request.proposedEndDate ?? assetBooking.endDate,
       );
-    } else {
+    } else if (bookingKind === "service") {
       const serviceBooking = booking as typeof booking & {
         serviceId: string;
         scheduledDate: Date;
@@ -386,6 +522,11 @@ export default class BookingEditRequestSvc {
           serviceBooking.scheduledDate,
       );
     }
+    // "booking" (direct venue): no re-check — venue double-booking isn't
+    // guarded anywhere in this codebase, including at booking creation
+    // itself (BookingSvc.createBooking's venue path never calls
+    // AvailabilitySvc.reserve for the venue), so there is nothing to
+    // re-validate here that creation-time didn't already skip.
 
     const priceDelta = request.priceDelta.toNumber();
 
@@ -411,7 +552,11 @@ export default class BookingEditRequestSvc {
     }
 
     if (priceDelta < 0) {
-      const paymentTransactionId = booking.paymentTransactionId;
+      const paymentTransactionId =
+        bookingKind === "booking"
+          ? await this.getBookingPaymentIntentId(booking.id)
+          : (booking as { paymentTransactionId?: string | null })
+              .paymentTransactionId;
       let refundId: string | null = null;
       if (paymentTransactionId?.startsWith("pi_")) {
         const sr = await stripe.refunds.create({
@@ -421,8 +566,11 @@ export default class BookingEditRequestSvc {
         refundId = sr.id;
         await prisma.refund.create({
           data: {
-            [bookingKind === "asset" ? "assetBookingId" : "serviceBookingId"]:
-              booking.id,
+            ...(bookingKind === "asset"
+              ? { assetBookingId: booking.id }
+              : bookingKind === "service"
+                ? { serviceBookingId: booking.id }
+                : { bookingId: booking.id }),
             amount: Math.abs(priceDelta),
             providerReference: sr.id,
             status:
@@ -461,14 +609,31 @@ export default class BookingEditRequestSvc {
     return updated;
   }
 
+  // A direct-venue Booking's citizen-facing page is /booking/:id — there's
+  // no /booking/fulfillment/booking/:id route (that path only ever existed
+  // for asset/service), unlike the asset/service kinds below.
+  private static fulfillmentLink(
+    bookingKind: BookingKind,
+    bookingId: string | null,
+  ): string {
+    return bookingKind === "booking"
+      ? `/booking/${bookingId}`
+      : `/booking/fulfillment/${bookingKind}/${bookingId}`;
+  }
+
   private static notifyApproved(
     bookingKind: BookingKind,
     citizenId: string,
-    request: { assetBookingId: string | null; serviceBookingId: string | null },
+    request: {
+      assetBookingId: string | null;
+      serviceBookingId: string | null;
+      bookingId: string | null;
+    },
     paymentRequired: boolean,
   ) {
     announceToUser(citizenId, "bookings");
-    const bookingId = request.assetBookingId ?? request.serviceBookingId;
+    const bookingId =
+      request.assetBookingId ?? request.serviceBookingId ?? request.bookingId;
     NotificationService.create({
       userId: citizenId,
       type: "booking_edit_approved",
@@ -476,7 +641,7 @@ export default class BookingEditRequestSvc {
       message: paymentRequired
         ? "The provider approved your requested change. Pay the price difference to confirm it."
         : "The provider approved your requested change — it's already been applied.",
-      metadata: { link: `/booking/fulfillment/${bookingKind}/${bookingId}` },
+      metadata: { link: this.fulfillmentLink(bookingKind, bookingId) },
     }).catch((e) => console.error("Failed to notify citizen of approval", e));
   }
 
@@ -486,6 +651,7 @@ export default class BookingEditRequestSvc {
       id: string;
       assetBookingId: string | null;
       serviceBookingId: string | null;
+      bookingId: string | null;
       proposedQuantity: number | null;
       proposedGuestCount: number | null;
       proposedStartDate: Date | null;
@@ -505,14 +671,52 @@ export default class BookingEditRequestSvc {
       });
       return;
     }
-    await prisma.serviceBooking.update({
-      where: { id: request.serviceBookingId! },
-      data: {
-        guestCount: request.proposedGuestCount ?? undefined,
-        scheduledDate: request.proposedStartDate ?? undefined,
-        endDate: request.proposedEndDate ?? undefined,
-        totalAmount: request.proposedTotalAmount,
-      },
+    if (bookingKind === "service") {
+      await prisma.serviceBooking.update({
+        where: { id: request.serviceBookingId! },
+        data: {
+          guestCount: request.proposedGuestCount ?? undefined,
+          scheduledDate: request.proposedStartDate ?? undefined,
+          endDate: request.proposedEndDate ?? undefined,
+          totalAmount: request.proposedTotalAmount,
+        },
+      });
+      return;
+    }
+
+    // "booking" (direct venue): also keeps the Event's own mirrored
+    // startAt/endAt/guestCount/totalAmount in sync (a direct-venue Booking's
+    // Event exists 1:1 for it and duplicates these fields — see the schema
+    // comment on Event.discountAmount), and strips this reprice's flat 5%
+    // platform fee back out of the new total so the venue's
+    // EventVenueTransaction.agreedPrice — what PayoutSvc actually pays out
+    // — moves together with the price change instead of going stale.
+    await prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.update({
+        where: { id: request.bookingId! },
+        data: {
+          guestCount: request.proposedGuestCount ?? undefined,
+          startAt: request.proposedStartDate ?? undefined,
+          endAt: request.proposedEndDate ?? undefined,
+          totalAmount: request.proposedTotalAmount,
+        },
+      });
+
+      await tx.event.update({
+        where: { id: booking.eventId },
+        data: {
+          guestCount: request.proposedGuestCount ?? undefined,
+          startAt: request.proposedStartDate ?? undefined,
+          endAt: request.proposedEndDate ?? undefined,
+          totalAmount: request.proposedTotalAmount,
+        },
+      });
+
+      const discountedItemsTotal = request.proposedTotalAmount.div(1.05);
+      await tx.eventVenueTransaction.updateMany({
+        where: { eventId: booking.eventId },
+        data: { agreedPrice: discountedItemsTotal },
+      });
     });
   }
 
@@ -564,7 +768,8 @@ export default class BookingEditRequestSvc {
     );
 
     announceToUser(citizenId, "bookings");
-    const bookingId = request.assetBookingId ?? request.serviceBookingId;
+    const bookingId =
+      request.assetBookingId ?? request.serviceBookingId ?? request.bookingId;
     NotificationService.create({
       userId: citizenId,
       type: "booking_edit_declined",
@@ -572,7 +777,7 @@ export default class BookingEditRequestSvc {
       message: declineReason
         ? `The provider declined your request: ${declineReason}`
         : "The provider declined your requested change.",
-      metadata: { link: `/booking/fulfillment/${bookingKind}/${bookingId}` },
+      metadata: { link: this.fulfillmentLink(bookingKind, bookingId) },
     }).catch((e) => console.error("Failed to notify citizen of decline", e));
 
     return updated;
@@ -621,6 +826,16 @@ export default class BookingEditRequestSvc {
     // client_secret at creation time, but the *citizen* is who actually pays
     // it — they need it too, on a later request, once the change is
     // approved and still awaiting that payment.
+    //
+    // There's no webhook wired to this PaymentIntent (it carries
+    // bookingEditRequestId, not bookingId, so the generic
+    // payment_intent.succeeded handler doesn't recognize it) and the
+    // frontend applies the change via a single client-side confirm call
+    // right after Stripe reports success — if that call never lands (closed
+    // tab, dropped network), Stripe has the money but the change is never
+    // applied. Since this lookup already retrieves the PaymentIntent, it
+    // self-heals here: if Stripe already has it as succeeded, apply the
+    // change now instead of just handing back the client secret again.
     let deltaClientSecret: string | null = null;
     if (
       viewerId === citizenId &&
@@ -632,6 +847,23 @@ export default class BookingEditRequestSvc {
         const pi = await stripe.paymentIntents.retrieve(
           request.deltaPaymentIntentId,
         );
+        if (pi.status === "succeeded") {
+          await this.applyChange(bookingKind, request);
+          const applied = await BookingEditRequestRepo.updateStatus(
+            request.id,
+            BookingEditRequestStatus.approved,
+            { appliedAt: new Date() },
+          );
+          announceToUser(citizenId, "bookings");
+          announceToAdmins("bookings");
+          return {
+            ...applied,
+            deltaClientSecret: null,
+            canApprove: false,
+            canDecline: false,
+            canWithdraw: false,
+          };
+        }
         deltaClientSecret = pi.client_secret;
       } catch (e) {
         console.error("Failed to retrieve delta PaymentIntent", e);
