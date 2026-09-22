@@ -151,3 +151,47 @@ describe("a mail failure during password reset", () => {
     expect(logged).toContain("123456");
   });
 });
+
+describe("email transport selection", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.resetModules();
+  });
+
+  it("uses Resend when a Resend API key is configured", async () => {
+    const resendSend = vi.fn(async () => ({ id: "email_123" }));
+    const resendCtor = vi.fn(function ResendMock() {
+      return { emails: { send: resendSend } };
+    });
+
+    vi.doMock("../src/config", () => ({
+      MAILER_EMAIL: "noreply@example.com",
+      MAILER_PASSWORD: "secret",
+      MAILER_TRANSPORT_HOST: "smtp.example.com",
+      MAILER_TRANSPORT_PORT: 587,
+      MAILER_TRANSPORT_SECURE: false,
+      RESEND_API_KEY: "test-resend-key",
+    }));
+
+    vi.doMock("resend", () => ({
+      Resend: resendCtor,
+    }));
+
+    const { sendEmail } = await import("../src/utils/mailer");
+
+    await sendEmail({
+      to: "person@example.com",
+      subject: "Verify your email",
+      html: "<p>Code: 123456</p>",
+    });
+
+    expect(resendCtor).toHaveBeenCalledWith("test-resend-key");
+    expect(resendSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: "FoxPassport <onboarding@foxpassport.com>",
+        to: "person@example.com",
+        subject: "Verify your email",
+      }),
+    );
+  });
+});

@@ -2,7 +2,11 @@ import Stripe from "stripe";
 import ServiceBookingRepo from "./service-booking.repository";
 import { prisma } from "../../utils/prisma";
 import { BillingRate, ItemBookingStatus, RefundStatus } from "@prisma/client";
-import { calculateItemsTotal, toStripeCents } from "../../utils/pricing";
+import {
+  calculateItemsTotal,
+  formatCurrency,
+  toStripeCents,
+} from "../../utils/pricing";
 import { PLATFORM_FEE_PERCENT, STRIPE_SECRET_KEY } from "../../config";
 import PayoutSvc from "../payout/payout.service";
 import NotificationService from "../notifications/user-notification.service";
@@ -11,6 +15,7 @@ import PromotionSvc from "../promotion/promotion.service";
 import RefundSvc from "../refund/refund.service";
 import { isPerformerServiceCategory } from "../../types/permissions";
 import AvailabilitySvc from "../availability/availability.service";
+import { sendBookingConfirmationEmail } from "../../utils/emails/confirmation";
 import {
   announceToAdmins,
   announceToUser,
@@ -31,6 +36,21 @@ function announceBookingChanged(
 }
 
 export default class ServiceBookingSvc {
+  private static async requireVerifiedIdentity(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, isEmailVerified: true },
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    if (user.isEmailVerified !== true) {
+      throw new Error("Identity verification required before booking");
+    }
+  }
+
   static async getAvailability(serviceId: string) {
     const service = await prisma.service.findUnique({
       where: { id: serviceId },
@@ -153,6 +173,8 @@ export default class ServiceBookingSvc {
     notes?: string;
     voucherCode?: string;
   }) {
+    await this.requireVerifiedIdentity(data.userId);
+
     const service = await prisma.service.findUnique({
       where: { id: data.serviceId },
     });
@@ -253,6 +275,22 @@ export default class ServiceBookingSvc {
     }
 
     announceBookingChanged(booking.userId, booking.service?.ownerId);
+
+    // Fire-and-forget, mirroring BookingSvc.confirmBookingPayment — a failed
+    // send must never fail a payment confirmation that already succeeded.
+    const userEmail = booking.user?.email;
+    if (userEmail) {
+      sendBookingConfirmationEmail({
+        to: userEmail,
+        eventName: booking.service?.name ?? "Your Service Booking",
+        bookingId: id,
+        startDate: booking.scheduledDate.toISOString(),
+        totalPaid: formatCurrency(booking.totalAmount.toNumber()),
+      }).catch((e) =>
+        console.error(`Failed to send confirmation email for ${id}`, e),
+      );
+    }
+
     return confirmed;
   }
 

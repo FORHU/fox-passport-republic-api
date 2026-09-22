@@ -235,26 +235,32 @@ model EventServiceTransaction {
 }
 
 model EventVenueTransaction {
-  id               String            @id @default(uuid())
-  eventId          String
-  bookingId        String?
-  venueId          String
-  providerId       String
-  status           TransactionStatus @default(pending)
-  agreedPrice      Decimal           @db.Decimal(12, 2)
-  included         Boolean           @default(true)
-  currency         String            @default("PHP")
-  stripeTransferId String?           @unique
-  disputeReason    String?
-  disputeAt        DateTime?
-  lockedAt         DateTime?
-  releasedAt       DateTime?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  event            Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  booking          Booking?          @relation(fields: [bookingId], references: [id])
-  provider         User              @relation("VenueProvider", fields: [providerId], references: [id])
-  venue            Venue             @relation(fields: [venueId], references: [id])
+  id                   String            @id @default(uuid())
+  eventId              String
+  bookingId            String?
+  venueId              String
+  providerId           String
+  status               TransactionStatus @default(pending)
+  agreedPrice          Decimal           @db.Decimal(12, 2)
+  included             Boolean           @default(true)
+  currency             String            @default("PHP")
+  stripeTransferId     String?           @unique
+  disputeReason        String?
+  disputeAt            DateTime?
+  lockedAt             DateTime?
+  releasedAt           DateTime?
+  // Only ever set on a capacity-overage Request — the same fields
+  // EventAssetTransaction/EventServiceTransaction already carry for their
+  // pending_provider_confirmation lifecycle. Null for every ordinary venue
+  // booking, which never enters that status.
+  confirmationDeadline DateTime?
+  rejectionReason      String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  event                Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  booking              Booking?          @relation(fields: [bookingId], references: [id])
+  provider             User              @relation("VenueProvider", fields: [providerId], references: [id])
+  venue                Venue             @relation(fields: [venueId], references: [id])
 
   @@map("event_venue_transactions")
 }

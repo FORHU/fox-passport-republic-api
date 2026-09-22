@@ -1,5 +1,6 @@
 import { prisma, AppTransactionClient } from "../../utils/prisma";
 import { ItemBookingStatus, PaymentStatus } from "@prisma/client";
+import { RESERVING_TRANSACTION_STATUSES } from "../availability/availability.types";
 
 export default class ServiceBookingRepo {
   static async create(
@@ -110,15 +111,59 @@ export default class ServiceBookingRepo {
     });
   }
 
+  /**
+   * Booked days for the citizen-facing calendar — direct bookings
+   * (`serviceBooking`) alone used to be the whole answer (and only their
+   * `scheduledDate`, ignoring a multi-day booking's own `endDate`), which
+   * left both template-booked events (`eventServiceTransaction`) and the
+   * later days of a multi-day direct booking invisible here. Both sources
+   * feed the same calendar, so both are queried and fully expanded,
+   * mirroring `AvailabilitySvc.lockAndCheckService`.
+   */
   static async getBookedDates(serviceId: string): Promise<string[]> {
-    const bookings = await prisma.serviceBooking.findMany({
-      where: {
-        serviceId,
-        status: { notIn: ["cancelled", "disputed"] },
-      },
-      select: { scheduledDate: true },
-    });
-    return bookings.map((b) => b.scheduledDate.toISOString().split("T")[0]);
+    const now = new Date();
+    const [directBookings, templateReservations] = await Promise.all([
+      prisma.serviceBooking.findMany({
+        where: {
+          serviceId,
+          status: { notIn: ["cancelled", "disputed"] },
+          OR: [
+            { endDate: { gte: now } },
+            { endDate: null, scheduledDate: { gte: now } },
+          ],
+        },
+        select: { scheduledDate: true, endDate: true },
+      }),
+      prisma.eventServiceTransaction.findMany({
+        where: {
+          serviceId,
+          status: { in: [...RESERVING_TRANSACTION_STATUSES] },
+          event: { endAt: { gte: now } },
+        },
+        select: { event: { select: { startAt: true, endAt: true } } },
+      }),
+    ]);
+
+    const days = new Set<string>();
+    const addRange = (start: Date, end: Date) => {
+      const cursor = new Date(start);
+      cursor.setUTCHours(0, 0, 0, 0);
+      const last = new Date(end);
+      last.setUTCHours(0, 0, 0, 0);
+      while (cursor <= last) {
+        days.add(cursor.toISOString().slice(0, 10));
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+    };
+
+    for (const b of directBookings) {
+      addRange(b.scheduledDate, b.endDate ?? b.scheduledDate);
+    }
+    for (const r of templateReservations) {
+      addRange(r.event.startAt, r.event.endAt);
+    }
+
+    return [...days].sort();
   }
 
   static async confirmArrival(id: string) {

@@ -9,6 +9,23 @@ function statusForError(message: string): number {
 }
 
 export default class ReportsController {
+  static async getAdminReports(req: Request, res: Response) {
+    try {
+      const result = await ReportsService.getAdminReports(
+        Number(req.query.page ?? 1),
+        Number(req.query.limit ?? 50),
+      );
+      return res.status(200).json({
+        success: true,
+        data: result.rows,
+        pagination: result.pagination,
+      });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
   static async fileReport(req: Request, res: Response) {
     const schema = Joi.object({
       targetType: Joi.string()

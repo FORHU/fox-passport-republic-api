@@ -121,6 +121,11 @@ function isCredentialFailure(e: unknown): boolean {
   return message === "Invalid credentials";
 }
 
+function isEmailVerificationFailure(e: unknown): boolean {
+  const message = typeof e === "string" ? e : (e as Error)?.message;
+  return message === "Email not verified";
+}
+
 export default class AuthCtrl {
   static async register(req: Request, res: Response) {
     const { email, password, username, name, mobileNumber } = req.body;
@@ -211,6 +216,12 @@ export default class AuthCtrl {
       // credentials" and cost real debugging time.
       if (isCredentialFailure(e)) {
         return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      if (isEmailVerificationFailure(e)) {
+        return res.status(403).json({
+          message: "Please verify your email before logging in.",
+        });
       }
 
       return res.status(500).json({

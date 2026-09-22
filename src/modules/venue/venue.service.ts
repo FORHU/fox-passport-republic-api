@@ -80,6 +80,7 @@ export default class VenueSvc {
     policies?: string[];
     status?: VenueStatus;
     price?: number;
+    extraGuestRate?: number;
     billingRate?: BillingRate;
 
     facilities?: string[];
@@ -409,6 +410,7 @@ export default class VenueSvc {
       category: VenueCategory;
       capacity: number;
       price: number;
+      extraGuestRate: number;
       address: string;
       city: string;
       state?: string;
@@ -554,6 +556,51 @@ export default class VenueSvc {
         "Unauthorized: you do not have calendar access to this venue",
       );
     }
+  }
+
+  /**
+   * Unavailable days for a venue within [start, end) — manually blocked days
+   * unioned with every day covered by a live booking's date range. Public:
+   * a citizen needs this before logging in to know what they can even pick,
+   * same as the venue listing itself.
+   *
+   * `blockedDates` is returned as its own list alongside the union
+   * (`dates`) so the venue Foxer's dashboard can tell "I blocked this" (safe
+   * to unblock) apart from "a citizen booked this" (not theirs to touch)
+   * without a second round trip.
+   */
+  static async getUnavailableDates(
+    venueId: string,
+    start: Date,
+    end: Date,
+  ): Promise<{ dates: string[]; blockedDates: string[] }> {
+    const { blockedDates, bookedRanges } = await VenueRepo.getUnavailability(
+      venueId,
+      start,
+      end,
+    );
+
+    const days = new Set<string>();
+    const blockedDays = new Set<string>();
+    const addDay = (d: Date, set: Set<string>) => {
+      if (d >= start && d < end) set.add(d.toISOString().slice(0, 10));
+    };
+
+    for (const d of blockedDates) {
+      addDay(d, days);
+      addDay(d, blockedDays);
+    }
+    for (const range of bookedRanges) {
+      const cursor = new Date(Math.max(range.start.getTime(), start.getTime()));
+      cursor.setUTCHours(0, 0, 0, 0);
+      const rangeEnd = new Date(Math.min(range.end.getTime(), end.getTime()));
+      while (cursor < rangeEnd) {
+        addDay(cursor, days);
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+    }
+
+    return { dates: [...days].sort(), blockedDates: [...blockedDays].sort() };
   }
 
   static async addBlockedDate(params: {
