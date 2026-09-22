@@ -4,13 +4,19 @@ import {
   createTransport,
   getTestMessageUrl,
 } from "nodemailer";
+import { Resend } from "resend";
 import {
   MAILER_EMAIL,
   MAILER_PASSWORD,
   MAILER_TRANSPORT_HOST,
   MAILER_TRANSPORT_PORT,
   MAILER_TRANSPORT_SECURE,
+  RESEND_API_KEY,
 } from "../config";
+
+const resendClient = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
+
+const FROM_ADDRESS = "FoxPassport <onboarding@foxpassport.com>";
 
 export async function sendEmail({
   to,
@@ -25,6 +31,24 @@ export async function sendEmail({
   html?: string;
   attachments?: Attachment[];
 }): Promise<string> {
+  if (resendClient) {
+    try {
+      await resendClient.emails.send({
+        from: FROM_ADDRESS,
+        to,
+        subject,
+        html: html ?? text ?? "",
+      });
+      console.log(`Resend email sent to ${to}: ${subject}`);
+      return "Email sent successfully";
+    } catch (error) {
+      console.error(`Resend email failed to ${to}:`, error);
+      // Preserve the SMTP fallback for deployments that have a Resend key but
+      // temporarily hit provider-side issues. A provider outage should not
+      // silently swallow the real message on the primary email path.
+    }
+  }
+
   const transporter = createTransport({
     host: MAILER_TRANSPORT_HOST,
     port: MAILER_TRANSPORT_PORT,

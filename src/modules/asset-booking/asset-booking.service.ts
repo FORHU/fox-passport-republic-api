@@ -2,7 +2,11 @@ import Stripe from "stripe";
 import AssetBookingRepo from "./asset-booking.repository";
 import { prisma } from "../../utils/prisma";
 import { BillingRate, ItemBookingStatus, RefundStatus } from "@prisma/client";
-import { calculateItemsTotal, toStripeCents } from "../../utils/pricing";
+import {
+  calculateItemsTotal,
+  formatCurrency,
+  toStripeCents,
+} from "../../utils/pricing";
 import { PLATFORM_FEE_PERCENT, STRIPE_SECRET_KEY } from "../../config";
 import PayoutSvc from "../payout/payout.service";
 import NotificationService from "../notifications/user-notification.service";
@@ -10,6 +14,7 @@ import PricingSvc from "../pricing/pricing.service";
 import PromotionSvc from "../promotion/promotion.service";
 import RefundSvc from "../refund/refund.service";
 import AvailabilitySvc from "../availability/availability.service";
+import { sendBookingConfirmationEmail } from "../../utils/emails/confirmation";
 import {
   announceToAdmins,
   announceToUser,
@@ -40,6 +45,21 @@ function announceBookingChanged(
 }
 
 export default class AssetBookingSvc {
+  private static async requireVerifiedIdentity(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, isEmailVerified: true },
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    if (user.isEmailVerified !== true) {
+      throw new Error("Identity verification required before booking");
+    }
+  }
+
   static async getAvailability(assetId: string) {
     const asset = await prisma.asset.findUnique({ where: { id: assetId } });
     if (!asset) throw new Error("Asset not found");
@@ -171,6 +191,8 @@ export default class AssetBookingSvc {
     notes?: string;
     voucherCode?: string;
   }) {
+    await this.requireVerifiedIdentity(data.userId);
+
     const asset = await prisma.asset.findUnique({
       where: { id: data.assetId },
     });
@@ -285,6 +307,22 @@ export default class AssetBookingSvc {
     }
 
     announceBookingChanged(booking.userId, booking.asset?.ownerId);
+
+    // Fire-and-forget, mirroring BookingSvc.confirmBookingPayment — a failed
+    // send must never fail a payment confirmation that already succeeded.
+    const userEmail = booking.user?.email;
+    if (userEmail) {
+      sendBookingConfirmationEmail({
+        to: userEmail,
+        eventName: `${booking.asset?.name ?? "Equipment"} Rental`,
+        bookingId: id,
+        startDate: booking.startDate.toISOString(),
+        totalPaid: formatCurrency(booking.totalAmount.toNumber()),
+      }).catch((e) =>
+        console.error(`Failed to send confirmation email for ${id}`, e),
+      );
+    }
+
     return confirmed;
   }
 

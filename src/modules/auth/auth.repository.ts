@@ -77,7 +77,7 @@ export default class AuthRepo {
   static async linkGoogleId(userId: string, googleId: string) {
     return prisma.user.update({
       where: { id: userId },
-      data: { googleId },
+      data: { googleId, isEmailVerified: true },
     });
   }
 

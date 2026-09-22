@@ -73,100 +73,28 @@ export default class PaymentPayoutSvc {
         const payoutAmount =
           itemAmount - itemDiscountAmount - itemPlatformFee - gatewayFee;
 
-        // Find recipient ID based on source type. `sourceType` can also be
-        // `booking` (InvoiceSourceType, not PayoutSourceType) — that isn't
-        // payable here and falls through to the `!recipientId` skip below.
-        let recipientId = "";
-        let payoutSourceType: PayoutSourceType | null = null;
-        // Only a venue transaction can be split with an investor here — an
-        // investor's `revenueSharePercent` targets a Venue or Event, and a
-        // Venue is the only one of those two reachable from this invoice's
-        // line items (an Event's own cut is the host markup, which never
-        // appears as an invoice line item — see payout/payout.service.ts).
-        let venueIdForInvestorSplit: string | null = null;
+        // Venue/asset/service transactions are deliberately *not* paid out
+        // here, even though this function knows their provider and amount —
+        // they belong to a Booking, and `PayoutSvc.createPayoutsForEventBooking`
+        // already pays them the moment that booking reaches `completed`
+        // (ADR-0002's hold-until-rendered design, same as the direct
+        // PaymentIntent flow). Paying them here too — at "invoice paid",
+        // before the service ever happens — was the bug: a provider got
+        // transferred funds for a booking that could still be cancelled or
+        // disputed. Only `sponsorship` has no such "rendered" checkpoint, so
+        // it's the one source type this function still settles immediately.
+        if (item.sourceType !== PayoutSourceType.sponsorship) continue;
 
-        switch (item.sourceType) {
-          case PayoutSourceType.event_venue_transaction: {
-            const venueTx = await tx.eventVenueTransaction.findUnique({
-              where: { id: item.sourceId },
-            });
-            if (venueTx) {
-              recipientId = venueTx.providerId;
-              venueIdForInvestorSplit = venueTx.venueId;
-            }
-            payoutSourceType = PayoutSourceType.event_venue_transaction;
-            break;
-          }
-          case PayoutSourceType.event_asset_transaction: {
-            const assetTx = await tx.eventAssetTransaction.findUnique({
-              where: { id: item.sourceId },
-            });
-            if (assetTx) recipientId = assetTx.providerId;
-            payoutSourceType = PayoutSourceType.event_asset_transaction;
-            break;
-          }
-          case PayoutSourceType.event_service_transaction: {
-            const serviceTx = await tx.eventServiceTransaction.findUnique({
-              where: { id: item.sourceId },
-            });
-            if (serviceTx) recipientId = serviceTx.providerId;
-            payoutSourceType = PayoutSourceType.event_service_transaction;
-            break;
-          }
-          case PayoutSourceType.sponsorship: {
-            const sponsorship = await tx.partnershipProposal.findUnique({
-              where: { id: item.sourceId },
-              include: { targetEvent: true, targetVenue: true },
-            });
-            if (sponsorship?.targetEvent) {
-              recipientId = sponsorship.targetEvent.organizerId;
-            } else if (sponsorship?.targetVenue) {
-              recipientId = sponsorship.targetVenue.mayorId;
-            }
-            payoutSourceType = PayoutSourceType.sponsorship;
-            break;
-          }
-        }
-
-        if (!recipientId || !payoutSourceType) continue; // Unable to resolve recipient
-
-        // Revenue-share split: any active investor(s) who pledged capital
-        // against this venue get their percentage carved out of the mayor's
-        // own payoutAmount (not the citizen's total or the platform's fee —
-        // this is an agreement between the investor and the venue owner).
-        // The arithmetic itself lives in `PayoutSvc.resolveInvestorSplit`,
-        // shared with payout/payout.service.ts's `createPayoutsForEventBooking`
-        // — this caller just writes the result through the same `tx`
-        // transaction client the rest of this loop already uses, since
-        // firing Stripe transfers happens later, outside it.
-        let ownerPayoutAmount = payoutAmount;
-        if (venueIdForInvestorSplit) {
-          const split = await PayoutSvc.resolveInvestorSplit(tx, payoutAmount, {
-            targetVenueId: venueIdForInvestorSplit,
-          });
-          ownerPayoutAmount = split.ownerAmount;
-
-          for (const cut of split.investorCuts) {
-            const investorPayout = await tx.payout.upsert({
-              where: {
-                sourceType_sourceId_providerId: {
-                  sourceType: PayoutSourceType.investor_revenue_share,
-                  sourceId: item.sourceId,
-                  providerId: cut.partnerId,
-                },
-              },
-              create: {
-                providerId: cut.partnerId,
-                sourceType: PayoutSourceType.investor_revenue_share,
-                sourceId: item.sourceId,
-                allocationAmount: cut.amount,
-                payoutAmount: cut.amount,
-              },
-              update: {},
-            });
-            ids.push(investorPayout.id);
-          }
-        }
+        const sponsorship = await tx.partnershipProposal.findUnique({
+          where: { id: item.sourceId },
+          include: { targetEvent: true, targetVenue: true },
+        });
+        const recipientId = sponsorship?.targetEvent
+          ? sponsorship.targetEvent.organizerId
+          : sponsorship?.targetVenue
+            ? sponsorship.targetVenue.mayorId
+            : "";
+        if (!recipientId) continue; // Unable to resolve recipient
 
         // Idempotency guard: the @@unique([sourceType, sourceId, providerId])
         // constraint means calling this twice for the same provider/source
@@ -174,19 +102,19 @@ export default class PaymentPayoutSvc {
         const payout = await tx.payout.upsert({
           where: {
             sourceType_sourceId_providerId: {
-              sourceType: payoutSourceType,
+              sourceType: PayoutSourceType.sponsorship,
               sourceId: item.sourceId,
               providerId: recipientId,
             },
           },
           create: {
             providerId: recipientId,
-            sourceType: payoutSourceType,
+            sourceType: PayoutSourceType.sponsorship,
             sourceId: item.sourceId,
             allocationAmount: itemAmount,
             platformFeeAmount: itemPlatformFee,
             gatewayFeeAmount: gatewayFee,
-            payoutAmount: ownerPayoutAmount,
+            payoutAmount: payoutAmount,
           },
           update: {}, // already exists — no-op, this is the idempotency guard
         });

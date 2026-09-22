@@ -72,6 +72,24 @@ export default class PaymentSvc {
     bookingId: string;
     description?: string;
   }) {
+    // A venue booking that exceeded capacity sits in
+    // pending_provider_confirmation until the mayor approves it — see
+    // BookingSvc.createBooking's venue branch. Nothing about it is payable
+    // yet: charging first and asking the mayor to confirm afterward would
+    // let a citizen pay for a headcount the venue might not actually fit.
+    const pendingVenueRequest = await prisma.eventVenueTransaction.findFirst({
+      where: {
+        bookingId: data.bookingId,
+        status: "pending_provider_confirmation",
+      },
+      select: { id: true },
+    });
+    if (pendingVenueRequest) {
+      throw new Error(
+        "This booking is still awaiting the Venue Foxer's approval before you can pay.",
+      );
+    }
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: toStripeCents(data.amount),
       currency: (data.currency || "PHP").toLowerCase(),

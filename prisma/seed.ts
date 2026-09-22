@@ -6,6 +6,7 @@ import { assertSchemaIsMigrated } from "./preflight";
 import {
   seedUsers,
   seedVenues,
+  seedInternationalVenues,
   seedAssets,
   seedServices,
   seedEvents,
@@ -106,6 +107,9 @@ async function main() {
 
   // 2. Seed Venues
   await seedVenues(prisma, users);
+
+  // 2b. Seed international (non-Philippines) venues for map testing
+  await seedInternationalVenues(prisma, users);
 
   // 3. Seed Assets
   await seedAssets(prisma, users);

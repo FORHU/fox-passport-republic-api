@@ -1,4 +1,4 @@
-export type AvailabilityItemKind = "asset" | "service";
+export type AvailabilityItemKind = "asset" | "service" | "venue";
 
 export interface AvailabilityCheckItem {
   kind: AvailabilityItemKind;

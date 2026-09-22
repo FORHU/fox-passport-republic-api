@@ -13,6 +13,11 @@ const router = express.Router();
 router.post("/from-template", authenticate, BookingCtrl.bookFromTemplate); // Book directly from an approved template
 router.post("/draft", authenticate, BookingCtrl.createDraftBooking); // Step 1: Create draft
 router.get("/venue-price-preview", authenticate, BookingCtrl.previewVenuePrice); // must be before /:id
+router.get(
+  "/schedule-conflicts",
+  authenticate,
+  BookingCtrl.getScheduleConflicts,
+); // must be before /:id
 
 // ========== MARKETPLACE (PHASE B) ROUTES ==========
 // Ad-hoc item add. Remove/confirm/reject reuse the existing, centralized
