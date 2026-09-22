@@ -78,6 +78,14 @@ model Venue {
   description          String
   capacity             Int
   price                Decimal                 @db.Decimal(12, 2)
+  // Rate charged per guest beyond `capacity`, per billing unit (same unit as
+  // `price` — e.g. per extra guest per day for a daily-rate venue). Null
+  // means the mayor hasn't opted into over-capacity requests at all: a
+  // citizen can only book up to `capacity`, full stop. Set means a citizen
+  // requesting more may submit a Request, priced automatically from this
+  // rate, for the mayor to approve or reject — see
+  // TransactionStatusSvc.transitionVenue's confirm/reject entries.
+  extraGuestRate       Decimal?                @db.Decimal(12, 2)
   billingRate          BillingRate
   address              String
   city                 String

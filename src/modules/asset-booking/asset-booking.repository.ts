@@ -1,5 +1,6 @@
 import { prisma, AppTransactionClient } from "../../utils/prisma";
 import { ItemBookingStatus, PaymentStatus } from "@prisma/client";
+import { RESERVING_TRANSACTION_STATUSES } from "../availability/availability.types";
 
 export default class AssetBookingRepo {
   static async create(
@@ -112,15 +113,36 @@ export default class AssetBookingRepo {
     });
   }
 
+  /**
+   * Booked ranges for the citizen-facing calendar — direct bookings
+   * (`assetBooking`) alone used to be the whole answer, which left every
+   * template-booked event (`eventAssetTransaction`) invisible here: a
+   * citizen would see a date as open, submit, and only find out it was
+   * unavailable when `AvailabilitySvc` rejected the actual booking. Both
+   * sources feed the same physical stock, so both are queried, mirroring
+   * `AvailabilitySvc.lockAndCheckAsset`.
+   */
   static async getBookedRanges(assetId: string) {
-    const [bookings, asset] = await Promise.all([
+    const now = new Date();
+    const [directBookings, templateReservations, asset] = await Promise.all([
       prisma.assetBooking.findMany({
         where: {
           assetId,
           status: { notIn: ["cancelled", "disputed"] },
-          endDate: { gte: new Date() },
+          endDate: { gte: now },
         },
         select: { startDate: true, endDate: true, quantity: true },
+      }),
+      prisma.eventAssetTransaction.findMany({
+        where: {
+          assetId,
+          status: { in: [...RESERVING_TRANSACTION_STATUSES] },
+          event: { endAt: { gte: now } },
+        },
+        select: {
+          quantity: true,
+          event: { select: { startAt: true, endAt: true } },
+        },
       }),
       prisma.asset.findUnique({
         where: { id: assetId },
@@ -128,11 +150,18 @@ export default class AssetBookingRepo {
       }),
     ]);
     return {
-      bookedRanges: bookings.map((b) => ({
-        startDate: b.startDate.toISOString().split("T")[0],
-        endDate: b.endDate.toISOString().split("T")[0],
-        bookedQty: b.quantity,
-      })),
+      bookedRanges: [
+        ...directBookings.map((b) => ({
+          startDate: b.startDate.toISOString().split("T")[0],
+          endDate: b.endDate.toISOString().split("T")[0],
+          bookedQty: b.quantity,
+        })),
+        ...templateReservations.map((r) => ({
+          startDate: r.event.startAt.toISOString().split("T")[0],
+          endDate: r.event.endAt.toISOString().split("T")[0],
+          bookedQty: r.quantity,
+        })),
+      ],
       totalQty: asset?.quantity ?? 0,
     };
   }

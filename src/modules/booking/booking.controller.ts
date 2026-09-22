@@ -163,6 +163,7 @@ export default class BookingCtrl {
         venueId: Joi.string().required(),
         startDate: Joi.date().iso().required(),
         endDate: Joi.date().iso().required(),
+        guestCount: Joi.number().integer().min(1).default(1),
         voucherCode: Joi.string().trim().uppercase().allow("").optional(),
       });
       const { error, value } = schema.validate(req.query);
@@ -173,6 +174,29 @@ export default class BookingCtrl {
         userId: req.user!.userId,
       });
       return res.status(200).json({ success: true, data: pricing });
+    } catch (e: unknown) {
+      const error = e as Error;
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  // Informational only — see BookingSvc.getScheduleConflicts. Must be
+  // registered before the generic /:id routes.
+  static async getScheduleConflicts(req: Request, res: Response) {
+    try {
+      const schema = Joi.object({
+        startDate: Joi.date().iso().required(),
+        endDate: Joi.date().iso().required(),
+      });
+      const { error, value } = schema.validate(req.query);
+      if (error) return res.status(400).json({ message: error.message });
+
+      const conflicts = await BookingSvc.getScheduleConflicts(
+        req.user!.userId,
+        new Date(value.startDate),
+        new Date(value.endDate),
+      );
+      return res.status(200).json({ success: true, data: conflicts });
     } catch (e: unknown) {
       const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });

@@ -156,6 +156,10 @@ export default class AuthSvc {
       throw "Invalid credentials";
     }
 
+    if (!user.isEmailVerified) {
+      throw new Error("Email not verified");
+    }
+
     // Transparently upgrade legacy/low-cost hashes now that we have the plaintext.
     if (needsRehash(user.password)) {
       try {

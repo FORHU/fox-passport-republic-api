@@ -64,8 +64,10 @@ export default class AvailabilitySvc {
   ): Promise<void> {
     if (item.kind === "asset") {
       await this.lockAndCheckAsset(tx, item, excludeBookingId);
-    } else {
+    } else if (item.kind === "service") {
       await this.lockAndCheckService(tx, item, excludeBookingId);
+    } else {
+      await this.lockAndCheckVenue(tx, item, excludeBookingId);
     }
   }
 
@@ -172,6 +174,62 @@ export default class AvailabilitySvc {
       throw new AvailabilityConflictError(
         `Service ${item.itemId} is not available for the requested date range`,
         "service",
+        item.itemId,
+      );
+    }
+  }
+
+  /**
+   * A venue has no `quantity` concept — one venue can only host one thing at
+   * a time — so this mirrors `lockAndCheckService`'s single-conflict shape,
+   * not the asset one. Unlike asset/service, there is no separate
+   * direct-booking table to also check: a direct venue booking already goes
+   * through `eventVenueTransaction` (see `BookingSvc.createBooking`'s
+   * venue branch), so that one query covers both flows.
+   */
+  private static async lockAndCheckVenue(
+    tx: AppTransactionClient,
+    item: AvailabilityCheckItem,
+    excludeBookingId: string | undefined,
+  ): Promise<void> {
+    await tx.$executeRaw`SELECT id FROM venues WHERE id = ${item.itemId} FOR UPDATE`;
+
+    const venue = await tx.venue.findUniqueOrThrow({
+      where: { id: item.itemId },
+      select: { blockedDates: true },
+    });
+
+    const { start, end } = item.dateRange;
+
+    const blockedConflict = venue.blockedDates.some(
+      (d) => d >= start && d < end,
+    );
+    if (blockedConflict) {
+      throw new AvailabilityConflictError(
+        `Venue ${item.itemId} has a manually blocked date within the requested range`,
+        "venue",
+        item.itemId,
+      );
+    }
+
+    const bookingExclusion = excludeBookingId
+      ? { OR: [{ bookingId: null }, { bookingId: { not: excludeBookingId } }] }
+      : {};
+
+    const transactionConflict = await tx.eventVenueTransaction.findFirst({
+      where: {
+        venueId: item.itemId,
+        status: { in: [...RESERVING_TRANSACTION_STATUSES] },
+        event: { startAt: { lt: end }, endAt: { gt: start } },
+        ...bookingExclusion,
+      },
+      select: { id: true },
+    });
+
+    if (transactionConflict) {
+      throw new AvailabilityConflictError(
+        `Venue ${item.itemId} is not available for the requested date range`,
+        "venue",
         item.itemId,
       );
     }

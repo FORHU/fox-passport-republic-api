@@ -155,6 +155,21 @@ export interface BookingViewerContext {
 }
 
 export default class BookingSvc {
+  private static async requireVerifiedIdentity(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, isEmailVerified: true },
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    if (user.isEmailVerified !== true) {
+      throw new Error("Identity verification required before booking");
+    }
+  }
+
   /**
    * Retires every cached booking read.
    *
@@ -177,6 +192,15 @@ export default class BookingSvc {
    * `previewVenuePrice` — mirrors AssetBookingSvc.priceAssetBooking's split
    * so the checkout screen's live total can never drift from what actually
    * gets charged. Voucher discount applies to the pre-fee subtotal.
+   *
+   * A venue's `price` is a flat package rate for up to `capacity` guests —
+   * guest count itself never multiplies the price. The only place guests
+   * affect the total is `extraGuests` beyond capacity, priced at the venue's
+   * own `extraGuestRate` (also flat-rate-shaped: multiplied by the same
+   * duration `rateMultiplier` as the base price, not by requested guests a
+   * second time in some other unit). `needsApproval` tells the caller
+   * whether this is a capacity-overage Request — see
+   * `TransactionStatusSvc.transitionVenue`.
    */
   private static async priceVenueBooking(
     venue: {
@@ -184,10 +208,13 @@ export default class BookingSvc {
       price: Prisma.Decimal;
       billingRate: string;
       category: string;
+      capacity: number;
+      extraGuestRate: Prisma.Decimal | null;
     },
     startAt: Date,
     endAt: Date,
     userId: string,
+    guestCount: number,
     voucherCode?: string,
   ) {
     const days = Math.max(
@@ -204,7 +231,18 @@ export default class BookingSvc {
             : venue.billingRate === "monthly"
               ? Math.ceil(days / 30)
               : 1;
-    const itemsTotal = venue.price.mul(rateMultiplier);
+
+    const extraGuests = Math.max(0, guestCount - venue.capacity);
+    if (extraGuests > 0 && !venue.extraGuestRate) {
+      throw new Error(
+        `This venue only accommodates ${venue.capacity} guests and does not accept requests beyond capacity.`,
+      );
+    }
+    const overageAmount = venue.extraGuestRate
+      ? venue.extraGuestRate.mul(rateMultiplier).mul(extraGuests)
+      : new Prisma.Decimal(0);
+    const itemsTotal = venue.price.mul(rateMultiplier).add(overageAmount);
+    const needsApproval = extraGuests > 0;
 
     let discountAmount = new Prisma.Decimal(0);
     let voucherId: string | null = null;
@@ -247,6 +285,8 @@ export default class BookingSvc {
       discountedItemsTotal,
       platformFeeAmount,
       totalAmount,
+      needsApproval,
+      extraGuests,
     };
   }
 
@@ -256,6 +296,7 @@ export default class BookingSvc {
     userId: string;
     startDate: string | Date;
     endDate: string | Date;
+    guestCount: number;
     voucherCode?: string;
   }) {
     const venue = await prisma.venue.findUnique({
@@ -268,6 +309,7 @@ export default class BookingSvc {
       new Date(data.startDate),
       new Date(data.endDate),
       data.userId,
+      data.guestCount,
       data.voucherCode,
     );
     return {
@@ -277,10 +319,120 @@ export default class BookingSvc {
       voucherCode: pricing.voucherCode,
       platformFeeAmount: pricing.platformFeeAmount.toNumber(),
       totalAmount: pricing.totalAmount.toNumber(),
+      needsApproval: pricing.needsApproval,
+      extraGuests: pricing.extraGuests,
     };
   }
 
+  /**
+   * A citizen's own bookings — across all three booking models, since
+   * nothing here shares one table — that overlap a date range they're about
+   * to book something else into. Informational only: there is no limit on
+   * how many things a citizen can book, and nothing here blocks the
+   * booking being configured. This just answers "would this be the second
+   * thing I have on that day," which the booking screens surface as a
+   * heads-up, not an error.
+   */
+  static async getScheduleConflicts(
+    userId: string,
+    start: Date,
+    end: Date,
+  ): Promise<
+    {
+      id: string;
+      type: "venue" | "event" | "asset" | "service";
+      title: string;
+      startDate: string;
+      endDate: string;
+    }[]
+  > {
+    const [bookings, assetBookings, serviceBookings] = await Promise.all([
+      prisma.booking.findMany({
+        where: {
+          userId,
+          status: { notIn: [BookingStatus.cancelled] },
+          startAt: { lt: end },
+          endAt: { gt: start },
+        },
+        select: {
+          id: true,
+          startAt: true,
+          endAt: true,
+          event: {
+            select: {
+              name: true,
+              venueTransactions: {
+                select: { venue: { select: { name: true } } },
+              },
+            },
+          },
+        },
+      }),
+      prisma.assetBooking.findMany({
+        where: {
+          userId,
+          status: { not: "cancelled" },
+          startDate: { lt: end },
+          endDate: { gt: start },
+        },
+        select: {
+          id: true,
+          startDate: true,
+          endDate: true,
+          asset: { select: { name: true } },
+        },
+      }),
+      prisma.serviceBooking.findMany({
+        where: {
+          userId,
+          status: { not: "cancelled" },
+          scheduledDate: { lt: end },
+          OR: [
+            { endDate: { gt: start } },
+            { endDate: null, scheduledDate: { gt: start } },
+          ],
+        },
+        select: {
+          id: true,
+          scheduledDate: true,
+          endDate: true,
+          service: { select: { name: true } },
+        },
+      }),
+    ]);
+
+    return [
+      ...bookings.map((b) => ({
+        id: b.id,
+        type: (b.event?.venueTransactions?.[0]?.venue ? "venue" : "event") as
+          "venue" | "event",
+        title:
+          b.event?.venueTransactions?.[0]?.venue?.name ??
+          b.event?.name ??
+          "Booking",
+        startDate: b.startAt.toISOString(),
+        endDate: b.endAt.toISOString(),
+      })),
+      ...assetBookings.map((b) => ({
+        id: b.id,
+        type: "asset" as const,
+        title: b.asset?.name ?? "Equipment",
+        startDate: b.startDate.toISOString(),
+        endDate: b.endDate.toISOString(),
+      })),
+      ...serviceBookings.map((b) => ({
+        id: b.id,
+        type: "service" as const,
+        title: b.service?.name ?? "Service",
+        startDate: b.scheduledDate.toISOString(),
+        endDate: (b.endDate ?? b.scheduledDate).toISOString(),
+      })),
+    ];
+  }
+
   static async createBooking(data: CreateBookingInput) {
+    await this.requireVerifiedIdentity(data.userId);
+
     const {
       attendees,
       eventId,
@@ -309,14 +461,16 @@ export default class BookingSvc {
       const startAt = new Date(startDate);
       const endAt = new Date(endDate);
 
-      // A client-supplied `data.totalAmount` is only trusted when there's no
-      // voucher — once a voucher is involved, the server total is the only
-      // one anyone can check against.
+      // `data.totalAmount` is never trusted here, voucher or not — a client
+      // that omitted the voucher code used to have its raw `totalAmount`
+      // charged verbatim, which let anyone book a venue for whatever price
+      // they sent. The server-computed price is the only one anyone charges.
       const pricing = await this.priceVenueBooking(
         venue,
         startAt,
         endAt,
         userId,
+        data.guestCount || 1,
         data.voucherCode,
       );
       const itemsTotal = pricing.itemsTotal;
@@ -324,11 +478,8 @@ export default class BookingSvc {
       const voucherId = pricing.voucherId;
       const discountedItemsTotal = pricing.discountedItemsTotal;
       const platformFeeAmount = pricing.platformFeeAmount;
-      const totalAmount = data.voucherCode
-        ? pricing.totalAmount
-        : data.totalAmount
-          ? new Prisma.Decimal(data.totalAmount)
-          : pricing.totalAmount;
+      const totalAmount = pricing.totalAmount;
+      const needsApproval = pricing.needsApproval;
 
       // Create a minimal Event (no template — direct venue booking)
       const event = await prisma.event.create({
@@ -360,15 +511,46 @@ export default class BookingSvc {
       // the payout logic (PayoutSvc.createPayoutsForEventBooking) adds the
       // discount back only when the voucher was platform-funded, restoring
       // the venue owner's undiscounted cut in that case.
-      await prisma.eventVenueTransaction.create({
-        data: {
-          eventId: event.id,
-          venueId: venue.id,
-          providerId: venue.mayorId,
-          agreedPrice: discountedItemsTotal,
-          status: "pending",
-          currency: "PHP",
-        },
+      //
+      // The conflict check and this insert must share one transaction — a
+      // venue has no `quantity` to oversell against, so the FOR UPDATE lock
+      // AvailabilitySvc.reserve takes on the venue row is the only thing
+      // stopping two citizens from booking the same dates. Checking outside
+      // this transaction (or inserting outside it) would leave a window
+      // where both requests pass the check before either's row exists.
+      //
+      // A request that exceeds capacity starts in
+      // pending_provider_confirmation instead of pending — the mayor has to
+      // confirm the venue can actually fit the extra guests before this
+      // becomes payable (see TransactionStatusSvc.transitionVenue and the
+      // create-payment-intent gate in payment.service.ts). It still reserves
+      // the dates immediately: RESERVING_TRANSACTION_STATUSES treats a
+      // pending request as occupying the calendar, so nobody else can book
+      // over it while the mayor is deciding.
+      const confirmationDeadline = needsApproval
+        ? new Date(
+            Date.now() + this.CONFIRMATION_DEADLINE_HOURS * 60 * 60 * 1000,
+          )
+        : null;
+      await prisma.$transaction(async (tx) => {
+        await AvailabilitySvc.reserve(tx, [
+          {
+            kind: "venue",
+            itemId: venue.id,
+            dateRange: { start: startAt, end: endAt },
+          },
+        ]);
+        await tx.eventVenueTransaction.create({
+          data: {
+            eventId: event.id,
+            venueId: venue.id,
+            providerId: venue.mayorId,
+            agreedPrice: discountedItemsTotal,
+            status: needsApproval ? "pending_provider_confirmation" : "pending",
+            confirmationDeadline,
+            currency: "PHP",
+          },
+        });
       });
 
       // Create Booking
@@ -463,7 +645,12 @@ export default class BookingSvc {
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
-    const totalAmount = data.totalAmount || 0;
+    // `data.totalAmount` is never trusted here either — the event row already
+    // carries a server-computed total (set at creation, either by the venue
+    // branch above or by `bookFromTemplate`'s template pricing), so a client
+    // sending a request straight at this branch (e.g. `POST /booking/create`)
+    // can no longer charge whatever `totalAmount` it puts in the body.
+    const totalAmount = event.totalAmount.toNumber();
 
     const { specialRequests: _, ...cleanRest } = rest;
 

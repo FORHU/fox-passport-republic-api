@@ -5,8 +5,16 @@ import {
   authenticate,
   requirePermission,
 } from "../../middleware/auth.middleware";
+import ReportsController from "../reports/reports.controller";
 
 const router = express.Router();
+
+router.get(
+  "/reports",
+  authenticate,
+  requirePermission("queue:read"),
+  ReportsController.getAdminReports,
+);
 
 // Role assignment — the only routes that hand out capability directly, so they
 // are gated on the narrowest permission in the table.
