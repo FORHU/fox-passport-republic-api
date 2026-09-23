@@ -117,7 +117,11 @@ export function getCityOrLandmarkCoords(
 // Deterministic small offset (~0.3-2.8km) so venues sharing a city don't
 // stack on one pin. Seeded by name (not random) so re-running the seeder
 // produces the exact same coordinates every time.
-function jitterCoords(
+//
+// Exported so other seeders (e.g. international-venue.seeder.ts, whose
+// cities aren't in CITY_COORDS above) can spread their own city-centroid
+// venues apart using the same deterministic scheme.
+export function jitterCoords(
   base: { lat: number; lng: number },
   seed: string,
 ): { lat: number; lng: number } {

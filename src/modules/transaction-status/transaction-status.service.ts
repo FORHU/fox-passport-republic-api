@@ -39,11 +39,19 @@ const ALLOWED_TRANSITIONS: Record<string, TransactionStatus> = {
   "service:pending_provider_confirmation:cancel": TransactionStatus.cancelled,
   "service:approved:cancel": TransactionStatus.cancelled,
 
-  // Venue rows never enter pending_provider_confirmation (Phase A's
-  // affiliation gate is the venue's consent step) — only cancel applies,
-  // from either of its two possible starting statuses.
+  // Ordinary venue bookings never enter pending_provider_confirmation
+  // (Phase A's affiliation gate is the venue's one-time consent to being
+  // listed at all) — cancel applies from either of their two normal
+  // statuses. A capacity-overage Request is the one deliberate exception:
+  // BookingSvc.createBooking creates its EventVenueTransaction directly in
+  // pending_provider_confirmation, needing its own per-booking confirm/
+  // reject from the mayor, since exceeding the venue's stated capacity is a
+  // real feasibility question the affiliation approval never answered.
   "venue:pending:cancel": TransactionStatus.cancelled,
   "venue:approved:cancel": TransactionStatus.cancelled,
+  "venue:pending_provider_confirmation:confirm": TransactionStatus.approved,
+  "venue:pending_provider_confirmation:reject": TransactionStatus.rejected,
+  "venue:pending_provider_confirmation:expire": TransactionStatus.rejected,
 };
 
 // action -> rejectionReason. Deliberately not client-suppliable — reject and
@@ -207,27 +215,47 @@ export default class TransactionStatusSvc {
       include: { booking: { select: { userId: true } } },
     });
 
-    if (action !== "cancel") {
-      // No (venue, *, confirm|reject|expire) entry exists in the allow-list
-      // either, so this would fail resolveTransition anyway — this check
-      // just gives a clearer error for the venue case specifically.
-      throw new InvalidTransitionError("venue", row.status, action);
+    if (action === "confirm" || action === "reject") {
+      // Only a capacity-overage Request ever reaches this branch — see the
+      // ALLOWED_TRANSITIONS comment. providerId is the venue's mayor.
+      if (!actorId || row.providerId !== actorId) {
+        throw new TransactionActorUnauthorizedError(
+          "Unauthorized: only the venue's mayor can confirm or reject this request",
+        );
+      }
+    } else if (action === "cancel") {
+      if (!row.bookingId || !row.booking) {
+        throw new Error("This item is not yet attached to a booking to cancel");
+      }
+      if (!actorId || row.booking.userId !== actorId) {
+        throw new TransactionActorUnauthorizedError(
+          "Unauthorized: only the booking owner can cancel this item",
+        );
+      }
     }
-
-    if (!row.bookingId || !row.booking) {
-      throw new Error("This item is not yet attached to a booking to cancel");
-    }
-    if (!actorId || row.booking.userId !== actorId) {
-      throw new TransactionActorUnauthorizedError(
-        "Unauthorized: only the booking owner can cancel this item",
-      );
-    }
+    // action === "expire": system-driven, no actor check.
 
     const toStatus = this.resolveTransition("venue", row.status, action);
 
+    if (action === "confirm" || action === "expire") {
+      const now = await this.dbNow(tx);
+      const withinDeadline = isWithinDeadline(now, row.confirmationDeadline);
+      if (action === "confirm" && !withinDeadline) {
+        throw new DeadlinePassedError(
+          "The confirmation deadline for this request has passed",
+        );
+      }
+      if (action === "expire" && withinDeadline) {
+        throw new InvalidTransitionError("venue", row.status, action);
+      }
+    }
+
     return tx.eventVenueTransaction.update({
       where: { id, status: row.status },
-      data: { status: toStatus },
+      data: {
+        status: toStatus,
+        rejectionReason: REJECTION_REASON[action] ?? row.rejectionReason,
+      },
     });
   }
 }

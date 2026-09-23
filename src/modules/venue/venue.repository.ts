@@ -6,6 +6,7 @@ import {
   VenueCategory,
   Prisma,
 } from "@prisma/client";
+import { RESERVING_TRANSACTION_STATUSES } from "../availability/availability.types";
 
 // Venues in these statuses hold their service area; drafts haven't committed
 // to a boundary yet and archived/rejected ones are dead, so neither blocks
@@ -55,6 +56,7 @@ export default class VenueRepo {
     policies: string[];
     status?: VenueStatus;
     price: number;
+    extraGuestRate?: number;
     billingRate: BillingRate;
 
     facilities: string[];
@@ -331,6 +333,38 @@ export default class VenueRepo {
         (rows) => rows[0] ?? null,
       ),
     );
+  }
+
+  /**
+   * Raw ingredients for a venue's unavailability calendar within a window —
+   * manually blocked days, plus every live booking's date range. Left
+   * unexpanded (ranges, not individual days) and unmerged with `blockedDates`
+   * on purpose: turning a range into a list of days, and deciding what counts
+   * as "unavailable," is a display/business decision for `VenueSvc`, not a
+   * data-access one.
+   */
+  static async getUnavailability(venueId: string, start: Date, end: Date) {
+    const [venue, transactions] = await Promise.all([
+      prisma.venue.findUnique({
+        where: { id: venueId },
+        select: { blockedDates: true },
+      }),
+      prisma.eventVenueTransaction.findMany({
+        where: {
+          venueId,
+          status: { in: [...RESERVING_TRANSACTION_STATUSES] },
+          event: { startAt: { lt: end }, endAt: { gt: start } },
+        },
+        select: { event: { select: { startAt: true, endAt: true } } },
+      }),
+    ]);
+    return {
+      blockedDates: venue?.blockedDates ?? [],
+      bookedRanges: transactions.map((t) => ({
+        start: t.event.startAt,
+        end: t.event.endAt,
+      })),
+    };
   }
 
   static async archiveVenue(id: string) {

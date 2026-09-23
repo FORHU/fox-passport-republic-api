@@ -18,7 +18,7 @@ export default class ConfirmationDeadlineSweepSvc {
   static async runSweep() {
     const now = new Date();
 
-    const [staleAssets, staleServices] = await Promise.all([
+    const [staleAssets, staleServices, staleVenues] = await Promise.all([
       prisma.eventAssetTransaction.findMany({
         where: {
           status: "pending_provider_confirmation",
@@ -43,6 +43,20 @@ export default class ConfirmationDeadlineSweepSvc {
           service: { select: { name: true } },
         },
       }),
+      // Only ever populated by a capacity-overage Request — ordinary venue
+      // bookings never reach pending_provider_confirmation at all.
+      prisma.eventVenueTransaction.findMany({
+        where: {
+          status: "pending_provider_confirmation",
+          confirmationDeadline: { lt: now },
+        },
+        select: {
+          id: true,
+          providerId: true,
+          bookingId: true,
+          venue: { select: { name: true } },
+        },
+      }),
     ]);
 
     let expired = 0;
@@ -50,13 +64,14 @@ export default class ConfirmationDeadlineSweepSvc {
     let failed = 0;
 
     const expireOne = async (
-      kind: "asset" | "service",
+      kind: "asset" | "service" | "venue",
       row: {
         id: string;
         providerId: string;
         bookingId: string | null;
         asset?: { name: string } | null;
         service?: { name: string } | null;
+        venue?: { name: string } | null;
       },
     ) => {
       try {
@@ -69,7 +84,8 @@ export default class ConfirmationDeadlineSweepSvc {
         );
         expired++;
 
-        const itemName = row.asset?.name ?? row.service?.name ?? "an item";
+        const itemName =
+          row.asset?.name ?? row.service?.name ?? row.venue?.name ?? "an item";
         await NotificationSvc.create({
           userId: row.providerId,
           type: "MARKETPLACE_ITEM_EXPIRED",
@@ -110,9 +126,11 @@ export default class ConfirmationDeadlineSweepSvc {
 
     for (const row of staleAssets) await expireOne("asset", row);
     for (const row of staleServices) await expireOne("service", row);
+    for (const row of staleVenues) await expireOne("venue", row);
 
     return {
-      candidates: staleAssets.length + staleServices.length,
+      candidates:
+        staleAssets.length + staleServices.length + staleVenues.length,
       expired,
       alreadyResolved,
       failed,

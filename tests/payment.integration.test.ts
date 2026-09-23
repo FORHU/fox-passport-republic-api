@@ -343,8 +343,7 @@ describe("Central Payment & Checkout Integration Tests", () => {
     // provider's cut of the same transaction.
     let provider: any;
     let event: any;
-    let asset: any;
-    let transaction: any;
+    let sponsorship: any;
 
     beforeAll(async () => {
       provider = await prisma.user.create({
@@ -354,21 +353,10 @@ describe("Central Payment & Checkout Integration Tests", () => {
           name: "Payout Idempotency Provider",
         },
       });
-      asset = await prisma.asset.create({
-        data: {
-          ownerId: provider.id,
-          category: "sound_system",
-          name: "Idempotency Test Speakers",
-          description: "desc",
-          price: 100,
-          billingRate: "daily",
-          status: "available",
-        },
-      });
       event = await prisma.event.create({
         data: {
           name: "Payout Idempotency Test Event",
-          organizerId: testUser.id,
+          organizerId: provider.id,
           clientId: testUser.id,
           startAt: new Date(),
           endAt: new Date(),
@@ -378,24 +366,23 @@ describe("Central Payment & Checkout Integration Tests", () => {
           eventCategory: "corporate",
         },
       });
-      transaction = await prisma.eventAssetTransaction.create({
+      sponsorship = await prisma.partnershipProposal.create({
         data: {
-          eventId: event.id,
-          assetId: asset.id,
-          providerId: provider.id,
-          agreedPrice: 1000,
-          status: "approved",
+          partnerId: testUser.id,
+          targetEventId: event.id,
+          partnershipType: "sponsorship",
+          title: "Idempotency Test Sponsorship",
+          description: "Test sponsorship",
+          proposedAmount: 1000,
+          status: "accepted",
         },
       });
     });
 
     afterAll(async () => {
       await prisma.payout.deleteMany({ where: { providerId: provider.id } });
-      await prisma.eventAssetTransaction.deleteMany({
-        where: { id: transaction.id },
-      });
+      await prisma.partnershipProposal.delete({ where: { id: sponsorship.id } });
       await prisma.event.deleteMany({ where: { id: event.id } });
-      await prisma.asset.deleteMany({ where: { id: asset.id } });
       await prisma.user.deleteMany({ where: { id: provider.id } });
     });
 
@@ -406,8 +393,8 @@ describe("Central Payment & Checkout Integration Tests", () => {
           {
             amount: 1000,
             description: "Idempotency test item",
-            sourceType: "event_asset_transaction" as any,
-            sourceId: transaction.id,
+            sourceType: "sponsorship" as any,
+            sourceId: sponsorship.id,
           },
         ],
       });
@@ -430,8 +417,8 @@ describe("Central Payment & Checkout Integration Tests", () => {
 
       const payouts = await prisma.payout.findMany({
         where: {
-          sourceType: "event_asset_transaction",
-          sourceId: transaction.id,
+          sourceType: "sponsorship",
+          sourceId: sponsorship.id,
           providerId: provider.id,
         },
       });
@@ -447,8 +434,8 @@ describe("Central Payment & Checkout Integration Tests", () => {
         prisma.payout.create({
           data: {
             providerId: provider.id,
-            sourceType: "event_asset_transaction",
-            sourceId: transaction.id,
+            sourceType: "sponsorship",
+            sourceId: sponsorship.id,
             allocationAmount: 1000,
             payoutAmount: 1000,
           },
