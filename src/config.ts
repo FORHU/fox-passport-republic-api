@@ -135,13 +135,21 @@ export const STRIPE_CONNECT_REFRESH_URL =
   `${FRONTEND_URL}/creator-dashboard/stripe-onboard`;
 export const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
 
-// Warned about rather than required: the app runs perfectly well without
-// Google sign-in, so a missing client id should not stop everyone else's
-// deployment. It should not be silent either - the button is rendered
-// unconditionally, so without these it leads somewhere broken.
-export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID as string;
-export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET as string;
-if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+// Google sign-in is optional, but a partially configured integration must fail
+// at boot instead of waiting until the first user clicks the button.
+const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() || undefined;
+const googleClientSecret =
+  process.env.GOOGLE_CLIENT_SECRET?.trim() || undefined;
+
+if (Boolean(googleClientId) !== Boolean(googleClientSecret)) {
+  throw new Error(
+    "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be provided together.",
+  );
+}
+
+export const GOOGLE_CLIENT_ID = googleClientId;
+export const GOOGLE_CLIENT_SECRET = googleClientSecret;
+if (!GOOGLE_CLIENT_ID) {
   console.warn(
     "⚠️  GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set — Google sign-in will fail.",
   );
@@ -150,3 +158,14 @@ export const GOOGLE_CALLBACK_URL = (
   process.env.GOOGLE_CALLBACK_URL ||
   `http://localhost:${PORT}/api/v1/auth/google/callback`
 ).trim();
+
+if (GOOGLE_CLIENT_ID) {
+  try {
+    const callbackUrl = new URL(GOOGLE_CALLBACK_URL);
+    if (!/^https?:$/.test(callbackUrl.protocol)) throw new Error();
+  } catch {
+    throw new Error(
+      "GOOGLE_CALLBACK_URL must be an absolute http(s) URL when Google OAuth is configured.",
+    );
+  }
+}
