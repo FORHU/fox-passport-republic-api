@@ -252,7 +252,7 @@ export default class PaymentSvc {
     // `paymentType` (deposit/full) is no longer stored on `Payment` — every
     // real payment was one or the other, so the old check was always true for
     // any payment reaching `paid`; this keeps that behavior without the field.
-    const bookingId = updated.invoice.items[0]?.sourceId;
+    const bookingId = updated.invoice?.items[0]?.sourceId;
     if (data.paymentStatus === PaymentStatus.paid && bookingId) {
       // Full payment means the citizen has paid in full — it does NOT mean the event
       // has happened yet. Mirrors AssetBooking/ServiceBooking's confirmPayment, which

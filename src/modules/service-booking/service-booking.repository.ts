@@ -71,6 +71,12 @@ export default class ServiceBookingRepo {
           },
         },
         user: { select: { id: true, name: true, email: true } },
+        payments: {
+          orderBy: { createdAt: "desc" },
+        },
+        refunds: {
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
   }

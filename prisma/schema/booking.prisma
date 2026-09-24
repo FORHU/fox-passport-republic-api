@@ -86,6 +86,7 @@ model ServiceBooking {
   service              Service              @relation(fields: [serviceId], references: [id])
   user                 User                 @relation(fields: [userId], references: [id])
   editRequests         BookingEditRequest[]
+  payments             Payment[]
   refunds              Refund[]
   voucherRedemption    VoucherRedemption?
 
@@ -121,6 +122,7 @@ model AssetBooking {
   asset                Asset                @relation(fields: [assetId], references: [id])
   user                 User                 @relation(fields: [userId], references: [id])
   editRequests         BookingEditRequest[]
+  payments             Payment[]
   refunds              Refund[]
   voucherRedemption    VoucherRedemption?
 

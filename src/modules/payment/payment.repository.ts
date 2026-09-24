@@ -293,6 +293,7 @@ export default class PaymentRepo {
       where: {
         status: PaymentStatus.pending,
         createdAt: { lt: cutoff },
+        invoice: { isNot: null },
       },
       select: {
         id: true,
@@ -312,7 +313,9 @@ export default class PaymentRepo {
     const paymentIds = expiredPayments.map((p) => p.id);
     const bookingIds = [
       ...new Set(
-        expiredPayments.flatMap((p) => p.invoice.items.map((i) => i.sourceId)),
+        expiredPayments.flatMap(
+          (p) => p.invoice?.items.map((i) => i.sourceId) ?? [],
+        ),
       ),
     ];
 
