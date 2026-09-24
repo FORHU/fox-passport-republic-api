@@ -80,6 +80,7 @@ model User {
   postMediaTags            PostMediaTag[]
   pollVotes                PollVote[]
   reportsFiled             Report[]
+  reportsResolved          Report[]                   @relation("ReportResolvedBy")
   groupConversations       ConversationParticipant[]
   messageReactions         MessageReaction[]
   conversationReads        ConversationRead[]

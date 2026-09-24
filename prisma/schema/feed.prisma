@@ -38,6 +38,18 @@ enum ReportTargetType {
   venue
 }
 
+// open: filed, not yet looked at. dismissed: reviewed, no violation found —
+// target untouched. actioned: reviewed, admin took a real moderation action
+// against the target (reject the listing, suspend the account, remove the
+// post) through that target's own existing endpoint — this status only
+// records that a decision was made and why, it does not perform the action
+// itself.
+enum ReportStatus {
+  open
+  dismissed
+  actioned
+}
+
 model Post {
   id         String         @id @default(uuid())
   authorId   String
@@ -248,8 +260,15 @@ model Report {
   details    String?
   createdAt  DateTime         @default(now())
 
-  reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  status         ReportStatus @default(open)
+  resolvedById   String?
+  resolvedAt     DateTime?
+  resolutionNote String?
+
+  reporter   User  @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  resolvedBy User? @relation("ReportResolvedBy", fields: [resolvedById], references: [id])
 
   @@index([targetType, targetId])
+  @@index([status])
   @@map("reports")
 }
