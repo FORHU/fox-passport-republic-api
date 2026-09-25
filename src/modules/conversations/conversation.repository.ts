@@ -1,6 +1,16 @@
 import { prisma } from "../../utils/prisma";
+import type { BidStatus, InboxCounterpart } from "@prisma/client";
+import AppointmentAccess from "../appointment/appointment.access";
 
 const PARTICIPANT_SELECT = { id: true, name: true, imgId: true };
+
+// A Shared Inbox thread (see Conversation in messaging.prisma) names its Venue
+// or Event and its guest instead of a pair of users.
+const INBOX_INCLUDE = {
+  inboxVenue: { select: { id: true, name: true } },
+  inboxEvent: { select: { id: true, name: true } },
+  guest: { select: PARTICIPANT_SELECT },
+} as const;
 
 // Small preview, not the full Post shape — just enough for a chat bubble to
 // render a mini card (author, snippet, first image) without pulling in
@@ -85,11 +95,30 @@ export default class ConversationRepository {
           { userAId: userId, hiddenForA: false },
           { userBId: userId, hiddenForB: false },
           { isGroup: true, participants: { some: { userId } } },
+          // Shared Inbox threads: the ones they started as a guest, and those
+          // of every Venue and Event whose inbox they answer (ADR 0005).
+          { guestId: userId },
+          { inboxVenue: AppointmentAccess.venueScope(userId, "venue:reply") },
+          {
+            inboxWith: "guest",
+            inboxEvent: AppointmentAccess.eventScope(
+              userId,
+              "event:message-attendees",
+            ),
+          },
+          {
+            inboxWith: "supplier",
+            inboxEvent: AppointmentAccess.eventScope(
+              userId,
+              "event:message-suppliers",
+            ),
+          },
         ],
       },
       include: {
         userA: { select: PARTICIPANT_SELECT },
         userB: { select: PARTICIPANT_SELECT },
+        ...INBOX_INCLUDE,
         participants: { include: { user: { select: PARTICIPANT_SELECT } } },
         // Most recent message (any sender) for the list preview — a
         // different shape than the unread count below, so it's a separate
@@ -149,6 +178,7 @@ export default class ConversationRepository {
       include: {
         userA: { select: PARTICIPANT_SELECT },
         userB: { select: PARTICIPANT_SELECT },
+        ...INBOX_INCLUDE,
         participants: { include: { user: { select: PARTICIPANT_SELECT } } },
         messages: {
           orderBy: { createdAt: "desc" },
@@ -232,6 +262,8 @@ export default class ConversationRepository {
         sharedPost: { select: SHARED_POST_SELECT },
         replyTo: { select: REPLY_TO_SELECT },
         reactions: REACTIONS_SELECT,
+        // A Shared Inbox reply shows who on the team wrote it.
+        sender: { select: PARTICIPANT_SELECT },
       },
       orderBy: { createdAt: "desc" },
       take: opts.limit,
@@ -257,6 +289,8 @@ export default class ConversationRepository {
         sharedPost: { select: SHARED_POST_SELECT },
         replyTo: { select: REPLY_TO_SELECT },
         reactions: REACTIONS_SELECT,
+        // A Shared Inbox reply shows who on the team wrote it.
+        sender: { select: PARTICIPANT_SELECT },
       },
       orderBy: { createdAt: "desc" },
       take: limit,
@@ -300,6 +334,8 @@ export default class ConversationRepository {
         sharedPost: { select: SHARED_POST_SELECT },
         replyTo: { select: REPLY_TO_SELECT },
         reactions: REACTIONS_SELECT,
+        // A Shared Inbox reply shows who on the team wrote it.
+        sender: { select: PARTICIPANT_SELECT },
       },
     });
   }
@@ -319,6 +355,8 @@ export default class ConversationRepository {
         sharedPost: { select: SHARED_POST_SELECT },
         replyTo: { select: REPLY_TO_SELECT },
         reactions: REACTIONS_SELECT,
+        // A Shared Inbox reply shows who on the team wrote it.
+        sender: { select: PARTICIPANT_SELECT },
       },
     });
   }
@@ -337,6 +375,8 @@ export default class ConversationRepository {
         sharedPost: { select: SHARED_POST_SELECT },
         replyTo: { select: REPLY_TO_SELECT },
         reactions: REACTIONS_SELECT,
+        // A Shared Inbox reply shows who on the team wrote it.
+        sender: { select: PARTICIPANT_SELECT },
       },
     });
   }
@@ -406,6 +446,8 @@ export default class ConversationRepository {
         sharedPost: { select: SHARED_POST_SELECT },
         replyTo: { select: REPLY_TO_SELECT },
         reactions: REACTIONS_SELECT,
+        // A Shared Inbox reply shows who on the team wrote it.
+        sender: { select: PARTICIPANT_SELECT },
       },
     });
   }
@@ -449,6 +491,115 @@ export default class ConversationRepository {
   // Everyone this user has a 1:1 thread with — used to scope presence
   // broadcasts to people who'd actually notice, instead of every connected
   // socket.
+  /** This guest's Shared Inbox thread with a Venue or Event, if any. */
+  static async findInbox(
+    target: { venueId: string } | { eventId: string },
+    guestId: string,
+  ) {
+    return prisma.conversation.findFirst({
+      where:
+        "venueId" in target
+          ? { inboxVenueId: target.venueId, guestId }
+          : { inboxEventId: target.eventId, guestId },
+    });
+  }
+
+  static async createInbox(data: {
+    target: { venueId: string } | { eventId: string };
+    guestId: string;
+    inboxWith: InboxCounterpart;
+    initiatorId: string;
+    contextLabel: string;
+  }) {
+    const { target, ...rest } = data;
+    return prisma.conversation.create({
+      data: {
+        ...rest,
+        ...("venueId" in target
+          ? {
+              inboxVenueId: target.venueId,
+              contextType: "venue_inbox",
+              contextId: target.venueId,
+            }
+          : {
+              inboxEventId: target.eventId,
+              contextType: "event_inbox",
+              contextId: target.eventId,
+            }),
+        status: "accepted",
+      },
+    });
+  }
+
+  /**
+   * An Event's Suppliers (CONTEXT.md): everyone booked to supply it - its
+   * Venue, Talent and Gear - and everyone with a live bid on one of its
+   * slots. One row per person, with everything they supply or offer, so the
+   * team can see who they would be talking to. A withdrawn or rejected bid
+   * no longer makes someone a Supplier.
+   */
+  static async findEventSuppliers(eventId: string) {
+    const person = { select: { id: true, name: true, imgId: true } } as const;
+    const liveBid = { in: ["pending", "accepted"] as BidStatus[] };
+    const [venues, services, assets, serviceBids, assetBids] =
+      await Promise.all([
+        prisma.eventVenueTransaction.findMany({
+          where: { eventId },
+          select: { provider: person, venue: { select: { name: true } } },
+        }),
+        prisma.eventServiceTransaction.findMany({
+          where: { eventId },
+          select: { provider: person, service: { select: { name: true } } },
+        }),
+        prisma.eventAssetTransaction.findMany({
+          where: { eventId },
+          select: { provider: person, asset: { select: { name: true } } },
+        }),
+        prisma.eventServiceBid.findMany({
+          where: { eventId, status: liveBid },
+          select: {
+            provider: person,
+            proposedService: { select: { name: true } },
+          },
+        }),
+        prisma.eventAssetBid.findMany({
+          where: { eventId, status: liveBid },
+          select: {
+            provider: person,
+            proposedAsset: { select: { name: true } },
+          },
+        }),
+      ]);
+
+    const byId = new Map<
+      string,
+      {
+        user: { id: string; name: string | null; imgId: string | null };
+        supplies: { kind: "venue" | "service" | "asset"; name: string; via: "booked" | "bid" }[];
+      }
+    >();
+    const add = (
+      user: { id: string; name: string | null; imgId: string | null },
+      kind: "venue" | "service" | "asset",
+      name: string,
+      via: "booked" | "bid",
+    ) => {
+      const row = byId.get(user.id) ?? { user, supplies: [] };
+      row.supplies.push({ kind, name, via });
+      byId.set(user.id, row);
+    };
+    venues.forEach((t) => add(t.provider, "venue", t.venue.name, "booked"));
+    services.forEach((t) => add(t.provider, "service", t.service.name, "booked"));
+    assets.forEach((t) => add(t.provider, "asset", t.asset.name, "booked"));
+    serviceBids.forEach((b) =>
+      add(b.provider, "service", b.proposedService.name, "bid"),
+    );
+    assetBids.forEach((b) =>
+      add(b.provider, "asset", b.proposedAsset.name, "bid"),
+    );
+    return [...byId.values()];
+  }
+
   static async getPartnerIds(userId: string): Promise<string[]> {
     const rows = await prisma.conversation.findMany({
       where: { OR: [{ userAId: userId }, { userBId: userId }] },

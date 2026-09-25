@@ -128,25 +128,78 @@ export const resolveServiceProviderRole = (
   isPerformerServiceCategory(category) ? "performerFoxer" : "serviceFoxer";
 
 /**
- * Permissions an Event Foxer may delegate to someone else for a single event,
- * via `EventOrganizerAssignment.permissions` — not a `RoleType` grant, and not
- * visible to `can()`/`permissionsForUser()` at all. Scoped entirely to that
- * one event: approving requests, reviews, payouts and XP still key off
- * `Event.organizerId` alone regardless of what a delegate holds here.
+ * What an Appointment lets someone do on one Event or Venue — see
+ * docs/adr/0005-organizer-role-and-appointments.md. Not `RoleType` grants,
+ * and not visible to `can()`/`permissionsForUser()` at all: they are checked
+ * only by `AppointmentAccess`, against a specific Event or Venue.
  *
- * Keeping this as an explicit allow-list (rather than accepting any
- * `Permission`) means a new delegable capability is a deliberate code change,
- * not an accident of some other permission existing in the main table.
+ * Each kind of Appointment gets its whole set, fixed; the set is copied onto
+ * the row so per-person choice can come later without a migration. What is
+ * deliberately in *no* set stays with the Mayor or Event Owner alone:
+ * payouts, pricing, deleting or transferring, Appointments, refunds.
+ *
+ * Explicit allow-lists rather than any `Permission`, so a new capability is a
+ * deliberate code change, not an accident of the main table growing.
  */
-export const DELEGABLE_EVENT_PERMISSIONS = ["booking:check-in"] as const;
-export type DelegableEventPermission =
-  (typeof DELEGABLE_EVENT_PERMISSIONS)[number];
+// Settled 25 Sep (docs/adr/0005): editing an Event's details and schedule
+// stays the Owner's - Organizers never get it, even once an endpoint exists.
+// A supplier problem on the day is handled by talking to the Supplier
+// (`event:message-suppliers`), not by an Organizer opening a dispute.
+export const EVENT_ORGANIZER_PERMISSIONS = [
+  "booking:check-in",
+  /** Accept a client's request for the Event. Declining refunds the client,
+   * so it stays the Event Owner's alone. */
+  "event:approve-bookings",
+  "event:message-attendees",
+  /** Message the Event's Suppliers - those booked on it and those who bid -
+   * through its Shared Inbox. Talking, not deciding: prices stay the
+   * Owner's. */
+  "event:message-suppliers",
+  /** See and reject bids against the Event's open slots. Accepting one sets
+   * the agreed price, so it stays the Event Owner's alone. */
+  "event:manage-bids",
+  /** Read-only: the Event's bookings and sales. */
+  "event:view-sales",
+] as const;
+
+export const VENUE_ORGANIZER_PERMISSIONS = [
+  /** Guests of any Event held at the Venue, on that Event's day only. */
+  "booking:check-in",
+  /** Block and unblock dates on the Venue's calendar. */
+  "venue:calendar",
+  /** Approve affiliation requests — unless one carries an `agreedPrice`,
+   * which is a price decision and stays with the Mayor. */
+  "venue:approve-affiliations",
+  /** Answer guests' messages and reviews. */
+  "venue:reply",
+  /** Edit the description and photos — never prices. */
+  "venue:edit-listing",
+  /** Read-only: bookings of Events at the Venue. */
+  "venue:view-bookings",
+] as const;
+
+export const CHECK_IN_HELPER_PERMISSIONS = ["booking:check-in"] as const;
+
+export type AppointmentPermission =
+  | (typeof EVENT_ORGANIZER_PERMISSIONS)[number]
+  | (typeof VENUE_ORGANIZER_PERMISSIONS)[number];
+
+/** The fixed set an Appointment of this kind, on this kind of target, gets. */
+export function permissionsForAppointment(
+  kind: "organizer" | "check_in_helper",
+  target: "event" | "venue",
+): AppointmentPermission[] {
+  if (kind === "check_in_helper") return [...CHECK_IN_HELPER_PERMISSIONS];
+  return target === "event"
+    ? [...EVENT_ORGANIZER_PERMISSIONS]
+    : [...VENUE_ORGANIZER_PERMISSIONS];
+}
 
 /**
  * Permissions a Venue Foxer may grant an Event Foxer via an approved
  * `VenueEventFoxerAffiliation.permissions` — not a `RoleType` grant, not
  * visible to `can()`/`permissionsForUser()`, and scoped to that one venue.
- * Mirrors `DELEGABLE_EVENT_PERMISSIONS`'s shape and rationale: an explicit
+ * Mirrors `EVENT_ORGANIZER_PERMISSIONS`'s shape and rationale: an explicit
  * allow-list rather than accepting any `Permission`, so a new delegable
  * capability is a deliberate code change. Deliberately excludes editing the
  * venue's own listing/pricing and any booking/payout authority, which stay
@@ -260,6 +313,12 @@ const ROLE_TYPE_GRANTS: Record<RoleType, readonly Permission[]> = {
   // (see PayoutSvc.resolveInvestorSplit) — an investor now needs a Connect
   // account to actually receive that money, same as any other payout role.
   investor: ["partnership:propose", "payouts:onboard"],
+  // Deliberately empty — see docs/adr/0005-organizer-role-and-appointments.md.
+  // Holding the role only makes a person eligible to be Appointed; every
+  // permission an Organizer has comes from an accepted Appointment, scoped to
+  // that one Venue or Event. No `payouts:onboard` either: Organizers are paid
+  // privately by the Mayor or Event Owner, not through the platform.
+  organizer: [],
 };
 
 /**

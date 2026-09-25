@@ -232,7 +232,7 @@ describe('Bidding Lifecycle Integration Tests', () => {
     });
 
     await expect(BiddingSvc.acceptServiceBid(bid.id, talentFoxerId)).rejects.toThrow('Unauthorized: only the event host can accept bids');
-    await expect(BiddingSvc.rejectServiceBid(bid.id, talentFoxerId)).rejects.toThrow('Unauthorized: only the event host can reject bids');
+    await expect(BiddingSvc.rejectServiceBid(bid.id, talentFoxerId)).rejects.toThrow("Unauthorized: only this event's owner or organizers can manage its bids");
   });
 
   it('Bid cannot use a deleted/unavailable Asset', async () => {

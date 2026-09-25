@@ -241,7 +241,7 @@ describe("VenueAffiliationSvc", () => {
 
       await expect(
         VenueAffiliationSvc.approve("aff1", "organizer1"),
-      ).rejects.toThrow("only the venue owner can decide");
+      ).rejects.toThrow("only the venue's mayor or organizers can decide");
     });
 
     it("lets the invited event foxer approve an invite", async () => {

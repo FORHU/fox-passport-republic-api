@@ -23,8 +23,10 @@ model User {
   assetTransactions        EventAssetTransaction[]      @relation("AssetProvider")
   clientEvents             Event[]                      @relation("EventClient")
   organizedEvents          Event[]                      @relation("EventOrganizer")
-  organizerAssignments     EventOrganizerAssignment[]   @relation("EventOrganizerAssignmentDelegate")
-  organizerAssignmentsMade EventOrganizerAssignment[]   @relation("EventOrganizerAssignmentAssignedBy")
+  appointments             Appointment[]                @relation("AppointmentAppointee")
+  appointmentsMade         Appointment[]                @relation("AppointmentAppointedBy")
+  appointmentsEnded        Appointment[]                @relation("AppointmentEndedBy")
+  organizerEventXp         OrganizerEventXp[]
   serviceTransactions      EventServiceTransaction[]    @relation("ServiceProvider")
   eventTemplates           EventTemplate[]
   venueTransactions        EventVenueTransaction[]      @relation("VenueProvider")
@@ -58,6 +60,7 @@ model User {
   refreshTokens            RefreshToken[]
   conversationsAsA         Conversation[]               @relation("ConversationUserA")
   conversationsAsB         Conversation[]               @relation("ConversationUserB")
+  inboxConversations       Conversation[]               @relation("ConversationGuest")
   messagesSent             Message[]
   posts                    Post[]
   postComments             PostComment[]
@@ -117,6 +120,7 @@ model RoleRequest {
   performerFoxerApplication PerformerFoxerApplication?
   eventFoxerApplication     EventFoxerApplication?
   investorApplication       InvestorApplication?
+  organizerApplication      OrganizerApplication?
   venueFoxerApplication     VenueFoxerApplication?
   reviewer                  User?                      @relation("Reviewer", fields: [reviewedBy], references: [id])
   user                      User                       @relation("Applicant", fields: [userId], references: [id], onDelete: Cascade)
@@ -368,4 +372,32 @@ model PartnerProfile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("partner_profiles")
+}
+
+// An Organizer is vetted as a person, not as a business — see
+// docs/adr/0005-organizer-role-and-appointments.md. So identity documents
+// only: no tax or business-permit files. The document fields are named
+// generically rather than after one country's paperwork (NBI, TIN, BIR);
+// `backgroundClearanceFile` is whatever police/background clearance the
+// applicant's country issues.
+model OrganizerApplication {
+  id                        String      @id @default(uuid())
+  requestId                 String      @unique
+  bio                       String
+  experience                Int
+  location                  String
+  // Values from EventCategory and VenueCategory — the kinds of events and
+  // venues this person has helped run.
+  specializations           String[]
+  validId1FileId            String?
+  backgroundClearanceFileId String?
+  selfieFileId              String?
+  createdAt                 DateTime    @default(now())
+  updatedAt                 DateTime    @updatedAt
+  request                   RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  validId1                  File?       @relation("OrganizerValidId1", fields: [validId1FileId], references: [id])
+  backgroundClearanceFile   File?       @relation("OrganizerBackgroundClearance", fields: [backgroundClearanceFileId], references: [id])
+  selfieFile                File?       @relation("OrganizerSelfie", fields: [selfieFileId], references: [id])
+
+  @@map("organizer_applications")
 }

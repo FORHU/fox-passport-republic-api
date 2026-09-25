@@ -292,7 +292,10 @@ export default class BookingCtrl {
   // GET ONE
   static async getBookingById(req: Request, res: Response) {
     try {
-      const booking = await BookingSvc.getBookingById(req.params.id, req.user);
+      const booking = await BookingSvc.getBookingForViewer(
+        req.params.id,
+        req.user,
+      );
       return res.status(200).json({ success: true, data: booking });
     } catch (e: unknown) {
       const error = e as Error;

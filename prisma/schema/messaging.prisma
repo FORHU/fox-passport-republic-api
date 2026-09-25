@@ -50,8 +50,30 @@ model Conversation {
   // threads — group membership (leaving) is tracked via `participants`.
   hiddenForA    Boolean                   @default(false)
   hiddenForB    Boolean                   @default(false)
+  // Shared Inbox (CONTEXT.md; docs/adr/0005): a thread that belongs to a Venue
+  // or an Event rather than to two people. Exactly one of inboxVenueId /
+  // inboxEventId is set, `guestId` is the person on the other side, and the
+  // pair columns and participants stay empty; the staff side is whoever runs
+  // that Venue or Event right now (its Mayor or Owner, and its Organizers),
+  // worked out on every read, so a team change moves the inbox with it. Each
+  // message keeps its real sender, which is how a reply shows who wrote it.
+  // One thread per guest per Venue or Event (partial unique indexes in the
+  // migration).
+  //
+  // On an Event, the person on the other side may be a Supplier rather than
+  // a guest; `inboxWith` says which, and so which team permission reads the
+  // thread (`event:message-attendees` or `event:message-suppliers`). Set on
+  // every inbox thread, null on the rest. Someone who is both keeps the one
+  // thread, as whichever they were when it started.
+  inboxVenueId  String?
+  inboxEventId  String?
+  guestId       String?
+  inboxWith     InboxCounterpart?
   userA         User?                     @relation("ConversationUserA", fields: [userAId], references: [id], onDelete: Cascade)
   userB         User?                     @relation("ConversationUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  inboxVenue    Venue?                    @relation(fields: [inboxVenueId], references: [id], onDelete: Cascade)
+  inboxEvent    Event?                    @relation(fields: [inboxEventId], references: [id], onDelete: Cascade)
+  guest         User?                     @relation("ConversationGuest", fields: [guestId], references: [id], onDelete: Cascade)
   messages      Message[]
   participants  ConversationParticipant[]
   reads         ConversationRead[]
@@ -60,6 +82,9 @@ model Conversation {
   @@unique([userAId, userBId])
   @@index([userBId, status])
   @@index([userAId, status])
+  @@index([inboxVenueId])
+  @@index([inboxEventId])
+  @@index([guestId])
   @@map("conversations")
 }
 
@@ -178,4 +203,11 @@ model MessageReaction {
 
   @@id([messageId, userId])
   @@map("message_reactions")
+}
+
+// Who a Shared Inbox thread is with: a guest of the Venue or Event, or a
+// Supplier the Event has booked or had a bid from.
+enum InboxCounterpart {
+  guest
+  supplier
 }

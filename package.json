@@ -11,6 +11,7 @@
     "lint:fix": "eslint src --fix",
     "validate": "node tools/validate-architecture.mjs",
     "validate:rbac": "node tools/validate-rbac-guards.mjs",
+    "seed:organizers": "pnpm exec tsx prisma/seeder/organizer-scenario.seeder.ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "vitest run",
     "test:watch": "vitest",

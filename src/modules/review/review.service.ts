@@ -2,6 +2,7 @@ import { prisma } from "../../utils/prisma";
 import { versionedCache } from "../../utils/cache.util";
 import BookingRepo from "../booking/booking.repository";
 import ReviewRepo from "./review.repository";
+import AppointmentAccess from "../appointment/appointment.access";
 import { isPerformerServiceCategory } from "../../types/permissions";
 
 /**
@@ -268,11 +269,13 @@ export default class ReviewSvc {
     let isVenueHost = false;
 
     if (review.entityType === "venue") {
-      const venue = await prisma.venue.findUnique({
-        where: { id: String(review.entityId) },
-        select: { mayorId: true },
-      });
-      isVenueHost = venue?.mayorId === String(userId);
+      // The Mayor, or one of the Venue's Organizers (`venue:reply`). The
+      // reply is stored under whoever wrote it, so readers see who answered.
+      isVenueHost = await AppointmentAccess.canOnVenue(
+        String(review.entityId),
+        String(userId),
+        "venue:reply",
+      );
     } else if (review.entityType === "event") {
       const event = await prisma.event.findUnique({
         where: { id: String(review.entityId) },

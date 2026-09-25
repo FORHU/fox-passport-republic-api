@@ -11,6 +11,16 @@ router.get(
   ConversationController.canMessage,
 );
 router.post("/", authenticate, ConversationController.startConversation);
+router.post(
+  "/inbox",
+  authenticate,
+  ConversationController.startInboxConversation,
+);
+router.get(
+  "/inbox/suppliers",
+  authenticate,
+  ConversationController.listEventSuppliers,
+);
 router.post("/group", authenticate, ConversationController.createGroup);
 router.patch("/:id/name", authenticate, ConversationController.renameGroup);
 router.patch("/:id/photo", authenticate, ConversationController.setGroupPhoto);

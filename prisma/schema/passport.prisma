@@ -129,6 +129,7 @@ enum UserPath {
   venueFoxer
   performerFoxer
   investor
+  organizer
 }
 
 enum BadgeRarity {

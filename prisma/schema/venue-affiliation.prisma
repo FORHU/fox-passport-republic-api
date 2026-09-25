@@ -20,7 +20,7 @@ enum AffiliationStatus {
 /// Once `approved`, `permissions` grants the Event Foxer standing rights at
 /// this one venue — a fixed allow-list enforced in code
 /// (`VENUE_AFFILIATION_PERMISSIONS` in src/types/permissions.ts), the same
-/// pattern as `EventOrganizerAssignment.permissions`. Deliberately excludes
+/// pattern as `Appointment.permissions`. Deliberately excludes
 /// editing the venue's own listing and any booking/payout authority, which
 /// stay with `Venue.mayorId` regardless of what is granted here.
 ///

@@ -7,6 +7,8 @@ import EventTemplateSvc from "../event-template/event-template.service";
 import { can } from "../../types/permissions";
 import { sendApprovedEmail } from "../../utils/emails/approved";
 import { sendRejectedEmail } from "../../utils/emails/rejected";
+import OrganizerXpService from "../appointment/organizer-xp.service";
+import AppointmentAccess from "../appointment/appointment.access";
 
 export default class EventRequestSvc {
   static async createDirectEvent(data: {
@@ -163,6 +165,10 @@ export default class EventRequestSvc {
     if (!request) throw new Error("Request not found");
     const result = await EventRequestRepo.updateStatus(id, "completed");
 
+    // Organizers of the Event, and of the Venue it was held at, earn on the
+    // Organizer path (ADR 0005). Idempotent, and never throws.
+    void OrganizerXpService.onEventCompleted(id);
+
     // Award completeEvent XP to the event organizer (eventFoxer path)
     // `hostId` was a second fallback here, but Event has no such column — the
     // organizer FK is the only one.
@@ -186,9 +192,32 @@ export default class EventRequestSvc {
     return EventRequestRepo.findAll({ clientId });
   }
 
-  static async getRequestById(id: string) {
+  /**
+   * One Event's full record — its bookings, and every supplier transaction
+   * with its price. Used by the event page's line-items panel, which the
+   * route (`GET /event-requests/:id`) used to hand to anyone signed in,
+   * regardless of that Event.
+   *
+   * Who may see it: the client who booked it, its Owner, an admin, and an
+   * Organizer with `event:view-sales` (the same read-only set that already
+   * covers the Event's bookings elsewhere).
+   */
+  static async getRequestById(
+    id: string,
+    viewer?: { userId?: string; systemRole?: string },
+  ) {
     const request = await EventRequestRepo.findById(id);
     if (!request) throw new Error("Request not found");
+
+    const userId = viewer?.userId;
+    const allowed =
+      !!userId &&
+      (request.clientId === userId ||
+        request.organizerId === userId ||
+        can(viewer?.systemRole, "bookings:read:all") ||
+        (await AppointmentAccess.canOnEvent(id, userId, "event:view-sales")));
+    if (!allowed) throw new Error("Request not found");
+
     return request;
   }
 

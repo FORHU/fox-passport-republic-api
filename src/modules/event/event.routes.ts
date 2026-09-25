@@ -1,11 +1,11 @@
 import express from "express";
 import EventCtrl from "./event.controller";
 import { authenticate } from "../../middleware/auth.middleware";
-import eventOrganizerRoutes from "../event-organizer/event-organizer.routes";
+import appointmentTeamRoutes from "../appointment/appointment-team.routes";
 
 const router = express.Router();
 
 router.get("/", authenticate, EventCtrl.getEvents);
-router.use("/:eventId/organizers", eventOrganizerRoutes);
+router.use("/:eventId/appointments", appointmentTeamRoutes);
 
 export default router;

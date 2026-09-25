@@ -2,7 +2,12 @@ import { Request, Response } from "express";
 import RoleRequestService from "./role-request.service";
 import S3Svc from "../s3/s3.service";
 import FileSvc from "../file/file.service";
-import { RequestStatus, RoleType } from "@prisma/client";
+import {
+  EventCategory,
+  RequestStatus,
+  RoleType,
+  VenueCategory,
+} from "@prisma/client";
 import {
   announceAdminQueueChanged,
   announceToUser,
@@ -16,7 +21,54 @@ const FILE_FIELD_TO_DB_COLUMN: Record<string, string> = {
   birPermitFile: "birPermitFileId",
   selfieFile: "selfieFileId",
   portfolioFile: "portfolioFileId",
+  backgroundClearanceFile: "backgroundClearanceFileId", // organizer only
 };
+
+// An Organizer's specializations are the kinds of events and venues they have
+// helped run, so they draw from both vocabularies.
+const ORGANIZER_SPECIALIZATIONS = new Set<string>([
+  ...Object.values(EventCategory),
+  ...Object.values(VenueCategory),
+]);
+
+// The Organizer role exists to vet a person before any Mayor or Event Owner
+// can appoint them (docs/adr/0005), so unlike the Foxer roles every identity
+// document is required, not optional.
+const ORGANIZER_REQUIRED_DOCUMENTS = [
+  "validId1FileId",
+  "backgroundClearanceFileId",
+  "selfieFileId",
+] as const;
+
+export function validateOrganizerApplication(
+  data: Record<string, unknown>,
+): string | null {
+  if (typeof data.bio !== "string" || data.bio.trim().length === 0) {
+    return "A short bio is required";
+  }
+  if (typeof data.location !== "string" || data.location.trim().length === 0) {
+    return "Location is required";
+  }
+  const experience = Number(data.experience);
+  if (!Number.isInteger(experience) || experience < 0 || experience > 100) {
+    return "Years of experience must be between 0 and 100";
+  }
+  data.experience = experience;
+  const specializations = data.specializations ?? [];
+  if (
+    !Array.isArray(specializations) ||
+    specializations.some((s) => !ORGANIZER_SPECIALIZATIONS.has(String(s)))
+  ) {
+    return "Specializations must be event or venue categories";
+  }
+  const missing = ORGANIZER_REQUIRED_DOCUMENTS.filter(
+    (field) => typeof data[field] !== "string" || data[field] === "",
+  );
+  if (missing.length > 0) {
+    return "A valid ID, a background clearance and a selfie are all required";
+  }
+  return null;
+}
 
 export default class RoleRequestController {
   /**
@@ -134,6 +186,15 @@ export default class RoleRequestController {
           success: false,
           message: "TIN Number must be 1-9 digits",
         });
+      }
+
+      if (roleType === RoleType.organizer) {
+        const organizerError = validateOrganizerApplication(data);
+        if (organizerError) {
+          return res
+            .status(400)
+            .json({ success: false, message: organizerError });
+        }
       }
 
       const application = await RoleRequestService.submitApplication(

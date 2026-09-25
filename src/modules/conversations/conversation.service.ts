@@ -1,6 +1,9 @@
 import { prisma } from "../../utils/prisma";
 import BlockRepo from "../block/block.repository";
 import ConversationRepository from "./conversation.repository";
+import AppointmentAccess from "../appointment/appointment.access";
+import type { InboxCounterpart } from "@prisma/client";
+import type { AppointmentPermission } from "../../types/permissions";
 import {
   CreateGroupInput,
   SendMessageInput,
@@ -14,6 +17,35 @@ import {
   notifyMessageRequestAccepted,
   notifyGroupMention,
 } from "../notifications/message-notification";
+
+/**
+ * Whether a conversation is a Shared Inbox thread, and if so which Venue or
+ * Event it belongs to and which permission answers it: `venue:reply` for a
+ * Venue; for an Event, `event:message-attendees` when it is with a guest and
+ * `event:message-suppliers` when it is with a Supplier (ADR 0005).
+ */
+function inboxOf(c: {
+  inboxVenueId?: string | null;
+  inboxEventId?: string | null;
+  inboxWith?: InboxCounterpart | null;
+}): {
+  target: { venueId: string } | { eventId: string };
+  permission: AppointmentPermission;
+} | null {
+  if (c.inboxVenueId) {
+    return { target: { venueId: c.inboxVenueId }, permission: "venue:reply" };
+  }
+  if (c.inboxEventId) {
+    return {
+      target: { eventId: c.inboxEventId },
+      permission:
+        c.inboxWith === "supplier"
+          ? "event:message-suppliers"
+          : "event:message-attendees",
+    };
+  }
+  return null;
+}
 
 // Sorting the pair means the same two users always land on the same row
 // regardless of who started the conversation, so the @@unique([userAId,
@@ -301,6 +333,13 @@ export default class ConversationService {
       messages?: { content: string; senderId: string }[];
       _count?: { messages: number };
       settings?: { muted: boolean; pinnedAt: Date | null }[];
+      inboxVenueId?: string | null;
+      inboxEventId?: string | null;
+      guestId?: string | null;
+      inboxWith?: InboxCounterpart | null;
+      inboxVenue?: { id: string; name: string } | null;
+      inboxEvent?: { id: string; name: string } | null;
+      guest?: { id: string; name: string; imgId: string | null } | null;
     },
     userId: string,
   ) {
@@ -330,6 +369,31 @@ export default class ConversationService {
       isPinned: !!settings?.pinnedAt,
       pinnedAt: settings?.pinnedAt ?? null,
     };
+
+    // Shared Inbox: the guest sees the Venue or Event as the other side; its
+    // team sees the guest, labelled with whose inbox this is. Each message
+    // carries its own `sender`, which is how either side sees who wrote it.
+    const inboxTarget = c.inboxVenue ?? c.inboxEvent;
+    if (inboxTarget) {
+      const inbox = {
+        type: c.inboxVenue ? ("venue" as const) : ("event" as const),
+        id: inboxTarget.id,
+        name: inboxTarget.name,
+        // Whether the person on the other side is a guest or a Supplier.
+        with: c.inboxWith ?? ("guest" as const),
+      };
+      const viewerIsGuest = c.guestId === userId;
+      return {
+        ...base,
+        isGroup: false as const,
+        isInbox: true as const,
+        inbox,
+        viewerRole: viewerIsGuest ? ("guest" as const) : ("team" as const),
+        // The guest's side of the thread is the Venue or Event, not a person;
+        // the team's side is the guest.
+        otherUser: viewerIsGuest ? null : (c.guest ?? null),
+      };
+    }
 
     if (c.isGroup) {
       const members = (c.participants ?? [])
@@ -372,6 +436,141 @@ export default class ConversationService {
     });
   }
 
+  /**
+   * Open (or reopen) a Shared Inbox thread (ADR 0005). A guest writes to a
+   * Venue or an Event they have booked; an Event's team may also start one
+   * with one of its attendees. Either way there is one thread per guest per
+   * Venue or Event, so this finds before it creates.
+   */
+  static async startInboxConversation(
+    callerId: string,
+    input: { venueId?: string; eventId?: string; guestId?: string },
+  ) {
+    if (!!input.venueId === !!input.eventId) {
+      throw new Error("Give a venueId or an eventId");
+    }
+
+    let target: { venueId: string } | { eventId: string };
+    let label: string;
+    let guestId = callerId;
+    // A Venue's inbox only ever talks to guests.
+    let inboxWith: InboxCounterpart = "guest";
+
+    if (input.venueId) {
+      if (input.guestId) {
+        throw new Error(
+          "A venue's team answers messages; it doesn't start them",
+        );
+      }
+      const venue = await prisma.venue.findUnique({
+        where: { id: input.venueId },
+        select: { id: true, name: true, status: true },
+      });
+      if (!venue || venue.status !== "available") {
+        throw new Error("Venue not found");
+      }
+      if (
+        await AppointmentAccess.canOnVenue(venue.id, callerId, "venue:reply")
+      ) {
+        throw new Error("This is your venue's inbox — you answer it");
+      }
+      target = { venueId: venue.id };
+      label = venue.name;
+    } else {
+      const eventId = input.eventId!;
+      const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        select: { id: true, name: true },
+      });
+      if (!event) throw new Error("Event not found");
+
+      const [answersGuests, answersSuppliers] = await Promise.all([
+        AppointmentAccess.canOnEvent(eventId, callerId, "event:message-attendees"),
+        AppointmentAccess.canOnEvent(eventId, callerId, "event:message-suppliers"),
+      ]);
+      if (input.guestId) {
+        if (!answersGuests && !answersSuppliers) {
+          throw new Error("Unauthorized");
+        }
+        guestId = input.guestId;
+      } else if (answersGuests || answersSuppliers) {
+        throw new Error("This is your event's inbox — you answer it");
+      }
+
+      // Only someone this Event actually deals with - a guest with a booking
+      // or one of its Suppliers - never an Event's inbox as a way to message
+      // anyone at all. A thread keeps what it started as.
+      const existing = await ConversationRepository.findInbox(
+        { eventId },
+        guestId,
+      );
+      const [attending, supplying] = existing
+        ? [existing.inboxWith !== "supplier", existing.inboxWith === "supplier"]
+        : await Promise.all([
+            prisma.booking
+              .findFirst({ where: { eventId, userId: guestId }, select: { id: true } })
+              .then(Boolean),
+            ConversationRepository.findEventSuppliers(eventId).then((rows) =>
+              rows.some((r) => r.user.id === guestId),
+            ),
+          ]);
+      if (!attending && !supplying) {
+        throw new Error(
+          input.guestId
+            ? "That person has no booking for this event and doesn't supply it"
+            : "Only guests with a booking and its suppliers can message this event",
+        );
+      }
+      // Starting as a guest wins when someone is both.
+      inboxWith = attending ? "guest" : "supplier";
+      // The team member starting it needs the matching permission.
+      if (
+        input.guestId &&
+        !(inboxWith === "guest" ? answersGuests : answersSuppliers)
+      ) {
+        throw new Error("Unauthorized");
+      }
+      target = { eventId };
+      label = event.name;
+    }
+
+    const existing = await ConversationRepository.findInbox(target, guestId);
+    const conversation =
+      existing ??
+      (await ConversationRepository.createInbox({
+        target,
+        guestId,
+        inboxWith,
+        initiatorId: callerId,
+        contextLabel: label,
+      }));
+
+    const shaped = await ConversationRepository.findByIdWithListShape(
+      conversation.id,
+      callerId,
+    );
+    return ConversationService.formatConversation(shaped!, callerId);
+  }
+
+  /**
+   * An Event's Suppliers, for its team to pick someone to message. Only for
+   * those who may message them (the Owner and its Organizers); the caller is
+   * left out, as an Owner may well supply their own Event.
+   */
+  static async listEventSuppliers(callerId: string, eventId: string) {
+    if (
+      !(await AppointmentAccess.canOnEvent(
+        eventId,
+        callerId,
+        "event:message-suppliers",
+      ))
+    ) {
+      throw new Error("Unauthorized");
+    }
+    const rows = await ConversationRepository.findEventSuppliers(eventId);
+    return rows.filter((r) => r.user.id !== callerId);
+  }
+
   static async setMuted(
     conversationId: string,
     userId: string,
@@ -411,21 +610,44 @@ export default class ConversationService {
   ) {
     const conversation = await ConversationRepository.findById(conversationId);
     if (!conversation) throw new Error("Conversation not found");
+
+    // A Shared Inbox thread has no fixed members: its guest, and whoever
+    // answers that Venue's or Event's inbox right now. Worked out here once
+    // and carried on the result, so every caller that goes on to emit or
+    // notify reaches the current team through getMemberIds unchanged.
+    const inbox = inboxOf(conversation);
+    if (inbox) {
+      const staff = await AppointmentAccess.staffIds(
+        inbox.target,
+        inbox.permission,
+      );
+      const memberIds = [
+        conversation.guestId!,
+        ...staff.filter((id) => id !== conversation.guestId),
+      ];
+      if (!memberIds.includes(userId)) throw new Error("Unauthorized");
+      return { ...conversation, memberIds };
+    }
+
     const isMember = conversation.isGroup
       ? conversation.participants.some((p) => p.userId === userId)
       : conversation.userAId === userId || conversation.userBId === userId;
     if (!isMember) throw new Error("Unauthorized");
-    return conversation;
+    return { ...conversation, memberIds: undefined };
   }
 
   // Everyone who should receive a socket emit for this conversation —
-  // all participants for a group, both sides for a 1:1.
+  // all participants for a group, both sides for a 1:1, and for a Shared
+  // Inbox thread the guest plus its current team (resolved by
+  // assertParticipant, which is the only way such a thread reaches here).
   private static getMemberIds(conversation: {
     isGroup: boolean;
     userAId: string | null;
     userBId: string | null;
     participants: { userId: string }[];
+    memberIds?: string[];
   }): string[] {
+    if (conversation.memberIds) return conversation.memberIds;
     if (conversation.isGroup) {
       return conversation.participants.map((p) => p.userId);
     }
@@ -938,6 +1160,11 @@ export default class ConversationService {
       conversationId,
       userId,
     );
+    // Hiding is per side of a pair; a Shared Inbox thread has no pair, and
+    // the team's copy is shared by everyone on it.
+    if (conversation.memberIds) {
+      throw new Error("A venue or event conversation can't be deleted");
+    }
     const side = conversation.userAId === userId ? "A" : "B";
     await ConversationRepository.hideForUser(conversationId, side);
     return { success: true as const };

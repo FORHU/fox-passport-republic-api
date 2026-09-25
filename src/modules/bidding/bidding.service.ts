@@ -1,13 +1,29 @@
 import BiddingRepo from "./bidding.repository";
 import { prisma } from "../../utils/prisma";
 import AvailabilitySvc from "../availability/availability.service";
+import AppointmentAccess from "../appointment/appointment.access";
+
+// Seeing and rejecting bids is `event:manage-bids`: the Event Owner or one of
+// their Organizers (AppointmentAccess). Accepting one sets the agreed price,
+// a money decision, so it stays the Owner's alone.
+async function assertCanManageBids(eventId: string, userId: string) {
+  if (
+    !(await AppointmentAccess.canOnEvent(eventId, userId, "event:manage-bids"))
+  ) {
+    throw new Error(
+      "Unauthorized: only this event's owner or organizers can manage its bids",
+    );
+  }
+}
 
 export default class BiddingSvc {
-  static async getServiceBidsForEvent(eventId: string) {
+  static async getServiceBidsForEvent(eventId: string, userId: string) {
+    await assertCanManageBids(eventId, userId);
     return BiddingRepo.findServiceBidsByEventId(eventId);
   }
 
-  static async getAssetBidsForEvent(eventId: string) {
+  static async getAssetBidsForEvent(eventId: string, userId: string) {
+    await assertCanManageBids(eventId, userId);
     return BiddingRepo.findAssetBidsByEventId(eventId);
   }
 
@@ -182,9 +198,7 @@ export default class BiddingSvc {
     const bid = await BiddingRepo.findServiceBidById(bidId);
     if (!bid) throw new Error("Bid not found");
 
-    if (bid.event.organizerId !== hostId) {
-      throw new Error("Unauthorized: only the event host can reject bids");
-    }
+    await assertCanManageBids(bid.event.id, hostId);
     if (bid.providerId === hostId) {
       throw new Error("Unauthorized: provider cannot reject their own bid");
     }
@@ -340,9 +354,7 @@ export default class BiddingSvc {
     const bid = await BiddingRepo.findAssetBidById(bidId);
     if (!bid) throw new Error("Bid not found");
 
-    if (bid.event.organizerId !== hostId) {
-      throw new Error("Unauthorized: only the event host can reject bids");
-    }
+    await assertCanManageBids(bid.event.id, hostId);
     if (bid.providerId === hostId) {
       throw new Error("Unauthorized: provider cannot reject their own bid");
     }

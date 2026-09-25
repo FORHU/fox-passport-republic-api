@@ -8,6 +8,7 @@ import NotificationSvc from "../notifications/user-notification.service";
 import PaymentSvc from "../payment/payment.service";
 import { prisma } from "../../utils/prisma";
 import BookingRepo from "../booking/booking.repository";
+import AppointmentAccess from "../appointment/appointment.access";
 
 export default class MatchSvc {
   static async createMatchRequest(data: {
@@ -159,7 +160,8 @@ export default class MatchSvc {
   static async getFoxerClientInbox(foxerId: string, limit = 10, offset = 0) {
     const [events, total] = await Promise.all([
       prisma.event.findMany({
-        where: { organizerId: foxerId },
+        // The Event Owner's requests, and those of Events they organise.
+        where: AppointmentAccess.eventScope(foxerId, "event:approve-bookings"),
         select: {
           id: true,
           name: true,
@@ -178,7 +180,9 @@ export default class MatchSvc {
         take: limit,
         skip: offset,
       }),
-      prisma.event.count({ where: { organizerId: foxerId } }),
+      prisma.event.count({
+        where: AppointmentAccess.eventScope(foxerId, "event:approve-bookings"),
+      }),
     ]);
     const data = events.map(({ bookings, ...event }) => ({
       ...event,
@@ -194,7 +198,17 @@ export default class MatchSvc {
       include: { bookings: { select: { id: true, stripePaymentId: true } } },
     });
     if (!event) throw new Error("Match not found");
-    if (event.organizerId !== foxerId) throw new Error("Unauthorized");
+    // The Event Owner or one of their Organizers (`event:approve-bookings`).
+    // Declining refunds the client, so declineMatch stays the Owner's alone.
+    if (
+      !(await AppointmentAccess.canOnEvent(
+        eventId,
+        foxerId,
+        "event:approve-bookings",
+      ))
+    ) {
+      throw new Error("Unauthorized");
+    }
     if (event.requestStatus !== "pending")
       throw new Error("Match already processed");
 

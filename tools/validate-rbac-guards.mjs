@@ -62,6 +62,71 @@ const MAX_UNGUARDED_ROUTES = 180;
  */
 const ALLOW_LIST = new Set([
   // "users.routes.ts GET /:id/profile — self-service, no separate permission needed",
+
+  // Appointments (docs/adr/0005). Audited 24 Sep 2026 when written. Who may
+  // act is "owns this one Venue or Event" or "is the person this Appointment
+  // names" — both checked in AppointmentService, and neither expressible as a
+  // global permission, because the Organizer role deliberately grants none.
+  // The person an Appointment names answers or leaves only their own:
+  "appointment.routes.ts GET /mine",
+  // Only ever describes the caller themselves:
+  "appointment.routes.ts GET /access",
+  "appointment.routes.ts POST /:appointmentId/accept",
+  "appointment.routes.ts POST /:appointmentId/decline",
+  "appointment.routes.ts POST /:appointmentId/leave",
+  // An Organizer asking to join, checking whether they can, or taking a
+  // request back: checked against their own role and request in the
+  // service. The Organizer search is limited there to Mayors and Event Owners.
+  "appointment.routes.ts GET /join-status",
+  "appointment.routes.ts GET /open",
+  "appointment.routes.ts GET /organizers",
+  "appointment.routes.ts POST /request",
+  "appointment.routes.ts POST /:appointmentId/withdraw",
+  // Only the Mayor or Event Owner (or an admin holding
+  // event:manage-organizers) manages the team:
+  "appointment-team.routes.ts GET /",
+  "appointment-team.routes.ts POST /",
+  "appointment-team.routes.ts DELETE /:appointmentId",
+  "appointment-team.routes.ts GET /settings",
+  "appointment-team.routes.ts PATCH /settings",
+  "appointment-team.routes.ts POST /:appointmentId/approve-request",
+  "appointment-team.routes.ts POST /:appointmentId/decline-request",
+  // Shared Inbox: who may write is checked per Venue or Event in
+  // ConversationService.startInboxConversation (a booking for an Event; the
+  // team, via AppointmentAccess, to start one with an attendee).
+  "conversation.routes.ts POST /inbox",
+  // An Event's Suppliers, for its team to message: checked per Event in
+  // ConversationService.listEventSuppliers (`event:message-suppliers` via
+  // AppointmentAccess — the Owner and their Organizers).
+  "conversation.routes.ts GET /inbox/suppliers",
+  // Check-in: authorized per Event by AppointmentAccess.canOnEvent inside
+  // BookingSvc — Owner, Organizers, Check-in Helpers, and the staff of the
+  // Venue it is held at on the day. A global `booking:check-in` shut all of
+  // them but the Owner out.
+  "booking.routes.ts PATCH /check-in",
+  "booking.routes.ts PATCH /attendees/check-in",
+  // One booking: BookingSvc.getBookingForViewer lets in the guest, invited
+  // attendees, admins, and the Event's or booked Venue's Owner and staff.
+  // No single global permission describes that set.
+  "booking.routes.ts GET /:id",
+  // Seeing and rejecting bids: checked per Event in BiddingSvc (Owner or
+  // Organizers). Accepting still requires `bid:manage` and ownership.
+  "bidding.routes.ts GET /service/event/:eventId",
+  "bidding.routes.ts PATCH /service/:id/reject",
+  "bidding.routes.ts GET /asset/event/:eventId",
+  "bidding.routes.ts PATCH /asset/:id/reject",
+  // Venue listing and calendar: checked per Venue in VenueSvc — the Mayor, its
+  // Organizers (descriptive fields only; `venue:calendar`), or an affiliated
+  // Event Foxer for the calendar.
+  "venue.routes.ts PUT /:id",
+  "venue.routes.ts POST /:id/blocked-dates",
+  "venue.routes.ts DELETE /:id/blocked-dates/:date",
+  // Venue affiliations: checked per Venue in VenueAffiliationSvc — the mayor
+  // or its Organizers; approving one that carries an `agreedPrice` is the
+  // mayor's alone.
+  "venue-affiliation.routes.ts GET /venue/:venueId",
+  "venue-affiliation.routes.ts PATCH /:id/approve",
+  "venue-affiliation.routes.ts PATCH /:id/reject",
 ]);
 
 const BANNED_GUARDS = ["requireRole", "requireAdmin", "requireHost"];

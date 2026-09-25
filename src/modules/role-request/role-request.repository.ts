@@ -99,6 +99,13 @@ export default class RoleRequestRepo {
           },
         },
         investorApplication: true,
+        organizerApplication: {
+          include: {
+            validId1: true,
+            backgroundClearanceFile: true,
+            selfieFile: true,
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -116,6 +123,7 @@ export default class RoleRequestRepo {
         serviceFoxerApplication: true,
         performerFoxerApplication: true,
         investorApplication: true,
+        organizerApplication: true,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -176,6 +184,13 @@ export default class RoleRequestRepo {
           },
         },
         investorApplication: true,
+        organizerApplication: {
+          include: {
+            validId1: true,
+            backgroundClearanceFile: true,
+            selfieFile: true,
+          },
+        },
       },
     });
   }
