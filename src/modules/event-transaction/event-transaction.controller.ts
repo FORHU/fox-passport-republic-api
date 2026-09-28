@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import EventTransactionSvc from "./event-transaction.service";
 import Joi from "joi";
+import { AppError } from "../../utils/errors";
 
 export default class EventTransactionCtrl {
   static async listProviderItems(req: Request, res: Response) {
@@ -65,6 +66,9 @@ export default class EventTransactionCtrl {
         .status(200)
         .json({ message: `Item ${value.action}ed successfully`, updated });
     } catch (e: unknown) {
+      if (e instanceof AppError) {
+        return res.status(e.status).json({ message: e.message, code: e.code });
+      }
       const error = e as Error;
       return res.status(400).json({ message: error.message });
     }

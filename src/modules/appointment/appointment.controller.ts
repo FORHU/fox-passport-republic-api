@@ -9,7 +9,9 @@ import AppointmentAccess from "./appointment.access";
 
 function fail(res: Response, e: unknown) {
   if (e instanceof AppointmentError) {
-    return res.status(e.status).json({ success: false, message: e.message });
+    return res
+      .status(e.status)
+      .json({ success: false, message: e.message, code: e.code });
   }
   console.error("Appointment error:", e);
   return res

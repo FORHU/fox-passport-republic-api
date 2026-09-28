@@ -1,3 +1,4 @@
+import { AppError } from "../../utils/errors";
 import Stripe from "stripe";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
 import InvoiceSvc from "./invoice.service";
@@ -26,12 +27,13 @@ const REUSABLE_STATUSES = ["pending", "processing"] as const;
 // charged, not have it quietly vanish from the invoice.
 const PAYABLE_STATUSES = ["pending", "approved"] as const;
 
-export class BlockingItemsError extends Error {
+export class BlockingItemsError extends AppError {
   constructor(public readonly blockingItemIds: string[]) {
     super(
       `Checkout is blocked: ${blockingItemIds.length} item(s) are still awaiting provider confirmation`,
+      409,
+      "ITEMS_AWAITING_CONFIRMATION",
     );
-    this.name = "BlockingItemsError";
   }
 }
 

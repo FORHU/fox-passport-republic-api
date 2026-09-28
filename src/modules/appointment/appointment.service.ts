@@ -6,6 +6,7 @@ import {
   RoleType,
 } from "@prisma/client";
 import { can, permissionsForAppointment } from "../../types/permissions";
+import { AppError } from "../../utils/errors";
 import NotificationService from "../notifications/user-notification.service";
 import AppointmentRepo, { AppointmentTarget } from "./appointment.repository";
 
@@ -26,13 +27,9 @@ import {
  * effective at once. Either side can end it.
  */
 
-export class AppointmentError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number = 400,
-  ) {
-    super(message);
-    this.name = "AppointmentError";
+export class AppointmentError extends AppError {
+  constructor(message: string, status: number = 400, code?: string) {
+    super(message, status, code);
   }
 }
 

@@ -1,3 +1,5 @@
+import { AppError } from "../../utils/errors";
+
 export type AvailabilityItemKind = "asset" | "service" | "venue";
 
 export interface AvailabilityCheckItem {
@@ -16,13 +18,12 @@ export const RESERVING_TRANSACTION_STATUSES = [
   "approved",
 ] as const;
 
-export class AvailabilityConflictError extends Error {
+export class AvailabilityConflictError extends AppError {
   constructor(
     message: string,
     public readonly kind: AvailabilityItemKind,
     public readonly itemId: string,
   ) {
-    super(message);
-    this.name = "AvailabilityConflictError";
+    super(message, 409, "AVAILABILITY_CONFLICT");
   }
 }

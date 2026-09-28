@@ -204,12 +204,13 @@ describe("Ad-hoc marketplace HTTP endpoints — authorization", () => {
       expect(res.status).toBe(400);
     });
 
-    it("400s (via TransactionActorUnauthorizedError) for someone who is not the item's provider", async () => {
+    it("403s (via TransactionActorUnauthorizedError) for someone who is not the item's provider", async () => {
       const res = await request(app)
         .patch(`/api/v1/event-transactions/${transactionId}/review`)
         .set("Authorization", `Bearer ${strangerToken}`)
         .send({ type: "asset", action: "confirm" });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe("FORBIDDEN");
       expect(res.body.message).toMatch(/only the provider/i);
     });
 

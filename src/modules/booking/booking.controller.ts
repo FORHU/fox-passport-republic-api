@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
-import BookingSvc, { BookingError } from "./booking.service";
+import BookingSvc from "./booking.service";
+import { AppError } from "../../utils/errors";
 import RefundSvc from "../refund/refund.service";
 import { totalPages } from "../../utils/pagination";
 
@@ -32,7 +33,7 @@ export default class BookingCtrl {
 
       return res.status(201).json({ success: true, data: result });
     } catch (e: unknown) {
-      if (e instanceof BookingError) {
+      if (e instanceof AppError) {
         return res.status(e.status).json({
           success: false,
           message: e.message,
@@ -72,7 +73,7 @@ export default class BookingCtrl {
 
       return res.status(201).json({ success: true, data: result });
     } catch (e: unknown) {
-      if (e instanceof BookingError) {
+      if (e instanceof AppError) {
         return res.status(e.status).json({
           success: false,
           message: e.message,
@@ -435,7 +436,7 @@ export default class BookingCtrl {
         payoutTriggered: result.payoutTriggered,
       });
     } catch (e: unknown) {
-      if (e instanceof BookingError) {
+      if (e instanceof AppError) {
         return res
           .status(e.status)
           .json({ success: false, message: e.message });
@@ -467,7 +468,7 @@ export default class BookingCtrl {
 
       return res.status(200).json({ success: true, data: updated });
     } catch (e: unknown) {
-      if (e instanceof BookingError) {
+      if (e instanceof AppError) {
         return res
           .status(e.status)
           .json({ success: false, message: e.message });

@@ -1,3 +1,4 @@
+import { AppError } from "../../utils/errors";
 import { RoleType, SystemRole } from "@prisma/client";
 import { userCache } from "../../utils/cache-namespaces";
 import { prisma } from "../../utils/prisma";
@@ -48,14 +49,13 @@ async function announceRoleChange(targetId: string): Promise<void> {
  * mechanism a password change already uses.
  */
 
-export class RoleAssignmentError extends Error {
+export class RoleAssignmentError extends AppError {
   constructor(
     message: string,
     readonly reason: string,
-    readonly status = 400,
+    status = 400,
   ) {
-    super(message);
-    this.name = "RoleAssignmentError";
+    super(message, status);
   }
 }
 

@@ -1,3 +1,4 @@
+import { AppError } from "../../utils/errors";
 import Stripe from "stripe";
 import BookingRepo from "./booking.repository";
 import EventRepo from "../event/event.repository";
@@ -91,14 +92,9 @@ function announceBookingChanged(
  * phone. Mapping them from message text would have been the alternative, and
  * that is how `checkInBooking` used to do it. Mirrors `RoleAssignmentError`.
  */
-export class BookingError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly code?: string,
-  ) {
-    super(message);
-    this.name = "BookingError";
+export class BookingError extends AppError {
+  constructor(message: string, status: number, code?: string) {
+    super(message, status, code);
   }
 }
 
