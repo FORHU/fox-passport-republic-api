@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "../src/utils/prisma";
-import BookingSvc, { BookingError } from "../src/modules/booking/booking.service";
+import BookingSvc, {
+  BookingError,
+} from "../src/modules/booking/booking.service";
 import TransactionStatusSvc from "../src/modules/transaction-status/transaction-status.service";
 
 describe("BookingSvc.addAdHocItem — ad-hoc marketplace item add, authorization, idempotency", () => {
@@ -16,13 +18,28 @@ describe("BookingSvc.addAdHocItem — ad-hoc marketplace item add, authorization
 
   beforeAll(async () => {
     const owner = await prisma.user.create({
-      data: { email: `adhoc_owner_${runId}@test.com`, password: "pw", name: "Owner", roleType: ["eventFoxer"] },
+      data: {
+        email: `adhoc_owner_${runId}@test.com`,
+        password: "pw",
+        name: "Owner",
+        roleType: ["eventFoxer"],
+      },
     });
     const provider = await prisma.user.create({
-      data: { email: `adhoc_provider_${runId}@test.com`, password: "pw", name: "Provider", roleType: ["gearFoxer"] },
+      data: {
+        email: `adhoc_provider_${runId}@test.com`,
+        password: "pw",
+        name: "Provider",
+        roleType: ["gearFoxer"],
+      },
     });
     const stranger = await prisma.user.create({
-      data: { email: `adhoc_stranger_${runId}@test.com`, password: "pw", name: "Stranger", roleType: ["eventFoxer"] },
+      data: {
+        email: `adhoc_stranger_${runId}@test.com`,
+        password: "pw",
+        name: "Stranger",
+        roleType: ["eventFoxer"],
+      },
     });
     ownerId = owner.id;
     providerId = provider.id;
@@ -31,7 +48,9 @@ describe("BookingSvc.addAdHocItem — ad-hoc marketplace item add, authorization
   });
 
   afterAll(async () => {
-    await prisma.eventAssetTransaction.deleteMany({ where: { eventId: { in: eventIds } } });
+    await prisma.eventAssetTransaction.deleteMany({
+      where: { eventId: { in: eventIds } },
+    });
     await prisma.booking.deleteMany({ where: { id: { in: bookingIds } } });
     await prisma.event.deleteMany({ where: { id: { in: eventIds } } });
     await prisma.asset.deleteMany({ where: { id: { in: assetIds } } });
@@ -39,7 +58,9 @@ describe("BookingSvc.addAdHocItem — ad-hoc marketplace item add, authorization
     await prisma.$executeRaw`DELETE FROM request_idempotency_keys WHERE endpoint = 'POST /bookings/:id/items'`;
   });
 
-  async function makeBooking(opts: { status?: "pending" | "cancelled"; expiresAt?: Date } = {}) {
+  async function makeBooking(
+    opts: { status?: "pending" | "cancelled"; expiresAt?: Date } = {},
+  ) {
     const start = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const end = new Date(Date.now() + 48 * 60 * 60 * 1000);
     const event = await prisma.event.create({
@@ -138,7 +159,9 @@ describe("BookingSvc.addAdHocItem — ad-hoc marketplace item add, authorization
   });
 
   it("rejects adding to an expired booking", async () => {
-    const { booking } = await makeBooking({ expiresAt: new Date(Date.now() - 60000) });
+    const { booking } = await makeBooking({
+      expiresAt: new Date(Date.now() - 60000),
+    });
     const asset = await makeAsset();
 
     await expect(
@@ -223,7 +246,12 @@ describe("BookingSvc.addAdHocItem — ad-hoc marketplace item add, authorization
       idempotencyKey: `confirm-${Math.random()}`,
     });
     const confirmed = await prisma.$transaction((tx) =>
-      TransactionStatusSvc.transition(tx, { id: rowA.id, kind: "asset", action: "confirm", actorId: providerId }),
+      TransactionStatusSvc.transition(tx, {
+        id: rowA.id,
+        kind: "asset",
+        action: "confirm",
+        actorId: providerId,
+      }),
     );
     expect((confirmed as any).status).toBe("approved");
 
@@ -238,7 +266,12 @@ describe("BookingSvc.addAdHocItem — ad-hoc marketplace item add, authorization
       idempotencyKey: `reject-${Math.random()}`,
     });
     const rejected = await prisma.$transaction((tx) =>
-      TransactionStatusSvc.transition(tx, { id: rowB.id, kind: "asset", action: "reject", actorId: providerId }),
+      TransactionStatusSvc.transition(tx, {
+        id: rowB.id,
+        kind: "asset",
+        action: "reject",
+        actorId: providerId,
+      }),
     );
     expect((rejected as any).status).toBe("rejected");
     expect((rejected as any).rejectionReason).toBe("provider_declined");
@@ -257,7 +290,12 @@ describe("BookingSvc.addAdHocItem — ad-hoc marketplace item add, authorization
       idempotencyKey: `cancel-${Math.random()}`,
     });
     const cancelled = await prisma.$transaction((tx) =>
-      TransactionStatusSvc.transition(tx, { id: rowC.id, kind: "asset", action: "cancel", actorId: ownerId }),
+      TransactionStatusSvc.transition(tx, {
+        id: rowC.id,
+        kind: "asset",
+        action: "cancel",
+        actorId: ownerId,
+      }),
     );
     expect((cancelled as any).status).toBe("cancelled");
   });

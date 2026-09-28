@@ -26,16 +26,36 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
 
   beforeAll(async () => {
     const provider = await prisma.user.create({
-      data: { email: `ts_provider_${runId}@test.com`, password: "pw", name: "Provider", roleType: ["gearFoxer"] },
+      data: {
+        email: `ts_provider_${runId}@test.com`,
+        password: "pw",
+        name: "Provider",
+        roleType: ["gearFoxer"],
+      },
     });
     const otherProvider = await prisma.user.create({
-      data: { email: `ts_other_provider_${runId}@test.com`, password: "pw", name: "OtherProvider", roleType: ["gearFoxer"] },
+      data: {
+        email: `ts_other_provider_${runId}@test.com`,
+        password: "pw",
+        name: "OtherProvider",
+        roleType: ["gearFoxer"],
+      },
     });
     const customer = await prisma.user.create({
-      data: { email: `ts_customer_${runId}@test.com`, password: "pw", name: "Customer", roleType: ["eventFoxer"] },
+      data: {
+        email: `ts_customer_${runId}@test.com`,
+        password: "pw",
+        name: "Customer",
+        roleType: ["eventFoxer"],
+      },
     });
     const otherUser = await prisma.user.create({
-      data: { email: `ts_other_${runId}@test.com`, password: "pw", name: "OtherUser", roleType: ["eventFoxer"] },
+      data: {
+        email: `ts_other_${runId}@test.com`,
+        password: "pw",
+        name: "OtherUser",
+        roleType: ["eventFoxer"],
+      },
     });
     providerId = provider.id;
     otherProviderId = otherProvider.id;
@@ -87,10 +107,14 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
   });
 
   afterAll(async () => {
-    await prisma.eventAssetTransaction.deleteMany({ where: { id: { in: eatIds } } });
+    await prisma.eventAssetTransaction.deleteMany({
+      where: { id: { in: eatIds } },
+    });
     await prisma.booking.delete({ where: { id: bookingId } });
     await prisma.event.delete({ where: { id: eventId } });
-    await prisma.asset.deleteMany({ where: { id: { in: [assetId, ...perTestAssetIds] } } });
+    await prisma.asset.deleteMany({
+      where: { id: { in: [assetId, ...perTestAssetIds] } },
+    });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   });
 
@@ -99,7 +123,9 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
   // row for the same pair (this was discovered by this very test suite
   // failing against the real index on the first run, not assumed), so each
   // independent test case needs its own item to stay isolated.
-  async function makeAdHocRow(overrides: Partial<{ confirmationDeadline: Date | null; status: any }> = {}) {
+  async function makeAdHocRow(
+    overrides: Partial<{ confirmationDeadline: Date | null; status: any }> = {},
+  ) {
     const asset = await prisma.asset.create({
       data: {
         ownerId: providerId,
@@ -123,7 +149,10 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
         quantity: 1,
         status: overrides.status ?? "pending_provider_confirmation",
         agreedPrice: 500,
-        confirmationDeadline: overrides.confirmationDeadline === undefined ? future : overrides.confirmationDeadline,
+        confirmationDeadline:
+          overrides.confirmationDeadline === undefined
+            ? future
+            : overrides.confirmationDeadline,
       },
     });
     eatIds.push(row.id);
@@ -133,7 +162,12 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
   it("lets the provider confirm within the deadline", async () => {
     const row = await makeAdHocRow();
     const result = await prisma.$transaction((tx) =>
-      TransactionStatusSvc.transition(tx, { id: row.id, kind: "asset", action: "confirm", actorId: providerId }),
+      TransactionStatusSvc.transition(tx, {
+        id: row.id,
+        kind: "asset",
+        action: "confirm",
+        actorId: providerId,
+      }),
     );
     expect((result as any).status).toBe("approved");
   });
@@ -142,7 +176,12 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
     const row = await makeAdHocRow();
     await expect(
       prisma.$transaction((tx) =>
-        TransactionStatusSvc.transition(tx, { id: row.id, kind: "asset", action: "confirm", actorId: otherProviderId }),
+        TransactionStatusSvc.transition(tx, {
+          id: row.id,
+          kind: "asset",
+          action: "confirm",
+          actorId: otherProviderId,
+        }),
       ),
     ).rejects.toThrow(TransactionActorUnauthorizedError);
   });
@@ -151,7 +190,12 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
     const row = await makeAdHocRow({ confirmationDeadline: past });
     await expect(
       prisma.$transaction((tx) =>
-        TransactionStatusSvc.transition(tx, { id: row.id, kind: "asset", action: "confirm", actorId: providerId }),
+        TransactionStatusSvc.transition(tx, {
+          id: row.id,
+          kind: "asset",
+          action: "confirm",
+          actorId: providerId,
+        }),
       ),
     ).rejects.toThrow(DeadlinePassedError);
   });
@@ -159,11 +203,21 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
   it("rejects a duplicate confirm on an already-approved row", async () => {
     const row = await makeAdHocRow();
     await prisma.$transaction((tx) =>
-      TransactionStatusSvc.transition(tx, { id: row.id, kind: "asset", action: "confirm", actorId: providerId }),
+      TransactionStatusSvc.transition(tx, {
+        id: row.id,
+        kind: "asset",
+        action: "confirm",
+        actorId: providerId,
+      }),
     );
     await expect(
       prisma.$transaction((tx) =>
-        TransactionStatusSvc.transition(tx, { id: row.id, kind: "asset", action: "confirm", actorId: providerId }),
+        TransactionStatusSvc.transition(tx, {
+          id: row.id,
+          kind: "asset",
+          action: "confirm",
+          actorId: providerId,
+        }),
       ),
     ).rejects.toThrow(InvalidTransitionError);
   });
@@ -171,20 +225,38 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
   it("rejects confirm on an already-rejected row", async () => {
     const row = await makeAdHocRow();
     await prisma.$transaction((tx) =>
-      TransactionStatusSvc.transition(tx, { id: row.id, kind: "asset", action: "reject", actorId: providerId }),
+      TransactionStatusSvc.transition(tx, {
+        id: row.id,
+        kind: "asset",
+        action: "reject",
+        actorId: providerId,
+      }),
     );
     await expect(
       prisma.$transaction((tx) =>
-        TransactionStatusSvc.transition(tx, { id: row.id, kind: "asset", action: "confirm", actorId: providerId }),
+        TransactionStatusSvc.transition(tx, {
+          id: row.id,
+          kind: "asset",
+          action: "confirm",
+          actorId: providerId,
+        }),
       ),
     ).rejects.toThrow(InvalidTransitionError);
   });
 
   it("PROVES a pre-attached item (status pending, never pending_provider_confirmation) cannot enter the confirmation flow", async () => {
-    const row = await makeAdHocRow({ status: "pending", confirmationDeadline: null });
+    const row = await makeAdHocRow({
+      status: "pending",
+      confirmationDeadline: null,
+    });
     await expect(
       prisma.$transaction((tx) =>
-        TransactionStatusSvc.transition(tx, { id: row.id, kind: "asset", action: "confirm", actorId: providerId }),
+        TransactionStatusSvc.transition(tx, {
+          id: row.id,
+          kind: "asset",
+          action: "confirm",
+          actorId: providerId,
+        }),
       ),
     ).rejects.toThrow(InvalidTransitionError);
   });
@@ -192,7 +264,12 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
   it("lets the booking owner cancel a pending_provider_confirmation item", async () => {
     const row = await makeAdHocRow();
     const result = await prisma.$transaction((tx) =>
-      TransactionStatusSvc.transition(tx, { id: row.id, kind: "asset", action: "cancel", actorId: customerId }),
+      TransactionStatusSvc.transition(tx, {
+        id: row.id,
+        kind: "asset",
+        action: "cancel",
+        actorId: customerId,
+      }),
     );
     expect((result as any).status).toBe("cancelled");
   });
@@ -200,10 +277,20 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
   it("lets the booking owner cancel an approved item", async () => {
     const row = await makeAdHocRow();
     await prisma.$transaction((tx) =>
-      TransactionStatusSvc.transition(tx, { id: row.id, kind: "asset", action: "confirm", actorId: providerId }),
+      TransactionStatusSvc.transition(tx, {
+        id: row.id,
+        kind: "asset",
+        action: "confirm",
+        actorId: providerId,
+      }),
     );
     const result = await prisma.$transaction((tx) =>
-      TransactionStatusSvc.transition(tx, { id: row.id, kind: "asset", action: "cancel", actorId: customerId }),
+      TransactionStatusSvc.transition(tx, {
+        id: row.id,
+        kind: "asset",
+        action: "cancel",
+        actorId: customerId,
+      }),
     );
     expect((result as any).status).toBe("cancelled");
   });
@@ -212,7 +299,12 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
     const row = await makeAdHocRow();
     await expect(
       prisma.$transaction((tx) =>
-        TransactionStatusSvc.transition(tx, { id: row.id, kind: "asset", action: "cancel", actorId: otherUserId }),
+        TransactionStatusSvc.transition(tx, {
+          id: row.id,
+          kind: "asset",
+          action: "cancel",
+          actorId: otherUserId,
+        }),
       ),
     ).rejects.toThrow(TransactionActorUnauthorizedError);
   });
@@ -220,7 +312,11 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
   it("expires a row past its deadline (system action, no actor)", async () => {
     const row = await makeAdHocRow({ confirmationDeadline: past });
     const result = await prisma.$transaction((tx) =>
-      TransactionStatusSvc.transition(tx, { id: row.id, kind: "asset", action: "expire" }),
+      TransactionStatusSvc.transition(tx, {
+        id: row.id,
+        kind: "asset",
+        action: "expire",
+      }),
     );
     expect((result as any).status).toBe("rejected");
     expect((result as any).rejectionReason).toBe("deadline_expired");
@@ -230,7 +326,11 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
     const row = await makeAdHocRow({ confirmationDeadline: future });
     await expect(
       prisma.$transaction((tx) =>
-        TransactionStatusSvc.transition(tx, { id: row.id, kind: "asset", action: "expire" }),
+        TransactionStatusSvc.transition(tx, {
+          id: row.id,
+          kind: "asset",
+          action: "expire",
+        }),
       ),
     ).rejects.toThrow(InvalidTransitionError);
   });
@@ -238,7 +338,12 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
   it("records a distinct rejectionReason for provider-declined vs deadline-expired", async () => {
     const row = await makeAdHocRow();
     const result = await prisma.$transaction((tx) =>
-      TransactionStatusSvc.transition(tx, { id: row.id, kind: "asset", action: "reject", actorId: providerId }),
+      TransactionStatusSvc.transition(tx, {
+        id: row.id,
+        kind: "asset",
+        action: "reject",
+        actorId: providerId,
+      }),
     );
     expect((result as any).rejectionReason).toBe("provider_declined");
   });
@@ -249,7 +354,12 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
       // This id only exists in event_asset_transactions; asking for kind "service" must not succeed.
       await expect(
         prisma.$transaction((tx) =>
-          TransactionStatusSvc.transition(tx, { id: row.id, kind: "service", action: "confirm", actorId: providerId }),
+          TransactionStatusSvc.transition(tx, {
+            id: row.id,
+            kind: "service",
+            action: "confirm",
+            actorId: providerId,
+          }),
         ),
       ).rejects.toThrow();
     });

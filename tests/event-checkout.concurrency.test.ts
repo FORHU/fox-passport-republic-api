@@ -5,12 +5,10 @@ import { AvailabilityConflictError } from "../src/modules/availability/availabil
 // Mock Stripe so real network calls never happen, and so we can assert on
 // exactly how many times (and with what arguments) it was invoked — this is
 // the "verify no Stripe call before DB commit" evidence, not an assumption.
-const sessionsCreateMock = vi
-  .fn()
-  .mockImplementation(async () => ({
-    id: `cs_test_${Math.random().toString(36).slice(2)}`,
-    url: "http://checkout.url",
-  }));
+const sessionsCreateMock = vi.fn().mockImplementation(async () => ({
+  id: `cs_test_${Math.random().toString(36).slice(2)}`,
+  url: "http://checkout.url",
+}));
 
 vi.mock("stripe", () => {
   return {
@@ -25,8 +23,12 @@ vi.mock("stripe", () => {
 
 // Imported AFTER the mock so StripeAdapter's module-level `new Stripe(...)`
 // picks up the mocked class.
-const EventCheckoutSvc = (await import("../src/modules/payment/event-checkout.service")).default;
-const AvailabilitySvc = (await import("../src/modules/availability/availability.service")).default;
+const EventCheckoutSvc = (
+  await import("../src/modules/payment/event-checkout.service")
+).default;
+const AvailabilitySvc = (
+  await import("../src/modules/availability/availability.service")
+).default;
 
 describe("Event checkout — concurrency, duplicate-checkout, availability revalidation", () => {
   const runId = Math.random().toString(36).substring(7);
@@ -41,10 +43,20 @@ describe("Event checkout — concurrency, duplicate-checkout, availability reval
 
   beforeAll(async () => {
     const payer = await prisma.user.create({
-      data: { email: `checkout_payer_${runId}@test.com`, password: "pw", name: "Payer", roleType: ["eventFoxer"] },
+      data: {
+        email: `checkout_payer_${runId}@test.com`,
+        password: "pw",
+        name: "Payer",
+        roleType: ["eventFoxer"],
+      },
     });
     const provider = await prisma.user.create({
-      data: { email: `checkout_provider_${runId}@test.com`, password: "pw", name: "Provider", roleType: ["gearFoxer"] },
+      data: {
+        email: `checkout_provider_${runId}@test.com`,
+        password: "pw",
+        name: "Provider",
+        roleType: ["gearFoxer"],
+      },
     });
     payerId = payer.id;
     providerId = provider.id;
@@ -52,7 +64,9 @@ describe("Event checkout — concurrency, duplicate-checkout, availability reval
   });
 
   afterAll(async () => {
-    await prisma.eventAssetTransaction.deleteMany({ where: { eventId: { in: eventIds } } });
+    await prisma.eventAssetTransaction.deleteMany({
+      where: { eventId: { in: eventIds } },
+    });
     await prisma.checkout.deleteMany({ where: { invoice: { payerId } } });
     await prisma.invoice.deleteMany({ where: { payerId } });
     await prisma.booking.deleteMany({ where: { id: { in: bookingIds } } });
@@ -150,7 +164,11 @@ describe("Event checkout — concurrency, duplicate-checkout, availability reval
     expect(resultA.invoice.id).toBe(resultB.invoice.id); // same invoice reused, not duplicated
 
     const invoiceCount = await prisma.invoice.count({
-      where: { payerId, items: { some: { sourceType: "event_asset_transaction" } }, id: resultA.invoice.id },
+      where: {
+        payerId,
+        items: { some: { sourceType: "event_asset_transaction" } },
+        id: resultA.invoice.id,
+      },
     });
     expect(invoiceCount).toBe(1);
 
@@ -178,7 +196,10 @@ describe("Event checkout — concurrency, duplicate-checkout, availability reval
     });
 
     const first = await EventCheckoutSvc.createEventCheckout(event.id, payerId);
-    const second = await EventCheckoutSvc.createEventCheckout(event.id, payerId);
+    const second = await EventCheckoutSvc.createEventCheckout(
+      event.id,
+      payerId,
+    );
 
     expect(second.invoice.id).toBe(first.invoice.id);
 
@@ -211,14 +232,24 @@ describe("Event checkout — concurrency, duplicate-checkout, availability reval
     // exactly the race the approved design named: availability can change
     // between "item added" and "payment submitted."
     const conflictingBooker = await prisma.user.create({
-      data: { email: `conflict_${runId}@test.com`, password: "pw", name: "Conflict", roleType: ["eventFoxer"] },
+      data: {
+        email: `conflict_${runId}@test.com`,
+        password: "pw",
+        name: "Conflict",
+        roleType: ["eventFoxer"],
+      },
     });
     userIds.push(conflictingBooker.id);
 
     await expect(
       prisma.$transaction((tx) =>
         AvailabilitySvc.reserve(tx, [
-          { kind: "asset", itemId: asset.id, dateRange: { start, end }, quantity: 1 },
+          {
+            kind: "asset",
+            itemId: asset.id,
+            dateRange: { start, end },
+            quantity: 1,
+          },
         ]).then(() =>
           tx.assetBooking.create({
             data: {
@@ -276,7 +307,7 @@ describe("Event checkout — concurrency, duplicate-checkout, availability reval
         providerId,
         quantity: 1,
         status: "approved",
-      agreedPrice: 500,
+        agreedPrice: 500,
       },
     });
 
@@ -305,7 +336,12 @@ describe("Event checkout — concurrency, duplicate-checkout, availability reval
 
     // Wrong payer — ownership check fails before any Stripe contact.
     const stranger = await prisma.user.create({
-      data: { email: `stranger_${runId}@test.com`, password: "pw", name: "Stranger", roleType: ["eventFoxer"] },
+      data: {
+        email: `stranger_${runId}@test.com`,
+        password: "pw",
+        name: "Stranger",
+        roleType: ["eventFoxer"],
+      },
     });
     userIds.push(stranger.id);
 

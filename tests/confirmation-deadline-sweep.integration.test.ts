@@ -17,10 +17,20 @@ describe("ConfirmationDeadlineSweepSvc.runSweep — deadline expiration and race
 
   beforeAll(async () => {
     const customer = await prisma.user.create({
-      data: { email: `sweep_customer_${runId}@test.com`, password: "pw", name: "Customer", roleType: ["eventFoxer"] },
+      data: {
+        email: `sweep_customer_${runId}@test.com`,
+        password: "pw",
+        name: "Customer",
+        roleType: ["eventFoxer"],
+      },
     });
     const provider = await prisma.user.create({
-      data: { email: `sweep_provider_${runId}@test.com`, password: "pw", name: "Provider", roleType: ["gearFoxer"] },
+      data: {
+        email: `sweep_provider_${runId}@test.com`,
+        password: "pw",
+        name: "Provider",
+        roleType: ["gearFoxer"],
+      },
     });
     customerId = customer.id;
     providerId = provider.id;
@@ -56,7 +66,9 @@ describe("ConfirmationDeadlineSweepSvc.runSweep — deadline expiration and race
   });
 
   afterAll(async () => {
-    await prisma.eventAssetTransaction.deleteMany({ where: { id: { in: eatIds } } });
+    await prisma.eventAssetTransaction.deleteMany({
+      where: { id: { in: eatIds } },
+    });
     await prisma.booking.delete({ where: { id: bookingId } });
     await prisma.event.delete({ where: { id: eventId } });
     await prisma.asset.deleteMany({ where: { id: { in: assetIds } } });
@@ -100,7 +112,9 @@ describe("ConfirmationDeadlineSweepSvc.runSweep — deadline expiration and race
     const result = await ConfirmationDeadlineSweepSvc.runSweep();
     expect(result.expired).toBeGreaterThanOrEqual(1);
 
-    const updated = await prisma.eventAssetTransaction.findUnique({ where: { id: row.id } });
+    const updated = await prisma.eventAssetTransaction.findUnique({
+      where: { id: row.id },
+    });
     expect(updated?.status).toBe("rejected");
     expect(updated?.rejectionReason).toBe("deadline_expired");
 
@@ -119,7 +133,9 @@ describe("ConfirmationDeadlineSweepSvc.runSweep — deadline expiration and race
 
     await ConfirmationDeadlineSweepSvc.runSweep();
 
-    const unchanged = await prisma.eventAssetTransaction.findUnique({ where: { id: row.id } });
+    const unchanged = await prisma.eventAssetTransaction.findUnique({
+      where: { id: row.id },
+    });
     expect(unchanged?.status).toBe("pending_provider_confirmation");
   });
 
@@ -135,7 +151,12 @@ describe("ConfirmationDeadlineSweepSvc.runSweep — deadline expiration and race
     // corrupted intermediate state.
     const [rejectResult, sweepResult] = await Promise.allSettled([
       prisma.$transaction((tx) =>
-        TransactionStatusSvc.transition(tx, { id: row.id, kind: "asset", action: "reject", actorId: providerId }),
+        TransactionStatusSvc.transition(tx, {
+          id: row.id,
+          kind: "asset",
+          action: "reject",
+          actorId: providerId,
+        }),
       ),
       ConfirmationDeadlineSweepSvc.runSweep(),
     ]);
@@ -148,7 +169,9 @@ describe("ConfirmationDeadlineSweepSvc.runSweep — deadline expiration and race
       sweepResult.status === "fulfilled" && sweepResult.value.expired >= 1;
     expect(rejectSucceeded || sweepExpiredThisRow).toBe(true);
 
-    const final = await prisma.eventAssetTransaction.findUnique({ where: { id: row.id } });
+    const final = await prisma.eventAssetTransaction.findUnique({
+      where: { id: row.id },
+    });
     // Whichever won, the row ends up rejected exactly once — not left in
     // pending_provider_confirmation, and not double-processed.
     expect(final?.status).toBe("rejected");

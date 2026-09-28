@@ -1,12 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { prisma } from "../src/utils/prisma";
 
-const sessionsCreateMock = vi
-  .fn()
-  .mockImplementation(async () => ({
-    id: `cs_reconciled_${Math.random().toString(36).slice(2)}`,
-    url: "http://checkout.url",
-  }));
+const sessionsCreateMock = vi.fn().mockImplementation(async () => ({
+  id: `cs_reconciled_${Math.random().toString(36).slice(2)}`,
+  url: "http://checkout.url",
+}));
 
 vi.mock("stripe", () => {
   return {
@@ -19,8 +17,10 @@ vi.mock("stripe", () => {
   };
 });
 
-const CheckoutSvc = (await import("../src/modules/payment/checkout.service")).default;
-const InvoiceSvc = (await import("../src/modules/payment/invoice.service")).default;
+const CheckoutSvc = (await import("../src/modules/payment/checkout.service"))
+  .default;
+const InvoiceSvc = (await import("../src/modules/payment/invoice.service"))
+  .default;
 
 describe("CheckoutSvc.reconcileStaleCheckouts — lost-response recovery", () => {
   const runId = Math.random().toString(36).substring(7);
@@ -30,14 +30,20 @@ describe("CheckoutSvc.reconcileStaleCheckouts — lost-response recovery", () =>
 
   beforeAll(async () => {
     const payer = await prisma.user.create({
-      data: { email: `reconcile_${runId}@test.com`, password: "pw", name: "Reconcile Payer" },
+      data: {
+        email: `reconcile_${runId}@test.com`,
+        password: "pw",
+        name: "Reconcile Payer",
+      },
     });
     payerId = payer.id;
   });
 
   afterAll(async () => {
     await prisma.checkout.deleteMany({ where: { id: { in: checkoutIds } } });
-    await prisma.invoiceItem.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+    await prisma.invoiceItem.deleteMany({
+      where: { invoiceId: { in: invoiceIds } },
+    });
     await prisma.invoice.deleteMany({ where: { id: { in: invoiceIds } } });
     await prisma.user.delete({ where: { id: payerId } });
   });
@@ -64,7 +70,9 @@ describe("CheckoutSvc.reconcileStaleCheckouts — lost-response recovery", () =>
       data: {
         invoiceId: invoice.id,
         provider: "stripe",
-        providerSessionId: opts.hasSession ? `cs_existing_${Math.random().toString(36).slice(2)}` : null,
+        providerSessionId: opts.hasSession
+          ? `cs_existing_${Math.random().toString(36).slice(2)}`
+          : null,
         status: opts.status,
       },
     });
@@ -93,7 +101,9 @@ describe("CheckoutSvc.reconcileStaleCheckouts — lost-response recovery", () =>
     expect(thisResult?.outcome).toBe("recovered");
     expect(sessionsCreateMock).toHaveBeenCalledTimes(1);
 
-    const updated = await prisma.checkout.findUnique({ where: { id: checkout.id } });
+    const updated = await prisma.checkout.findUnique({
+      where: { id: checkout.id },
+    });
     expect(updated?.providerSessionId).not.toBeNull();
   });
 
@@ -107,10 +117,10 @@ describe("CheckoutSvc.reconcileStaleCheckouts — lost-response recovery", () =>
     sessionsCreateMock.mockClear();
     await CheckoutSvc.reconcileStaleCheckouts();
 
-    expect(
-      sessionsCreateMock.mock.calls.length,
-    ).toBe(0);
-    const unchanged = await prisma.checkout.findUnique({ where: { id: checkout.id } });
+    expect(sessionsCreateMock.mock.calls.length).toBe(0);
+    const unchanged = await prisma.checkout.findUnique({
+      where: { id: checkout.id },
+    });
     expect(unchanged?.providerSessionId).toBeNull();
     expect(unchanged?.status).toBe("active");
   });
@@ -126,7 +136,9 @@ describe("CheckoutSvc.reconcileStaleCheckouts — lost-response recovery", () =>
     await CheckoutSvc.reconcileStaleCheckouts();
 
     expect(sessionsCreateMock).not.toHaveBeenCalled();
-    const unchanged = await prisma.checkout.findUnique({ where: { id: checkout.id } });
+    const unchanged = await prisma.checkout.findUnique({
+      where: { id: checkout.id },
+    });
     expect(unchanged?.status).toBe("completed");
   });
 });

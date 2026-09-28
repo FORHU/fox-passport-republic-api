@@ -108,8 +108,12 @@ describe("Central Payment checkout — HTTP layer", () => {
   });
 
   afterAll(async () => {
-    await prisma.booking.deleteMany({ where: { eventId: { in: createdEventIds } } });
-    await prisma.eventVenueTransaction.deleteMany({ where: { eventId: { in: createdEventIds } } });
+    await prisma.booking.deleteMany({
+      where: { eventId: { in: createdEventIds } },
+    });
+    await prisma.eventVenueTransaction.deleteMany({
+      where: { eventId: { in: createdEventIds } },
+    });
     await prisma.event.deleteMany({ where: { id: { in: createdEventIds } } });
     await prisma.checkout.deleteMany({});
     await prisma.payment.deleteMany({});

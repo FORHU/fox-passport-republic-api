@@ -36,7 +36,10 @@ beforeEach(() => {
 });
 
 const view = (userId?: string, systemRole?: string) =>
-  EventRequestSvc.getRequestById("e1", userId ? { userId, systemRole } : undefined);
+  EventRequestSvc.getRequestById(
+    "e1",
+    userId ? { userId, systemRole } : undefined,
+  );
 
 describe("EventRequestSvc.getRequestById", () => {
   it("refuses a signed-out caller", async () => {
@@ -62,9 +65,13 @@ describe("EventRequestSvc.getRequestById", () => {
   it("lets in an Organizer with event:view-sales", async () => {
     access.canOnEvent.mockImplementation(
       async (eventId: string, userId: string, permission: string) =>
-        eventId === "e1" && userId === "organizer" && permission === "event:view-sales",
+        eventId === "e1" &&
+        userId === "organizer" &&
+        permission === "event:view-sales",
     );
-    await expect(view("organizer", "user")).resolves.toMatchObject({ id: "e1" });
+    await expect(view("organizer", "user")).resolves.toMatchObject({
+      id: "e1",
+    });
   });
 
   it("throws the same message for a missing request", async () => {

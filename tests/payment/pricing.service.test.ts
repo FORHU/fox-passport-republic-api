@@ -1,11 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { prisma } from '../../src/utils/prisma';
-import PricingSvc from '../../src/modules/pricing/pricing.service';
-import { Prisma } from '@prisma/client';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { prisma } from "../../src/utils/prisma";
+import PricingSvc from "../../src/modules/pricing/pricing.service";
+import { Prisma } from "@prisma/client";
 const Decimal = Prisma.Decimal;
 
 // Mock Prisma
-vi.mock('../../src/utils/prisma', () => ({
+vi.mock("../../src/utils/prisma", () => ({
   prisma: {
     platformFeeConfig: {
       findMany: vi.fn(),
@@ -15,23 +15,23 @@ vi.mock('../../src/utils/prisma', () => ({
     },
     voucherRedemption: {
       count: vi.fn(),
-    }
-  }
+    },
+  },
 }));
 
-describe('PricingSvc', () => {
+describe("PricingSvc", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('resolvePricingRule', () => {
-    it('should resolve the most specific category over a global fallback', async () => {
+  describe("resolvePricingRule", () => {
+    it("should resolve the most specific category over a global fallback", async () => {
       // Setup mock data
       const mockRules = [
         {
-          id: 'global-1',
-          name: 'Global Default',
-          transactionType: 'event',
+          id: "global-1",
+          name: "Global Default",
+          transactionType: "event",
           category: null,
           subcategory: null,
           priority: 0,
@@ -39,35 +39,35 @@ describe('PricingSvc', () => {
           fixedAmount: new Decimal(0),
         },
         {
-          id: 'birthday-1',
-          name: 'Birthday Premium',
-          transactionType: 'event',
-          category: 'birthday',
+          id: "birthday-1",
+          name: "Birthday Premium",
+          transactionType: "event",
+          category: "birthday",
           subcategory: null,
           priority: 0,
           percentage: new Decimal(2),
           fixedAmount: new Decimal(0),
-        }
+        },
       ];
 
       (prisma.platformFeeConfig.findMany as any).mockResolvedValue(mockRules);
 
       const context = {
-        transactionType: 'event',
-        category: 'birthday'
+        transactionType: "event",
+        category: "birthday",
       };
 
       const bestRule = await PricingSvc.resolvePricingRule(context);
-      
+
       expect(bestRule).not.toBeNull();
-      expect(bestRule?.id).toBe('birthday-1');
+      expect(bestRule?.id).toBe("birthday-1");
     });
 
-    it('should respect priority overrides even if category matches', async () => {
+    it("should respect priority overrides even if category matches", async () => {
       const mockRules = [
         {
-          id: 'global-1',
-          name: 'Global Priority Override',
+          id: "global-1",
+          name: "Global Priority Override",
           transactionType: null,
           category: null,
           subcategory: null,
@@ -76,40 +76,40 @@ describe('PricingSvc', () => {
           fixedAmount: new Decimal(0),
         },
         {
-          id: 'birthday-1',
-          name: 'Birthday Premium',
-          transactionType: 'event',
-          category: 'birthday',
+          id: "birthday-1",
+          name: "Birthday Premium",
+          transactionType: "event",
+          category: "birthday",
           subcategory: null,
           priority: 0,
           percentage: new Decimal(2),
           fixedAmount: new Decimal(0),
-        }
+        },
       ];
 
       (prisma.platformFeeConfig.findMany as any).mockResolvedValue(mockRules);
 
       const context = {
-        transactionType: 'event',
-        category: 'birthday'
+        transactionType: "event",
+        category: "birthday",
       };
 
       const bestRule = await PricingSvc.resolvePricingRule(context);
-      
-      expect(bestRule?.id).toBe('global-1');
+
+      expect(bestRule?.id).toBe("global-1");
     });
   });
 
-  describe('validateAndCalculateVoucher', () => {
-    it('should calculate percentage discount correctly', async () => {
+  describe("validateAndCalculateVoucher", () => {
+    it("should calculate percentage discount correctly", async () => {
       const mockVoucher = {
-        id: 'v1',
-        code: 'TEST10',
+        id: "v1",
+        code: "TEST10",
         active: true,
         promotion: {
-          id: 'p1',
+          id: "p1",
           active: true,
-          discountType: 'percentage',
+          discountType: "percentage",
           discountValue: new Decimal(10),
           minSubtotal: null,
           maxDiscount: null,
@@ -118,25 +118,29 @@ describe('PricingSvc', () => {
           usageLimit: null,
           perUserLimit: null,
           transactionType: null,
-          category: null
-        }
+          category: null,
+        },
       };
-      
+
       (prisma.voucher.findUnique as any).mockResolvedValue(mockVoucher);
 
-      const result = await PricingSvc.validateAndCalculateVoucher('TEST10', 1000, { transactionType: 'event', userId: 'user-1' });
+      const result = await PricingSvc.validateAndCalculateVoucher(
+        "TEST10",
+        1000,
+        { transactionType: "event", userId: "user-1" },
+      );
       expect(result.discountAmount).toBe(100);
     });
 
-    it('should calculate fixed discount correctly', async () => {
+    it("should calculate fixed discount correctly", async () => {
       const mockVoucher = {
-        id: 'v1',
-        code: 'FIXED50',
+        id: "v1",
+        code: "FIXED50",
         active: true,
         promotion: {
-          id: 'p1',
+          id: "p1",
           active: true,
-          discountType: 'fixed',
+          discountType: "fixed",
           discountValue: new Decimal(50),
           minSubtotal: null,
           maxDiscount: null,
@@ -145,25 +149,29 @@ describe('PricingSvc', () => {
           usageLimit: null,
           perUserLimit: null,
           transactionType: null,
-          category: null
-        }
+          category: null,
+        },
       };
-      
+
       (prisma.voucher.findUnique as any).mockResolvedValue(mockVoucher);
 
-      const result = await PricingSvc.validateAndCalculateVoucher('FIXED50', 1000, { transactionType: 'event', userId: 'user-1' });
+      const result = await PricingSvc.validateAndCalculateVoucher(
+        "FIXED50",
+        1000,
+        { transactionType: "event", userId: "user-1" },
+      );
       expect(result.discountAmount).toBe(50);
     });
 
-    it('should cap discount at maxDiscount', async () => {
+    it("should cap discount at maxDiscount", async () => {
       const mockVoucher = {
-        id: 'v1',
-        code: 'TEST50',
+        id: "v1",
+        code: "TEST50",
         active: true,
         promotion: {
-          id: 'p1',
+          id: "p1",
           active: true,
-          discountType: 'percentage',
+          discountType: "percentage",
           discountValue: new Decimal(50),
           minSubtotal: null,
           maxDiscount: new Decimal(100),
@@ -172,25 +180,29 @@ describe('PricingSvc', () => {
           usageLimit: null,
           perUserLimit: null,
           transactionType: null,
-          category: null
-        }
+          category: null,
+        },
       };
-      
+
       (prisma.voucher.findUnique as any).mockResolvedValue(mockVoucher);
 
-      const result = await PricingSvc.validateAndCalculateVoucher('TEST50', 1000, { transactionType: 'event', userId: 'user-1' });
+      const result = await PricingSvc.validateAndCalculateVoucher(
+        "TEST50",
+        1000,
+        { transactionType: "event", userId: "user-1" },
+      );
       expect(result.discountAmount).toBe(100);
     });
 
-    it('should reject if minimum subtotal is not met', async () => {
+    it("should reject if minimum subtotal is not met", async () => {
       const mockVoucher = {
-        id: 'v1',
-        code: 'MIN1000',
+        id: "v1",
+        code: "MIN1000",
         active: true,
         promotion: {
-          id: 'p1',
+          id: "p1",
           active: true,
-          discountType: 'fixed',
+          discountType: "fixed",
           discountValue: new Decimal(50),
           minSubtotal: new Decimal(1000),
           maxDiscount: null,
@@ -199,26 +211,29 @@ describe('PricingSvc', () => {
           usageLimit: null,
           perUserLimit: null,
           transactionType: null,
-          category: null
-        }
+          category: null,
+        },
       };
-      
+
       (prisma.voucher.findUnique as any).mockResolvedValue(mockVoucher);
 
       await expect(
-        PricingSvc.validateAndCalculateVoucher('MIN1000', 500, { transactionType: 'event', userId: 'user-1' })
+        PricingSvc.validateAndCalculateVoucher("MIN1000", 500, {
+          transactionType: "event",
+          userId: "user-1",
+        }),
       ).rejects.toThrow(/Minimum subtotal/);
     });
 
-    it('should reject if usage limits are exceeded', async () => {
+    it("should reject if usage limits are exceeded", async () => {
       const mockVoucher = {
-        id: 'v1',
-        code: 'LIMIT1',
+        id: "v1",
+        code: "LIMIT1",
         active: true,
         promotion: {
-          id: 'p1',
+          id: "p1",
           active: true,
-          discountType: 'fixed',
+          discountType: "fixed",
           discountValue: new Decimal(50),
           minSubtotal: null,
           maxDiscount: null,
@@ -227,27 +242,30 @@ describe('PricingSvc', () => {
           usageLimit: 1,
           perUserLimit: null,
           transactionType: null,
-          category: null
-        }
+          category: null,
+        },
       };
-      
+
       (prisma.voucher.findUnique as any).mockResolvedValue(mockVoucher);
       (prisma.voucherRedemption.count as any).mockResolvedValue(1);
 
       await expect(
-        PricingSvc.validateAndCalculateVoucher('LIMIT1', 1000, { transactionType: 'event', userId: 'user-1' })
+        PricingSvc.validateAndCalculateVoucher("LIMIT1", 1000, {
+          transactionType: "event",
+          userId: "user-1",
+        }),
       ).rejects.toThrow(/usage limit reached/);
     });
 
-    it('should reject if per-user limits are exceeded', async () => {
+    it("should reject if per-user limits are exceeded", async () => {
       const mockVoucher = {
-        id: 'v1',
-        code: 'USER_LIMIT1',
+        id: "v1",
+        code: "USER_LIMIT1",
         active: true,
         promotion: {
-          id: 'p1',
+          id: "p1",
           active: true,
-          discountType: 'fixed',
+          discountType: "fixed",
           discountValue: new Decimal(50),
           minSubtotal: null,
           maxDiscount: null,
@@ -256,31 +274,36 @@ describe('PricingSvc', () => {
           usageLimit: null,
           perUserLimit: 1,
           transactionType: null,
-          category: null
-        }
+          category: null,
+        },
       };
-      
+
       (prisma.voucher.findUnique as any).mockResolvedValue(mockVoucher);
-      
-      (prisma.voucherRedemption.count as any).mockImplementation((args: any) => {
-        if (args.where.userId) return Promise.resolve(1);
-        return Promise.resolve(0);
-      });
+
+      (prisma.voucherRedemption.count as any).mockImplementation(
+        (args: any) => {
+          if (args.where.userId) return Promise.resolve(1);
+          return Promise.resolve(0);
+        },
+      );
 
       await expect(
-        PricingSvc.validateAndCalculateVoucher('USER_LIMIT1', 1000, { transactionType: 'event', userId: 'user-1' })
+        PricingSvc.validateAndCalculateVoucher("USER_LIMIT1", 1000, {
+          transactionType: "event",
+          userId: "user-1",
+        }),
       ).rejects.toThrow(/reached the usage limit/);
     });
 
-    it('should reject an expired voucher', async () => {
+    it("should reject an expired voucher", async () => {
       const mockVoucher = {
-        id: 'v1',
-        code: 'EXPIRED1',
+        id: "v1",
+        code: "EXPIRED1",
         active: true,
         promotion: {
-          id: 'p1',
+          id: "p1",
           active: true,
-          discountType: 'fixed',
+          discountType: "fixed",
           discountValue: new Decimal(50),
           minSubtotal: null,
           maxDiscount: null,
@@ -289,27 +312,30 @@ describe('PricingSvc', () => {
           usageLimit: null,
           perUserLimit: null,
           transactionType: null,
-          category: null
-        }
+          category: null,
+        },
       };
       (prisma.voucher.findUnique as any).mockResolvedValue(mockVoucher);
 
       await expect(
-        PricingSvc.validateAndCalculateVoucher('EXPIRED1', 1000, { transactionType: 'event', userId: 'user-1' })
+        PricingSvc.validateAndCalculateVoucher("EXPIRED1", 1000, {
+          transactionType: "event",
+          userId: "user-1",
+        }),
       ).rejects.toThrow(/expired/);
     });
   });
 
-  describe('calculatePrice', () => {
-    it('should calculate final amount sequentially: Subtotal -> Discount -> Platform Fee', async () => {
+  describe("calculatePrice", () => {
+    it("should calculate final amount sequentially: Subtotal -> Discount -> Platform Fee", async () => {
       const mockVoucher = {
-        id: 'v1',
-        code: 'FOX2026',
+        id: "v1",
+        code: "FOX2026",
         active: true,
         promotion: {
-          id: 'p1',
+          id: "p1",
           active: true,
-          discountType: 'percentage',
+          discountType: "percentage",
           discountValue: new Decimal(10),
           minSubtotal: null,
           maxDiscount: null,
@@ -318,29 +344,29 @@ describe('PricingSvc', () => {
           usageLimit: null,
           perUserLimit: null,
           transactionType: null,
-          category: null
-        }
+          category: null,
+        },
       };
       (prisma.voucher.findUnique as any).mockResolvedValue(mockVoucher);
 
       const mockRules = [
         {
-          id: 'rule-1',
-          name: 'Test Fee',
+          id: "rule-1",
+          name: "Test Fee",
           transactionType: null,
           category: null,
           subcategory: null,
           priority: 0,
           percentage: new Decimal(2),
           fixedAmount: new Decimal(10),
-        }
+        },
       ];
       (prisma.platformFeeConfig.findMany as any).mockResolvedValue(mockRules);
 
       const breakdown = await PricingSvc.calculatePrice(1000, {
-        transactionType: 'event',
-        voucherCode: 'FOX2026',
-        userId: 'user-1'
+        transactionType: "event",
+        voucherCode: "FOX2026",
+        userId: "user-1",
       });
 
       expect(breakdown.subtotal).toBe(1000);

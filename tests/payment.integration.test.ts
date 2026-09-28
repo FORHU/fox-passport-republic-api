@@ -381,7 +381,9 @@ describe("Central Payment & Checkout Integration Tests", () => {
 
     afterAll(async () => {
       await prisma.payout.deleteMany({ where: { providerId: provider.id } });
-      await prisma.partnershipProposal.delete({ where: { id: sponsorship.id } });
+      await prisma.partnershipProposal.delete({
+        where: { id: sponsorship.id },
+      });
       await prisma.event.deleteMany({ where: { id: event.id } });
       await prisma.user.deleteMany({ where: { id: provider.id } });
     });

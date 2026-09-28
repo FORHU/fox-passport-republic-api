@@ -262,7 +262,10 @@ describe("starting a Shared Inbox thread", () => {
 describe("an Event's inbox with its Suppliers", () => {
   const gino = { id: "gino", name: "Gino", imgId: null };
   const asSupplier = (userId: string) => [
-    { user: { ...gino, id: userId }, supplies: [{ kind: "service", name: "DJ set", via: "booked" }] },
+    {
+      user: { ...gino, id: userId },
+      supplies: [{ kind: "service", name: "DJ set", via: "booked" }],
+    },
   ];
   const canOnEventWith = (...granted: string[]) =>
     access.canOnEvent.mockImplementation(
@@ -294,7 +297,9 @@ describe("an Event's inbox with its Suppliers", () => {
     canOnEventWith();
     repo.findEventSuppliers.mockResolvedValue(asSupplier("gino"));
 
-    await ConversationService.startInboxConversation("gino", { eventId: "ev1" });
+    await ConversationService.startInboxConversation("gino", {
+      eventId: "ev1",
+    });
     expect(repo.createInbox).toHaveBeenCalledWith(
       expect.objectContaining({ guestId: "gino", inboxWith: "supplier" }),
     );

@@ -37,7 +37,10 @@ beforeEach(() => {
 });
 
 const view = (userId?: string, systemRole?: string) =>
-  BookingSvc.getBookingForViewer("b1", userId ? { userId, systemRole } : undefined);
+  BookingSvc.getBookingForViewer(
+    "b1",
+    userId ? { userId, systemRole } : undefined,
+  );
 
 describe("BookingSvc.getBookingForViewer", () => {
   it("refuses a signed-out caller", async () => {
@@ -61,7 +64,9 @@ describe("BookingSvc.getBookingForViewer", () => {
     access.canOnEvent.mockImplementation(
       async (_e: string, userId: string) => userId === "organizer",
     );
-    await expect(view("organizer", "user")).resolves.toMatchObject({ id: "b1" });
+    await expect(view("organizer", "user")).resolves.toMatchObject({
+      id: "b1",
+    });
   });
 
   it("lets in the booked Venue's Mayor and staff", async () => {

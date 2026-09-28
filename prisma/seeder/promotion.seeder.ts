@@ -22,7 +22,8 @@ const PROMOTIONS: {
 }[] = [
   {
     name: "Welcome Discount",
-    description: "10% off, any booking type, for testing the voucher flow end to end.",
+    description:
+      "10% off, any booking type, for testing the voucher flow end to end.",
     transactionType: null,
     discountType: "percentage",
     discountValue: 10,
@@ -41,7 +42,8 @@ const PROMOTIONS: {
   },
   {
     name: "Talent Booking Discount",
-    description: "15% off any talent/performer (Service) booking, capped at ₱2,000.",
+    description:
+      "15% off any talent/performer (Service) booking, capped at ₱2,000.",
     transactionType: "service",
     discountType: "percentage",
     discountValue: 15,
