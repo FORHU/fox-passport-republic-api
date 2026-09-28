@@ -1,3 +1,4 @@
+import { sendServerError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
 import { Prisma } from "@prisma/client";
@@ -26,12 +27,7 @@ export default class PaymentController {
         data: payments,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Get all payments error:", error);
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to fetch payments",
-      });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -53,15 +49,7 @@ export default class PaymentController {
         data: payment,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Get payment by ID error:", error);
-      if (error.message === "Payment not found") {
-        return res.status(404).json({ success: false, message: error.message });
-      }
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to fetch payment",
-      });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -85,15 +73,7 @@ export default class PaymentController {
         data: payment,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Get payment by transaction ID error:", error);
-      if (error.message === "Payment not found") {
-        return res.status(404).json({ success: false, message: error.message });
-      }
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to fetch payment",
-      });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -128,12 +108,7 @@ export default class PaymentController {
         data: payment,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Create payment error:", error);
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to create payment",
-      });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -170,15 +145,7 @@ export default class PaymentController {
         data: payment,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Update payment error:", error);
-      if (error.message === "Payment not found") {
-        return res.status(404).json({ success: false, message: error.message });
-      }
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to update payment",
-      });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -201,12 +168,7 @@ export default class PaymentController {
         data: payments,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Get booking payments error:", error);
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to fetch booking payments",
-      });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -228,12 +190,7 @@ export default class PaymentController {
         data: balance,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Get remaining balance error:", error);
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to calculate balance",
-      });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -258,12 +215,7 @@ export default class PaymentController {
         data: intentData,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Create payment intent error:", error);
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to create payment intent",
-      });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -334,6 +286,17 @@ export default class PaymentController {
         async () => {
           await WebhookSvc.handleCheckoutExpired(session.id);
         },
+      );
+    } else if (event.type === "payment_intent.succeeded") {
+      // The legacy booking-payment flow. Wrapped like the events above so a
+      // redelivery is skipped once handled, and a failure that leaves it
+      // unprocessed is answered 5xx (the route's asyncHandler) so Stripe retries.
+      await WebhookSvc.processEventWithIdempotency(
+        "stripe",
+        event.id,
+        event.type,
+        event.data.object as unknown as Prisma.InputJsonValue,
+        () => PaymentSvc.handleStripeEvent(event),
       );
     } else {
       await PaymentSvc.handleStripeEvent(event);

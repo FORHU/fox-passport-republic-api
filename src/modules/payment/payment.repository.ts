@@ -1,3 +1,4 @@
+import { notFound } from "../../utils/errors";
 import { prisma } from "../../utils/prisma";
 import { bookingCache } from "../../utils/cache-namespaces";
 import {
@@ -79,7 +80,7 @@ export default class PaymentRepo {
       where: { id: bookingId },
       select: { userId: true },
     });
-    if (!booking) throw new Error("Booking not found");
+    if (!booking) throw notFound("Booking");
 
     const invoice = await prisma.invoice.create({
       data: {

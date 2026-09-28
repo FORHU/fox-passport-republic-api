@@ -1,4 +1,5 @@
 import express from "express";
+import { asyncHandler } from "../../utils/async-handler";
 import PaymentCtrl from "./payment.controller";
 import {
   authenticate,
@@ -7,8 +8,9 @@ import {
 
 const router = express.Router();
 
-// Stripe — webhook must remain public (called by Stripe, not the client)
-router.post("/webhook", PaymentCtrl.handleWebhook);
+// Stripe — webhook must remain public (called by Stripe, not the client).
+// asyncHandler: a thrown failure must answer 5xx so Stripe retries, not hang.
+router.post("/webhook", asyncHandler(PaymentCtrl.handleWebhook));
 
 // Authenticated
 router.post("/create-intent", authenticate, PaymentCtrl.createPaymentIntent);
