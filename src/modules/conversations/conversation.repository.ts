@@ -575,7 +575,11 @@ export default class ConversationRepository {
       string,
       {
         user: { id: string; name: string | null; imgId: string | null };
-        supplies: { kind: "venue" | "service" | "asset"; name: string; via: "booked" | "bid" }[];
+        supplies: {
+          kind: "venue" | "service" | "asset";
+          name: string;
+          via: "booked" | "bid";
+        }[];
       }
     >();
     const add = (
@@ -589,7 +593,9 @@ export default class ConversationRepository {
       byId.set(user.id, row);
     };
     venues.forEach((t) => add(t.provider, "venue", t.venue.name, "booked"));
-    services.forEach((t) => add(t.provider, "service", t.service.name, "booked"));
+    services.forEach((t) =>
+      add(t.provider, "service", t.service.name, "booked"),
+    );
     assets.forEach((t) => add(t.provider, "asset", t.asset.name, "booked"));
     serviceBids.forEach((b) =>
       add(b.provider, "service", b.proposedService.name, "bid"),

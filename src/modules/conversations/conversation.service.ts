@@ -485,8 +485,16 @@ export default class ConversationService {
       if (!event) throw new Error("Event not found");
 
       const [answersGuests, answersSuppliers] = await Promise.all([
-        AppointmentAccess.canOnEvent(eventId, callerId, "event:message-attendees"),
-        AppointmentAccess.canOnEvent(eventId, callerId, "event:message-suppliers"),
+        AppointmentAccess.canOnEvent(
+          eventId,
+          callerId,
+          "event:message-attendees",
+        ),
+        AppointmentAccess.canOnEvent(
+          eventId,
+          callerId,
+          "event:message-suppliers",
+        ),
       ]);
       if (input.guestId) {
         if (!answersGuests && !answersSuppliers) {
@@ -508,7 +516,10 @@ export default class ConversationService {
         ? [existing.inboxWith !== "supplier", existing.inboxWith === "supplier"]
         : await Promise.all([
             prisma.booking
-              .findFirst({ where: { eventId, userId: guestId }, select: { id: true } })
+              .findFirst({
+                where: { eventId, userId: guestId },
+                select: { id: true },
+              })
               .then(Boolean),
             ConversationRepository.findEventSuppliers(eventId).then((rows) =>
               rows.some((r) => r.user.id === guestId),
