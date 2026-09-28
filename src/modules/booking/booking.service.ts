@@ -1,4 +1,4 @@
-import { AppError } from "../../utils/errors";
+import { AppError, notFound } from "../../utils/errors";
 import Stripe from "stripe";
 import BookingRepo from "./booking.repository";
 import EventRepo from "../event/event.repository";
@@ -160,11 +160,11 @@ export default class BookingSvc {
     });
 
     if (!user) {
-      throw new Error("User not found");
+      throw notFound("User");
     }
 
     if (user.isEmailVerified !== true) {
-      throw new Error("Identity verification required before booking");
+      throw new AppError("Identity verification required before booking", 403);
     }
   }
 
@@ -232,8 +232,9 @@ export default class BookingSvc {
 
     const extraGuests = Math.max(0, guestCount - venue.capacity);
     if (extraGuests > 0 && !venue.extraGuestRate) {
-      throw new Error(
+      throw new AppError(
         `This venue only accommodates ${venue.capacity} guests and does not accept requests beyond capacity.`,
+        400,
       );
     }
     const overageAmount = venue.extraGuestRate
@@ -300,7 +301,7 @@ export default class BookingSvc {
     const venue = await prisma.venue.findUnique({
       where: { id: data.venueId },
     });
-    if (!venue) throw new Error("Venue not found");
+    if (!venue) throw notFound("Venue");
 
     const pricing = await this.priceVenueBooking(
       venue,
@@ -448,12 +449,15 @@ export default class BookingSvc {
         where: { id: venueId },
         include: { mayor: true },
       });
-      if (!venue) throw new Error("Venue not found");
+      if (!venue) throw notFound("Venue");
 
       // A direct venue booking has no event to inherit dates from, so the
       // caller must supply them.
       if (!startDate || !endDate) {
-        throw new Error("startDate and endDate are required to book a venue");
+        throw new AppError(
+          "startDate and endDate are required to book a venue",
+          400,
+        );
       }
 
       const startAt = new Date(startDate);
@@ -606,9 +610,9 @@ export default class BookingSvc {
     }
 
     // ── Existing event-based booking path ────────────────────────────────
-    if (!data.eventId) throw new Error("eventId is required");
+    if (!data.eventId) throw new AppError("eventId is required", 400);
     const event = await EventRequestRepo.findById(data.eventId);
-    if (!event) throw new Error("Event not found");
+    if (!event) throw notFound("Event");
 
     // early_bird: if template has publicOpenAt in the future, only early_bird holders can book
     const { default: PassportSvc } =
@@ -621,8 +625,9 @@ export default class BookingSvc {
       const hasEarlyBird = await PassportSvc.hasPerk(userId, "early_bird");
       if (!hasEarlyBird) {
         const opensAt = new Date(template.publicOpenAt);
-        throw new Error(
+        throw new AppError(
           `Bookings open on ${opensAt.toLocaleDateString()} — Early Bird members can book now`,
+          403,
         );
       }
     }
@@ -761,7 +766,7 @@ export default class BookingSvc {
 
     let where: Prisma.BookingWhereInput = requested;
     if (!can(viewer?.systemRole, "bookings:read:all")) {
-      if (!viewer?.userId) throw new Error("Unauthorized");
+      if (!viewer?.userId) throw new AppError("Unauthorized", 403);
       where = {
         AND: [
           requested,
@@ -851,7 +856,7 @@ export default class BookingSvc {
     const booking = await bookingCache.cached(`byId:${id}`, BOOKING_TTL, () =>
       BookingRepo.findById(id),
     );
-    if (!booking) throw new Error("Booking not found");
+    if (!booking) throw notFound("Booking");
 
     // Role-based visibility filtering
     const isOwner = booking.userId === userContext?.userId;
@@ -881,7 +886,7 @@ export default class BookingSvc {
   static async getBookingForViewer(id: string, viewer?: BookingViewerContext) {
     const booking = await this.getBookingById(id, viewer);
     const userId = viewer?.userId;
-    if (!userId) throw new Error("Booking not found");
+    if (!userId) throw notFound("Booking");
 
     if (
       booking.userId === userId ||
@@ -920,7 +925,7 @@ export default class BookingSvc {
       }
     }
 
-    throw new Error("Booking not found");
+    throw notFound("Booking");
   }
 
   /**
@@ -951,13 +956,15 @@ export default class BookingSvc {
     inviterId: string,
   ) {
     const booking = await BookingRepo.findById(bookingId);
-    if (!booking) throw new Error("Booking not found");
-    if (booking.isGuestListLocked) throw new Error("Guest list is locked");
+    if (!booking) throw notFound("Booking");
+    if (booking.isGuestListLocked)
+      throw new AppError("Guest list is locked", 409);
 
     // Check for duplicates
     if (data.email) {
       const existing = booking.attendees.find((a) => a.email === data.email);
-      if (existing) throw new Error("Guest with this email already invited");
+      if (existing)
+        throw new AppError("Guest with this email already invited", 409);
     }
 
     const added = await BookingRepo.addAttendee(bookingId, {
@@ -976,19 +983,20 @@ export default class BookingSvc {
 
   static async removeAttendee(attendeeId: string, userId: string) {
     const attendee = await BookingRepo.findAttendeeById(attendeeId);
-    if (!attendee) throw new Error("Attendee not found");
+    if (!attendee) throw notFound("Attendee");
 
     const booking = attendee.booking;
-    if (booking.userId !== userId) throw new Error("Unauthorized");
-    if (booking.isGuestListLocked) throw new Error("Guest list is locked");
+    if (booking.userId !== userId) throw new AppError("Unauthorized", 403);
+    if (booking.isGuestListLocked)
+      throw new AppError("Guest list is locked", 409);
 
     return BookingRepo.removeAttendee(attendeeId);
   }
 
   static async finalizeGuestList(bookingId: string, userId: string) {
     const booking = await BookingRepo.findById(bookingId);
-    if (!booking) throw new Error("Booking not found");
-    if (booking.userId !== userId) throw new Error("Unauthorized");
+    if (!booking) throw notFound("Booking");
+    if (booking.userId !== userId) throw new AppError("Unauthorized", 403);
 
     await BookingRepo.finalizeAttendees(bookingId);
     return { message: "Guest list finalized and visible to host" };
@@ -1004,7 +1012,7 @@ export default class BookingSvc {
       attendee = await BookingRepo.findAttendeeById(identifier);
     }
 
-    if (!attendee) throw new Error("Attendee not found");
+    if (!attendee) throw notFound("Attendee");
 
     return BookingRepo.updateAttendee(attendee.id, {
       inviteStatus: status,
@@ -1037,7 +1045,7 @@ export default class BookingSvc {
   // the payout trigger point — see docs/adr/0002-stripe-connect-payouts.md.
   static async updateStatus(id: string, status: string, requesterId: string) {
     const booking = await BookingRepo.findById(id);
-    if (!booking) throw new Error("Booking not found");
+    if (!booking) throw notFound("Booking");
 
     const isOwner = booking.userId === requesterId;
     let isOrganizer = booking.event?.organizerId === requesterId;
@@ -1056,7 +1064,7 @@ export default class BookingSvc {
         "booking:check-in",
       );
     }
-    if (!isOwner && !isOrganizer) throw new Error("Unauthorized");
+    if (!isOwner && !isOrganizer) throw new AppError("Unauthorized", 403);
 
     const updated = await BookingRepo.updateStatus(
       id,
@@ -1125,7 +1133,7 @@ export default class BookingSvc {
   // Reuses the existing payout trigger in updateStatus (status -> completed).
   static async checkInAndSettle(id: string, hostId: string) {
     const booking = await BookingRepo.findById(id);
-    if (!booking) throw new Error("Booking not found");
+    if (!booking) throw notFound("Booking");
 
     const isOrganizer = booking.event?.organizerId === hostId;
     const authorized =
@@ -1138,12 +1146,15 @@ export default class BookingSvc {
           )
         : false);
     if (!authorized) {
-      throw new Error("Unauthorized — you are not the host of this event");
+      throw new AppError(
+        "Unauthorized — you are not the host of this event",
+        403,
+      );
     }
 
     // Don't release a payout for an unpaid/cancelled booking.
     if (["pending", "cancelled"].includes(booking.status)) {
-      throw new Error("Booking is not confirmed/paid yet");
+      throw new AppError("Booking is not confirmed/paid yet", 409);
     }
 
     // Already settled — idempotent, no re-payout.
@@ -1164,11 +1175,11 @@ export default class BookingSvc {
 
   static async confirmArrival(id: string, requesterId: string) {
     const booking = await BookingRepo.findById(id);
-    if (!booking) throw new Error("Booking not found");
+    if (!booking) throw notFound("Booking");
     if (booking.userId !== requesterId)
-      throw new Error("Only the client can confirm arrival");
+      throw new AppError("Only the client can confirm arrival", 403);
     if (!["confirmed", "pending"].includes(booking.status)) {
-      throw new Error("Booking cannot be confirmed at this stage");
+      throw new AppError("Booking cannot be confirmed at this stage", 409);
     }
     const confirmed = await BookingRepo.confirmArrival(id);
     announceBookingChanged(booking.userId, booking.event?.organizerId);
@@ -1509,10 +1520,10 @@ export default class BookingSvc {
    */
   static async cancelWithRefunds(id: string, requesterId: string) {
     const booking = await BookingRepo.findForCancellation(id);
-    if (!booking) throw new Error("Booking not found");
-    if (booking.userId !== requesterId) throw new Error("Unauthorized");
+    if (!booking) throw notFound("Booking");
+    if (booking.userId !== requesterId) throw new AppError("Unauthorized", 403);
     if (booking.status === "cancelled")
-      throw new Error("Booking is already cancelled");
+      throw new AppError("Booking is already cancelled", 409);
 
     const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
       apiVersion: "2025-08-27.basil",
@@ -1792,19 +1803,19 @@ export default class BookingSvc {
     viewer: { userId: string; email?: string; systemRole?: string },
   ) {
     const bookingRow = await BookingRepo.findById(bookingId);
-    if (!bookingRow) throw new Error("Booking not found");
+    if (!bookingRow) throw notFound("Booking");
     if (
       bookingRow.userId !== viewer.userId &&
       !can(viewer.systemRole, "bookings:read:all")
     ) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 403);
     }
 
     if (
       input.method !== "stripe" &&
       !String(input.transactionId).startsWith("pi_")
     ) {
-      throw new Error("Unsupported payment method");
+      throw new AppError("Unsupported payment method", 400);
     }
     const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
       apiVersion: "2025-08-27.basil",
@@ -1813,13 +1824,13 @@ export default class BookingSvc {
     try {
       paymentIntent = await stripe.paymentIntents.retrieve(input.transactionId);
     } catch {
-      throw new Error("Could not verify this payment with Stripe");
+      throw new AppError("Could not verify this payment with Stripe", 502);
     }
     if (paymentIntent.status !== "succeeded") {
-      throw new Error("This payment has not succeeded at Stripe");
+      throw new AppError("This payment has not succeeded at Stripe", 409);
     }
     if (paymentIntent.metadata.bookingId !== bookingId) {
-      throw new Error("This payment was not made for this booking");
+      throw new AppError("This payment was not made for this booking", 403);
     }
     const verifiedAmount = paymentIntent.amount / 100;
     const verifiedCurrency = paymentIntent.currency.toUpperCase();

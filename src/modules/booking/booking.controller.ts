@@ -1,3 +1,4 @@
+import { sendServerError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
 import BookingSvc from "./booking.service";
@@ -40,8 +41,7 @@ export default class BookingCtrl {
           ...(e.code ? { code: e.code } : {}),
         });
       }
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -80,8 +80,7 @@ export default class BookingCtrl {
           ...(e.code ? { code: e.code } : {}),
         });
       }
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -149,8 +148,7 @@ export default class BookingCtrl {
 
       return res.status(201).json({ success: true, data: booking });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -215,8 +213,7 @@ export default class BookingCtrl {
       const availability = await BookingSvc.getAvailability(templateId);
       return res.status(200).json({ success: true, data: availability });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -285,8 +282,7 @@ export default class BookingCtrl {
         },
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -324,8 +320,7 @@ export default class BookingCtrl {
       const bookings = await BookingSvc.getUpcomingBookings(req.user!.userId);
       return res.status(200).json({ success: true, data: bookings });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -350,8 +345,7 @@ export default class BookingCtrl {
         },
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -473,8 +467,7 @@ export default class BookingCtrl {
           .status(e.status)
           .json({ success: false, message: e.message });
       }
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
