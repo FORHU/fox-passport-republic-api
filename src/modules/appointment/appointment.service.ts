@@ -8,6 +8,9 @@ import {
 import { can, permissionsForAppointment } from "../../types/permissions";
 import NotificationService from "../notifications/user-notification.service";
 import AppointmentRepo, { AppointmentTarget } from "./appointment.repository";
+
+// Re-exported so the controller can name the type without touching the repo.
+export type { AppointmentTarget };
 import {
   INVITATION_TTL_MS,
   isAppointmentLive,

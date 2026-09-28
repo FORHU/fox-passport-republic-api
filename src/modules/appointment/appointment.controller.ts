@@ -1,9 +1,11 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import { AppointmentKind } from "@prisma/client";
-import AppointmentService, { AppointmentError } from "./appointment.service";
+import AppointmentService, {
+  AppointmentError,
+  type AppointmentTarget,
+} from "./appointment.service";
 import AppointmentAccess from "./appointment.access";
-import type { AppointmentTarget } from "./appointment.repository";
 
 function fail(res: Response, e: unknown) {
   if (e instanceof AppointmentError) {
