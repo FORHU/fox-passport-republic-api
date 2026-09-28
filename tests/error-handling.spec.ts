@@ -4,7 +4,12 @@ import app from "../src/app";
 import { asyncHandler } from "../src/utils/async-handler";
 import { Prisma } from "@prisma/client";
 import { createErrorHandler } from "../src/middleware/error.middleware";
-import { AppError, conflict, notFound } from "../src/utils/errors";
+import {
+  AppError,
+  conflict,
+  notFound,
+  sendServerError,
+} from "../src/utils/errors";
 
 describe("asyncHandler", () => {
   it("forwards a rejected promise to next()", async () => {
@@ -133,6 +138,40 @@ describe("createErrorHandler", () => {
 
     expect(status).toBe(500);
     expect(body.message).toBe("just a string");
+  });
+});
+
+describe("sendServerError", () => {
+  function send(err: unknown, opts?: { success?: boolean }) {
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+    };
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    sendServerError(res as never, err, opts);
+    return {
+      status: res.status.mock.calls[0][0],
+      body: res.json.mock.calls[0][0],
+    };
+  }
+
+  it("answers an AppError with its own status, message and code", () => {
+    const { status, body } = send(notFound("Booking"), { success: true });
+
+    expect(status).toBe(404);
+    expect(body).toEqual({
+      success: false,
+      message: "Booking not found",
+      code: "NOT_FOUND",
+    });
+  });
+
+  it("answers anything else with a generic 500 and logs it", () => {
+    const { status, body } = send(new Error("relation users does not exist"));
+
+    expect(status).toBe(500);
+    expect(body.code).toBe("INTERNAL");
+    expect(console.error).toHaveBeenCalled();
   });
 });
 

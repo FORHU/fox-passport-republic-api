@@ -1,3 +1,4 @@
+import { AppError, notFound } from "../../utils/errors";
 import { MatchConstraint, InvoiceSourceType } from "@prisma/client";
 import { eventTemplateCache, bookingCache } from "../../utils/cache-namespaces";
 import EventTransactionSvc from "../event-transaction/event-transaction.service";
@@ -30,7 +31,7 @@ export default class MatchSvc {
 
     if (data.venueId) {
       venue = await prisma.venue.findUnique({ where: { id: data.venueId } });
-      if (!venue) throw new Error("Venue not found");
+      if (!venue) throw notFound("Venue");
     } else {
       const { templates: foxerTemplates } =
         await EventTemplateRepo.findAllTemplates({ ownerId: data.foxerId });
@@ -197,7 +198,7 @@ export default class MatchSvc {
       where: { id: eventId },
       include: { bookings: { select: { id: true, stripePaymentId: true } } },
     });
-    if (!event) throw new Error("Match not found");
+    if (!event) throw notFound("Match");
     // The Event Owner or one of their Organizers (`event:approve-bookings`).
     // Declining refunds the client, so declineMatch stays the Owner's alone.
     if (
@@ -207,10 +208,10 @@ export default class MatchSvc {
         "event:approve-bookings",
       ))
     ) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 403);
     }
     if (event.requestStatus !== "pending")
-      throw new Error("Match already processed");
+      throw new AppError("Match already processed", 409);
 
     await EventRequestRepo.updateRequestStatus(eventId, "approved");
 
@@ -230,10 +231,10 @@ export default class MatchSvc {
       where: { id: eventId },
       include: { bookings: { select: { id: true, stripePaymentId: true } } },
     });
-    if (!event) throw new Error("Match not found");
-    if (event.organizerId !== foxerId) throw new Error("Unauthorized");
+    if (!event) throw notFound("Match");
+    if (event.organizerId !== foxerId) throw new AppError("Unauthorized", 403);
     if (event.requestStatus !== "pending")
-      throw new Error("Match already processed");
+      throw new AppError("Match already processed", 409);
 
     await EventRequestRepo.rejectRequest(eventId, reason);
 

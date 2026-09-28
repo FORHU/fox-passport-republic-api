@@ -1,3 +1,4 @@
+import { sendServerError } from "../../utils/errors";
 import { Request, Response } from "express";
 import PassportSvc from "../passport/passport.service";
 import AnalyticsSvc from "./analytics.service";
@@ -20,8 +21,7 @@ export default class AnalyticsCtrl {
       const stats = await AnalyticsSvc.getEventStats(userId);
       return res.status(200).json({ success: true, data: stats });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 }

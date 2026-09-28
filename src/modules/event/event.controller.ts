@@ -1,3 +1,4 @@
+import { sendServerError } from "../../utils/errors";
 import { Request, Response } from "express";
 import EventSvc from "./event.service";
 
@@ -23,8 +24,7 @@ export default class EventCtrl {
 
       return res.status(200).json({ events, total });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ message: error.message || error });
+      return sendServerError(res, e);
     }
   }
 }
