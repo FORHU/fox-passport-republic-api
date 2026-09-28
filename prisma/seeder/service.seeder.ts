@@ -552,7 +552,12 @@ export async function seedServices(prisma: PrismaClient, users: any[]) {
             city: "Cebu City",
             state: "Cebu",
             country: "Philippines",
-            tags: ["videography", "cinematic", "highlight reel", "colour grade"],
+            tags: [
+              "videography",
+              "cinematic",
+              "highlight reel",
+              "colour grade",
+            ],
             isWillingToTravel: true,
           },
           {

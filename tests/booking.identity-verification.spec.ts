@@ -38,13 +38,17 @@ vi.mock("../src/utils/prisma", () => ({
       })),
     },
     eventVenueTransaction: {
-      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => data),
+      create: vi.fn(
+        async ({ data }: { data: Record<string, unknown> }) => data,
+      ),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     $transaction: vi.fn(async (callback: (tx: any) => any) => {
       const tx = {
         eventVenueTransaction: {
-          create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => data),
+          create: vi.fn(
+            async ({ data }: { data: Record<string, unknown> }) => data,
+          ),
         },
       };
       return callback(tx);

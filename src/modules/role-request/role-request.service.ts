@@ -20,6 +20,7 @@ const APPLICATION_MODEL_BY_ROLE: Record<RoleType, string> = {
   [RoleType.serviceFoxer]: "serviceFoxerApplication",
   [RoleType.performerFoxer]: "performerFoxerApplication",
   [RoleType.investor]: "investorApplication",
+  [RoleType.organizer]: "organizerApplication",
 };
 
 // Maps the document field names admins flag (and applicants resubmit) to the
@@ -32,6 +33,7 @@ const DOCUMENT_FIELD_TO_DB_COLUMN: Record<string, string> = {
   birPermitFile: "birPermitFileId",
   selfieFile: "selfieFileId",
   portfolioFile: "portfolioFileId",
+  backgroundClearanceFile: "backgroundClearanceFileId", // organizer only
 };
 
 export default class RoleRequestService {

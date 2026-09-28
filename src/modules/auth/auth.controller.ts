@@ -461,14 +461,18 @@ export default class AuthCtrl {
     const { code } = req.body ?? {};
 
     if (typeof code !== "string" || code.length === 0) {
-      return res.status(400).json({ message: "Invalid exchange code" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid exchange code" });
     }
 
     const session = await GoogleAuthSvc.redeemSession(code);
     if (!session) {
       // Expired, already redeemed, or never existed - all the same to the
       // caller, and worth keeping indistinguishable.
-      return res.status(400).json({ message: "Invalid exchange code" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid exchange code" });
     }
 
     setSessionCookies(res, session);
@@ -491,10 +495,10 @@ export default class AuthCtrl {
         message: "Logged out successfully",
       });
     } catch (e: unknown) {
-      const error = e as Error;
+      console.error("Logout error:", e);
       return res.status(500).json({
         success: false,
-        message: error.message || "Failed to logout",
+        message: "Failed to logout",
       });
     }
   }

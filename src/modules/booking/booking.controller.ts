@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
-import BookingSvc, { BookingError } from "./booking.service";
+import BookingSvc from "./booking.service";
+import { AppError } from "../../utils/errors";
 import RefundSvc from "../refund/refund.service";
 import { totalPages } from "../../utils/pagination";
 
@@ -32,7 +33,7 @@ export default class BookingCtrl {
 
       return res.status(201).json({ success: true, data: result });
     } catch (e: unknown) {
-      if (e instanceof BookingError) {
+      if (e instanceof AppError) {
         return res.status(e.status).json({
           success: false,
           message: e.message,
@@ -72,7 +73,7 @@ export default class BookingCtrl {
 
       return res.status(201).json({ success: true, data: result });
     } catch (e: unknown) {
-      if (e instanceof BookingError) {
+      if (e instanceof AppError) {
         return res.status(e.status).json({
           success: false,
           message: e.message,
@@ -292,7 +293,10 @@ export default class BookingCtrl {
   // GET ONE
   static async getBookingById(req: Request, res: Response) {
     try {
-      const booking = await BookingSvc.getBookingById(req.params.id, req.user);
+      const booking = await BookingSvc.getBookingForViewer(
+        req.params.id,
+        req.user,
+      );
       return res.status(200).json({ success: true, data: booking });
     } catch (e: unknown) {
       const error = e as Error;
@@ -432,7 +436,7 @@ export default class BookingCtrl {
         payoutTriggered: result.payoutTriggered,
       });
     } catch (e: unknown) {
-      if (e instanceof BookingError) {
+      if (e instanceof AppError) {
         return res
           .status(e.status)
           .json({ success: false, message: e.message });
@@ -464,7 +468,7 @@ export default class BookingCtrl {
 
       return res.status(200).json({ success: true, data: updated });
     } catch (e: unknown) {
-      if (e instanceof BookingError) {
+      if (e instanceof AppError) {
         return res
           .status(e.status)
           .json({ success: false, message: e.message });

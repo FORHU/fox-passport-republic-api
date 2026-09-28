@@ -1,4 +1,5 @@
 import VenueRepo from "./venue.repository";
+import AppointmentAccess from "../appointment/appointment.access";
 import { venueCache } from "../../utils/cache-namespaces";
 import { fingerprint } from "../../utils/cache.util";
 import {
@@ -26,6 +27,24 @@ import {
  * TTL bounds orphans rather than staleness.
  */
 const VENUE_TTL = 300;
+
+/**
+ * What an Organizer with `venue:edit-listing` may change on `updateVenue`:
+ * how the Venue is described and shown. Everything else — its name, kind,
+ * capacity, every price and deposit, where it is, its status, policies and
+ * hours, and what it recommends — stays with the Mayor (ADR 0005).
+ */
+const ORGANIZER_EDITABLE_VENUE_FIELDS = new Set<string>([
+  "description",
+  "imgIds",
+  "amenities",
+  "facilities",
+  "parkingInformation",
+  "accessibilityInformation",
+  "entranceInstructions",
+  "floorPlanUrls",
+  "seatingLayoutUrls",
+]);
 
 export default class VenueSvc {
   /**
@@ -265,8 +284,20 @@ export default class VenueSvc {
     // filters to `available` in VenueRepo.findAllVenues) — without this, a
     // venue's direct URL made it fully viewable/bookable while still
     // `pending` review, `draft`, or `rejected`, to anyone who had the link.
-    // The owner previewing their own unpublished venue is the one exception.
-    if (venue.status !== VenueStatus.available && venue.mayorId !== requesterId)
+    // The Mayor previewing their own unpublished venue is the exception, and so
+    // is one of its Organizers (`venue:edit-listing`), who edits it with them.
+    if (
+      venue.status !== VenueStatus.available &&
+      venue.mayorId !== requesterId &&
+      !(
+        requesterId &&
+        (await AppointmentAccess.canOnVenue(
+          id,
+          requesterId,
+          "venue:edit-listing",
+        ))
+      )
+    )
       throw new Error("Venue not found");
 
     const { default: PassportSvc } =
@@ -450,7 +481,28 @@ export default class VenueSvc {
 
     const isAdmin = this.isAdminRole(requesterRole);
     if (!isAdmin && venue.mayorId !== requesterId) {
-      throw new Error("Unauthorized");
+      // An Organizer with `venue:edit-listing` may change how the Venue is
+      // described, never what it costs or what it is — see
+      // ORGANIZER_EDITABLE_VENUE_FIELDS.
+      if (
+        !(await AppointmentAccess.canOnVenue(
+          id,
+          requesterId,
+          "venue:edit-listing",
+        ))
+      ) {
+        throw new Error("Unauthorized");
+      }
+      const refused = Object.keys(data).filter(
+        (field) =>
+          data[field as keyof typeof data] !== undefined &&
+          !ORGANIZER_EDITABLE_VENUE_FIELDS.has(field),
+      );
+      if (refused.length > 0) {
+        throw new Error(
+          `Unauthorized: only the Mayor can change ${refused.join(", ")}`,
+        );
+      }
     }
 
     if (data.price !== undefined && data.price < 0) {
@@ -529,11 +581,11 @@ export default class VenueSvc {
   }
 
   /**
-   * Either the venue's mayor, or an Event Foxer with an approved
-   * `VenueEventFoxerAffiliation` granting `calendar:block`, may add/remove a
-   * blocked date. Deliberately not a full `updateVenue` — this is the one
-   * slice of the venue an affiliate may touch; everything else (listing,
-   * pricing, packages) stays mayor-only.
+   * The venue's mayor, one of its Organizers (`venue:calendar`), or an Event
+   * Foxer with an approved `VenueEventFoxerAffiliation` granting
+   * `calendar:block`, may add/remove a blocked date. Deliberately not a full
+   * `updateVenue` — this is the one slice of the venue an affiliate may
+   * touch; everything else (listing, pricing, packages) stays mayor-only.
    */
   private static async assertCanBlockCalendar(
     venueId: string,
@@ -541,7 +593,11 @@ export default class VenueSvc {
   ) {
     const venue = await VenueRepo.findVenueById(venueId);
     if (!venue) throw new Error("Venue not found");
-    if (venue.mayorId === requesterId) return;
+    if (
+      await AppointmentAccess.canOnVenue(venueId, requesterId, "venue:calendar")
+    ) {
+      return;
+    }
 
     const { default: VenueAffiliationSvc } =
       await import("../venue-affiliation/venue-affiliation.service");

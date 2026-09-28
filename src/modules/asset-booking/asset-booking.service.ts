@@ -288,6 +288,25 @@ export default class AssetBookingSvc {
       method,
     );
 
+    await prisma.payment.upsert({
+      where: { providerReference: transactionId },
+      create: {
+        assetBookingId: id,
+        amount: booking.totalAmount,
+        method,
+        providerReference: transactionId,
+        status: "paid",
+        paidAt: new Date(),
+      },
+      update: {
+        assetBookingId: id,
+        amount: booking.totalAmount,
+        method,
+        status: "paid",
+        paidAt: new Date(),
+      },
+    });
+
     // Redemption is only counted once payment actually confirms — mirrors
     // webhook.service.ts's paid-invoice redemption, so an abandoned checkout
     // never counts against the voucher's usage limits.

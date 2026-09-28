@@ -1,6 +1,21 @@
 import { prisma } from "../../utils/prisma";
 import { BidStatus } from "@prisma/client";
 
+// For an Event's bid list: which slot each bid is for (and the currency its
+// price is in), and the Event itself, so the screen can name it.
+const BID_SLOT_SELECT = {
+  select: {
+    id: true,
+    description: true,
+    currency: true,
+    agreedPrice: true,
+    matched: true,
+  },
+} as const;
+const BID_EVENT_SELECT = {
+  select: { id: true, name: true, startAt: true, organizerId: true },
+} as const;
+
 export default class BiddingRepo {
   static async createServiceBid(data: {
     eventId: string;
@@ -49,6 +64,9 @@ export default class BiddingRepo {
           },
         },
         proposedService: true,
+        // What the bid is for, and in which currency its price is.
+        targetRequirement: BID_SLOT_SELECT,
+        event: BID_EVENT_SELECT,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -123,6 +141,8 @@ export default class BiddingRepo {
           },
         },
         proposedAsset: true,
+        targetRequirement: BID_SLOT_SELECT,
+        event: BID_EVENT_SELECT,
       },
       orderBy: { createdAt: "desc" },
     });

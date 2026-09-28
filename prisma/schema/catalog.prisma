@@ -158,6 +158,11 @@ model Venue {
   // and manage its blockedDates on the mayor's behalf. See
   // VenueEventFoxerAffiliation in venue-affiliation.prisma.
   affiliations VenueEventFoxerAffiliation[]
+  appointments Appointment[]
+  // Whether approved Organizers may ask to join this Venue's team. Off until
+  // the Mayor turns it on, so nobody gets requests they didn't ask for.
+  acceptsOrganizerRequests Boolean @default(false)
+  inboxConversations Conversation[]
 
   @@map("venues")
 }

@@ -151,7 +151,7 @@ export default class EventRequestCtrl {
   static async getById(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const request = await EventRequestSvc.getRequestById(id);
+      const request = await EventRequestSvc.getRequestById(id, req.user);
       return res.status(200).json({ success: true, data: request });
     } catch (e: unknown) {
       const error = e as Error;

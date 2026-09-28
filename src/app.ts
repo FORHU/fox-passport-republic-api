@@ -5,6 +5,7 @@ import { createRateLimitStore } from "./utils/rate-limit-store";
 import helmet from "helmet";
 import router from "./routes";
 import { isDev, CORS_ORIGINS } from "./config";
+import { createErrorHandler } from "./middleware/error.middleware";
 import cors from "cors";
 import setup from "./setup";
 
@@ -37,7 +38,11 @@ app.use(
         callback(null, true);
       } else {
         // Name the origin - "Not allowed by CORS" alone is undebuggable.
-        callback(new Error(`Not allowed by CORS: ${origin}`));
+        const err: Error & { status?: number } = new Error(
+          `Not allowed by CORS: ${origin}`,
+        );
+        err.status = 403;
+        callback(err);
       }
     },
     credentials: true,
@@ -96,33 +101,6 @@ app.use("/api", (req, res) => {
 });
 
 // Global error handler
-/** An Error that carries an HTTP status for the global handler to honour. */
-interface HttpError extends Error {
-  status?: number;
-}
-
-function toHttpError(err: unknown): HttpError {
-  if (err instanceof Error) return err as HttpError;
-  return new Error(
-    typeof err === "string" ? err : "An unexpected error occurred",
-  );
-}
-
-app.use(
-  (
-    err: unknown,
-    _req: express.Request,
-    res: express.Response,
-    _next: express.NextFunction,
-  ) => {
-    const error = toHttpError(err);
-    console.error("❌ GLOBAL ERROR:", error.message);
-    res.status(error.status || 400).json({
-      success: false,
-      message: error.message || "An unexpected error occurred",
-      stack: isDev ? error.stack : undefined,
-    });
-  },
-);
+app.use(createErrorHandler(isDev));
 
 export default app;

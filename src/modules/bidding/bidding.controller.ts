@@ -65,7 +65,10 @@ export default class BiddingCtrl {
   static async getServiceBidsForEvent(req: Request, res: Response) {
     try {
       const { eventId } = req.params;
-      const bids = await BiddingSvc.getServiceBidsForEvent(eventId);
+      const bids = await BiddingSvc.getServiceBidsForEvent(
+        eventId,
+        req.user!.userId,
+      );
       res.status(200).json({ success: true, data: bids });
     } catch (err: unknown) {
       const error = err as Error;
@@ -126,7 +129,10 @@ export default class BiddingCtrl {
   static async getAssetBidsForEvent(req: Request, res: Response) {
     try {
       const { eventId } = req.params;
-      const bids = await BiddingSvc.getAssetBidsForEvent(eventId);
+      const bids = await BiddingSvc.getAssetBidsForEvent(
+        eventId,
+        req.user!.userId,
+      );
       res.status(200).json({ success: true, data: bids });
     } catch (err: unknown) {
       const error = err as Error;

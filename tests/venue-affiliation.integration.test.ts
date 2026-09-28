@@ -138,7 +138,11 @@ describe("Venue affiliation gating on EventTemplateSvc.attachVenue", () => {
   it("rejects an organizer with no affiliation at all", async () => {
     const templateId = await makeTemplate(unaffiliatedOrganizerId);
     await expect(
-      EventTemplateSvc.attachVenue(templateId, unaffiliatedOrganizerId, venueId),
+      EventTemplateSvc.attachVenue(
+        templateId,
+        unaffiliatedOrganizerId,
+        venueId,
+      ),
     ).rejects.toThrow(/approved affiliation/);
   });
 
@@ -152,7 +156,11 @@ describe("Venue affiliation gating on EventTemplateSvc.attachVenue", () => {
   it("rejects an approved affiliation that lacks the template:attach permission", async () => {
     const templateId = await makeTemplate(noCalendarPermOrganizerId);
     await expect(
-      EventTemplateSvc.attachVenue(templateId, noCalendarPermOrganizerId, venueId),
+      EventTemplateSvc.attachVenue(
+        templateId,
+        noCalendarPermOrganizerId,
+        venueId,
+      ),
     ).rejects.toThrow(/approved affiliation/);
   });
 

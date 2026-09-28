@@ -259,6 +259,25 @@ export default class ServiceBookingSvc {
       method,
     );
 
+    await prisma.payment.upsert({
+      where: { providerReference: transactionId },
+      create: {
+        serviceBookingId: id,
+        amount: booking.totalAmount,
+        method,
+        providerReference: transactionId,
+        status: "paid",
+        paidAt: new Date(),
+      },
+      update: {
+        serviceBookingId: id,
+        amount: booking.totalAmount,
+        method,
+        status: "paid",
+        paidAt: new Date(),
+      },
+    });
+
     if (booking.voucherId && booking.discountAmount.toNumber() > 0) {
       await prisma.voucherRedemption
         .create({

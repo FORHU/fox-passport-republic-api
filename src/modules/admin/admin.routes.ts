@@ -15,6 +15,12 @@ router.get(
   requirePermission("queue:read"),
   ReportsController.getAdminReports,
 );
+router.patch(
+  "/reports/:id/resolve",
+  authenticate,
+  requirePermission("queue:decide"),
+  ReportsController.resolveReport,
+);
 
 // Role assignment — the only routes that hand out capability directly, so they
 // are gated on the narrowest permission in the table.

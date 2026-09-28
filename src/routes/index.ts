@@ -45,6 +45,7 @@ import promotionRoutes from "../modules/promotion/promotion.routes";
 import promotionOwnRoutes from "../modules/promotion/promotion-own.routes";
 import fxRoutes from "../modules/fx/fx.routes";
 import venueAffiliationRoutes from "../modules/venue-affiliation/venue-affiliation.routes";
+import appointmentRoutes from "../modules/appointment/appointment.routes";
 
 const router = express.Router();
 
@@ -102,6 +103,7 @@ router.use("/v1/investments", investmentRoutes);
 router.use("/v1/events", eventRoutes);
 router.use("/v1/bids", biddingRoutes);
 router.use("/v1/venue-affiliations", venueAffiliationRoutes);
+router.use("/v1/appointments", appointmentRoutes);
 router.use("/v1/partnerships", partnershipRoutes);
 router.use("/v1/booking-edit-requests", bookingEditRequestRoutes);
 // Central Payment checkout — mounted at bare /v1, not nested under events/

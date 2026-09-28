@@ -1,3 +1,4 @@
+import { AppError } from "../../utils/errors";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { prisma } from "../../utils/prisma";
@@ -29,10 +30,9 @@ export interface IssueContext {
  * A refresh token that cannot be used: bad signature, unknown jti, expired, or
  * revoked by logout. Ordinary — the caller should answer 401.
  */
-export class RefreshTokenError extends Error {
+export class RefreshTokenError extends AppError {
   constructor(message = "Invalid refresh token") {
-    super(message);
-    this.name = "RefreshTokenError";
+    super(message, 401);
   }
 }
 
@@ -45,7 +45,6 @@ export class RefreshTokenError extends Error {
 export class RefreshTokenReuseError extends RefreshTokenError {
   constructor(message = "Refresh token reuse detected") {
     super(message);
-    this.name = "RefreshTokenReuseError";
   }
 }
 

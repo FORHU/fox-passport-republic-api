@@ -1,6 +1,7 @@
 import express from "express";
 import AuthCtrl from "./auth.controller";
 import { authenticate } from "../../middleware/auth.middleware";
+import { asyncHandler } from "../../utils/async-handler";
 import {
   loginRateLimit,
   registerRateLimit,
@@ -28,7 +29,7 @@ router.post(
 );
 router.get("/google", AuthCtrl.googleRedirect);
 router.get("/google/callback", AuthCtrl.googleCallback);
-router.post("/google/exchange", AuthCtrl.googleExchange);
+router.post("/google/exchange", asyncHandler(AuthCtrl.googleExchange));
 router.post("/socket-ticket", authenticate, AuthCtrl.socketTicket);
 
 export default router;

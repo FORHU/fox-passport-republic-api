@@ -1,27 +1,45 @@
 import { prisma } from "../../utils/prisma";
-import { ReportTargetType } from "@prisma/client";
+import { ReportStatus, ReportTargetType } from "@prisma/client";
 import ReportsRepo from "./reports.repository";
 import { AuthenticatedUser } from "../../types/auth";
 
 export default class ReportsService {
-  static async getAdminReports(page = 1, limit = 50) {
+  static async getAdminReports(
+    page = 1,
+    limit = 50,
+    targetType?: ReportTargetType,
+  ) {
     const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
     const safeLimit = Number.isFinite(limit)
       ? Math.min(100, Math.max(1, Math.floor(limit)))
       : 50;
     const skip = (safePage - 1) * safeLimit;
+    const where = targetType ? { targetType } : {};
 
-    const [reports, total] = await Promise.all([
+    const [reports, total, counts] = await Promise.all([
       prisma.report.findMany({
+        where,
         orderBy: { createdAt: "desc" },
         skip,
         take: safeLimit,
         include: {
           reporter: { select: { id: true, name: true, email: true } },
+          resolvedBy: { select: { id: true, name: true } },
         },
       }),
-      prisma.report.count(),
+      prisma.report.count({ where }),
+      prisma.report.groupBy({
+        by: ["targetType"],
+        _count: { _all: true },
+      }),
     ]);
+
+    const countByType: Record<ReportTargetType, number> = {
+      post: 0,
+      user: 0,
+      venue: 0,
+    };
+    for (const row of counts) countByType[row.targetType] = row._count._all;
 
     const ids = {
       post: reports
@@ -64,6 +82,10 @@ export default class ReportsService {
         createdAt: report.createdAt,
         reporter: report.reporter,
         target: byId[report.targetType].get(report.targetId) ?? null,
+        status: report.status,
+        resolvedBy: report.resolvedBy,
+        resolvedAt: report.resolvedAt,
+        resolutionNote: report.resolutionNote,
       })),
       pagination: {
         page: safePage,
@@ -71,6 +93,7 @@ export default class ReportsService {
         total,
         totalPages: Math.max(1, Math.ceil(total / safeLimit)),
       },
+      counts: countByType,
     };
   }
 
@@ -105,6 +128,33 @@ export default class ReportsService {
       targetId,
       reason,
       details,
+    });
+  }
+
+  /**
+   * Records a decision on a report — dismissed (no violation found) or
+   * actioned (admin took a real moderation step against the target through
+   * that target's own endpoint, e.g. PATCH /admin/venues/:id/reject). This
+   * call only logs the outcome; it never touches the target itself.
+   */
+  static async resolveReport(
+    user: AuthenticatedUser,
+    reportId: string,
+    input: {
+      status: Extract<ReportStatus, "dismissed" | "actioned">;
+      resolutionNote?: string;
+    },
+  ) {
+    const report = await ReportsRepo.findById(reportId);
+    if (!report) throw new Error("Report not found");
+    if (report.status !== ReportStatus.open) {
+      throw new Error("Report has already been resolved");
+    }
+
+    return ReportsRepo.resolve(reportId, {
+      status: input.status,
+      resolvedById: user.userId,
+      resolutionNote: input.resolutionNote,
     });
   }
 }
