@@ -1,3 +1,4 @@
+import { sendServerError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
 import CategorySvc from "./category.service";
@@ -14,12 +15,7 @@ export default class CategoryController {
         data: categories,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Get all categories error:", error);
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to fetch categories",
-      });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -33,12 +29,8 @@ export default class CategoryController {
         data: categories,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Get top-level categories error:", error);
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to fetch top-level categories",
-      });
+      console.error("Get top-level categories error:", e);
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -60,18 +52,7 @@ export default class CategoryController {
         data: category,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Get category by ID error:", error);
-      if (error.message === "Category not found") {
-        return res.status(404).json({
-          success: false,
-          message: error.message,
-        });
-      }
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to fetch category",
-      });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -93,18 +74,7 @@ export default class CategoryController {
         data: category,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Get category by slug error:", error);
-      if (error.message === "Category not found") {
-        return res.status(404).json({
-          success: false,
-          message: error.message,
-        });
-      }
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to fetch category",
-      });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -135,18 +105,7 @@ export default class CategoryController {
         data: category,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Create category error:", error);
-      if (error.message.includes("already exists")) {
-        return res.status(409).json({
-          success: false,
-          message: error.message,
-        });
-      }
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to create category",
-      });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -188,27 +147,7 @@ export default class CategoryController {
         data: category,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Update category error:", error);
-      if (error.message === "Category not found") {
-        return res.status(404).json({
-          success: false,
-          message: error.message,
-        });
-      }
-      if (
-        error.message.includes("already exists") ||
-        error.message.includes("own parent")
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: error.message,
-        });
-      }
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to update category",
-      });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -231,18 +170,7 @@ export default class CategoryController {
         message: "Category deleted successfully",
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Delete category error:", error);
-      if (error.message === "Category not found") {
-        return res.status(404).json({
-          success: false,
-          message: error.message,
-        });
-      }
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to delete category",
-      });
+      return sendServerError(res, e, { success: true });
     }
   }
 }

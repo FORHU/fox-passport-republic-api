@@ -1,3 +1,4 @@
+import { AppError, notFound } from "../../utils/errors";
 import crypto from "crypto";
 import PromotionRepo from "./promotion.repository";
 import AssetRepo from "../asset/asset.repository";
@@ -53,18 +54,18 @@ function randomCode(length: number): string {
 }
 
 function assertValidPromotion(data: PromotionInput) {
-  if (!data.name?.trim()) throw new Error("Promotion name is required");
+  if (!data.name?.trim()) throw new AppError("Promotion name is required", 400);
   if (!["percentage", "fixed"].includes(data.discountType)) {
-    throw new Error('discountType must be "percentage" or "fixed"');
+    throw new AppError('discountType must be "percentage" or "fixed"', 400);
   }
   if (data.discountValue == null || data.discountValue <= 0) {
-    throw new Error("discountValue must be greater than 0");
+    throw new AppError("discountValue must be greater than 0", 400);
   }
   if (data.discountType === "percentage" && data.discountValue > 100) {
-    throw new Error("A percentage discount cannot exceed 100");
+    throw new AppError("A percentage discount cannot exceed 100", 400);
   }
   if (data.startDate && data.endDate && data.endDate <= data.startDate) {
-    throw new Error("endDate must be after startDate");
+    throw new AppError("endDate must be after startDate", 400);
   }
 }
 
@@ -116,7 +117,7 @@ export default class PromotionSvc {
 
   static async getById(id: string) {
     const promo = await PromotionRepo.findById(id);
-    if (!promo) throw new Error("Promotion not found");
+    if (!promo) throw notFound("Promotion");
     return toApi(promo);
   }
 
@@ -132,7 +133,7 @@ export default class PromotionSvc {
 
   static async update(id: string, data: Partial<PromotionInput>) {
     const existing = await PromotionRepo.findById(id);
-    if (!existing) throw new Error("Promotion not found");
+    if (!existing) throw notFound("Promotion");
 
     // Validate the merged shape — an update sending only `endDate` must
     // still be checked against the existing `startDate`.
@@ -157,7 +158,7 @@ export default class PromotionSvc {
 
   static async remove(id: string) {
     const existing = await PromotionRepo.findById(id);
-    if (!existing) throw new Error("Promotion not found");
+    if (!existing) throw notFound("Promotion");
     return PromotionRepo.softDelete(id);
   }
 
@@ -168,9 +169,9 @@ export default class PromotionSvc {
     prefix?: string,
   ) {
     const promo = await PromotionRepo.findById(promotionId);
-    if (!promo) throw new Error("Promotion not found");
+    if (!promo) throw notFound("Promotion");
     if (count < 1 || count > 500) {
-      throw new Error("count must be between 1 and 500");
+      throw new AppError("count must be between 1 and 500", 400);
     }
 
     const cleanPrefix = prefix
@@ -203,7 +204,7 @@ export default class PromotionSvc {
    */
   static async importVouchers(promotionId: string, rawCodes: string[]) {
     const promo = await PromotionRepo.findById(promotionId);
-    if (!promo) throw new Error("Promotion not found");
+    if (!promo) throw notFound("Promotion");
 
     const seen = new Set<string>();
     const toCreate: string[] = [];
@@ -276,15 +277,16 @@ export default class PromotionSvc {
   }> {
     const scoped = [assetId, serviceId, venueId].filter(Boolean);
     if (scoped.length !== 1) {
-      throw new Error(
+      throw new AppError(
         "A promotion must be scoped to exactly one of your own listings (assetId, serviceId or venueId)",
+        400,
       );
     }
 
     if (assetId) {
       const asset = await AssetRepo.findAssetById(assetId);
-      if (!asset) throw new Error("Asset not found");
-      if (asset.ownerId !== providerId) throw new Error("Unauthorized");
+      if (!asset) throw notFound("Asset");
+      if (asset.ownerId !== providerId) throw new AppError("Unauthorized", 403);
       return {
         assetId,
         serviceId: null,
@@ -296,8 +298,9 @@ export default class PromotionSvc {
 
     if (serviceId) {
       const service = await ServiceRepo.getServiceById(serviceId);
-      if (!service || service.deletedAt) throw new Error("Service not found");
-      if (service.ownerId !== providerId) throw new Error("Unauthorized");
+      if (!service || service.deletedAt) throw notFound("Service");
+      if (service.ownerId !== providerId)
+        throw new AppError("Unauthorized", 403);
       return {
         assetId: null,
         serviceId,
@@ -308,8 +311,8 @@ export default class PromotionSvc {
     }
 
     const venue = await VenueRepo.findVenueById(venueId!);
-    if (!venue) throw new Error("Venue not found");
-    if (venue.mayorId !== providerId) throw new Error("Unauthorized");
+    if (!venue) throw notFound("Venue");
+    if (venue.mayorId !== providerId) throw new AppError("Unauthorized", 403);
     return {
       assetId: null,
       serviceId: null,
@@ -332,8 +335,9 @@ export default class PromotionSvc {
   /** Ownership-guarded fetch — throws rather than returning another provider's promotion. */
   private static async getOwnedById(providerId: string, id: string) {
     const promo = await PromotionRepo.findById(id);
-    if (!promo) throw new Error("Promotion not found");
-    if (promo.providerId !== providerId) throw new Error("Unauthorized");
+    if (!promo) throw notFound("Promotion");
+    if (promo.providerId !== providerId)
+      throw new AppError("Unauthorized", 403);
     return promo;
   }
 
@@ -385,8 +389,9 @@ export default class PromotionSvc {
       (data.serviceId !== undefined && data.serviceId !== existing.serviceId) ||
       (data.venueId !== undefined && data.venueId !== existing.venueId)
     ) {
-      throw new Error(
+      throw new AppError(
         "The listing a promotion is scoped to cannot be changed — deactivate this one and create a new one",
+        400,
       );
     }
 
@@ -439,9 +444,9 @@ export default class PromotionSvc {
     active: boolean,
   ) {
     const voucher = await PromotionRepo.findVoucherWithPromotion(voucherId);
-    if (!voucher) throw new Error("Voucher not found");
+    if (!voucher) throw notFound("Voucher");
     if (voucher.promotion.providerId !== providerId) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 403);
     }
     return PromotionRepo.setVoucherActive(voucherId, active);
   }

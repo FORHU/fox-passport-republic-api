@@ -1,3 +1,4 @@
+import { AppError, sendAppError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
 import VenueSvc from "./venue.service";
@@ -140,6 +141,7 @@ export default class VenueCtrl {
         .status(201)
         .json({ message: "Venue created successfully", venue });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       const status = error.message?.includes("overlaps an existing venue")
         ? 409
@@ -195,6 +197,7 @@ export default class VenueCtrl {
       });
       return res.status(200).json({ venues, total });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res.status(500).json({ message: error.message || error });
     }
@@ -208,6 +211,7 @@ export default class VenueCtrl {
       const venue = await VenueSvc.getVenueById(id, requesterId);
       return res.status(200).json({ venue });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res.status(404).json({ message: error.message || error });
     }
@@ -294,6 +298,7 @@ export default class VenueCtrl {
         .status(200)
         .json({ message: "Venue updated successfully", venue });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const err = e as Error;
       const status =
         err.message === "Unauthorized"
@@ -322,6 +327,7 @@ export default class VenueCtrl {
       announceAdminQueueChanged();
       return res.status(200).json({ message: "Venue deleted successfully" });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const err = e as Error;
       const status =
         err.message === "Unauthorized"
@@ -350,6 +356,7 @@ export default class VenueCtrl {
       const venues = await VenueSvc.getVenuesCoveringPoint(value);
       return res.status(200).json({ venues });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res.status(500).json({ message: error.message || error });
     }
@@ -373,6 +380,7 @@ export default class VenueCtrl {
       const boundaries = await VenueSvc.getReferenceBoundaries(value.excludeId);
       return res.status(200).json({ boundaries });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res.status(500).json({ message: error.message || error });
     }
@@ -401,6 +409,7 @@ export default class VenueCtrl {
       );
       return res.status(200).json(result);
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res.status(500).json({ message: error.message || error });
     }
@@ -431,6 +440,7 @@ export default class VenueCtrl {
       });
       return res.status(200).json({ message: "Date blocked", venue });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const err = e as Error;
       const status = err.message.includes("Unauthorized")
         ? 403
@@ -457,6 +467,7 @@ export default class VenueCtrl {
       });
       return res.status(200).json({ message: "Date unblocked", venue });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const err = e as Error;
       const status = err.message.includes("Unauthorized")
         ? 403

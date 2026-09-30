@@ -1,3 +1,4 @@
+import { AppError, notFound } from "../../utils/errors";
 import VenueRepo from "./venue.repository";
 import AppointmentAccess from "../appointment/appointment.access";
 import { venueCache } from "../../utils/cache-namespaces";
@@ -69,8 +70,9 @@ export default class VenueSvc {
       if (!other.boundary) continue;
       const otherRing = other.boundary as unknown as LngLat[];
       if (polygonsOverlap(boundary, otherRing)) {
-        throw new Error(
+        throw new AppError(
           `This venue's service area overlaps an existing venue: "${other.name}". Adjust the shape so they don't intersect.`,
+          409,
         );
       }
     }
@@ -121,16 +123,16 @@ export default class VenueSvc {
   }) {
     // Business logic: validate business rules before creation
     if (data.price && data.price < 0) {
-      throw new Error("Price cannot be negative");
+      throw new AppError("Price cannot be negative", 400);
     }
     if (data.capacity < 1) {
-      throw new Error("Capacity must be at least 1");
+      throw new AppError("Capacity must be at least 1", 400);
     }
     if (!Array.isArray(data.imgIds) || data.imgIds.length === 0) {
-      throw new Error("At least one image is required");
+      throw new AppError("At least one image is required", 400);
     }
     if (data.imgIds && data.imgIds.length > 5) {
-      throw new Error("A maximum of 5 images is allowed");
+      throw new AppError("A maximum of 5 images is allowed", 400);
     }
 
     // Every venue goes through admin review before it's live. `available`,
@@ -150,12 +152,13 @@ export default class VenueSvc {
 
     if (finalStatus !== VenueStatus.draft) {
       if (!data.boundary) {
-        throw new Error(
+        throw new AppError(
           "A service-area boundary is required to publish a venue",
+          400,
         );
       }
       const validationError = validatePolygon(data.boundary);
-      if (validationError) throw new Error(validationError);
+      if (validationError) throw new AppError(validationError, 400);
 
       await this.assertNoOverlap(data.boundary);
       centroid = polygonCentroid(data.boundary);
@@ -277,9 +280,9 @@ export default class VenueSvc {
       VenueRepo.findVenueById(id),
     );
 
-    if (!venue) throw new Error("Venue not found");
+    if (!venue) throw notFound("Venue");
     if (venue.status === VenueStatus.archived)
-      throw new Error("Venue has been removed");
+      throw new AppError("Venue has been removed", 404);
     // This is the public, unauthenticated single-venue read (search already
     // filters to `available` in VenueRepo.findAllVenues) — without this, a
     // venue's direct URL made it fully viewable/bookable while still
@@ -298,7 +301,7 @@ export default class VenueSvc {
         ))
       )
     )
-      throw new Error("Venue not found");
+      throw notFound("Venue");
 
     const { default: PassportSvc } =
       await import("../passport/passport.service");
@@ -426,7 +429,7 @@ export default class VenueSvc {
       () => VenueRepo.findVenueByIdAndOwner(id, mayorId),
     );
     if (!venue) {
-      throw new Error("Venue not found or access denied");
+      throw new AppError("Venue not found or access denied", 404);
     }
     return venue;
   }
@@ -477,7 +480,7 @@ export default class VenueSvc {
     const { id, requesterId, requesterRole, data } = params;
 
     const venue = await VenueRepo.findVenueById(id);
-    if (!venue) throw new Error("Venue not found");
+    if (!venue) throw notFound("Venue");
 
     const isAdmin = this.isAdminRole(requesterRole);
     if (!isAdmin && venue.mayorId !== requesterId) {
@@ -491,7 +494,7 @@ export default class VenueSvc {
           "venue:edit-listing",
         ))
       ) {
-        throw new Error("Unauthorized");
+        throw new AppError("Unauthorized", 403);
       }
       const refused = Object.keys(data).filter(
         (field) =>
@@ -499,20 +502,21 @@ export default class VenueSvc {
           !ORGANIZER_EDITABLE_VENUE_FIELDS.has(field),
       );
       if (refused.length > 0) {
-        throw new Error(
+        throw new AppError(
           `Unauthorized: only the Mayor can change ${refused.join(", ")}`,
+          403,
         );
       }
     }
 
     if (data.price !== undefined && data.price < 0) {
-      throw new Error("Price cannot be negative");
+      throw new AppError("Price cannot be negative", 400);
     }
     if (data.capacity !== undefined && data.capacity < 1) {
-      throw new Error("Capacity must be at least 1");
+      throw new AppError("Capacity must be at least 1", 400);
     }
     if (data.imgIds && data.imgIds.length > 5) {
-      throw new Error("A maximum of 5 images is allowed");
+      throw new AppError("A maximum of 5 images is allowed", 400);
     }
 
     // Same rule as create: `available`/`rejected`/`archived` are
@@ -534,12 +538,13 @@ export default class VenueSvc {
 
     if (finalStatus !== VenueStatus.draft) {
       if (!resolvedBoundary) {
-        throw new Error(
+        throw new AppError(
           "A service-area boundary is required to publish a venue",
+          400,
         );
       }
       const validationError = validatePolygon(resolvedBoundary);
-      if (validationError) throw new Error(validationError);
+      if (validationError) throw new AppError(validationError, 400);
 
       // Only worth re-checking when the shape itself moved, or when a draft
       // with no prior overlap check is being published for the first time.
@@ -592,7 +597,7 @@ export default class VenueSvc {
     requesterId: string,
   ) {
     const venue = await VenueRepo.findVenueById(venueId);
-    if (!venue) throw new Error("Venue not found");
+    if (!venue) throw notFound("Venue");
     if (
       await AppointmentAccess.canOnVenue(venueId, requesterId, "venue:calendar")
     ) {
@@ -608,8 +613,9 @@ export default class VenueSvc {
         "calendar:block",
       );
     if (!affiliation) {
-      throw new Error(
+      throw new AppError(
         "Unauthorized: you do not have calendar access to this venue",
+        403,
       );
     }
   }
@@ -667,7 +673,7 @@ export default class VenueSvc {
     const { venueId, requesterId, date } = params;
     await this.assertCanBlockCalendar(venueId, requesterId);
     const venue = await VenueRepo.addBlockedDate(venueId, date);
-    if (!venue) throw new Error("Venue not found");
+    if (!venue) throw notFound("Venue");
     return venue;
   }
 
@@ -679,7 +685,7 @@ export default class VenueSvc {
     const { venueId, requesterId, date } = params;
     await this.assertCanBlockCalendar(venueId, requesterId);
     const venue = await VenueRepo.removeBlockedDate(venueId, date);
-    if (!venue) throw new Error("Venue not found");
+    if (!venue) throw notFound("Venue");
     return venue;
   }
 
@@ -690,11 +696,11 @@ export default class VenueSvc {
   }) {
     const { id, requesterId, requesterRole } = params;
     const venue = await VenueRepo.findVenueById(id);
-    if (!venue) throw new Error("Venue not found");
+    if (!venue) throw notFound("Venue");
 
     const isAdmin = this.isAdminRole(requesterRole);
     if (!isAdmin && venue.mayorId !== requesterId) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 403);
     }
 
     return VenueRepo.archiveVenue(id);

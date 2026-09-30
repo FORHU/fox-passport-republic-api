@@ -1,3 +1,5 @@
+import { sendServerError } from "../../utils/errors";
+import { AppError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
 import FeedService from "./feed.service";
@@ -8,7 +10,11 @@ import {
   ReactionType,
 } from "@prisma/client";
 
-function statusForError(message: string): number {
+function statusForError(err: Error): number {
+  // AppError carries its own status; message matching is the fallback for
+  // anything still thrown as a plain Error.
+  if (err instanceof AppError) return err.status;
+  const message = err.message;
   if (
     message.includes("Unauthorized") ||
     message.includes("does not belong to you")
@@ -43,8 +49,7 @@ export default class FeedController {
         nextCursor: result.nextCursor,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -56,7 +61,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const error = e as Error;
       return res
-        .status(statusForError(error.message))
+        .status(statusForError(error))
         .json({ success: false, message: error.message });
     }
   }
@@ -106,7 +111,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const err = e as Error;
       return res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -119,7 +124,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const error = e as Error;
       return res
-        .status(statusForError(error.message))
+        .status(statusForError(error))
         .json({ success: false, message: error.message });
     }
   }
@@ -143,7 +148,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const err = e as Error;
       return res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -163,7 +168,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const err = e as Error;
       return res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -176,7 +181,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const err = e as Error;
       return res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -199,7 +204,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const err = e as Error;
       return res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -212,7 +217,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const error = e as Error;
       return res
-        .status(statusForError(error.message))
+        .status(statusForError(error))
         .json({ success: false, message: error.message });
     }
   }
@@ -233,7 +238,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const err = e as Error;
       return res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -246,7 +251,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const error = e as Error;
       return res
-        .status(statusForError(error.message))
+        .status(statusForError(error))
         .json({ success: false, message: error.message });
     }
   }
@@ -261,8 +266,7 @@ export default class FeedController {
       );
       return res.status(200).json({ success: true, data: posts, nextCursor });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -274,7 +278,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const error = e as Error;
       return res
-        .status(statusForError(error.message))
+        .status(statusForError(error))
         .json({ success: false, message: error.message });
     }
   }
@@ -287,8 +291,7 @@ export default class FeedController {
       );
       return res.status(200).json({ success: true, data: users });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -306,7 +309,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const error = e as Error;
       return res
-        .status(statusForError(error.message))
+        .status(statusForError(error))
         .json({ success: false, message: error.message });
     }
   }
@@ -334,7 +337,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const err = e as Error;
       return res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -360,7 +363,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const err = e as Error;
       return res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -375,7 +378,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const error = e as Error;
       return res
-        .status(statusForError(error.message))
+        .status(statusForError(error))
         .json({ success: false, message: error.message });
     }
   }
@@ -388,7 +391,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const error = e as Error;
       return res
-        .status(statusForError(error.message))
+        .status(statusForError(error))
         .json({ success: false, message: error.message });
     }
   }
@@ -411,7 +414,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const err = e as Error;
       return res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -424,7 +427,7 @@ export default class FeedController {
     } catch (e: unknown) {
       const error = e as Error;
       return res
-        .status(statusForError(error.message))
+        .status(statusForError(error))
         .json({ success: false, message: error.message });
     }
   }

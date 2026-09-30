@@ -290,6 +290,55 @@ describe("Stripe webhook dispatch — new Checkout Session flow vs legacy Paymen
     spy.mockRestore();
   });
 
+  it("payment_intent.succeeded that fails answers 5xx and stays unprocessed, so Stripe's retry is handled", async () => {
+    const spy = vi
+      .spyOn(PaymentSvc, "handleStripeEvent")
+      .mockRejectedValueOnce(new Error("connection reset"))
+      .mockResolvedValueOnce(undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    mockEvent = {
+      id: "evt_legacy_retry",
+      type: "payment_intent.succeeded",
+      data: { object: { id: "pi_retry", metadata: { bookingId: "bk" } } },
+    };
+
+    const first = await postWebhook();
+    expect(first.status).toBe(500);
+    const afterFailure = await prisma.paymentProviderEvent.findFirst({
+      where: { providerEventId: "evt_legacy_retry" },
+    });
+    expect(afterFailure?.processed).toBe(false);
+
+    const retry = await postWebhook();
+    expect(retry.status).toBe(200);
+    const afterRetry = await prisma.paymentProviderEvent.findFirst({
+      where: { providerEventId: "evt_legacy_retry" },
+    });
+    expect(afterRetry?.processed).toBe(true);
+    expect(spy).toHaveBeenCalledTimes(2);
+
+    vi.restoreAllMocks();
+  });
+
+  it("payment_intent.succeeded delivered again after it was handled is skipped", async () => {
+    const spy = vi
+      .spyOn(PaymentSvc, "handleStripeEvent")
+      .mockResolvedValue(undefined);
+
+    mockEvent = {
+      id: "evt_legacy_dup",
+      type: "payment_intent.succeeded",
+      data: { object: { id: "pi_dup", metadata: { bookingId: "bk" } } },
+    };
+
+    expect((await postWebhook()).status).toBe(200);
+    expect((await postWebhook()).status).toBe(200);
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    vi.restoreAllMocks();
+  });
+
   it("an unrelated event type (account.updated) is untouched by the new branching", async () => {
     const spy = vi.spyOn(PaymentSvc, "handleStripeEvent");
 

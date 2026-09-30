@@ -1,3 +1,4 @@
+import { sendServerError } from "../../utils/errors";
 import { Request, Response } from "express";
 import PayoutSvc from "./payout.service";
 
@@ -22,8 +23,7 @@ export default class PayoutCtrl {
         totals: result.totals,
       });
     } catch (e: unknown) {
-      const err = e as Error;
-      return res.status(500).json({ success: false, message: err.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 }

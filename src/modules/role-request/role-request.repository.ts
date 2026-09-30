@@ -98,7 +98,7 @@ export default class RoleRequestRepo {
             selfieFile: true,
           },
         },
-        investorApplication: true,
+        investorApplication: { include: { proofOfFunds: true } },
         organizerApplication: {
           include: {
             validId1: true,
@@ -122,7 +122,7 @@ export default class RoleRequestRepo {
         gearFoxerApplication: true,
         serviceFoxerApplication: true,
         performerFoxerApplication: true,
-        investorApplication: true,
+        investorApplication: { include: { proofOfFunds: true } },
         organizerApplication: true,
       },
       orderBy: { createdAt: "desc" },
@@ -183,7 +183,7 @@ export default class RoleRequestRepo {
             selfieFile: true,
           },
         },
-        investorApplication: true,
+        investorApplication: { include: { proofOfFunds: true } },
         organizerApplication: {
           include: {
             validId1: true,

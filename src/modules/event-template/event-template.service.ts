@@ -1,3 +1,4 @@
+import { AppError, notFound } from "../../utils/errors";
 import {
   EventCategory,
   MatchConstraint,
@@ -276,7 +277,7 @@ export default class EventTemplateSvc {
       () => EventTemplateRepo.findTemplateById(id),
     );
     if (!template) {
-      throw new Error("Event template not found");
+      throw notFound("Event template");
     }
     return {
       ...template,
@@ -401,10 +402,10 @@ export default class EventTemplateSvc {
     }
 
     const template = await EventTemplateRepo.findTemplateById(templateId);
-    if (!template) throw new Error("Template not found");
+    if (!template) throw notFound("Template");
 
     const asset = await prisma.asset.findUnique({ where: { id: assetId } });
-    if (!asset) throw new Error("Asset not found");
+    if (!asset) throw notFound("Asset");
 
     // Only enforce location mismatch when both sides have explicit state/country data.
     // If either the template or the resource has no location set, allow the attachment.
@@ -414,8 +415,9 @@ export default class EventTemplateSvc {
       (asset.state !== template.targetState ||
         asset.country !== template.targetCountry)
     ) {
-      throw new Error(
+      throw new AppError(
         "Asset location mismatch. Please use matching search or override.",
+        400,
       );
     }
 
@@ -481,12 +483,12 @@ export default class EventTemplateSvc {
     }
 
     const template = await EventTemplateRepo.findTemplateById(templateId);
-    if (!template) throw new Error("Template not found");
+    if (!template) throw notFound("Template");
 
     const service = await prisma.service.findUnique({
       where: { id: serviceId },
     });
-    if (!service) throw new Error("Service not found");
+    if (!service) throw notFound("Service");
 
     if (
       service.state &&
@@ -494,8 +496,9 @@ export default class EventTemplateSvc {
       (service.state !== template.targetState ||
         service.country !== template.targetCountry)
     ) {
-      throw new Error(
+      throw new AppError(
         "Service location mismatch. Please use matching search or override.",
+        400,
       );
     }
 
@@ -554,10 +557,10 @@ export default class EventTemplateSvc {
     }
 
     const template = await EventTemplateRepo.findTemplateById(templateId);
-    if (!template) throw new Error("Template not found");
+    if (!template) throw notFound("Template");
 
     const venue = await prisma.venue.findUnique({ where: { id: venueId } });
-    if (!venue) throw new Error("Venue not found");
+    if (!venue) throw notFound("Venue");
 
     // A venue may only be attached by its own mayor, or by an Event Foxer
     // holding an approved VenueEventFoxerAffiliation with "template:attach"
@@ -574,8 +577,9 @@ export default class EventTemplateSvc {
           "template:attach",
         );
       if (!affiliation) {
-        throw new Error(
+        throw new AppError(
           "Unauthorized: you need an approved affiliation with this venue's owner to attach it",
+          403,
         );
       }
     }
@@ -586,8 +590,9 @@ export default class EventTemplateSvc {
       (venue.state !== template.targetState ||
         venue.country !== template.targetCountry)
     ) {
-      throw new Error(
+      throw new AppError(
         "Venue location mismatch. Please use the Matching Search to find compatible venues or override the constraint.",
+        400,
       );
     }
 
@@ -637,10 +642,10 @@ export default class EventTemplateSvc {
   private static async verifyOwnership(templateId: string, ownerId: string) {
     const template = await EventTemplateRepo.findTemplateById(templateId);
     if (!template) {
-      throw new Error("Event template not found");
+      throw notFound("Event template");
     }
     if (template.ownerId !== ownerId) {
-      throw new Error("Unauthorized: You do not own this template");
+      throw new AppError("Unauthorized: You do not own this template", 403);
     }
     return template;
   }
@@ -654,7 +659,7 @@ export default class EventTemplateSvc {
     const template = await EventTemplateRepo.findTemplateById(
       params.templateId,
     );
-    if (!template) throw new Error("Template not found");
+    if (!template) throw notFound("Template");
 
     const filters: { state?: string; country?: string; category?: string } = {};
     if (params.scope === "state") {
@@ -735,7 +740,7 @@ export default class EventTemplateSvc {
         where: { id: params.providerId },
       });
 
-    if (!provider) throw new Error("Provider not found");
+    if (!provider) throw notFound("Provider");
 
     // Determine constraint
     let constraint: MatchConstraint = MatchConstraint.NONE;
@@ -751,7 +756,10 @@ export default class EventTemplateSvc {
     }
 
     if (constraint === MatchConstraint.MANUAL_OVERRIDE && !params.forceMatch) {
-      throw new Error("Location mismatch. Use forceMatch=true to override.");
+      throw new AppError(
+        "Location mismatch. Use forceMatch=true to override.",
+        400,
+      );
     }
 
     // Conditional Validation Rule
@@ -789,8 +797,9 @@ export default class EventTemplateSvc {
   ) {
     if (matched) {
       if (!description || !matchedAt) {
-        throw new Error(
+        throw new AppError(
           "Validation Error: 'description' and 'matchedAt' are required when item is matched.",
+          400,
         );
       }
     }
@@ -999,7 +1008,7 @@ export default class EventTemplateSvc {
       params.status !== MatchRequestStatus.accepted &&
       params.status !== MatchRequestStatus.declined
     ) {
-      throw new Error("status must be 'accepted' or 'declined'");
+      throw new AppError("status must be 'accepted' or 'declined'", 400);
     }
 
     if (params.type === "asset") {
@@ -1008,7 +1017,7 @@ export default class EventTemplateSvc {
         include: { asset: true },
       });
       if (!row || row.asset?.ownerId !== params.responderId)
-        throw new Error("Not found or unauthorized");
+        throw new AppError("Not found or unauthorized", 404);
       return prisma.eventTemplateAsset.update({
         where: { id: params.matchId },
         data: { matchRequestStatus: params.status },
@@ -1020,7 +1029,7 @@ export default class EventTemplateSvc {
         include: { service: true },
       });
       if (!row || row.service?.ownerId !== params.responderId)
-        throw new Error("Not found or unauthorized");
+        throw new AppError("Not found or unauthorized", 404);
       return prisma.eventTemplateService.update({
         where: { id: params.matchId },
         data: { matchRequestStatus: params.status },
@@ -1032,13 +1041,13 @@ export default class EventTemplateSvc {
         include: { venue: true },
       });
       if (!row || row.venue?.mayorId !== params.responderId)
-        throw new Error("Not found or unauthorized");
+        throw new AppError("Not found or unauthorized", 404);
       return prisma.eventTemplateVenue.update({
         where: { id: params.matchId },
         data: { matchRequestStatus: params.status },
       });
     }
-    throw new Error("Invalid type");
+    throw new AppError("Invalid type", 400);
   }
 
   /**

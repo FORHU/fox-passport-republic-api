@@ -1,4 +1,4 @@
-import { AppError } from "../../utils/errors";
+import { AppError, notFound } from "../../utils/errors";
 import Stripe from "stripe";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
 import InvoiceSvc from "./invoice.service";
@@ -83,7 +83,7 @@ export default class EventCheckoutSvc {
       },
     });
 
-    if (!event) throw new Error("Event not found");
+    if (!event) throw notFound("Event");
 
     // Anything still awaiting provider confirmation blocks checkout
     // entirely, cleanly, rather than being silently dropped from the
@@ -254,12 +254,16 @@ export default class EventCheckoutSvc {
         );
 
         if (event.clientId !== payerId) {
-          throw new Error(
+          throw new AppError(
             "Unauthorized: only this event's client may pay for it",
+            403,
           );
         }
         if (items.length === 0) {
-          throw new Error("No payable transactions found for this event.");
+          throw new AppError(
+            "No payable transactions found for this event.",
+            400,
+          );
         }
 
         // Lock the booking row itself — belt-and-suspenders alongside the
@@ -267,8 +271,9 @@ export default class EventCheckoutSvc {
         // approved design's "lock booking" step in the checkout sequence.
         const booking = event.bookings[0];
         if (!booking) {
-          throw new Error(
+          throw new AppError(
             "This event has no booking to check out — nothing to charge.",
+            400,
           );
         }
         await tx.$executeRaw`SELECT id FROM bookings WHERE id = ${booking.id} FOR UPDATE`;
@@ -307,7 +312,7 @@ export default class EventCheckoutSvc {
         );
         if (existing) {
           if (existing.status === "paid") {
-            throw new Error("This event has already been paid for.");
+            throw new AppError("This event has already been paid for.", 409);
           }
           if (
             (REUSABLE_STATUSES as readonly string[]).includes(existing.status)
@@ -396,12 +401,13 @@ export default class EventCheckoutSvc {
       await this.getPayableItems(eventId);
 
     if (event.clientId !== callerId) {
-      throw new Error(
+      throw new AppError(
         "Unauthorized: only this event's client may view its payment summary",
+        403,
       );
     }
     if (items.length === 0) {
-      throw new Error("No payable transactions found for this event.");
+      throw new AppError("No payable transactions found for this event.", 400);
     }
 
     const subtotal = items.reduce((sum, item) => {
@@ -495,16 +501,20 @@ export default class EventCheckoutSvc {
         },
       },
     });
-    if (!event) throw new Error("Event not found");
+    if (!event) throw notFound("Event");
     if (event.clientId !== requesterId) {
-      throw new Error("Unauthorized: only this event's client may cancel it");
+      throw new AppError(
+        "Unauthorized: only this event's client may cancel it",
+        403,
+      );
     }
     if (event.eventStatus === "cancelled") {
-      throw new Error("Event is already cancelled");
+      throw new AppError("Event is already cancelled", 409);
     }
     if (event.startAt.getTime() <= Date.now()) {
-      throw new Error(
+      throw new AppError(
         "Event has already started — cancellation is no longer allowed",
+        400,
       );
     }
 
@@ -538,7 +548,7 @@ export default class EventCheckoutSvc {
     ].filter((tx) => tx.status !== "cancelled");
 
     if (allTx.length === 0) {
-      throw new Error("Nothing to cancel for this event.");
+      throw new AppError("Nothing to cancel for this event.", 400);
     }
 
     const invoice = await InvoiceSvc.findInvoiceForSource(
@@ -587,7 +597,10 @@ export default class EventCheckoutSvc {
     });
     const payment = fullInvoice?.payments[0];
     if (!fullInvoice || !payment) {
-      throw new Error("No successful payment found for this event's invoice.");
+      throw new AppError(
+        "No successful payment found for this event's invoice.",
+        400,
+      );
     }
 
     const refunds = [];
