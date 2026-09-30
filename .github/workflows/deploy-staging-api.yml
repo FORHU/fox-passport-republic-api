@@ -97,18 +97,22 @@ jobs:
       # S3 and the SDK resolves it from instance metadata. Setting them empty
       # would break that: passing a credentials object makes the SDK skip its
       # provider chain and fail with "Resolved credential object is not valid".
+      # Only what is configured today. Anything config.ts declares but nobody
+      # has set is deliberately absent rather than written empty: an empty value
+      # looks configured and silently disables whatever reads it, which is how
+      # three separate features were found broken on the UK stack.
+      #
+      # Still to add when the devs supply them: EMAIL_FROM,
+      # MAILER_TRANSPORT_PORT, MAILER_TRANSPORT_SECURE, RESEND_API_KEY and
+      # PLATFORM_FEE_PERCENT — the last one is a marketplace fee, so check what
+      # the code does when it is undefined before running real payments.
       - name: Store env file in Parameter Store
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           ACCESS_TOKEN_SECRET: ${{ secrets.ACCESS_TOKEN_SECRET }}
           REFRESH_TOKEN_SECRET: ${{ secrets.REFRESH_TOKEN_SECRET }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
-          SERVICE_ACCOUNT: ${{ secrets.SERVICE_ACCOUNT }}
-          MAILER_EMAIL: ${{ secrets.MAILER_EMAIL }}
           MAILER_PASSWORD: ${{ secrets.MAILER_PASSWORD }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
         run: |
@@ -122,28 +126,17 @@ jobs:
           DATABASE_URL=${DATABASE_URL}
           REDIS_HOST=${{ vars.REDIS_HOST }}
           REDIS_PORT=${{ vars.REDIS_PORT }}
-          REDIS_PASSWORD=${REDIS_PASSWORD}
-          REDIS_TTL_SECONDS=${{ vars.REDIS_TTL_SECONDS }}
           ACCESS_TOKEN_SECRET=${ACCESS_TOKEN_SECRET}
-          ACCESS_TOKEN_EXPIRY=${{ vars.ACCESS_TOKEN_EXPIRY }}
           REFRESH_TOKEN_SECRET=${REFRESH_TOKEN_SECRET}
-          REFRESH_TOKEN_EXPIRY=${{ vars.REFRESH_TOKEN_EXPIRY }}
           SECRET_KEY=${SECRET_KEY}
-          SERVICE_ACCOUNT=${SERVICE_ACCOUNT}
           AWS_REGION=${{ env.AWS_REGION }}
           AWS_S3_BUCKET=${{ vars.AWS_S3_BUCKET }}
           CLOUD_FRONT_DOMAIN=${{ vars.CLOUD_FRONT_DOMAIN }}
           S3_CDN_URL=${{ vars.S3_CDN_URL }}
-          EMAIL_FROM=${{ vars.EMAIL_FROM }}
-          MAILER_EMAIL=${MAILER_EMAIL}
+          MAILER_EMAIL=${{ vars.MAILER_EMAIL }}
           MAILER_PASSWORD=${MAILER_PASSWORD}
-          MAILER_TRANSPORT_PORT=${{ vars.MAILER_TRANSPORT_PORT }}
-          MAILER_TRANSPORT_SECURE=${{ vars.MAILER_TRANSPORT_SECURE }}
-          RESEND_API_KEY=${RESEND_API_KEY}
-          OPENAI_API_KEY=${OPENAI_API_KEY}
           STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
           STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
-          PLATFORM_FEE_PERCENT=${{ vars.PLATFORM_FEE_PERCENT }}
           ENVEOF
 
           aws ssm put-parameter \
