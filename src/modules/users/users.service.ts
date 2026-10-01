@@ -150,6 +150,10 @@ export default class UsersSvc {
     const user = await UsersRepo.findUserById(id);
     if (!user) throw new Error("User not found");
 
+    if (data.password) {
+      data.password = await hashPassword(data.password);
+    }
+
     return UsersRepo.updateUser(id, data);
   }
 

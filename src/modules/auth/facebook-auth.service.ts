@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import axios from "axios";
-import { RoleType, SystemRole } from "@prisma/client";
+import { RoleType, SystemRole, OAuthProvider } from "@prisma/client";
 import AuthRepo from "./auth.repository";
 import { prisma } from "../../utils/prisma";
 import redisUtil from "../../utils/redis.util";
@@ -105,12 +105,14 @@ export default class FacebookAuthSvc {
       throw new Error("Facebook did not return a valid user profile");
     }
 
-    const email = (profile.email || `fb_${profile.id}@foxpassport.com`)
-      .toLowerCase()
-      .trim();
-    const name = profile.name || profile.first_name || email.split("@")[0];
+    const name = profile.name || profile.first_name || "Facebook User";
+    const avatarUrl = profile.picture?.data?.url;
 
-    const existing = await AuthRepo.findUserByEmail(email);
+    // 1. Check if Facebook platform account is already linked
+    const existingOAuth = await AuthRepo.findOAuthAccount(
+      OAuthProvider.FACEBOOK,
+      profile.id,
+    );
     let user: {
       id: string;
       email: string;
@@ -121,30 +123,60 @@ export default class FacebookAuthSvc {
     };
     let isNewUser = false;
 
-    if (!existing) {
-      const username = await uniqueUsernameFromEmail(email);
-      const randomPassword = await hashPassword(
-        crypto.randomBytes(32).toString("hex"),
-      );
+    if (existingOAuth?.user) {
+      user = existingOAuth.user;
+      await AuthRepo.linkOAuthAccount({
+        userId: user.id,
+        provider: OAuthProvider.FACEBOOK,
+        providerAccountId: profile.id,
+        email: profile.email || undefined,
+        displayName: name,
+        avatarUrl,
+      });
+    } else {
+      // [MIGRATION-FLAG: Stage 3 Switch] 2. Not linked by Facebook ID yet - verified email is strictly required (no synthetic emails)
+      if (!profile.email) {
+        throw new Error(
+          "Your Facebook account does not provide an email address. Please sign in using an account with a verified email.",
+        );
+      }
 
-      user = await prisma.user.create({
-        data: {
+      const email = profile.email.toLowerCase().trim();
+
+      // 3. Check if user with this email already exists
+      const existingUser = await AuthRepo.findUserByEmail(email);
+
+      if (existingUser) {
+        user = existingUser;
+        if (!existingUser.isEmailVerified) {
+          await prisma.user.update({
+            where: { id: existingUser.id },
+            data: { isEmailVerified: true },
+          });
+        }
+        await AuthRepo.linkOAuthAccount({
+          userId: existingUser.id,
+          provider: OAuthProvider.FACEBOOK,
+          providerAccountId: profile.id,
+          email,
+          displayName: name,
+          avatarUrl,
+        });
+      } else {
+        // 4. Brand new user created via Facebook (password & passwordHash = null)
+        const username = await uniqueUsernameFromEmail(email);
+
+        user = await AuthRepo.createOAuthUser({
           email,
           name,
           username,
-          password: randomPassword,
-          isEmailVerified: true,
-          updatedAt: new Date(),
-        },
-      });
-      isNewUser = true;
-    } else {
-      user = existing;
-      if (!existing.isEmailVerified) {
-        await prisma.user.update({
-          where: { id: existing.id },
-          data: { isEmailVerified: true },
+          password: null,
+          passwordHash: null,
+          provider: OAuthProvider.FACEBOOK,
+          providerAccountId: profile.id,
+          avatarUrl,
         });
+        isNewUser = true;
       }
     }
 

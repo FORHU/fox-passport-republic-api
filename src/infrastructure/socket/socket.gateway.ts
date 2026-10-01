@@ -118,9 +118,18 @@ export const registerSocketGateway = (io: Server) => {
       if (socket.userId) {
         const userId = socket.userId;
         if (markOffline(userId)) {
-          const lastActiveAt = new Date();
+          const now = new Date();
+          // [MIGRATION-FLAG: Stage 3 Switch] Update modular UserActivity presence timestamp
+          prisma.userActivity
+            .upsert({
+              where: { userId },
+              create: { userId, lastSeenAt: now, lastActiveAt: now },
+              update: { lastSeenAt: now },
+            })
+            .catch(() => {});
+          // [MIGRATION-FLAG: Stage 3 Switch] Legacy dual-write
           prisma.user
-            .update({ where: { id: userId }, data: { lastActiveAt } })
+            .update({ where: { id: userId }, data: { lastActiveAt: now } })
             .catch(() => {});
           ConversationService.getPartnerIds(userId)
             .then((partnerIds) => {
@@ -128,7 +137,7 @@ export const registerSocketGateway = (io: Server) => {
                 emitToUser(io, partnerId, SOCKET_EVENTS.PRESENCE_UPDATE, {
                   userId,
                   online: false,
-                  lastActiveAt: lastActiveAt.toISOString(),
+                  lastActiveAt: now.toISOString(),
                 });
               }
             })

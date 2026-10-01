@@ -64,10 +64,17 @@ export default class ProfileSvc {
       throw new Error("User not found");
     }
 
+    const passwordToCheck = user.passwordHash || user.password;
+    if (!passwordToCheck) {
+      throw new Error(
+        "This account does not have a password set (signed in with a social account).",
+      );
+    }
+
     // Verify current password
     const isPasswordValid = await verifyPassword(
       currentPassword,
-      user.password,
+      passwordToCheck,
     );
     if (!isPasswordValid) {
       throw new Error("Current password is incorrect");
@@ -98,8 +105,15 @@ export default class ProfileSvc {
       throw new Error("User not found");
     }
 
+    const passwordToCheck = user.passwordHash || user.password;
+    if (!passwordToCheck) {
+      throw new Error(
+        "Social login accounts must contact support to delete their account.",
+      );
+    }
+
     // Verify password
-    const isPasswordValid = await verifyPassword(password, user.password);
+    const isPasswordValid = await verifyPassword(password, passwordToCheck);
     if (!isPasswordValid) {
       throw new Error("Password is incorrect");
     }

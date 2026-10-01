@@ -380,7 +380,15 @@ export default class UsersRepo {
    * Adding a field here should be a deliberate decision, which is what an
    * allow-list forces.
    */
+  // [MIGRATION-FLAG: Stage 3 Switch] Read lastActiveAt from userActivity with fallback to legacy user.lastActiveAt
   static async getLastActiveAt(id: string) {
+    const activity = await prisma.userActivity.findUnique({
+      where: { userId: id },
+      select: { lastActiveAt: true },
+    });
+    if (activity?.lastActiveAt) {
+      return activity.lastActiveAt;
+    }
     const user = await prisma.user.findUnique({
       where: { id },
       select: { lastActiveAt: true },
@@ -388,8 +396,9 @@ export default class UsersRepo {
     return user?.lastActiveAt ?? null;
   }
 
+  // [MIGRATION-FLAG: Stage 3 Switch] Read user with profile relation and map fields for backwards compatibility
   static async findUserById(id: string) {
-    return prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: String(id) },
       select: {
         id: true,
@@ -404,8 +413,33 @@ export default class UsersRepo {
         roleType: true,
         isEmailVerified: true,
         createdAt: true,
+        profile: {
+          select: {
+            imgId: true,
+            city: true,
+            state: true,
+            country: true,
+          },
+        },
       },
     });
+
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      name: user.name,
+      username: user.username,
+      email: user.email,
+      imgId: user.profile?.imgId ?? user.imgId,
+      city: user.profile?.city ?? user.city,
+      state: user.profile?.state ?? user.state,
+      country: user.profile?.country ?? user.country,
+      systemRole: user.systemRole,
+      roleType: user.roleType,
+      isEmailVerified: user.isEmailVerified,
+      createdAt: user.createdAt,
+    };
   }
 
   // READ BY EMAIL
@@ -416,6 +450,7 @@ export default class UsersRepo {
   }
 
   // CREATE (username MUST be required)
+  // [MIGRATION-FLAG: Stage 3 Switch] Dual-write passwordHash and create 1:1 models (profile, settings, activity)
   static async createUser(data: {
     email: string;
     username: string;
@@ -427,6 +462,19 @@ export default class UsersRepo {
       prisma.user.create({
         data: {
           ...data,
+          passwordHash: data.password, // Dual-write passwordHash during Stage 3
+          profile: {
+            create: {},
+          },
+          settings: {
+            create: {},
+          },
+          activity: {
+            create: {
+              lastActiveAt: new Date(),
+              lastSeenAt: null,
+            },
+          },
           updatedAt: new Date(),
         },
         select: {
@@ -443,6 +491,7 @@ export default class UsersRepo {
   }
 
   // UPDATE (fields optional)
+  // [MIGRATION-FLAG: Stage 3 Switch] Dual-write passwordHash if password is updated
   static async updateUser(
     id: string,
     data: Partial<{
@@ -454,10 +503,22 @@ export default class UsersRepo {
       isActive: boolean;
     }>,
   ) {
+    const updateData: Prisma.UserUpdateInput = {
+      ...(data.email !== undefined && { email: data.email }),
+      ...(data.username !== undefined && { username: data.username }),
+      ...(data.name !== undefined && { name: data.name }),
+      ...(data.systemRole !== undefined && { systemRole: data.systemRole }),
+      ...(data.isActive !== undefined && { isActive: data.isActive }),
+      ...(data.password !== undefined && {
+        password: data.password,
+        passwordHash: data.password,
+      }),
+    };
+
     return this.retiring(
       prisma.user.update({
         where: { id: String(id) },
-        data,
+        data: updateData,
         select: {
           id: true,
           email: true,
@@ -566,8 +627,9 @@ export default class UsersRepo {
   }
 
   // READ PUBLIC CITIZEN PROFILE (for /user/:id or author popovers)
+  // [MIGRATION-FLAG: Stage 3 Switch] Read user with profile relation, map profile fields
   static async findPublicCitizenProfile(idOrUsername: string) {
-    return prisma.user.findFirst({
+    const user = await prisma.user.findFirst({
       where: {
         OR: [{ id: idOrUsername }, { username: idOrUsername }],
       },
@@ -579,6 +641,14 @@ export default class UsersRepo {
         city: true,
         state: true,
         country: true,
+        profile: {
+          select: {
+            imgId: true,
+            city: true,
+            state: true,
+            country: true,
+          },
+        },
         roleType: true,
         systemRole: true,
         createdAt: true,
@@ -738,5 +808,15 @@ export default class UsersRepo {
         },
       },
     });
+
+    if (!user) return null;
+
+    return {
+      ...user,
+      imgId: user.profile?.imgId ?? user.imgId,
+      city: user.profile?.city ?? user.city,
+      state: user.profile?.state ?? user.state,
+      country: user.profile?.country ?? user.country,
+    };
   }
 }

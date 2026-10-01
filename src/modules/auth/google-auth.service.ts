@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
+import { OAuthProvider } from "@prisma/client";
 import AuthRepo from "./auth.repository";
 import redisUtil from "../../utils/redis.util";
 import { issueRefreshToken, revokeAllForUser } from "./refresh-token.service";
@@ -133,9 +134,13 @@ export default class GoogleAuthSvc {
       throw new Error("Google account email is not verified");
     }
 
-    const { sub: googleId, email, name } = payload;
+    const { sub: googleId, email, name, picture } = payload;
 
-    let user = await AuthRepo.findUserByGoogleId(googleId);
+    const existingOAuth = await AuthRepo.findOAuthAccount(
+      OAuthProvider.GOOGLE,
+      googleId,
+    );
+    let user = existingOAuth?.user || (await AuthRepo.findUserByGoogleId(googleId));
     let isNewUser = false;
 
     if (!user) {
@@ -145,23 +150,36 @@ export default class GoogleAuthSvc {
         // Same email already registered (password signup) — link the
         // Google identity to that account rather than creating a duplicate.
         user = await AuthRepo.linkGoogleId(existingByEmail.id, googleId);
+        await AuthRepo.linkOAuthAccount({
+          userId: user.id,
+          provider: OAuthProvider.GOOGLE,
+          providerAccountId: googleId,
+          email,
+          displayName: name,
+          avatarUrl: picture,
+        });
       } else {
         const username = await uniqueUsernameFromEmail(email);
-        // Google users never log in with a password, but the column is
-        // NOT NULL — a random, never-communicated hash fills it.
-        const randomPassword = await hashPassword(
-          crypto.randomBytes(32).toString("hex"),
-        );
 
         user = await AuthRepo.createGoogleUser({
           email,
           name: name || email.split("@")[0],
           username,
-          password: randomPassword,
+          password: null,
           googleId,
+          avatarUrl: picture,
         });
         isNewUser = true;
       }
+    } else {
+      await AuthRepo.linkOAuthAccount({
+        userId: user.id,
+        provider: OAuthProvider.GOOGLE,
+        providerAccountId: googleId,
+        email,
+        displayName: name,
+        avatarUrl: picture,
+      });
     }
 
     const accessToken = jwt.sign(

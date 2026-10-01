@@ -1,7 +1,8 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, OAuthProvider } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 
 export default class AuthRepo {
+  // [MIGRATION-FLAG: Stage 3 Switch] Dual-writes passwordHash and populates 1:1 models (profile, settings, activity)
   static async createUser(data: {
     email: string;
     password: string;
@@ -15,10 +16,28 @@ export default class AuthRepo {
       data: {
         email: data.email,
         password: data.password,
+        passwordHash: data.password,
         username: data.username,
         name: data.name,
         phone: data.mobileNumber,
         updatedAt: new Date(),
+        profile: {
+          create: {
+            phone: data.mobileNumber,
+            country: "Philippines",
+          },
+        },
+        settings: {
+          create: {
+            preferredCurrency: "PHP",
+          },
+        },
+        activity: {
+          create: {
+            lastActiveAt: new Date(),
+            lastSeenAt: new Date(),
+          },
+        },
       },
       select: {
         id: true,
@@ -46,6 +65,105 @@ export default class AuthRepo {
     });
   }
 
+  // [MIGRATION-FLAG: Stage 3 Switch] Dedicated OAuthAccount lookup
+  static async findOAuthAccount(provider: OAuthProvider, providerAccountId: string) {
+    return prisma.oAuthAccount.findUnique({
+      where: {
+        provider_providerAccountId: {
+          provider,
+          providerAccountId,
+        },
+      },
+      include: {
+        user: true,
+      },
+    });
+  }
+
+  // [MIGRATION-FLAG: Stage 3 Switch] Upsert OAuthAccount for user account linking
+  static async linkOAuthAccount(data: {
+    userId: string;
+    provider: OAuthProvider;
+    providerAccountId: string;
+    email?: string;
+    displayName?: string;
+    avatarUrl?: string;
+  }) {
+    return prisma.oAuthAccount.upsert({
+      where: {
+        provider_providerAccountId: {
+          provider: data.provider,
+          providerAccountId: data.providerAccountId,
+        },
+      },
+      create: {
+        userId: data.userId,
+        provider: data.provider,
+        providerAccountId: data.providerAccountId,
+        email: data.email,
+        displayName: data.displayName,
+        avatarUrl: data.avatarUrl,
+      },
+      update: {
+        userId: data.userId,
+        email: data.email,
+        displayName: data.displayName,
+        avatarUrl: data.avatarUrl,
+      },
+    });
+  }
+
+  // [MIGRATION-FLAG: Stage 3 Switch] Create user with OAuthAccount and 1:1 modular domain records
+  static async createOAuthUser(data: {
+    email: string;
+    name: string;
+    username: string;
+    password?: string | null;
+    passwordHash?: string | null;
+    provider: OAuthProvider;
+    providerAccountId: string;
+    avatarUrl?: string;
+  }) {
+    return prisma.user.create({
+      data: {
+        email: data.email,
+        name: data.name,
+        username: data.username,
+        password: data.password || null,
+        passwordHash: data.passwordHash || data.password || null,
+        imgId: data.avatarUrl,
+        isEmailVerified: true,
+        updatedAt: new Date(),
+        profile: {
+          create: {
+            imgId: data.avatarUrl,
+            country: "Philippines",
+          },
+        },
+        settings: {
+          create: {
+            preferredCurrency: "PHP",
+          },
+        },
+        activity: {
+          create: {
+            lastActiveAt: new Date(),
+            lastSeenAt: new Date(),
+          },
+        },
+        oauthAccounts: {
+          create: {
+            provider: data.provider,
+            providerAccountId: data.providerAccountId,
+            email: data.email,
+            displayName: data.name,
+            avatarUrl: data.avatarUrl,
+          },
+        },
+      },
+    });
+  }
+
   static async findUserByGoogleId(googleId: string) {
     return prisma.user.findUnique({
       where: {
@@ -58,18 +176,47 @@ export default class AuthRepo {
     email: string;
     name: string;
     username: string;
-    password: string;
+    password?: string | null;
     googleId: string;
+    avatarUrl?: string;
   }) {
     return prisma.user.create({
       data: {
         email: data.email,
         name: data.name,
         username: data.username,
-        password: data.password,
+        password: data.password || null,
+        passwordHash: data.password || null,
         googleId: data.googleId,
+        imgId: data.avatarUrl,
         isEmailVerified: true,
         updatedAt: new Date(),
+        profile: {
+          create: {
+            imgId: data.avatarUrl,
+            country: "Philippines",
+          },
+        },
+        settings: {
+          create: {
+            preferredCurrency: "PHP",
+          },
+        },
+        activity: {
+          create: {
+            lastActiveAt: new Date(),
+            lastSeenAt: new Date(),
+          },
+        },
+        oauthAccounts: {
+          create: {
+            provider: OAuthProvider.GOOGLE,
+            providerAccountId: data.googleId,
+            email: data.email,
+            displayName: data.name,
+            avatarUrl: data.avatarUrl,
+          },
+        },
       },
     });
   }

@@ -22,10 +22,26 @@ export async function createStripeConnectAccount(user: {
     capabilities: { transfers: { requested: true } },
   });
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { stripeAccountId: account.id },
+  await prisma.$transaction(async (tx) => {
+    // [MIGRATION-FLAG: Stage 3 Switch] 1. Persist to modular PaymentAccount (lazy creation)
+    await tx.paymentAccount.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        stripeAccountId: account.id,
+      },
+      update: {
+        stripeAccountId: account.id,
+      },
+    });
+
+    // [MIGRATION-FLAG: Stage 3 Switch] 2. Legacy dual-write during transition
+    await tx.user.update({
+      where: { id: user.id },
+      data: { stripeAccountId: account.id },
+    });
   });
+
   await userCache.invalidateAll();
 
   return account;
@@ -63,10 +79,15 @@ export async function getStripeAccountStatus(stripeAccountId: string) {
  */
 export default class StripeConnectSvc {
   static async createExpressAccount(userId: string): Promise<string> {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { paymentAccount: true },
+    });
     if (!user) throw new Error("User not found");
 
-    if (user.stripeAccountId) return user.stripeAccountId;
+    const existingAccountId =
+      user.paymentAccount?.stripeAccountId || user.stripeAccountId;
+    if (existingAccountId) return existingAccountId;
 
     const account = await stripe.accounts.create({
       type: "express",
@@ -76,10 +97,26 @@ export default class StripeConnectSvc {
       },
     });
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: { stripeAccountId: account.id },
+    await prisma.$transaction(async (tx) => {
+      // [MIGRATION-FLAG: Stage 3 Switch] 1. Persist to modular PaymentAccount (lazy creation)
+      await tx.paymentAccount.upsert({
+        where: { userId },
+        create: {
+          userId,
+          stripeAccountId: account.id,
+        },
+        update: {
+          stripeAccountId: account.id,
+        },
+      });
+
+      // [MIGRATION-FLAG: Stage 3 Switch] 2. Legacy dual-write
+      await tx.user.update({
+        where: { id: userId },
+        data: { stripeAccountId: account.id },
+      });
     });
+
     await userCache.invalidateAll();
 
     return account.id;
@@ -99,32 +136,80 @@ export default class StripeConnectSvc {
   }
 
   static async getOnboardingStatus(userId: string) {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { paymentAccount: true },
+    });
     if (!user) throw new Error("User not found");
 
+    const paymentAccount = user.paymentAccount;
+    const stripeAccountId = paymentAccount?.stripeAccountId ?? user.stripeAccountId;
+    const stripeOnboardingComplete =
+      paymentAccount?.stripeOnboardingComplete ?? user.stripeOnboardingComplete;
+    const stripeChargesEnabled =
+      paymentAccount?.stripeChargesEnabled ?? user.stripeChargesEnabled;
+    const stripePayoutsEnabled =
+      paymentAccount?.stripePayoutsEnabled ?? user.stripePayoutsEnabled;
+
     return {
-      hasStripeAccount: !!user.stripeAccountId,
-      stripeOnboardingComplete: user.stripeOnboardingComplete,
-      stripeChargesEnabled: user.stripeChargesEnabled,
-      stripePayoutsEnabled: user.stripePayoutsEnabled,
+      hasStripeAccount: !!stripeAccountId,
+      stripeOnboardingComplete,
+      stripeChargesEnabled,
+      stripePayoutsEnabled,
     };
   }
 
-  /** Webhook-driven: keeps User flags in sync with the connected account's real state. */
+  /** Webhook-driven: keeps PaymentAccount and User flags in sync with the connected account's real state. */
   static async handleAccountUpdated(account: Stripe.Account): Promise<void> {
-    const user = await prisma.user.findUnique({
-      where: { stripeAccountId: account.id },
-    });
-    if (!user) return; // not one of our connected accounts (or already detached)
+    // Look up by PaymentAccount first, or legacy User
+    let userId: string | null = null;
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        stripeChargesEnabled: !!account.charges_enabled,
-        stripePayoutsEnabled: !!account.payouts_enabled,
-        stripeOnboardingComplete: !!account.details_submitted,
-      },
+    const paymentAcc = await prisma.paymentAccount.findUnique({
+      where: { stripeAccountId: account.id },
+      select: { userId: true },
     });
+
+    if (paymentAcc) {
+      userId = paymentAcc.userId;
+    } else {
+      const legacyUser = await prisma.user.findUnique({
+        where: { stripeAccountId: account.id },
+        select: { id: true },
+      });
+      userId = legacyUser?.id ?? null;
+    }
+
+    if (!userId) return; // not one of our connected accounts
+
+    await prisma.$transaction(async (tx) => {
+      // [MIGRATION-FLAG: Stage 3 Switch] 1. Update PaymentAccount
+      await tx.paymentAccount.upsert({
+        where: { userId: userId! },
+        create: {
+          userId: userId!,
+          stripeAccountId: account.id,
+          stripeChargesEnabled: !!account.charges_enabled,
+          stripePayoutsEnabled: !!account.payouts_enabled,
+          stripeOnboardingComplete: !!account.details_submitted,
+        },
+        update: {
+          stripeChargesEnabled: !!account.charges_enabled,
+          stripePayoutsEnabled: !!account.payouts_enabled,
+          stripeOnboardingComplete: !!account.details_submitted,
+        },
+      });
+
+      // [MIGRATION-FLAG: Stage 3 Switch] 2. Legacy dual-write
+      await tx.user.update({
+        where: { id: userId! },
+        data: {
+          stripeChargesEnabled: !!account.charges_enabled,
+          stripePayoutsEnabled: !!account.payouts_enabled,
+          stripeOnboardingComplete: !!account.details_submitted,
+        },
+      });
+    });
+
     await userCache.invalidateAll();
   }
 }

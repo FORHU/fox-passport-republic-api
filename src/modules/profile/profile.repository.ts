@@ -9,8 +9,9 @@ export default class ProfileRepo {
     return result;
   }
 
+  // [MIGRATION-FLAG: Stage 3 Switch] Read modular profile and settings relations with fallback to legacy fields
   static async findProfileById(userId: string) {
-    return prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: String(userId) },
       select: {
         id: true,
@@ -19,14 +20,51 @@ export default class ProfileRepo {
         name: true,
         phone: true,
         imgId: true,
+        city: true,
         systemRole: true,
         roleType: true,
         isPrivate: true,
         preferredCurrency: true,
         createdAt: true,
         updatedAt: true,
+        profile: {
+          select: {
+            phone: true,
+            imgId: true,
+            city: true,
+            address: true,
+            state: true,
+            country: true,
+            isPrivate: true,
+          },
+        },
+        settings: {
+          select: {
+            preferredCurrency: true,
+          },
+        },
       },
     });
+
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      name: user.name,
+      phone: user.profile?.phone ?? user.phone,
+      imgId: user.profile?.imgId ?? user.imgId,
+      city: user.profile?.city ?? user.city,
+      systemRole: user.systemRole,
+      roleType: user.roleType,
+      isPrivate: user.profile?.isPrivate ?? user.isPrivate,
+      preferredCurrency: user.settings?.preferredCurrency ?? user.preferredCurrency,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      profile: user.profile,
+      settings: user.settings,
+    };
   }
 
   static async findUserForPasswordCheck(userId: string) {
@@ -35,6 +73,7 @@ export default class ProfileRepo {
       select: {
         id: true,
         password: true,
+        passwordHash: true,
       },
     });
   }
@@ -52,6 +91,7 @@ export default class ProfileRepo {
     });
   }
 
+  // [MIGRATION-FLAG: Stage 3 Switch] Dual-write to user_profiles, user_settings, and legacy user columns
   static async updateProfile(
     userId: string,
     data: {
@@ -65,36 +105,87 @@ export default class ProfileRepo {
     },
   ) {
     return this.retiring(
-      prisma.user.update({
-        where: { id: String(userId) },
-        data,
-        select: {
-          id: true,
-          email: true,
-          username: true,
-          name: true,
-          phone: true,
-          imgId: true,
-          city: true,
-          systemRole: true,
-          roleType: true,
-          isPrivate: true,
-          preferredCurrency: true,
-          updatedAt: true,
-        },
+      prisma.$transaction(async (tx) => {
+        const user = await tx.user.update({
+          where: { id: String(userId) },
+          data: {
+            ...(data.name !== undefined && { name: data.name }),
+            ...(data.username !== undefined && { username: data.username }),
+            // Legacy dual-write
+            ...(data.phone !== undefined && { phone: data.phone }),
+            ...(data.imgId !== undefined && { imgId: data.imgId }),
+            ...(data.city !== undefined && { city: data.city }),
+            ...(data.isPrivate !== undefined && { isPrivate: data.isPrivate }),
+            ...(data.preferredCurrency !== undefined && {
+              preferredCurrency: data.preferredCurrency,
+            }),
+          },
+          select: {
+            id: true,
+            email: true,
+            username: true,
+            name: true,
+            systemRole: true,
+            roleType: true,
+            updatedAt: true,
+          },
+        });
+
+        const profile = await tx.userProfile.upsert({
+          where: { userId: String(userId) },
+          create: {
+            userId: String(userId),
+            phone: data.phone,
+            imgId: data.imgId,
+            city: data.city,
+            isPrivate: data.isPrivate ?? false,
+          },
+          update: {
+            ...(data.phone !== undefined && { phone: data.phone }),
+            ...(data.imgId !== undefined && { imgId: data.imgId }),
+            ...(data.city !== undefined && { city: data.city }),
+            ...(data.isPrivate !== undefined && { isPrivate: data.isPrivate }),
+          },
+        });
+
+        let settings;
+        if (data.preferredCurrency !== undefined) {
+          settings = await tx.userSettings.upsert({
+            where: { userId: String(userId) },
+            create: {
+              userId: String(userId),
+              preferredCurrency: data.preferredCurrency,
+            },
+            update: {
+              preferredCurrency: data.preferredCurrency,
+            },
+          });
+        }
+
+        return {
+          ...user,
+          phone: profile.phone,
+          imgId: profile.imgId,
+          city: profile.city,
+          isPrivate: profile.isPrivate,
+          preferredCurrency:
+            settings?.preferredCurrency ?? data.preferredCurrency ?? "PHP",
+          profile,
+          settings,
+        };
       }),
     );
   }
 
+  // [MIGRATION-FLAG: Stage 3 Switch] Dual-write password and passwordHash
   static async updatePasswordHash(userId: string, passwordHash: string) {
-    // A password is not displayed anywhere, so by the rule in
-    // `cache-namespaces.ts` this need not retire the cache. It does anyway:
-    // password changes are rare, one `INCR` costs nothing, and one fewer
-    // exception to remember is worth more than the hit rate it protects.
     return this.retiring(
       prisma.user.update({
         where: { id: String(userId) },
-        data: { password: passwordHash },
+        data: {
+          password: passwordHash,
+          passwordHash: passwordHash,
+        },
         select: { id: true },
       }),
     );

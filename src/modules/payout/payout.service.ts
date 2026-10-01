@@ -101,13 +101,24 @@ export default class PayoutSvc {
   static async fireTransfer(payoutId: string): Promise<void> {
     const payout = await prisma.payout.findUnique({
       where: { id: payoutId },
-      include: { providerUser: true },
+      include: {
+        providerUser: {
+          include: { paymentAccount: true },
+        },
+      },
     });
     if (!payout) return;
     if (payout.status !== PayoutStatus.pending) return; // already paid or failed, don't retry blindly
 
     const recipient = payout.providerUser;
-    if (!recipient.stripeAccountId || !recipient.stripePayoutsEnabled) {
+    // [MIGRATION-FLAG: Stage 3 Switch] Read stripeAccountId and stripePayoutsEnabled from paymentAccount with fallback
+    const stripeAccountId =
+      recipient.paymentAccount?.stripeAccountId || recipient.stripeAccountId;
+    const stripePayoutsEnabled =
+      recipient.paymentAccount?.stripePayoutsEnabled ??
+      recipient.stripePayoutsEnabled;
+
+    if (!stripeAccountId || !stripePayoutsEnabled) {
       await prisma.payout.update({
         where: { id: payoutId },
         data: {
@@ -124,7 +135,7 @@ export default class PayoutSvc {
       const transfer = await stripe.transfers.create({
         amount: toStripeCents(payout.payoutAmount.toNumber()),
         currency: "php",
-        destination: recipient.stripeAccountId,
+        destination: stripeAccountId,
         transfer_group: payout.sourceId,
       });
       await prisma.payout.update({
