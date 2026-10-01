@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import Joi from "joi";
+import { can } from "../../types/permissions";
 import AssetBookingSvc from "./asset-booking.service";
 
 export default class AssetBookingCtrl {
@@ -78,10 +79,25 @@ export default class AssetBookingCtrl {
   static async getAll(req: Request, res: Response) {
     try {
       const { userId, ownerId, status } = req.query as Record<string, string>;
+      const viewerId = req.user!.userId;
+      // Admins see every booking. Anyone else sees only bookings they made or
+      // that are on their own listings — a filter naming someone else is
+      // refused rather than quietly narrowed.
+      const isAdmin = can(req.user!, "bookings:read:all");
+      if (
+        !isAdmin &&
+        ((userId && userId !== viewerId) || (ownerId && ownerId !== viewerId))
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only list your own bookings",
+        });
+      }
       const bookings = await AssetBookingSvc.getAll({
         userId,
         ownerId,
         status,
+        participantId: !isAdmin && !userId && !ownerId ? viewerId : undefined,
       });
       return res.status(200).json({ success: true, data: bookings });
     } catch (e: unknown) {
@@ -94,6 +110,18 @@ export default class AssetBookingCtrl {
   static async getById(req: Request, res: Response) {
     try {
       const booking = await AssetBookingSvc.getById(req.params.id);
+      const viewerId = req.user!.userId;
+      // Only the renter, the asset's owner or an admin. Anyone else gets the
+      // same 404 as a missing booking, so ids can't be probed.
+      if (
+        booking.userId !== viewerId &&
+        booking.asset?.ownerId !== viewerId &&
+        !can(req.user!, "bookings:read:all")
+      ) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Asset booking not found" });
+      }
       return res.status(200).json({ success: true, data: booking });
     } catch (e: unknown) {
       const err = e as Error;

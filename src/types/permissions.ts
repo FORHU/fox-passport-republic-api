@@ -59,6 +59,16 @@ export const PERMISSIONS = [
    * `asset:manage`/`service:manage` check `ownerId`.
    */
   "promotions:manage-own",
+  /** May remove anyone's post or comment from the feed. */
+  "content:moderate",
+  /**
+   * May post marketplace content — spotlights, announcements — for any
+   * listing or event, not only their own, and without holding the supply
+   * role that would otherwise be required.
+   */
+  "feed:post-for-anyone",
+  /** May create or cancel any partner investment, not only their own. */
+  "investments:manage",
 
   // ── The supply side ───────────────────────────────────────────────────
   // Held through `RoleType`, not through `SystemRole`. Deliberately *not*
@@ -238,7 +248,14 @@ export type VenueAffiliationPermission =
  */
 const GRANTS: Record<SystemRole, readonly Permission[]> = {
   user: [],
-  admin_secretary: ["admin:access", "queue:read", "queue:decide"],
+  // `content:moderate` too: removing posts that break the rules is queue work,
+  // and secretaries could already delete any post before this was named.
+  admin_secretary: [
+    "admin:access",
+    "queue:read",
+    "queue:decide",
+    "content:moderate",
+  ],
   admin: [
     "admin:access",
     "queue:read",
@@ -256,6 +273,9 @@ const GRANTS: Record<SystemRole, readonly Permission[]> = {
     "event:manage-organizers",
     "fees:manage",
     "promotions:manage",
+    "content:moderate",
+    "feed:post-for-anyone",
+    "investments:manage",
     // The only supply-side permission an admin holds, because the guard it
     // replaces — `requireHost` — was `["eventFoxer", "admin"]`. Every other
     // `venue:` / `asset:` / `service:` / `template:` / `payouts:` capability

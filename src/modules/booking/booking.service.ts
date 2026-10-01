@@ -14,7 +14,7 @@ import PromotionSvc from "../promotion/promotion.service";
 import RefundSvc from "../refund/refund.service";
 import WaitlistSvc from "../waitlist/waitlist.service";
 import NotificationService from "../notifications/user-notification.service";
-import { STRIPE_SECRET_KEY } from "../../config";
+import { PLATFORM_FEE_PERCENT, STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents, formatCurrency } from "../../utils/pricing";
 import { sendBookingCancelledEmail } from "../../utils/emails/cancellation";
 import { sendBookingConfirmationEmail } from "../../utils/emails/confirmation";
@@ -276,7 +276,10 @@ export default class BookingSvc {
       }
     }
     const discountedItemsTotal = itemsTotal.sub(discountAmount);
-    const platformFeeAmount = discountedItemsTotal.mul(0.05);
+    // Same configured rate as every other booking path (was a hardcoded 5%).
+    const platformFeeAmount = discountedItemsTotal.mul(
+      PLATFORM_FEE_PERCENT / 100,
+    );
     const totalAmount = discountedItemsTotal.add(platformFeeAmount);
 
     return {

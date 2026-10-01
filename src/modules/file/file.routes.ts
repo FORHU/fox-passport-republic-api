@@ -20,4 +20,16 @@ router.post(
   FileCtrl.uploadDirect,
 );
 
+// Identity documents: images or PDFs, 15MB, into the private bucket.
+const documentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+});
+router.post(
+  "/upload-private",
+  authenticate,
+  documentUpload.single("file"),
+  FileCtrl.uploadPrivate,
+);
+
 export default router;

@@ -30,8 +30,25 @@ const OWN_SELECT = {
 const ADMIN_SELECT = {
   ...OWN_SELECT,
   user: { select: { id: true, name: true, email: true, username: true } },
-  idFile: { select: { url: true, name: true, type: true } },
-  selfieFile: { select: { url: true, name: true, type: true } },
+  // isPrivate + storageKey let signPrivateFiles swap in a short-lived link.
+  idFile: {
+    select: {
+      url: true,
+      name: true,
+      type: true,
+      isPrivate: true,
+      storageKey: true,
+    },
+  },
+  selfieFile: {
+    select: {
+      url: true,
+      name: true,
+      type: true,
+      isPrivate: true,
+      storageKey: true,
+    },
+  },
   reviewer: { select: { id: true, name: true } },
 } satisfies Prisma.IdentityVerificationSelect;
 

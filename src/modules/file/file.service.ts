@@ -1,4 +1,5 @@
 import FileRepo from "./file.repository";
+import S3Svc from "../s3/s3.service";
 
 export default class FileSvc {
   static async createFile(data: {
@@ -18,6 +19,28 @@ export default class FileSvc {
       venueId: data.venueId ?? null,
       assetId: data.assetId ?? null,
       serviceId: data.serviceId ?? null,
+    });
+  }
+
+  /**
+   * Stores an identity document in the private bucket and registers it.
+   * The record has no URL — see utils/private-files.ts for how it is read.
+   */
+  static async storePrivateDocument(
+    userId: string,
+    file: {
+      buffer: Buffer;
+      originalname: string;
+      mimetype: string;
+      size: number;
+    },
+  ) {
+    const { key, contentType } = await S3Svc.uploadPrivateFile(userId, file);
+    return FileRepo.createPrivateFile({
+      storageKey: key,
+      name: file.originalname,
+      type: contentType,
+      uploadedBy: userId,
     });
   }
 }

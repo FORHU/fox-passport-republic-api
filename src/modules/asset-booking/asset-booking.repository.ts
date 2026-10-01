@@ -45,12 +45,20 @@ export default class AssetBookingRepo {
   static async findAll(filters?: {
     userId?: string;
     ownerId?: string;
+    // Either side of the booking: the person who booked or the listing owner.
+    participantId?: string;
     status?: ItemBookingStatus;
   }) {
     return prisma.assetBooking.findMany({
       where: {
         ...(filters?.userId && { userId: filters.userId }),
         ...(filters?.ownerId && { asset: { ownerId: filters.ownerId } }),
+        ...(filters?.participantId && {
+          OR: [
+            { userId: filters.participantId },
+            { asset: { ownerId: filters.participantId } },
+          ],
+        }),
         ...(filters?.status && { status: filters.status }),
       },
       include: {

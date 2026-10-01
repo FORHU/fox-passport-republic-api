@@ -74,10 +74,23 @@ export default class AuthRepo {
     });
   }
 
-  static async linkGoogleId(userId: string, googleId: string) {
+  /**
+   * `replacePassword`: a fresh hash to overwrite the existing one, for an
+   * account whose email this link is the first to verify (see
+   * GoogleAuthSvc.handleCallback).
+   */
+  static async linkGoogleId(
+    userId: string,
+    googleId: string,
+    opts: { replacePassword?: string } = {},
+  ) {
     return prisma.user.update({
       where: { id: userId },
-      data: { googleId, isEmailVerified: true },
+      data: {
+        googleId,
+        isEmailVerified: true,
+        ...(opts.replacePassword && { password: opts.replacePassword }),
+      },
     });
   }
 

@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
 import { RequestStatus } from "@prisma/client";
 import { sendServerError } from "../../utils/errors";
-import S3Svc from "../s3/s3.service";
 import FileSvc from "../file/file.service";
+import { signPrivateFiles } from "../../utils/private-files";
 import {
   announceToAdmins,
   announceToUser,
@@ -15,16 +15,9 @@ import IdentityVerificationSvc, {
 const isDocument = (file: Express.Multer.File) =>
   file.mimetype.startsWith("image/") || file.mimetype === "application/pdf";
 
-async function store(userId: string, file: Express.Multer.File) {
-  const { key } = await S3Svc.uploadFile(userId, file);
-  const { url } = await S3Svc.generateDownloadUrl(key);
-  return FileSvc.createFile({
-    name: file.originalname,
-    type: file.mimetype,
-    url,
-    uploadedBy: userId,
-  });
-}
+// IDs and selfies go to the private bucket — never a public URL.
+const store = (userId: string, file: Express.Multer.File) =>
+  FileSvc.storePrivateDocument(userId, file);
 
 export default class IdentityVerificationCtrl {
   // GET /identity-verification/me
@@ -47,14 +40,16 @@ export default class IdentityVerificationCtrl {
     const { idType } = req.body;
 
     if (!isIdType(idType)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Choose the kind of ID you're sending" });
+      return res.status(400).json({
+        success: false,
+        message: "Choose the kind of ID you're sending",
+      });
     }
     if (!idFile) {
-      return res
-        .status(400)
-        .json({ success: false, message: "A photo or scan of your ID is required" });
+      return res.status(400).json({
+        success: false,
+        message: "A photo or scan of your ID is required",
+      });
     }
     if (!isDocument(idFile) || (selfieFile && !isDocument(selfieFile))) {
       return res
@@ -78,7 +73,7 @@ export default class IdentityVerificationCtrl {
       announceToUser(userId, "identity");
       return res.status(201).json({ success: true, data });
     } catch (e) {
-      // S3Svc rejects bad types/sizes with a plain Error meant for the user.
+      // The upload rejects bad types/sizes with a plain Error meant for the user.
       if (!(e instanceof Error) || e.constructor !== Error) {
         return sendServerError(res, e, { success: true });
       }
@@ -93,11 +88,14 @@ export default class IdentityVerificationCtrl {
       status !== undefined &&
       !Object.values(RequestStatus).includes(status as RequestStatus)
     ) {
-      return res.status(400).json({ success: false, message: "Invalid status" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid status" });
     }
     try {
-      const data = await IdentityVerificationSvc.list(
-        status as RequestStatus | undefined,
+      // Admin-only route: the ID files get their short-lived links here.
+      const data = await signPrivateFiles(
+        await IdentityVerificationSvc.list(status as RequestStatus | undefined),
       );
       return res.status(200).json({ success: true, data });
     } catch (e) {

@@ -251,11 +251,13 @@ export default class ServiceBookingSvc {
   static async getAll(filters?: {
     userId?: string;
     ownerId?: string;
+    participantId?: string;
     status?: string;
   }) {
     return ServiceBookingRepo.findAll({
       userId: filters?.userId,
       ownerId: filters?.ownerId,
+      participantId: filters?.participantId,
       status: filters?.status as ItemBookingStatus | undefined,
     });
   }
