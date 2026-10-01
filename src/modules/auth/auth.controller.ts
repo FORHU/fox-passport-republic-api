@@ -10,7 +10,7 @@ import {
   RefreshTokenError,
   RefreshTokenReuseError,
 } from "./refresh-token.service";
-import { FRONTEND_URL, CORS_ORIGINS, isDev } from "../../config";
+import { FRONTEND_URL, CORS_ORIGINS, isDev, FACEBOOK_CALLBACK_URL } from "../../config";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
 
 /**
@@ -88,6 +88,9 @@ function resolveRedirectUri(req: Request): string {
 }
 
 function resolveFacebookRedirectUri(req: Request): string {
+  if (FACEBOOK_CALLBACK_URL && !FACEBOOK_CALLBACK_URL.includes("localhost")) {
+    return FACEBOOK_CALLBACK_URL;
+  }
   return `${req.protocol}://${req.get("host")}/api/v1/auth/facebook/callback`;
 }
 
@@ -494,14 +497,20 @@ export default class AuthCtrl {
   }
 
   static facebookRedirect(req: Request, res: Response) {
-    const csrf = FacebookAuthSvc.createState();
-    const frontendOrigin = resolveFrontendOrigin(req);
-    const state = `${csrf}|${Buffer.from(frontendOrigin).toString("base64url")}`;
+    try {
+      const csrf = FacebookAuthSvc.createState();
+      const frontendOrigin = resolveFrontendOrigin(req);
+      const state = `${csrf}|${Buffer.from(frontendOrigin).toString("base64url")}`;
 
-    res.cookie(FACEBOOK_STATE_COOKIE, state, FACEBOOK_STATE_COOKIE_OPTIONS);
-    return res.redirect(
-      FacebookAuthSvc.getAuthUrl(state, resolveFacebookRedirectUri(req)),
-    );
+      res.cookie(FACEBOOK_STATE_COOKIE, state, FACEBOOK_STATE_COOKIE_OPTIONS);
+      return res.redirect(
+        FacebookAuthSvc.getAuthUrl(state, resolveFacebookRedirectUri(req)),
+      );
+    } catch (e: unknown) {
+      console.error("Facebook redirect error:", e);
+      const frontendOrigin = resolveFrontendOrigin(req);
+      return res.redirect(`${frontendOrigin}/?facebookAuthError=1`);
+    }
   }
 
   static async facebookCallback(req: Request, res: Response) {
