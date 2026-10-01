@@ -4,6 +4,12 @@ import {
   AvailabilityConflictError,
   RESERVING_TRANSACTION_STATUSES,
 } from "./availability.types";
+import {
+  bufferedWindow,
+  findProviderEngagements,
+  findScheduleConflict,
+  resolvePlace,
+} from "./provider-schedule";
 
 /**
  * The single choke point every asset/service reservation in this codebase
@@ -173,6 +179,35 @@ export default class AvailabilitySvc {
     if (templateConflict || directConflict) {
       throw new AvailabilityConflictError(
         `Service ${item.itemId} is not available for the requested date range`,
+        "service",
+        item.itemId,
+      );
+    }
+
+    // The provider is one person across all their services, with a travel
+    // day either side of a booking in another city (see provider-schedule).
+    // Their user row is the lock for that: every service of theirs takes it,
+    // so two bookings on two different services can't both slip through.
+    const service = await tx.service.findUnique({
+      where: { id: item.itemId },
+      select: { ownerId: true },
+    });
+    if (!service) return;
+    await tx.$executeRaw`SELECT id FROM users WHERE id = ${service.ownerId} FOR UPDATE`;
+
+    const [place, engagements] = await Promise.all([
+      resolvePlace(tx, item),
+      findProviderEngagements(tx, service.ownerId, bufferedWindow(start, end), {
+        excludeBookingId,
+        excludeEventId: item.eventId,
+      }),
+    ]);
+    const clash = findScheduleConflict({ start, end }, place, engagements);
+    if (clash) {
+      throw new AvailabilityConflictError(
+        clash === "booked"
+          ? "This Foxer is already booked on one of those days"
+          : "This Foxer is booked in another city the day before or after — they need that day to travel",
         "service",
         item.itemId,
       );

@@ -55,15 +55,20 @@ export default class ServiceBookingCtrl {
     }
   }
 
-  // GET /service/bookings/availability?serviceId=xxx
+  // GET /service/bookings/availability?serviceId=xxx[&location=…]
+  // `location` is where the citizen's event is — it decides which of the
+  // provider's travel days still apply (see provider-schedule).
   static async getAvailability(req: Request, res: Response) {
-    const { serviceId } = req.query as Record<string, string>;
+    const { serviceId, location } = req.query as Record<string, string>;
     if (!serviceId)
       return res
         .status(400)
         .json({ success: false, message: "serviceId is required" });
     try {
-      const data = await ServiceBookingSvc.getAvailability(serviceId);
+      const data = await ServiceBookingSvc.getAvailability(
+        serviceId,
+        location?.trim() || null,
+      );
       return res.status(200).json({ success: true, data });
     } catch (e: unknown) {
       const err = e as Error;

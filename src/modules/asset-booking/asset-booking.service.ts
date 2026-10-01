@@ -56,7 +56,7 @@ export default class AssetBookingSvc {
     }
 
     if (user.isEmailVerified !== true) {
-      throw new Error("Identity verification required before booking");
+      throw new Error("Please verify your email address before booking");
     }
   }
 

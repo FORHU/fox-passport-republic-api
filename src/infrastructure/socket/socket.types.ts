@@ -22,7 +22,10 @@ export type InvalidateTopic =
   // they read `/admin/disputes`, which no booking invalidation touches.
   | "disputes"
   | "waitlist"
-  | "roles";
+  | "roles"
+  // ID checks: the admin review queue, and the applicant's own status and
+  // badge.
+  | "identity";
 
 export interface InvalidatePayload {
   topic: InvalidateTopic;

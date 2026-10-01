@@ -53,6 +53,7 @@ describe("Central Payment checkout — HTTP layer", () => {
         email: `checkout_client_${runId}@test.com`,
         password: "pw",
         name: "Checkout Client",
+        isEmailVerified: true,
       },
     });
     otherUser = await prisma.user.create({

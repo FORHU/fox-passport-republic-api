@@ -18,6 +18,8 @@ model File {
   template                EventTemplate?              @relation(fields: [templateId], references: [id])
   user                    User?                       @relation(fields: [uploadedBy], references: [id])
   venue                   Venue?                      @relation(fields: [venueId], references: [id])
+  identityIdFiles         IdentityVerification[]      @relation("IdentityIdFile")
+  identitySelfies         IdentityVerification[]      @relation("IdentitySelfie")
   gearFoxerBirPermit      GearFoxerApplication[]      @relation("GearFoxerBirPermit")
   gearFoxerNbi            GearFoxerApplication[]      @relation("GearFoxerNBI")
   gearFoxerSelfie         GearFoxerApplication[]      @relation("GearFoxerSelfie")

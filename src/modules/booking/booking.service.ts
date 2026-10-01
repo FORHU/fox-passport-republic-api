@@ -164,7 +164,10 @@ export default class BookingSvc {
     }
 
     if (user.isEmailVerified !== true) {
-      throw new AppError("Identity verification required before booking", 403);
+      throw new AppError(
+        "Please verify your email address before booking",
+        403,
+      );
     }
   }
 
@@ -1331,6 +1334,7 @@ export default class BookingSvc {
             kind: "service" as const,
             itemId: s.serviceId,
             dateRange: escrowDateRange,
+            eventId: event.id,
           })),
       ]);
 
@@ -1454,6 +1458,7 @@ export default class BookingSvc {
             kind: input.kind,
             itemId: input.itemId,
             dateRange,
+            eventId: booking.eventId,
             quantity:
               input.kind === "asset" ? (input.quantity ?? 1) : undefined,
           },
