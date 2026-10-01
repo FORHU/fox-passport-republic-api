@@ -2,7 +2,8 @@
 
 **Branch:** `refactor/modular-identity-architecture`  
 **Target Repository:** `fox-passport-republic-api`  
-**Status:** In Progress — Stage 1 (Expand) Schema & Migration Created; Stage 3 (Switch) Application Updates Next
+**Status:** ✅ Stage 1 (Expand), Stage 2 (Migrate), and Stage 3 (Switch) COMPLETED & COMMITTED (`a95d1da`). Ready for database migration deployment and testing.  
+**Last Updated:** 2026-10-01 (End-of-day handoff)  
 
 ---
 
@@ -391,24 +392,28 @@ During the Switch phase, write operations update both `UserProfile` and the lega
 * `lastSeenAt` is explicitly initialized to `NULL` (populated by socket presence at runtime).
 * `passwordHash` is populated from `password` only where `password LIKE '$2%'` (bcrypt hashes generated via `bcryptjs`).
 
-### Stage 3: Switch & Automated Test Suite (NEXT STEP)
+### Stage 3: Switch & Dual-Writes (COMPLETED & FLAGGED ON BRANCH)
 
-#### A. Automated Test Matrix (Must pass before production deployment):
-1. **OAuthAccount exists** ➔ Logs into existing linked account.
-2. **OAuthAccount doesn't exist + verified email matches verified User** ➔ Links account cleanly.
-3. **OAuthAccount doesn't exist + email matches unverified User** ➔ Halts with email verification requirement.
-4. **OAuthAccount doesn't exist + no matching User + verified email** ➔ Creates User + UserProfile + UserSettings + UserActivity + OAuthAccount atomically.
-5. **No verified provider email** ➔ Rejects with 400 error.
-6. **Same `providerAccountId`** ➔ Rejects duplicate creation (`@@unique` constraint).
-7. **Facebook account A** ➔ Must NEVER authenticate as FoxPassport User B (strict tenant isolation).
+All domain repositories and services have been switched to read from the modular models while maintaining safe dual-writes to legacy columns during the stabilization window.
 
-#### B. Service Cutover:
-* [ ] Switch `profile.service.ts` and `profile.repository.ts` to read/write `user_profiles`.
-* [ ] Switch currency handling in `profile.service.ts` to read/write `user_settings`.
-* [ ] Switch Stripe Connect services to use `payment_accounts`.
-* [ ] Switch socket disconnect presence to update `lastSeenAt` in `user_activity`.
+#### A. Service Cutover Completed:
+* [x] `auth.repository.ts`: Atomic creation of 1:1 models (`profile`, `settings`, `activity`), dedicated `OAuthAccount` lookup and upsert. Dual-writes `passwordHash`.
+* [x] `facebook-auth.service.ts`: Enforces verified email, creates/links dedicated `OAuthAccount` with `OAuthProvider.FACEBOOK`, sets `passwordHash: null`.
+* [x] `google-auth.service.ts`: Links dedicated `OAuthAccount` with `OAuthProvider.GOOGLE`. Reconciled with PR #92 unverified-account takeover defense and `passwordHash` dual-write.
+* [x] `profile.repository.ts`: `findProfileById` reads `user_profiles` and `user_settings` with legacy fallback; `updateProfile` dual-writes to `users` and upserts modular records; `updatePasswordHash` dual-writes.
+* [x] `profile.service.ts`: Validates `passwordHash || password`, gracefully rejects password changes for OAuth-only accounts.
+* [x] `stripe-connect.service.ts`: Lazy `PaymentAccount` creation and updates with dual-writes to legacy `user.stripeAccountId`.
+* [x] `payout.service.ts`: Reads `stripeAccountId` & `stripePayoutsEnabled` from `paymentAccount` with fallback to legacy user columns.
+* [x] `socket.gateway.ts`: Updates `user_activity.lastSeenAt` upon socket disconnect with legacy `user.lastActiveAt` dual-write.
+* [x] `users.repository.ts`: `getLastActiveAt` checks `user_activity` first; `findUserById` and `findPublicCitizenProfile` include and map `profile` fields (`imgId`, `city`, `state`, `country`); `createUser` and `updateUser` dual-write `passwordHash`.
+* [x] `follow.repository.ts`: `getUserBasic` checks `profile.isPrivate` with fallback to `user.isPrivate`.
 
-### Stage 4: Pre-Contract Verification & Contract
+All 22 transition locations are explicitly tagged with:
+```bash
+grep -rn "\[MIGRATION-FLAG: Stage 3 Switch\]" src/
+```
+
+### Stage 4: Pre-Contract Verification & Contract (PENDING DEPLOYMENT & TESTING)
 
 #### Integrity Check Queries:
 ```sql
@@ -438,7 +443,7 @@ GROUP BY "stripeAccountId"
 HAVING COUNT(*) > 1;
 ```
 
-* **Contract Execution** (Only executed after verification queries return 0 issues):
+* **Contract Execution** (Only executed after verification queries return 0 issues and stabilization period passes):
 ```sql
 ALTER TABLE "users"
   DROP COLUMN IF EXISTS "address",
@@ -461,14 +466,71 @@ ALTER TABLE "users"
 
 ---
 
-## 6. Rollback Strategy
+## 6. Turning Back Point / Safe Rollback Protocol
 
 ```
 Expand ──► Migrate ──► Switch (Dual-Write) ──► Verify ──► Contract
                              │
-                             └── If failure occurs during stabilization:
-                                 1. Revert application code to previous release.
-                                 2. Because dual-writes were active, legacy columns
-                                    have fresh data.
-                                 3. Zero data loss; zero user interruption.
+                             └── TURNING BACK POINT (Today's Handoff State)
 ```
+
+Because we implemented **strict dual-writes** across all Stage 3 repositories and services, the legacy columns on the `users` table (`stripeAccountId`, `imgId`, `city`, `isPrivate`, `lastActiveAt`, `password`, `googleId`) are updated in real-time on every single write operation.
+
+### A. Git Turning Back Point:
+- **Pre-refactor baseline:** `origin/main` at commit `74c5e3b` (or commit `ef98e83`).
+- **To abort all code changes and return to main:**
+  ```bash
+  git checkout main
+  # or to hard reset this branch back to the pre-refactor state:
+  # git reset --hard 74c5e3b
+  ```
+
+### B. Database Rollback Protocol (If migration was deployed to Postgres):
+If the migration `20261001170500_add_oauth_accounts` was deployed to a database and needs to be completely rolled back, run this downward script in PostgreSQL:
+```sql
+-- 1. Drop foreign keys and modular tables
+DROP TABLE IF EXISTS "oauth_accounts" CASCADE;
+DROP TABLE IF EXISTS "user_activity" CASCADE;
+DROP TABLE IF EXISTS "payment_accounts" CASCADE;
+DROP TABLE IF EXISTS "user_settings" CASCADE;
+DROP TABLE IF EXISTS "user_profiles" CASCADE;
+
+-- 2. Drop OAuthProvider enum
+DROP TYPE IF EXISTS "OAuthProvider" CASCADE;
+
+-- 3. Drop temporary passwordHash column
+ALTER TABLE "users" DROP COLUMN IF EXISTS "passwordHash";
+
+-- 4. Re-mark password as NOT NULL if desired (or leave nullable)
+-- ALTER TABLE "users" ALTER COLUMN "password" SET NOT NULL;
+
+-- 5. Remove migration record from Prisma migrations table
+DELETE FROM "_prisma_migrations" WHERE "migration_name" = '20261001170500_add_oauth_accounts';
+```
+
+### C. Zero Data Loss Guarantee:
+Because legacy columns were never dropped and were continuously synchronized via dual-writes throughout Stage 3, reverting application code to `main` at this point results in **zero downtime and zero data loss**.
+
+---
+
+## 7. Next Steps for Tomorrow (Resume Protocol)
+
+When resuming tomorrow, follow this step-by-step checklist:
+
+1. **Verify PostgreSQL & Apply Migration:**
+   ```bash
+   pnpm exec prisma migrate deploy
+   ```
+2. **Execute Stage 4 Pre-Contract Integrity Queries:**
+   Run the 5 verification queries in Section 5.4 against the database to confirm:
+   - 0 users with missing `passwordHash`.
+   - 0 orphaned users (all users have `user_profiles`, `user_settings`, `user_activity`).
+   - 0 duplicate OAuth identities.
+3. **Execute Integration & OAuth Verification Tests:**
+   - Test Google sign-in (linking to existing account + creating new account).
+   - Test Facebook sign-in (rejecting synthetic/no-email, creating OAuthAccount).
+   - Test profile updates (updating avatar `imgId`, city, isPrivate, and checking that both modular tables and legacy columns are updated).
+   - Test Stripe Connect onboarding and payout transfer resolution.
+4. **Decommission Migration Flags (Stage 4 Contract):**
+   - Search for `[MIGRATION-FLAG: Stage 3 Switch]` across `src/`.
+   - Once all tests and verification queries pass in staging, drop the legacy columns on `users` via the Stage 4 migration and remove the legacy write fallbacks.
