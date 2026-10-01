@@ -5,7 +5,8 @@ import axios from "axios";
  * Configured with baseURL, interceptors for auth, and common settings.
  */
 const api = axios.create({
-  baseURL: "http://localhost:6002/api/v1",
+  // API_URL must be set in .env — no hardcoded fallback.
+  baseURL: process.env.API_URL,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",

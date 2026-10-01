@@ -13,13 +13,11 @@ const app = express();
 
 app.set("trust proxy", 1);
 
-// CORS configuration - allow the configured origins plus the local dev ports.
-const allowedOrigins = [
-  "http://localhost:6001", // front-end (6000 is unusable: browsers block it as the x11 port)
-  "http://localhost:6002", // this API
-  "192.168.1.34:6001",
-  ...CORS_ORIGINS,
-];
+// CORS configuration — all allowed origins come from CORS_ORIGIN in .env.
+// In development the LOCAL_ORIGIN regex below also accepts any loopback or
+// private-LAN address, so changing the front-end port doesn't require a code
+// edit here. Add explicit origins only if you need them in production.
+const allowedOrigins = [...CORS_ORIGINS];
 
 // In development also accept any loopback or private-LAN origin, so changing the
 // front-end port (or opening the app via a LAN IP on a phone) doesn't require

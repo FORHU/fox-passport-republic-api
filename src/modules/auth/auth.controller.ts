@@ -4,12 +4,13 @@ import Joi from "joi";
 import AuthSvc from "./auth.service";
 import { setSessionCookies, clearSessionCookies } from "./auth.cookies";
 import GoogleAuthSvc from "./google-auth.service";
+import FacebookAuthSvc from "./facebook-auth.service";
 import { issueSocketTicket } from "./socket-ticket.service";
 import {
   RefreshTokenError,
   RefreshTokenReuseError,
 } from "./refresh-token.service";
-import { FRONTEND_URL, CORS_ORIGINS, isDev } from "../../config";
+import { FRONTEND_URL, CORS_ORIGINS, isDev, FACEBOOK_CALLBACK_URL } from "../../config";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
 
 /**
@@ -25,6 +26,15 @@ const GOOGLE_STATE_COOKIE_OPTIONS = {
   secure: !isDev,
   sameSite: "lax",
   path: "/api/v1/auth/google",
+  maxAge: 10 * 60 * 1000,
+} as const;
+
+const FACEBOOK_STATE_COOKIE = "fb_oauth_state";
+const FACEBOOK_STATE_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: !isDev,
+  sameSite: "lax",
+  path: "/api/v1/auth/facebook",
   maxAge: 10 * 60 * 1000,
 } as const;
 
@@ -75,6 +85,13 @@ function isAllowedOrigin(origin: string): boolean {
  */
 function resolveRedirectUri(req: Request): string {
   return `${req.protocol}://${req.get("host")}/api/v1/auth/google/callback`;
+}
+
+function resolveFacebookRedirectUri(req: Request): string {
+  if (FACEBOOK_CALLBACK_URL && !FACEBOOK_CALLBACK_URL.includes("localhost")) {
+    return FACEBOOK_CALLBACK_URL;
+  }
+  return `${req.protocol}://${req.get("host")}/api/v1/auth/facebook/callback`;
 }
 
 /**
@@ -470,6 +487,91 @@ export default class AuthCtrl {
     if (!session) {
       // Expired, already redeemed, or never existed - all the same to the
       // caller, and worth keeping indistinguishable.
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid exchange code" });
+    }
+
+    setSessionCookies(res, session);
+    return res.status(200).json({ data: session });
+  }
+
+  static facebookRedirect(req: Request, res: Response) {
+    try {
+      const csrf = FacebookAuthSvc.createState();
+      const frontendOrigin = resolveFrontendOrigin(req);
+      const state = `${csrf}|${Buffer.from(frontendOrigin).toString("base64url")}`;
+
+      res.cookie(FACEBOOK_STATE_COOKIE, state, FACEBOOK_STATE_COOKIE_OPTIONS);
+      return res.redirect(
+        FacebookAuthSvc.getAuthUrl(state, resolveFacebookRedirectUri(req)),
+      );
+    } catch (e: unknown) {
+      console.error("Facebook redirect error:", e);
+      const frontendOrigin = resolveFrontendOrigin(req);
+      return res.redirect(`${frontendOrigin}/?facebookAuthError=1`);
+    }
+  }
+
+  static async facebookCallback(req: Request, res: Response) {
+    const { code, state, error: fbError } = req.query;
+
+    const expectedState = readCookie(req, FACEBOOK_STATE_COOKIE);
+    res.clearCookie(FACEBOOK_STATE_COOKIE, {
+      httpOnly: true,
+      secure: !isDev,
+      sameSite: "lax",
+      path: "/api/v1/auth/facebook",
+    });
+
+    const frontendOrigin = originFromState(expectedState);
+
+    if (fbError || typeof code !== "string") {
+      return res.redirect(`${frontendOrigin}/?facebookAuthError=1`);
+    }
+
+    if (
+      typeof state !== "string" ||
+      !expectedState ||
+      !statesMatch(state, expectedState)
+    ) {
+      console.warn("Facebook sign-in rejected: state mismatch");
+      return res.redirect(`${frontendOrigin}/?facebookAuthError=1`);
+    }
+
+    try {
+      const result = await FacebookAuthSvc.handleCallback(
+        code,
+        resolveFacebookRedirectUri(req),
+      );
+
+      const exchangeCode = await FacebookAuthSvc.stashSession({
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        isNewUser: result.isNewUser,
+        user: result.user,
+      });
+
+      return res.redirect(
+        `${frontendOrigin}/auth/facebook/callback?xc=${exchangeCode}`,
+      );
+    } catch (e: unknown) {
+      console.error("Facebook sign-in error:", e);
+      return res.redirect(`${frontendOrigin}/?facebookAuthError=1`);
+    }
+  }
+
+  static async facebookExchange(req: Request, res: Response) {
+    const { code } = req.body ?? {};
+
+    if (typeof code !== "string" || code.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid exchange code" });
+    }
+
+    const session = await FacebookAuthSvc.redeemSession(code);
+    if (!session) {
       return res
         .status(400)
         .json({ success: false, message: "Invalid exchange code" });

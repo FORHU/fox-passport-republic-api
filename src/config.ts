@@ -169,3 +169,32 @@ if (GOOGLE_CLIENT_ID) {
     );
   }
 }
+
+// Meta / Facebook sign-in configuration
+const facebookAppId = process.env.FACEBOOK_APP_ID?.trim() || undefined;
+const facebookAppSecret = process.env.FACEBOOK_APP_SECRET?.trim() || undefined;
+
+if (Boolean(facebookAppId) !== Boolean(facebookAppSecret)) {
+  throw new Error(
+    "FACEBOOK_APP_ID and FACEBOOK_APP_SECRET must be provided together.",
+  );
+}
+
+export const FACEBOOK_APP_ID = facebookAppId;
+export const FACEBOOK_APP_SECRET = facebookAppSecret;
+export const FACEBOOK_CALLBACK_URL = (
+  process.env.FACEBOOK_CALLBACK_URL ||
+  `http://localhost:${PORT}/api/v1/auth/facebook/callback`
+).trim();
+
+if (FACEBOOK_APP_ID) {
+  try {
+    const callbackUrl = new URL(FACEBOOK_CALLBACK_URL);
+    if (!/^https?:$/.test(callbackUrl.protocol)) throw new Error();
+  } catch {
+    throw new Error(
+      "FACEBOOK_CALLBACK_URL must be an absolute http(s) URL when Facebook OAuth is configured.",
+    );
+  }
+}
+
