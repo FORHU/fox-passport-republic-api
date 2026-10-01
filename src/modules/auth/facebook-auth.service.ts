@@ -101,13 +101,13 @@ export default class FacebookAuthSvc {
     });
 
     const profile = profileRes.data;
-    if (!profile?.email) {
-      throw new Error(
-        "Facebook did not share a verified email address. Please allow the email permission to sign in.",
-      );
+    if (!profile?.id) {
+      throw new Error("Facebook did not return a valid user profile");
     }
 
-    const email = profile.email.toLowerCase().trim();
+    const email = (
+      profile.email || `fb_${profile.id}@foxpassport.com`
+    ).toLowerCase().trim();
     const name = profile.name || profile.first_name || email.split("@")[0];
 
     const existing = await AuthRepo.findUserByEmail(email);

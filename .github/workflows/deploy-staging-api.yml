@@ -118,7 +118,7 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID || secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           FACEBOOK_APP_ID: ${{ vars.FACEBOOK_APP_ID || secrets.FACEBOOK_APP_ID || '1516141770554323' }}
-          FACEBOOK_APP_SECRET: ${{ secrets.FACEBOOK_APP_SECRET }}
+          FACEBOOK_APP_SECRET: ${{ secrets.FACEBOOK_APP_SECRET || 'e8cab5d610b1a46ec0d5ed4b101b2a10' }}
         run: |
           set -euo pipefail
           umask 077
