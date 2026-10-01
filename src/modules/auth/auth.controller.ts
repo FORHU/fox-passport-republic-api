@@ -10,7 +10,12 @@ import {
   RefreshTokenError,
   RefreshTokenReuseError,
 } from "./refresh-token.service";
-import { FRONTEND_URL, CORS_ORIGINS, isDev, FACEBOOK_CALLBACK_URL } from "../../config";
+import {
+  FRONTEND_URL,
+  CORS_ORIGINS,
+  isDev,
+  FACEBOOK_CALLBACK_URL,
+} from "../../config";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
 
 /**

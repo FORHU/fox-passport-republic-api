@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import axios from "axios";
+import { RoleType, SystemRole } from "@prisma/client";
 import AuthRepo from "./auth.repository";
 import { prisma } from "../../utils/prisma";
 import redisUtil from "../../utils/redis.util";
@@ -115,8 +116,8 @@ export default class FacebookAuthSvc {
       email: string;
       username: string | null;
       name: string;
-      systemRole?: any;
-      roleType?: any[];
+      systemRole?: SystemRole;
+      roleType?: RoleType[];
     };
     let isNewUser = false;
 
