@@ -15,6 +15,10 @@ import PromotionSvc from "../promotion/promotion.service";
 import RefundSvc from "../refund/refund.service";
 import { isPerformerServiceCategory } from "../../types/permissions";
 import AvailabilitySvc from "../availability/availability.service";
+import {
+  findProviderEngagements,
+  providerBlockedDays,
+} from "../availability/provider-schedule";
 import { sendBookingConfirmationEmail } from "../../utils/emails/confirmation";
 import {
   announceToAdmins,
@@ -47,17 +51,37 @@ export default class ServiceBookingSvc {
     }
 
     if (user.isEmailVerified !== true) {
-      throw new Error("Identity verification required before booking");
+      throw new Error("Please verify your email address before booking");
     }
   }
 
-  static async getAvailability(serviceId: string) {
+  /**
+   * The booking calendar for one service. A provider is one person across
+   * all their services, so `bookedDates` covers every booking they hold, not
+   * just this service's; `travelBlockedDates` are the days either side of a
+   * booking in a different city from `location` (all of them while the
+   * citizen hasn't said where their event is). See provider-schedule.
+   */
+  static async getAvailability(serviceId: string, location: string | null) {
     const service = await prisma.service.findUnique({
       where: { id: serviceId },
+      select: { ownerId: true },
     });
     if (!service) throw new Error("Service not found");
-    const bookedDates = await ServiceBookingRepo.getBookedDates(serviceId);
-    return { bookedDates };
+    const now = new Date();
+    const engagements = await findProviderEngagements(prisma, service.ownerId, {
+      start: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000),
+      end: new Date(now.getFullYear() + 3, 0, 1),
+    });
+    const { booked, travel } = providerBlockedDays(
+      engagements,
+      location ? { text: location } : null,
+    );
+    const today = now.toISOString().slice(0, 10);
+    return {
+      bookedDates: booked.filter((d) => d >= today),
+      travelBlockedDates: travel.filter((d) => d >= today),
+    };
   }
 
   /** Shared by `create` and `previewPrice` — see AssetBookingSvc.priceAssetBooking's comment. */
@@ -198,6 +222,7 @@ export default class ServiceBookingSvc {
           kind: "service",
           itemId: data.serviceId,
           dateRange: { start: scheduledDate, end: endDate },
+          location: data.location,
         },
       ]);
 
@@ -226,11 +251,13 @@ export default class ServiceBookingSvc {
   static async getAll(filters?: {
     userId?: string;
     ownerId?: string;
+    participantId?: string;
     status?: string;
   }) {
     return ServiceBookingRepo.findAll({
       userId: filters?.userId,
       ownerId: filters?.ownerId,
+      participantId: filters?.participantId,
       status: filters?.status as ItemBookingStatus | undefined,
     });
   }

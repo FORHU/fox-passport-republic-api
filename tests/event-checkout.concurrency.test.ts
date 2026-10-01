@@ -47,6 +47,7 @@ describe("Event checkout — concurrency, duplicate-checkout, availability reval
         email: `checkout_payer_${runId}@test.com`,
         password: "pw",
         name: "Payer",
+        isEmailVerified: true,
         roleType: ["eventFoxer"],
       },
     });

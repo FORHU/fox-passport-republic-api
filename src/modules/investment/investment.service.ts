@@ -8,6 +8,7 @@ import InvestmentRepo from "./investment.repository";
 import { investmentCache, INVESTMENT_TTL } from "../../utils/cache-namespaces";
 import { fingerprint } from "../../utils/cache.util";
 import UsersRepo from "../users/users.repository";
+import { can } from "../../types/permissions";
 import FeedRepo from "../feed/feed.repository";
 import PassportSvc from "../passport/passport.service";
 import VenueRepo from "../venue/venue.repository";
@@ -44,7 +45,7 @@ export default class InvestmentSvc {
     if (!user) throw new Error("Partner not found");
 
     const isPartner =
-      user.roleType?.includes("investor") || user.systemRole === "admin";
+      user.roleType?.includes("investor") || can(user, "investments:manage");
     if (!isPartner) {
       throw new Error(
         "Only Partner Foxers (investors) can register capital or inventory investments.",
@@ -183,7 +184,7 @@ export default class InvestmentSvc {
 
     const requester = await UsersRepo.findUserById(requesterId);
     const isOwner = investment.partnerId === requesterId;
-    const isAdmin = requester?.systemRole === "admin";
+    const isAdmin = !!requester && can(requester, "investments:manage");
     if (!isOwner && !isAdmin) {
       throw new Error("Only the investor who made this pledge can cancel it");
     }

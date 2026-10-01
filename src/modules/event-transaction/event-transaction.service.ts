@@ -87,6 +87,7 @@ export default class EventTransactionSvc {
           kind: "service" as const,
           itemId: item.serviceId!,
           dateRange,
+          eventId: event.id,
         })),
       ]);
 

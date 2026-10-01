@@ -120,9 +120,11 @@ describe("unknown and missing roles", () => {
 });
 
 describe("permissionsFor", () => {
-  it("gives the secretary exactly three capabilities", () => {
+  // The three queue capabilities, plus `content:moderate`: removing rule-
+  // breaking posts is queue work, and secretaries could already do it.
+  it("gives the secretary exactly four capabilities", () => {
     expect(permissionsFor("admin_secretary").sort()).toEqual(
-      ["admin:access", "queue:decide", "queue:read"].sort(),
+      ["admin:access", "content:moderate", "queue:decide", "queue:read"].sort(),
     );
   });
 

@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import Joi from "joi";
+import { can } from "../../types/permissions";
 import ServiceBookingSvc from "./service-booking.service";
 
 export default class ServiceBookingCtrl {
@@ -55,15 +56,20 @@ export default class ServiceBookingCtrl {
     }
   }
 
-  // GET /service/bookings/availability?serviceId=xxx
+  // GET /service/bookings/availability?serviceId=xxx[&location=…]
+  // `location` is where the citizen's event is — it decides which of the
+  // provider's travel days still apply (see provider-schedule).
   static async getAvailability(req: Request, res: Response) {
-    const { serviceId } = req.query as Record<string, string>;
+    const { serviceId, location } = req.query as Record<string, string>;
     if (!serviceId)
       return res
         .status(400)
         .json({ success: false, message: "serviceId is required" });
     try {
-      const data = await ServiceBookingSvc.getAvailability(serviceId);
+      const data = await ServiceBookingSvc.getAvailability(
+        serviceId,
+        location?.trim() || null,
+      );
       return res.status(200).json({ success: true, data });
     } catch (e: unknown) {
       const err = e as Error;
@@ -75,10 +81,25 @@ export default class ServiceBookingCtrl {
   static async getAll(req: Request, res: Response) {
     try {
       const { userId, ownerId, status } = req.query as Record<string, string>;
+      const viewerId = req.user!.userId;
+      // Admins see every booking. Anyone else sees only bookings they made or
+      // that are on their own services — a filter naming someone else is
+      // refused rather than quietly narrowed.
+      const isAdmin = can(req.user!, "bookings:read:all");
+      if (
+        !isAdmin &&
+        ((userId && userId !== viewerId) || (ownerId && ownerId !== viewerId))
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only list your own bookings",
+        });
+      }
       const bookings = await ServiceBookingSvc.getAll({
         userId,
         ownerId,
         status,
+        participantId: !isAdmin && !userId && !ownerId ? viewerId : undefined,
       });
       return res.status(200).json({ success: true, data: bookings });
     } catch (e: unknown) {
@@ -91,6 +112,18 @@ export default class ServiceBookingCtrl {
   static async getById(req: Request, res: Response) {
     try {
       const booking = await ServiceBookingSvc.getById(req.params.id);
+      const viewerId = req.user!.userId;
+      // Only the client, the service's owner or an admin. Anyone else gets the
+      // same 404 as a missing booking, so ids can't be probed.
+      if (
+        booking.userId !== viewerId &&
+        booking.service?.ownerId !== viewerId &&
+        !can(req.user!, "bookings:read:all")
+      ) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Service booking not found" });
+      }
       return res.status(200).json({ success: true, data: booking });
     } catch (e: unknown) {
       const err = e as Error;

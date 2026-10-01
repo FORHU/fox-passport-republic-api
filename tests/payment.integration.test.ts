@@ -45,11 +45,12 @@ describe("Central Payment & Checkout Integration Tests", () => {
     // Basic setup for integration tests
     testUser = await prisma.user.upsert({
       where: { email: "test_payment_user@example.com" },
-      update: {},
+      update: { isEmailVerified: true },
       create: {
         email: "test_payment_user@example.com",
         password: "password123",
         name: "Payment Test User",
+        isEmailVerified: true,
       },
     });
 

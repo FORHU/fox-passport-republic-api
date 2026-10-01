@@ -23,8 +23,13 @@ export default class ProfileRepo {
         city: true,
         systemRole: true,
         roleType: true,
+        // What the app's booking pages check before letting someone book —
+        // the same flag the booking services enforce.
+        isEmailVerified: true,
         isPrivate: true,
         preferredCurrency: true,
+        // The "Verified" badge — display only.
+        identityVerifiedAt: true,
         createdAt: true,
         updatedAt: true,
         profile: {

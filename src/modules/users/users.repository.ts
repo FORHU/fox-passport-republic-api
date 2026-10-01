@@ -303,6 +303,7 @@ export default class UsersRepo {
         city: true,
         state: true,
         roleType: true,
+        identityVerifiedAt: true,
         createdAt: true,
         services: {
           where: { status: "available", deletedAt: null },
@@ -651,6 +652,7 @@ export default class UsersRepo {
         },
         roleType: true,
         systemRole: true,
+        identityVerifiedAt: true,
         createdAt: true,
         foxerSpecializations: {
           select: {

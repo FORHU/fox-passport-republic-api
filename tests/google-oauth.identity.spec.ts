@@ -106,6 +106,7 @@ const VICTIM = {
   name: "Victim",
   systemRole: "user",
   roleType: [],
+  isEmailVerified: true,
 };
 
 beforeEach(() => {
@@ -182,6 +183,27 @@ describe("verified Google emails", () => {
     expect(repo.createGoogleUser).not.toHaveBeenCalled();
     expect(result.isNewUser).toBe(false);
     expect(result.accessToken).toBeTruthy();
+  });
+
+  it("replaces the password of an unverified account it claims", async () => {
+    // Someone registered the victim's address with a password they know but
+    // never verified it. The victim signing in with Google verifies the
+    // account — which must not also bring the squatter's password to life.
+    googleReturns({
+      sub: "google-id",
+      email: VICTIM.email,
+      email_verified: true,
+    });
+    repo.findUserByEmail.mockResolvedValue({
+      ...VICTIM,
+      isEmailVerified: false,
+    });
+
+    await GoogleAuthSvc.handleCallback("code");
+
+    expect(repo.linkGoogleId).toHaveBeenCalledWith(VICTIM.id, "google-id", {
+      replacePassword: expect.any(String),
+    });
   });
 
   it("creates an account when nothing matches", async () => {

@@ -66,6 +66,12 @@ model User {
   invitedAttendees         BookingAttendee[]            @relation("Inviter")
   notifications            Notification[]
   waitlistEntries          Waitlist[]
+  // Set when an admin approves an IdentityVerification. Display-only — a
+  // "Verified" badge, never a booking requirement (booking needs only a
+  // verified email).
+  identityVerifiedAt       DateTime?
+  identityVerifications    IdentityVerification[]       @relation("IdentityApplicant")
+  identityReviews          IdentityVerification[]       @relation("IdentityReviewer")
   payouts                  Payout[]
   ownPromotions            Promotion[]
   foxerSpecializations     FoxerSpecialization[]
@@ -90,7 +96,7 @@ model User {
   postMediaTags            PostMediaTag[]
   pollVotes                PollVote[]
   reportsFiled             Report[]
-  reportsResolved          Report[]                   @relation("ReportResolvedBy")
+  reportsResolved          Report[]                     @relation("ReportResolvedBy")
   groupConversations       ConversationParticipant[]
   messageReactions         MessageReaction[]
   conversationReads        ConversationRead[]
@@ -490,4 +496,31 @@ model OrganizerApplication {
   selfieFile                File?       @relation("OrganizerSelfie", fields: [selfieFileId], references: [id])
 
   @@map("organizer_applications")
+}
+
+// A citizen proving who they are with a government ID, reviewed by an admin.
+// Optional and separate from role applications: it earns a "Verified" badge
+// (User.identityVerifiedAt) and unlocks nothing else.
+model IdentityVerification {
+  id              String        @id @default(uuid())
+  userId          String
+  // "passport" | "drivers_license" | "national_id" | "other" — validated in
+  // the service, kept as text so new document kinds need no migration.
+  idType          String
+  idFileId        String
+  selfieFileId    String?
+  status          RequestStatus @default(pending)
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  user            User          @relation("IdentityApplicant", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer        User?         @relation("IdentityReviewer", fields: [reviewedBy], references: [id])
+  idFile          File          @relation("IdentityIdFile", fields: [idFileId], references: [id])
+  selfieFile      File?         @relation("IdentitySelfie", fields: [selfieFileId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@map("identity_verifications")
 }

@@ -1,6 +1,6 @@
 import express from "express";
 import AssetBookingCtrl from "./asset-booking.controller";
-import { authenticate, optionalAuth } from "../../middleware/auth.middleware";
+import { authenticate } from "../../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -11,10 +11,10 @@ router.get("/availability", AssetBookingCtrl.getAvailability);
 router.get("/price-preview", authenticate, AssetBookingCtrl.previewPrice);
 
 // Public — list bookings (filtered by ?userId or ?ownerId)
-router.get("/", optionalAuth, AssetBookingCtrl.getAll);
+router.get("/", authenticate, AssetBookingCtrl.getAll);
 
 // Public — single booking detail
-router.get("/:id", optionalAuth, AssetBookingCtrl.getById);
+router.get("/:id", authenticate, AssetBookingCtrl.getById);
 
 // Protected — create a booking
 router.post("/", authenticate, AssetBookingCtrl.create);

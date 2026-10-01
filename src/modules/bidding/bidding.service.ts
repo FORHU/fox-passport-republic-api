@@ -174,6 +174,7 @@ export default class BiddingSvc {
           kind: "service",
           itemId: bid.proposedServiceId,
           dateRange: { start: bid.event.startAt, end: bid.event.endAt },
+          eventId: bid.event.id,
         },
       ]);
 

@@ -149,7 +149,20 @@ export default class GoogleAuthSvc {
       if (existingByEmail) {
         // Same email already registered (password signup) — link the
         // Google identity to that account rather than creating a duplicate.
-        user = await AuthRepo.linkGoogleId(existingByEmail.id, googleId);
+        //
+        // Linking marks the email verified. If it wasn't already, whoever set
+        // that account's password never proved they own the address — it may
+        // be an attacker who registered it first and waited. Keeping their
+        // password would hand them the account the moment its owner signs in
+        // with Google, so it is replaced with one nobody knows; the owner can
+        // set their own through "forgot password".
+        user = existingByEmail.isEmailVerified
+          ? await AuthRepo.linkGoogleId(existingByEmail.id, googleId)
+          : await AuthRepo.linkGoogleId(existingByEmail.id, googleId, {
+              replacePassword: await hashPassword(
+                crypto.randomBytes(32).toString("hex"),
+              ),
+            });
         await AuthRepo.linkOAuthAccount({
           userId: user.id,
           provider: OAuthProvider.GOOGLE,

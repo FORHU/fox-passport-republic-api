@@ -11,6 +11,7 @@ import PassportSvc, { XP_REWARDS } from "../passport/passport.service";
 import NotificationService from "../notifications/user-notification.service";
 import { prisma } from "../../utils/prisma";
 import { AuthenticatedUser } from "../../types/auth";
+import { can } from "../../types/permissions";
 
 export interface MediaTagInput {
   mediaUrl: string;
@@ -213,8 +214,7 @@ export default class FeedService {
           throw new AppError("venueId is required for venue_spotlight", 400);
         }
         const isAuthorized =
-          user.systemRole === "admin" ||
-          user.systemRole === "admin_secretary" ||
+          can(user, "feed:post-for-anyone") ||
           user.roleType.includes("venueFoxer") ||
           user.roleType.includes("investor");
         if (!isAuthorized) {
@@ -229,7 +229,10 @@ export default class FeedService {
         if (!venue) {
           throw notFound("Venue");
         }
-        if (venue.mayorId !== user.userId && user.systemRole !== "admin") {
+        if (
+          venue.mayorId !== user.userId &&
+          !can(user, "feed:post-for-anyone")
+        ) {
           throw new AppError("You can only spotlight venues you own", 400);
         }
         break;
@@ -241,8 +244,7 @@ export default class FeedService {
           throw new AppError("assetId is required for gear_offering", 400);
         }
         const isAuthorized =
-          user.systemRole === "admin" ||
-          user.systemRole === "admin_secretary" ||
+          can(user, "feed:post-for-anyone") ||
           user.roleType.includes("gearFoxer") ||
           user.roleType.includes("investor");
         if (!isAuthorized) {
@@ -257,7 +259,10 @@ export default class FeedService {
         if (!asset) {
           throw new AppError("Asset/Gear not found", 404);
         }
-        if (asset.ownerId !== user.userId && user.systemRole !== "admin") {
+        if (
+          asset.ownerId !== user.userId &&
+          !can(user, "feed:post-for-anyone")
+        ) {
           throw new AppError("You can only spotlight gear you own", 400);
         }
         break;
@@ -269,8 +274,7 @@ export default class FeedService {
           throw new AppError("serviceId is required for service_offering", 400);
         }
         const isAuthorized =
-          user.systemRole === "admin" ||
-          user.systemRole === "admin_secretary" ||
+          can(user, "feed:post-for-anyone") ||
           user.roleType.includes("serviceFoxer") ||
           user.roleType.includes("performerFoxer") ||
           user.roleType.includes("investor");
@@ -286,7 +290,10 @@ export default class FeedService {
         if (!service) {
           throw notFound("Service");
         }
-        if (service.ownerId !== user.userId && user.systemRole !== "admin") {
+        if (
+          service.ownerId !== user.userId &&
+          !can(user, "feed:post-for-anyone")
+        ) {
           throw new AppError("You can only spotlight services you own", 400);
         }
         break;
@@ -298,8 +305,7 @@ export default class FeedService {
           throw new AppError("eventId is required for event_announcement", 400);
         }
         const isAuthorized =
-          user.systemRole === "admin" ||
-          user.systemRole === "admin_secretary" ||
+          can(user, "feed:post-for-anyone") ||
           user.roleType.includes("eventFoxer") ||
           user.roleType.includes("investor");
         if (!isAuthorized) {
@@ -314,7 +320,10 @@ export default class FeedService {
         if (!event) {
           throw notFound("Event");
         }
-        if (event.organizerId !== user.userId && user.systemRole !== "admin") {
+        if (
+          event.organizerId !== user.userId &&
+          !can(user, "feed:post-for-anyone")
+        ) {
           throw new AppError("You can only announce events you host", 400);
         }
         break;
@@ -323,7 +332,8 @@ export default class FeedService {
       case PostType.partner_announcement: {
         tab = FeedTab.partners;
         const isPartner =
-          user.systemRole === "admin" || user.roleType.includes("investor");
+          can(user, "feed:post-for-anyone") ||
+          user.roleType.includes("investor");
         if (!isPartner) {
           throw new AppError("Unauthorized: Partner Foxer role required", 403);
         }
@@ -460,9 +470,7 @@ export default class FeedService {
     }
 
     const canDelete =
-      post.authorId === user.userId ||
-      user.systemRole === "admin" ||
-      user.systemRole === "admin_secretary";
+      post.authorId === user.userId || can(user, "content:moderate");
 
     if (!canDelete) {
       throw new AppError("Unauthorized to delete this post", 403);
@@ -720,8 +728,7 @@ export default class FeedService {
     const canDelete =
       comment.authorId === user.userId ||
       (post && post.authorId === user.userId) ||
-      user.systemRole === "admin" ||
-      user.systemRole === "admin_secretary";
+      can(user, "content:moderate");
 
     if (!canDelete) {
       throw new AppError("Unauthorized to delete this comment", 403);
@@ -802,8 +809,7 @@ export default class FeedService {
     const canDelete =
       tag.userId === user.userId ||
       (post && post.authorId === user.userId) ||
-      user.systemRole === "admin" ||
-      user.systemRole === "admin_secretary";
+      can(user, "content:moderate");
 
     if (!canDelete) {
       throw new AppError("Unauthorized to remove this tag", 403);
