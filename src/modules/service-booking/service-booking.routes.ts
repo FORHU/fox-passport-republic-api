@@ -1,6 +1,6 @@
 import express from "express";
 import ServiceBookingCtrl from "./service-booking.controller";
-import { authenticate, optionalAuth } from "../../middleware/auth.middleware";
+import { authenticate } from "../../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -11,10 +11,10 @@ router.get("/availability", ServiceBookingCtrl.getAvailability);
 router.get("/price-preview", authenticate, ServiceBookingCtrl.previewPrice);
 
 // Public — list bookings (filtered by ?userId or ?ownerId)
-router.get("/", optionalAuth, ServiceBookingCtrl.getAll);
+router.get("/", authenticate, ServiceBookingCtrl.getAll);
 
 // Public — single booking detail
-router.get("/:id", optionalAuth, ServiceBookingCtrl.getById);
+router.get("/:id", authenticate, ServiceBookingCtrl.getById);
 
 // Protected — create a booking
 router.post("/", authenticate, ServiceBookingCtrl.create);

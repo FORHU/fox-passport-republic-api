@@ -259,6 +259,18 @@ export default class EventCheckoutSvc {
             403,
           );
         }
+        // The same rule every other booking path enforces (BookingSvc,
+        // AssetBookingSvc, ServiceBookingSvc) — paying for an event is booking it.
+        const payer = await tx.user.findUnique({
+          where: { id: payerId },
+          select: { isEmailVerified: true },
+        });
+        if (payer?.isEmailVerified !== true) {
+          throw new AppError(
+            "Please verify your email address before booking",
+            403,
+          );
+        }
         if (items.length === 0) {
           throw new AppError(
             "No payable transactions found for this event.",
@@ -294,6 +306,7 @@ export default class EventCheckoutSvc {
             kind: "service" as const,
             itemId: t.serviceId,
             dateRange: { start: event.startAt, end: event.endAt },
+            eventId: event.id,
           })),
         ];
         if (availabilityItems.length > 0) {

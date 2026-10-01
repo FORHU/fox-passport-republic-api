@@ -4,6 +4,7 @@ import {
   getPutObjectPresignedUrl,
   getGetObjectPresignedUrl,
   uploadToS3,
+  uploadPrivateToS3,
 } from "../../utils/s3";
 
 const IMAGE_EXTENSIONS = [
@@ -30,6 +31,8 @@ const RESIZABLE_IMAGE_EXTENSIONS = IMAGE_EXTENSIONS.filter(
   (ext) => ext !== "gif",
 );
 const MAX_IMAGE_DIMENSION = 1600;
+// Identity documents: big enough to read an ID number or a seal.
+const DOCUMENT_IMAGE_DIMENSION = 2400;
 const IMAGE_QUALITY = 80;
 
 /**
@@ -39,10 +42,13 @@ const IMAGE_QUALITY = 80;
  * the difference between a feed/chat that loads fast on mobile data and one
  * that doesn't, since every upload path here stored the raw buffer as-is.
  */
-async function optimizeImage(buffer: Buffer): Promise<Buffer> {
+async function optimizeImage(
+  buffer: Buffer,
+  maxDimension = MAX_IMAGE_DIMENSION,
+): Promise<Buffer> {
   return sharp(buffer)
     .rotate() // apply EXIF orientation before stripping metadata below
-    .resize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, {
+    .resize(maxDimension, maxDimension, {
       fit: "inside",
       withoutEnlargement: true,
     })
@@ -151,6 +157,56 @@ export default class S3Svc {
       contentType,
     });
 
+    return { key, contentType };
+  }
+
+  /**
+   * An identity document (ID, clearance, proof of funds) into the private
+   * bucket. Images or PDFs only. Returns the storage key, never a URL:
+   * readers get a short-lived link from `getPrivateObjectUrl` instead.
+   *
+   * Images are still re-encoded — which also strips EXIF, GPS included — but
+   * kept larger than feed photos so the small print on an ID stays legible.
+   */
+  static async uploadPrivateFile(
+    userId: string,
+    file: {
+      buffer: Buffer;
+      originalname: string;
+      mimetype: string;
+      size: number;
+    },
+  ) {
+    const ext = (
+      S3Svc.getFileExtension(file.originalname) || "bin"
+    ).toLowerCase();
+    if (!IMAGE_EXTENSIONS.includes(ext) && ext !== "pdf") {
+      throw new Error("Upload an image or a PDF");
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      throw new Error(
+        `File size must be ${MAX_IMAGE_SIZE / (1024 * 1024)}MB or below`,
+      );
+    }
+
+    let body = file.buffer;
+    let contentType = ext === "pdf" ? "application/pdf" : file.mimetype;
+    let outExt = ext;
+    if (RESIZABLE_IMAGE_EXTENSIONS.includes(ext)) {
+      try {
+        body = await optimizeImage(file.buffer, DOCUMENT_IMAGE_DIMENSION);
+        contentType = "image/webp";
+        outExt = "webp";
+      } catch (err) {
+        console.warn(
+          "[S3Svc] Document image optimization failed, storing original:",
+          err,
+        );
+      }
+    }
+
+    const key = `users/${userId}/private/${crypto.randomUUID()}.${outExt}`;
+    await uploadPrivateToS3({ key, body, contentType });
     return { key, contentType };
   }
 }

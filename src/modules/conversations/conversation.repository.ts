@@ -2,7 +2,15 @@ import { prisma } from "../../utils/prisma";
 import type { BidStatus, InboxCounterpart } from "@prisma/client";
 import AppointmentAccess from "../appointment/appointment.access";
 
-const PARTICIPANT_SELECT = { id: true, name: true, imgId: true };
+// `roleType` lets the chat show what each person is on the platform (Venue
+// Foxer, Organizer…) — the same public role badges their profile shows.
+const PARTICIPANT_SELECT = {
+  id: true,
+  name: true,
+  imgId: true,
+  roleType: true,
+  identityVerifiedAt: true,
+};
 
 // A Shared Inbox thread (see Conversation in messaging.prisma) names its Venue
 // or Event and its guest instead of a pair of users.

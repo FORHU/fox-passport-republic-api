@@ -112,6 +112,12 @@ export const S3_ENDPOINT = process.env.S3_ENDPOINT as string | undefined;
 export const S3_FORCE_PATH_STYLE = process.env.S3_FORCE_PATH_STYLE === "true";
 export const CLOUD_FRONT_DOMAIN = process.env.CLOUD_FRONT_DOMAIN as
   string | undefined;
+// A bucket with no public access and no CDN in front of it, for identity
+// documents (government IDs, clearances, proof of funds). Read only through
+// short-lived presigned links. Falls back to AWS_S3_BUCKET when unset, which
+// keeps local setups working but is not private — set it everywhere real.
+export const AWS_S3_PRIVATE_BUCKET = process.env.AWS_S3_PRIVATE_BUCKET as
+  string | undefined;
 
 export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY as string;
 export const STRIPE_WEBHOOK_SECRET = process.env

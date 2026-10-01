@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import RoleRequestService from "./role-request.service";
-import S3Svc from "../s3/s3.service";
 import FileSvc from "../file/file.service";
+import { signPrivateFiles } from "../../utils/private-files";
 import {
   EventCategory,
   RequestStatus,
@@ -100,7 +100,7 @@ export default class RoleRequestController {
           .json({ success: false, message: "Invalid role type" });
       }
 
-      // Process each uploaded file through the 4-step pipeline
+      // Store each uploaded document
       const files = req.files as
         Record<string, Express.Multer.File[]> | undefined;
 
@@ -112,22 +112,8 @@ export default class RoleRequestController {
           const dbColumn = FILE_FIELD_TO_DB_COLUMN[fieldName];
           if (!dbColumn) continue;
 
-          // 1. GET URL TO UPLOAD — generate presigned PUT URL & S3 key
-          //    (uploadFile handles this internally: generates key + uploads)
-
-          // 2. UPLOAD THE FILE — upload file buffer to S3
-          const { key } = await S3Svc.uploadFile(userId, file);
-
-          // 3. GET CLOUDFRONT URL — get public URL for the uploaded file
-          const { url } = await S3Svc.generateDownloadUrl(key);
-
-          // 4. CREATE FILE — register file record in DB
-          const dbFile = await FileSvc.createFile({
-            name: file.originalname,
-            type: file.mimetype,
-            url,
-            uploadedBy: userId,
-          });
+          // Identity documents go to the private bucket — no public URL.
+          const dbFile = await FileSvc.storePrivateDocument(userId, file);
 
           // Inject the file ID into application data
           data[dbColumn] = dbFile.id;
@@ -236,8 +222,9 @@ export default class RoleRequestController {
   static async list(req: Request, res: Response) {
     try {
       const { status } = req.query;
-      const requests = await RoleRequestService.getRequests(
-        status as RequestStatus,
+      // Admin-only route, so the documents get their short-lived links here.
+      const requests = await signPrivateFiles(
+        await RoleRequestService.getRequests(status as RequestStatus),
       );
 
       return res.status(200).json({

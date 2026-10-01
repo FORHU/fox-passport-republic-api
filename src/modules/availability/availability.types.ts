@@ -7,6 +7,12 @@ export interface AvailabilityCheckItem {
   itemId: string; // assetId or serviceId
   dateRange: { start: Date; end: Date };
   quantity?: number; // assets only; defaults to 1
+  /** Services only — where the new booking happens, for the provider's
+   * travel buffer (see ProviderSchedule). An Event's city is looked up from
+   * `eventId`; a direct booking passes its free-text `location`. Neither
+   * known means "somewhere else", the conservative reading. */
+  eventId?: string | null;
+  location?: string | null;
 }
 
 // Statuses that count as consuming inventory/calendar space on

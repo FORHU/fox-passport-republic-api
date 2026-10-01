@@ -85,8 +85,19 @@ export const optionalAuth = (
  * but must not reach the citizens list. Guarding the capability means adding a
  * role is a change to one grant table, not an audit of every call site.
  */
+/**
+ * Marks a guard with the permissions it checks, so the route-matrix test
+ * (tests/rbac.route-matrix.spec.ts) can find every protected route and what
+ * it needs by walking the mounted app — no hand-kept list to drift.
+ */
+export const REQUIRED_PERMISSIONS = Symbol("requiredPermissions");
+
+function tagGuard<T extends object>(guard: T, permissions: Permission[]): T {
+  return Object.assign(guard, { [REQUIRED_PERMISSIONS]: permissions });
+}
+
 export const requirePermission = (permission: Permission) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  const guard = (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res
         .status(401)
@@ -103,6 +114,7 @@ export const requirePermission = (permission: Permission) => {
     }
     next();
   };
+  return tagGuard(guard, [permission]);
 };
 
 /**
@@ -114,7 +126,7 @@ export const requirePermission = (permission: Permission) => {
  * existing single-permission call sites are untouched.
  */
 export const requirePermissionAny = (permissions: Permission[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  const guard = (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res
         .status(401)
@@ -128,4 +140,5 @@ export const requirePermissionAny = (permissions: Permission[]) => {
     }
     next();
   };
+  return tagGuard(guard, permissions);
 };
