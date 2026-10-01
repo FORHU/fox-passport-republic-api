@@ -115,7 +115,7 @@ jobs:
           MAILER_PASSWORD: ${{ secrets.MAILER_PASSWORD }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID || secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
           set -euo pipefail
@@ -140,8 +140,8 @@ jobs:
           STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
           STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
           GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-          GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
           GOOGLE_CALLBACK_URL=${{ vars.GOOGLE_CALLBACK_URL }}
+          GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
           ENVEOF
 
           aws ssm put-parameter \
@@ -151,7 +151,6 @@ jobs:
             --region "${{ env.AWS_REGION }}" > /dev/null
 
           rm -f env.tmp
-
 
       - name: Deploy via SSM
         id: send
