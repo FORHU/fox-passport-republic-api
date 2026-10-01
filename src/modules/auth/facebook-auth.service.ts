@@ -105,9 +105,9 @@ export default class FacebookAuthSvc {
       throw new Error("Facebook did not return a valid user profile");
     }
 
-    const email = (
-      profile.email || `fb_${profile.id}@foxpassport.com`
-    ).toLowerCase().trim();
+    const email = (profile.email || `fb_${profile.id}@foxpassport.com`)
+      .toLowerCase()
+      .trim();
     const name = profile.name || profile.first_name || email.split("@")[0];
 
     const existing = await AuthRepo.findUserByEmail(email);
