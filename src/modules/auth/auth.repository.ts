@@ -66,7 +66,10 @@ export default class AuthRepo {
   }
 
   // [MIGRATION-FLAG: Stage 3 Switch] Dedicated OAuthAccount lookup
-  static async findOAuthAccount(provider: OAuthProvider, providerAccountId: string) {
+  static async findOAuthAccount(
+    provider: OAuthProvider,
+    providerAccountId: string,
+  ) {
     return prisma.oAuthAccount.findUnique({
       where: {
         provider_providerAccountId: {

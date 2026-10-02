@@ -6,7 +6,6 @@ import AuthRepo from "./auth.repository";
 import { prisma } from "../../utils/prisma";
 import redisUtil from "../../utils/redis.util";
 import { issueRefreshToken, revokeAllForUser } from "./refresh-token.service";
-import { hashPassword } from "../../utils/password";
 import { permissionsForUser } from "../../types/permissions";
 import {
   FACEBOOK_APP_ID,

@@ -64,7 +64,8 @@ export default class ProfileRepo {
       systemRole: user.systemRole,
       roleType: user.roleType,
       isPrivate: user.profile?.isPrivate ?? user.isPrivate,
-      preferredCurrency: user.settings?.preferredCurrency ?? user.preferredCurrency,
+      preferredCurrency:
+        user.settings?.preferredCurrency ?? user.preferredCurrency,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       profile: user.profile,

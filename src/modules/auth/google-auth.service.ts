@@ -140,7 +140,8 @@ export default class GoogleAuthSvc {
       OAuthProvider.GOOGLE,
       googleId,
     );
-    let user = existingOAuth?.user || (await AuthRepo.findUserByGoogleId(googleId));
+    let user =
+      existingOAuth?.user || (await AuthRepo.findUserByGoogleId(googleId));
     let isNewUser = false;
 
     if (!user) {

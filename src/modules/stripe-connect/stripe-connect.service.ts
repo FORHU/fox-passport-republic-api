@@ -143,7 +143,8 @@ export default class StripeConnectSvc {
     if (!user) throw new Error("User not found");
 
     const paymentAccount = user.paymentAccount;
-    const stripeAccountId = paymentAccount?.stripeAccountId ?? user.stripeAccountId;
+    const stripeAccountId =
+      paymentAccount?.stripeAccountId ?? user.stripeAccountId;
     const stripeOnboardingComplete =
       paymentAccount?.stripeOnboardingComplete ?? user.stripeOnboardingComplete;
     const stripeChargesEnabled =
