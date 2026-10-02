@@ -2,8 +2,8 @@
 
 **Branch:** `refactor/modular-identity-architecture`  
 **Target Repository:** `fox-passport-republic-api`  
-**Status:** ✅ Stage 1 (Expand), Stage 2 (Migrate), and Stage 3 (Switch) COMPLETED & COMMITTED (`a95d1da`). Ready for database migration deployment and testing.  
-**Last Updated:** 2026-10-01 (End-of-day handoff)  
+**Status:** ✅ Stage 1 (Expand), Stage 2 (Migrate), Stage 3 (Switch & Dual-Writes), and Pre-Contract Integrity Verifications COMPLETED & VERIFIED (`be586b5`). 71/71 test suites (1,256 tests) passing, clean lint, build passing.  
+**Last Updated:** 2026-10-02 (Verified & Ready for Stage 4 Contract / PR)  
 
 ---
 
@@ -517,20 +517,17 @@ Because legacy columns were never dropped and were continuously synchronized via
 
 When resuming tomorrow, follow this step-by-step checklist:
 
-1. **Verify PostgreSQL & Apply Migration:**
+1. **Verify PostgreSQL & Apply Migration:** ✅ COMPLETED
+   - `foxpassportrepublic` and `foxpassportrepublic_test` both deployed with 111 migrations.
+2. **Execute Stage 4 Pre-Contract Integrity Queries:** ✅ COMPLETED
+   - Automated via `pnpm exec tsx tools/verify-modular-identity-integrity.ts`. All checks returned 0 anomalies.
+3. **Execute Integration & OAuth Verification Tests:** ✅ COMPLETED
+   - All 71 test suites passing (1,256 tests passing).
+   - Google & Facebook OAuth flows verified against modular architecture.
+4. **Push Branch & Open PR for Staging Review:**
    ```bash
-   pnpm exec prisma migrate deploy
+   git push origin refactor/modular-identity-architecture
    ```
-2. **Execute Stage 4 Pre-Contract Integrity Queries:**
-   Run the 5 verification queries in Section 5.4 against the database to confirm:
-   - 0 users with missing `passwordHash`.
-   - 0 orphaned users (all users have `user_profiles`, `user_settings`, `user_activity`).
-   - 0 duplicate OAuth identities.
-3. **Execute Integration & OAuth Verification Tests:**
-   - Test Google sign-in (linking to existing account + creating new account).
-   - Test Facebook sign-in (rejecting synthetic/no-email, creating OAuthAccount).
-   - Test profile updates (updating avatar `imgId`, city, isPrivate, and checking that both modular tables and legacy columns are updated).
-   - Test Stripe Connect onboarding and payout transfer resolution.
-4. **Decommission Migration Flags (Stage 4 Contract):**
-   - Search for `[MIGRATION-FLAG: Stage 3 Switch]` across `src/`.
-   - Once all tests and verification queries pass in staging, drop the legacy columns on `users` via the Stage 4 migration and remove the legacy write fallbacks.
+5. **Decommission Migration Flags (Stage 4 Contract):**
+   - Search for `[MIGRATION-FLAG: Stage 3 Switch]` across `src/` (22 transition points).
+   - Once the stabilization / burn-in period passes in staging without rollback, apply the Stage 4 migration dropping the legacy columns on `users` (`address`, `city`, `phone`, `imgId`, `stripe*`, `preferredCurrency`, `lastActiveAt`, `password`, `googleId`) and remove the legacy write fallbacks.
