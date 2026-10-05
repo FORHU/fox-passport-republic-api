@@ -21,8 +21,11 @@ const STATUS_VERBS: Record<string, string> = {
   pending: "is being processed",
 };
 
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  succeeded: { bg: "#d4ff00", text: "#111114" },
+const STATUS_COLORS: Record<
+  string,
+  { bg: string; text: string; border?: string }
+> = {
+  succeeded: { bg: "#d4ff00", text: "#111114", border: "#9fbf00" },
   failed: { bg: "#ffe3e3", text: "#c92a2a" },
   pending: { bg: "#fff3cd", text: "#8a6100" },
 };
@@ -65,7 +68,7 @@ export async function sendRefundUpdateEmail({
     : "";
 
   const inner = `
-    <span style="display:inline-block;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;background:${statusColor.bg};color:${statusColor.text};">${currentStatusLabel}</span>
+    <span style="display:inline-block;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;background:${statusColor.bg};color:${statusColor.text};${statusColor.border ? `border:1px solid ${statusColor.border};` : ""}">${currentStatusLabel}</span>
 
     <h1 style="margin: 18px 0 8px; font-size: 26px; font-weight: 800; color: #111114; letter-spacing: -0.5px;">
       Refund ${currentStatusVerb}
