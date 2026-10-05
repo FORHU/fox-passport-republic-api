@@ -14,7 +14,7 @@ export async function sendRejectedEmail({
   reason,
 }: SendRejectedEmailParams): Promise<boolean> {
   const inner = `
-    <span style="display:inline-block;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;background:#ff6b6b;color:#ffffff;">Rejected</span>
+    <span style="display:inline-block;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;background:#ff6b6b;color:#ffffff;border:1px solid #e03131;">Rejected</span>
 
     <h1 style="margin: 18px 0 8px; font-size: 26px; font-weight: 800; color: #111114; letter-spacing: -0.5px;">
       ${escapeHtml(entityType)} content update
@@ -64,7 +64,7 @@ export async function sendRejectedEmail({
 
     <div style="text-align:center;margin:24px 0;">
       <a href="${process.env.FRONTEND_URL || "http://localhost:6001"}/dashboard"
-         style="display:inline-block;padding:14px 32px;border-radius:12px;font-size:15px;font-weight:700;text-decoration:none;background:#d4ff00;color:#111114;">
+         style="display:inline-block;padding:14px 32px;border-radius:12px;font-size:15px;font-weight:700;text-decoration:none;background:#d4ff00;color:#111114;border:1px solid #9fbf00;">
         View Dashboard
       </a>
     </div>
