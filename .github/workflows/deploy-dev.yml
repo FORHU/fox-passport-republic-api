@@ -42,9 +42,9 @@ env:
   NETWORK: forhu-dev
   HOST_PORT: "4011"
   APP_PORT: "3002"
-  ENV_PARAM: /forhu-dev/foxpassport/env
+  ENV_PARAM: /forhu-dev/foxpassport-api/env
   SHARED_ENV: /opt/forhu-dev/credentials/foxpassport.env
-  MERGED_ENV: /opt/forhu-dev/foxpassport.env
+  MERGED_ENV: /opt/forhu-dev/foxpassport-api.env
 
 jobs:
   deploy:
