@@ -3,6 +3,7 @@ import { RoleType, SystemRole } from "@prisma/client";
 import { hashPassword } from "../../utils/password";
 import { userCache } from "../../utils/cache-namespaces";
 import { fingerprint } from "../../utils/cache.util";
+import AdminSvc from "../admin/admin.service";
 
 /**
  * Two minutes.
@@ -170,7 +171,14 @@ export default class UsersSvc {
   }
 
   // DELETE
-  static async deleteUser(id: string) {
+  static async deleteUser(
+    id: string,
+    actor?: { userId: string; email: string },
+    reason?: string,
+  ) {
+    if (actor) {
+      return AdminSvc.deleteUser(actor, id, reason);
+    }
     const user = await UsersRepo.findUserById(id);
     if (!user) throw new Error("User not found");
 

@@ -92,6 +92,17 @@ pnpm exec vitest run               # expect: 397 passing, 35 files, 0 errors
 node tools/validate-architecture.mjs   # expect: 185 files, boundaries intact
 ```
 
+To add the optional rotating-globe load fixtures to a local seed, set
+`SEED_GLOBE_STRESS_EVENTS=1` before running the seed. This creates 240 clearly
+labelled public templates across 24 cities in 24 countries; rerunning is safe. In
+PowerShell:
+
+```powershell
+$env:SEED_GLOBE_STRESS_EVENTS = "1"
+pnpm exec prisma db seed
+Remove-Item Env:SEED_GLOBE_STRESS_EVENTS
+```
+
 **Read the error count, not just the pass count.** Vitest prints unhandled
 rejections beside a green run. 156 of them sat next to "248 passed" for a day
 and were the API failing to boot without Redis. The expected number is zero.

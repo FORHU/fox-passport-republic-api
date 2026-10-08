@@ -182,6 +182,9 @@ export default class EventTemplateRepo {
           category: true,
           targetCity: true,
           targetState: true,
+          targetCountry: true,
+          lat: true,
+          lng: true,
           images: { take: 1, select: { url: true } },
           templateVenues: {
             take: 1,
