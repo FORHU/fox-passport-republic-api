@@ -27,7 +27,10 @@ export default class ProfileSvc {
       username?: string;
       phone?: string;
       profileImage?: string;
+      country?: string;
+      state?: string;
       city?: string;
+      district?: string;
       isPrivate?: boolean;
       preferredCurrency?: string;
     },

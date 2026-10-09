@@ -6,7 +6,9 @@ import {
   PaymentStatus,
   Prisma,
   RefundStatus,
+  RoleType,
   ServiceStatus,
+  SystemRole,
   VenueStatus,
 } from "@prisma/client";
 import AdminRepo, { queuePage } from "./admin.repository";
@@ -17,6 +19,11 @@ import { prisma } from "../../utils/prisma";
 import { STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents } from "../../utils/pricing";
 import IdempotencySvc from "../idempotency/idempotency.service";
+import { AppError } from "../../utils/errors";
+import { recordAudit } from "../audit/audit.service";
+import { revokeAllForUser } from "../auth/refresh-token.service";
+import AppointmentService from "../appointment/appointment.service";
+import { userCache } from "../../utils/cache-namespaces";
 
 const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-08-27.basil",
@@ -825,5 +832,111 @@ export default class AdminSvc {
       reason,
     });
     return event;
+  }
+
+  static async deleteUser(
+    actor: { userId: string; email: string },
+    targetId: string,
+    reason?: string,
+  ) {
+    const action = "user.delete";
+
+    const target = await prisma.user.findUnique({
+      where: { id: targetId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        username: true,
+        systemRole: true,
+        roleType: true,
+      },
+    });
+
+    if (!target) {
+      throw new AppError("User not found", 404, "target_missing");
+    }
+
+    if (target.id === actor.userId) {
+      await recordAudit({
+        actorId: actor.userId,
+        actorEmail: actor.email,
+        action,
+        targetId: target.id,
+        targetEmail: target.email,
+        outcome: "refused",
+        metadata: { reason: "self_delete" },
+      });
+      throw new AppError(
+        "You cannot delete your own account via admin user management",
+        400,
+        "self_delete",
+      );
+    }
+
+    if (target.systemRole === SystemRole.admin) {
+      const admins = await prisma.user.count({
+        where: { systemRole: SystemRole.admin },
+      });
+      if (admins <= 1) {
+        await recordAudit({
+          actorId: actor.userId,
+          actorEmail: actor.email,
+          action,
+          targetId: target.id,
+          targetEmail: target.email,
+          outcome: "refused",
+          metadata: { reason: "last_admin" },
+        });
+        throw new AppError(
+          "This is the only administrator left — promote someone else first",
+          400,
+          "last_admin",
+        );
+      }
+    }
+
+    // End active appointments and teams if applicable
+    if (target.roleType.includes(RoleType.organizer)) {
+      await AppointmentService.endForRevokedOrganizer(target.id, actor.userId);
+    }
+    await AppointmentService.endForRevokedOwner(
+      target.id,
+      {
+        venueFoxer: target.roleType.includes(RoleType.venueFoxer),
+        eventFoxer: target.roleType.includes(RoleType.eventFoxer),
+      },
+      actor.userId,
+    );
+
+    // Delete user and dependent references
+    await AdminRepo.deleteUser(target.id);
+
+    // Revoke all refresh tokens and sessions
+    const sessionsRevoked = await revokeAllForUser(target.id);
+
+    // Record audit log
+    await recordAudit({
+      actorId: actor.userId,
+      actorEmail: actor.email,
+      action,
+      targetId: target.id,
+      targetEmail: target.email,
+      outcome: "allowed",
+      metadata: {
+        systemRole: target.systemRole,
+        roleType: target.roleType,
+        sessionsRevoked,
+        ...(reason ? { reason } : {}),
+      },
+    });
+
+    // Invalidate caches and announce changes
+    announceToUser(target.id, "roles");
+    announceAdminQueueChanged();
+    await userCache.invalidateAll();
+    await this.invalidateQueues();
+
+    return { id: target.id, email: target.email };
   }
 }

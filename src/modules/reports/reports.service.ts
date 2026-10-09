@@ -40,7 +40,6 @@ export default class ReportsService {
       venue: 0,
     };
     for (const row of counts) countByType[row.targetType] = row._count._all;
-
     const ids = {
       post: reports
         .filter((r) => r.targetType === ReportTargetType.post)
