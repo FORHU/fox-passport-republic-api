@@ -1,4 +1,5 @@
 import { EventCategory, PrismaClient } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 
 const CITIES = [
   { city: "New York", country: "United States", lat: 40.7128, lng: -74.006 },
@@ -43,7 +44,7 @@ const CATEGORIES = [
 const EVENTS_PER_CITY = 10;
 
 export function buildGlobeStressEventData(ownerId: string) {
-  return CITIES.flatMap((city, cityIndex) =>
+  return CITIES.flatMap((city) =>
     Array.from({ length: EVENTS_PER_CITY }, (_, eventIndex) => {
       const category = CATEGORIES[eventIndex % CATEGORIES.length];
       const categoryName = category.replace(/^./, (first) =>
@@ -52,7 +53,7 @@ export function buildGlobeStressEventData(ownerId: string) {
       const sequence = String(eventIndex + 1).padStart(2, "0");
 
       return {
-        id: `seed-globe-stress-${String(cityIndex + 1).padStart(2, "0")}-${sequence}`,
+        id: randomUUID(),
         ownerId,
         name: `Globe Load Test · ${categoryName} · ${city.city} ${sequence}`,
         description:

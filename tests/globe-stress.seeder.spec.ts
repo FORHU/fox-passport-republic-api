@@ -13,6 +13,13 @@ describe("globe stress event fixtures", () => {
 
     expect(events).toHaveLength(240);
     expect(new Set(events.map((event) => event.id)).size).toBe(240);
+    expect(
+      events.every((event) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          event.id,
+        ),
+      ),
+    ).toBe(true);
     expect(cities.size).toBe(24);
     expect(new Set(events.map((event) => event.targetCountry)).size).toBe(24);
     expect(
