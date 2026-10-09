@@ -112,6 +112,12 @@ export const S3_ENDPOINT = process.env.S3_ENDPOINT as string | undefined;
 export const S3_FORCE_PATH_STYLE = process.env.S3_FORCE_PATH_STYLE === "true";
 export const CLOUD_FRONT_DOMAIN = process.env.CLOUD_FRONT_DOMAIN as
   string | undefined;
+// A bucket with no public access and no CDN in front of it, for identity
+// documents (government IDs, clearances, proof of funds). Read only through
+// short-lived presigned links. Falls back to AWS_S3_BUCKET when unset, which
+// keeps local setups working but is not private — set it everywhere real.
+export const AWS_S3_PRIVATE_BUCKET = process.env.AWS_S3_PRIVATE_BUCKET as
+  string | undefined;
 
 export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY as string;
 export const STRIPE_WEBHOOK_SECRET = process.env
@@ -135,13 +141,21 @@ export const STRIPE_CONNECT_REFRESH_URL =
   `${FRONTEND_URL}/creator-dashboard/stripe-onboard`;
 export const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
 
-// Warned about rather than required: the app runs perfectly well without
-// Google sign-in, so a missing client id should not stop everyone else's
-// deployment. It should not be silent either - the button is rendered
-// unconditionally, so without these it leads somewhere broken.
-export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID as string;
-export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET as string;
-if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+// Google sign-in is optional, but a partially configured integration must fail
+// at boot instead of waiting until the first user clicks the button.
+const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() || undefined;
+const googleClientSecret =
+  process.env.GOOGLE_CLIENT_SECRET?.trim() || undefined;
+
+if (Boolean(googleClientId) !== Boolean(googleClientSecret)) {
+  throw new Error(
+    "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be provided together.",
+  );
+}
+
+export const GOOGLE_CLIENT_ID = googleClientId;
+export const GOOGLE_CLIENT_SECRET = googleClientSecret;
+if (!GOOGLE_CLIENT_ID) {
   console.warn(
     "⚠️  GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set — Google sign-in will fail.",
   );
@@ -150,3 +164,42 @@ export const GOOGLE_CALLBACK_URL = (
   process.env.GOOGLE_CALLBACK_URL ||
   `http://localhost:${PORT}/api/v1/auth/google/callback`
 ).trim();
+
+if (GOOGLE_CLIENT_ID) {
+  try {
+    const callbackUrl = new URL(GOOGLE_CALLBACK_URL);
+    if (!/^https?:$/.test(callbackUrl.protocol)) throw new Error();
+  } catch {
+    throw new Error(
+      "GOOGLE_CALLBACK_URL must be an absolute http(s) URL when Google OAuth is configured.",
+    );
+  }
+}
+
+// Meta / Facebook sign-in configuration
+const facebookAppId = process.env.FACEBOOK_APP_ID?.trim() || undefined;
+const facebookAppSecret = process.env.FACEBOOK_APP_SECRET?.trim() || undefined;
+
+if (Boolean(facebookAppId) !== Boolean(facebookAppSecret)) {
+  throw new Error(
+    "FACEBOOK_APP_ID and FACEBOOK_APP_SECRET must be provided together.",
+  );
+}
+
+export const FACEBOOK_APP_ID = facebookAppId;
+export const FACEBOOK_APP_SECRET = facebookAppSecret;
+export const FACEBOOK_CALLBACK_URL = (
+  process.env.FACEBOOK_CALLBACK_URL ||
+  `http://localhost:${PORT}/api/v1/auth/facebook/callback`
+).trim();
+
+if (FACEBOOK_APP_ID) {
+  try {
+    const callbackUrl = new URL(FACEBOOK_CALLBACK_URL);
+    if (!/^https?:$/.test(callbackUrl.protocol)) throw new Error();
+  } catch {
+    throw new Error(
+      "FACEBOOK_CALLBACK_URL must be an absolute http(s) URL when Facebook OAuth is configured.",
+    );
+  }
+}

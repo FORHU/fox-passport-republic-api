@@ -1,3 +1,4 @@
+import { sendServerError } from "../../utils/errors";
 import { Request, Response } from "express";
 import PassportSvc from "./passport.service";
 
@@ -7,8 +8,7 @@ export default class PassportCtrl {
       const passport = await PassportSvc.getOrCreate(req.user!.userId);
       return res.status(200).json({ success: true, data: passport });
     } catch (e: unknown) {
-      const err = e as Error;
-      return res.status(500).json({ success: false, message: err.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -21,8 +21,7 @@ export default class PassportCtrl {
           .json({ success: false, message: "Passport not found" });
       return res.status(200).json({ success: true, data: passport });
     } catch (e: unknown) {
-      const err = e as Error;
-      return res.status(500).json({ success: false, message: err.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -31,8 +30,7 @@ export default class PassportCtrl {
       const badges = await PassportSvc.getAllBadges();
       return res.status(200).json({ success: true, data: badges });
     } catch (e: unknown) {
-      const err = e as Error;
-      return res.status(500).json({ success: false, message: err.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -42,8 +40,7 @@ export default class PassportCtrl {
       const data = await PassportSvc.getLeaderboard(limit);
       return res.status(200).json({ success: true, data });
     } catch (e: unknown) {
-      const err = e as Error;
-      return res.status(500).json({ success: false, message: err.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -68,8 +65,7 @@ export default class PassportCtrl {
         },
       });
     } catch (e: unknown) {
-      const err = e as Error;
-      return res.status(500).json({ success: false, message: err.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -86,8 +82,7 @@ export default class PassportCtrl {
         },
       });
     } catch (e: unknown) {
-      const err = e as Error;
-      return res.status(500).json({ success: false, message: err.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 }

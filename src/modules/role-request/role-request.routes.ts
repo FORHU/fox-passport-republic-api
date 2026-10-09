@@ -19,6 +19,7 @@ const applicationFiles = upload.fields([
   { name: "birPermitFile", maxCount: 1 },
   { name: "selfieFile", maxCount: 1 },
   { name: "portfolioFile", maxCount: 1 }, // host applications only
+  { name: "backgroundClearanceFile", maxCount: 1 }, // organizer applications only
 ]);
 
 const router = Router();

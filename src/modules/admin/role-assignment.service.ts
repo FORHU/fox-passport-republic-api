@@ -1,8 +1,10 @@
+import { AppError } from "../../utils/errors";
 import { RoleType, SystemRole } from "@prisma/client";
 import { userCache } from "../../utils/cache-namespaces";
 import { prisma } from "../../utils/prisma";
 import { recordAudit } from "../audit/audit.service";
 import { revokeAllForUser } from "../auth/refresh-token.service";
+import AppointmentService from "../appointment/appointment.service";
 import AdminSvc from "./admin.service";
 import {
   announceAdminQueueChanged,
@@ -47,14 +49,13 @@ async function announceRoleChange(targetId: string): Promise<void> {
  * mechanism a password change already uses.
  */
 
-export class RoleAssignmentError extends Error {
+export class RoleAssignmentError extends AppError {
   constructor(
     message: string,
     readonly reason: string,
-    readonly status = 400,
+    status = 400,
   ) {
-    super(message);
-    this.name = "RoleAssignmentError";
+    super(message, status);
   }
 }
 
@@ -227,6 +228,23 @@ export default class RoleAssignmentSvc {
     });
     // A role change is what the public foxer listings filter on.
     await userCache.invalidateAll();
+
+    // Losing a role ends the teams that depended on it — see ADR 0005. An
+    // Organizer's own Appointments end; a Mayor's or Event Owner's teams end
+    // with the role that made them one.
+    const lost = (role: RoleType) =>
+      previous.includes(role) && !unique.includes(role);
+    if (lost(RoleType.organizer)) {
+      await AppointmentService.endForRevokedOrganizer(target.id, actor.userId);
+    }
+    await AppointmentService.endForRevokedOwner(
+      target.id,
+      {
+        venueFoxer: lost(RoleType.venueFoxer),
+        eventFoxer: lost(RoleType.eventFoxer),
+      },
+      actor.userId,
+    );
 
     const revoked = await revokeAllForUser(target.id);
 

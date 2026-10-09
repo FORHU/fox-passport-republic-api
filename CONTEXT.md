@@ -26,7 +26,7 @@ Umbrella term for a `gearFoxer`, `serviceFoxer` or `performerFoxer` role-holder 
 
 **VenueFoxer**:
 Role-holder who owns/operates Venues. VenueFoxers list Venues; they don't assemble Events. A Venue is bare space — unlike an Asset or Service, it isn't a sellable experience on its own, so (unlike GearFoxers/ServiceFoxers) VenueFoxers have no standalone booking path. A VenueFoxer only earns when an EventFoxer selects their Venue into an Event; this is intentional, not a gap.
-_Avoid_: Mayor (old name)
+_Avoid_: Owner (for a venue — see **Mayor**)
 
 **EventFoxer**:
 Role-holder who assembles Events: an Event Template attaches an existing Venue (from a VenueFoxer) plus Assets/Services (from GearFoxers/ServiceFoxers), then spawns an Event Request for admin approval. An EventFoxer curates and organizes — they don't supply their own Venues, Assets, or Services. Also acts as the program manager for an event, coordinating all suppliers (decorations, catering, etc.) to deliver the full event experience.
@@ -46,6 +46,34 @@ _Avoid_: TalentFoxer (rejected key, collides with ServiceFoxer's public name)
 
 **Investor**:
 Role-holder who provides funding rather than operational supply. Application requires proof of funds and an investment range, unlike the other RoleTypes.
+
+**Organizer**:
+A RoleType a citizen applies for and is admin-approved to hold, which makes them eligible to be **Appointed** to help run a specific Event or Venue. Holding the role alone grants nothing over any Event or Venue — only an Appointment does.
+_Avoid_: Delegate, staff, co-host
+
+**Mayor**:
+The VenueFoxer a Venue belongs to — exactly one per Venue. The only one who can make or revoke Appointments on that Venue, and the only one who sets its prices.
+_Avoid_: Owner, venue owner
+
+**Event Owner**:
+The EventFoxer who created an Event — exactly one per Event. The only one who can make or revoke Appointments on that Event, and the only one who controls its pricing and payouts. Stored in code as `Event.organizerId`, a legacy name: the Event Owner is not an Organizer by Appointment.
+_Avoid_: Host, organizer (for the Event Owner) — an Event has one Event Owner and any number of Organizers
+
+**Appointment**:
+A Mayor or Event Owner naming an approved Organizer to help run one of their own Venues or Events. They may make any number of Appointments per Event or Venue. It starts from either side (the Mayor or Event Owner invites, or an Organizer requests to join one that accepts requests) and takes effect only once the other side accepts. Either side can end it at any time. The Mayor or Event Owner is always an Organizer of what they own, without applying and without an Appointment.
+_Avoid_: Assignment, delegation
+
+**Check-in Helper**:
+Any user a Mayor or Event Owner adds to an Event or Venue solely to check guests in. Needs no RoleType and no admin approval — the lightweight tier beneath Organizer. Every Organizer can also check guests in, so an Organizer is never also added as a Check-in Helper.
+_Avoid_: Door staff, delegate, check-in delegate
+
+**Shared Inbox**:
+The one conversation space an Event or Venue has with guests — and, for an Event, with its Suppliers. Every conversation belongs to the Event or Venue, not to whoever replied; its Mayor or Event Owner and every current Organizer read and answer it, and each reply shows who sent it.
+_Avoid_: Organizer inbox, personal thread (for these conversations)
+
+**Supplier**:
+Anyone an Event depends on to happen: the Mayor of its booked Venue, and the Foxers booked to supply its Talent or Gear, or bidding to. An Event's Organizers talk to its Suppliers through its Shared Inbox, but only the Event Owner agrees prices with them.
+_Avoid_: Vendor, provider (in conversation; `providerId` in code)
 
 **Host Markup**:
 The percentage a Host adds on top of the sum of an Event Template's attached items (Venue/Assets/Services agreed prices) — this is how a Host earns. Set by the Host per template, not by the platform.

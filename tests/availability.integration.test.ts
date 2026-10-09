@@ -20,10 +20,20 @@ describe("AvailabilitySvc — locking and cross-flow conflict detection", () => 
 
   beforeAll(async () => {
     const owner = await prisma.user.create({
-      data: { email: `avail_owner_${runId}@test.com`, password: "pw", name: "Owner", roleType: ["gearFoxer"] },
+      data: {
+        email: `avail_owner_${runId}@test.com`,
+        password: "pw",
+        name: "Owner",
+        roleType: ["gearFoxer"],
+      },
     });
     const customer = await prisma.user.create({
-      data: { email: `avail_customer_${runId}@test.com`, password: "pw", name: "Customer", roleType: ["eventFoxer"] },
+      data: {
+        email: `avail_customer_${runId}@test.com`,
+        password: "pw",
+        name: "Customer",
+        roleType: ["eventFoxer"],
+      },
     });
     ownerId = owner.id;
     customerId = customer.id;
@@ -62,7 +72,9 @@ describe("AvailabilitySvc — locking and cross-flow conflict detection", () => 
   });
 
   afterAll(async () => {
-    await prisma.eventAssetTransaction.deleteMany({ where: { id: { in: eatIds } } });
+    await prisma.eventAssetTransaction.deleteMany({
+      where: { id: { in: eatIds } },
+    });
     await prisma.assetBooking.deleteMany({ where: { id: { in: abIds } } });
     await prisma.event.deleteMany({ where: { id: { in: eventIds } } });
     await prisma.asset.deleteMany({ where: { id: { in: assetIds } } });
@@ -72,7 +84,12 @@ describe("AvailabilitySvc — locking and cross-flow conflict detection", () => 
   it("reserves successfully when there is room", async () => {
     const result = await prisma.$transaction(async (tx) => {
       await AvailabilitySvc.reserve(tx, [
-        { kind: "asset", itemId: asset1Id, dateRange: { start, end }, quantity: 1 },
+        {
+          kind: "asset",
+          itemId: asset1Id,
+          dateRange: { start, end },
+          quantity: 1,
+        },
       ]);
       const row = await tx.eventAssetTransaction.create({
         data: {
@@ -94,7 +111,12 @@ describe("AvailabilitySvc — locking and cross-flow conflict detection", () => 
     await expect(
       prisma.$transaction(async (tx) => {
         await AvailabilitySvc.reserve(tx, [
-          { kind: "asset", itemId: asset1Id, dateRange: { start, end }, quantity: 1 },
+          {
+            kind: "asset",
+            itemId: asset1Id,
+            dateRange: { start, end },
+            quantity: 1,
+          },
         ]);
         // Should never be reached.
         return tx.eventAssetTransaction.create({
@@ -112,7 +134,12 @@ describe("AvailabilitySvc — locking and cross-flow conflict detection", () => 
 
     // Prove the rollback actually happened: still exactly one active row for this asset/date range.
     const count = await prisma.eventAssetTransaction.count({
-      where: { assetId: asset1Id, status: { in: ["pending", "approved", "pending_provider_confirmation"] } },
+      where: {
+        assetId: asset1Id,
+        status: {
+          in: ["pending", "approved", "pending_provider_confirmation"],
+        },
+      },
     });
     expect(count).toBe(1);
   });
@@ -140,7 +167,12 @@ describe("AvailabilitySvc — locking and cross-flow conflict detection", () => 
     await expect(
       prisma.$transaction(async (tx) => {
         await AvailabilitySvc.reserve(tx, [
-          { kind: "asset", itemId: asset1Id, dateRange: { start, end }, quantity: 1 },
+          {
+            kind: "asset",
+            itemId: asset1Id,
+            dateRange: { start, end },
+            quantity: 1,
+          },
         ]);
       }),
     ).rejects.toThrow(AvailabilityConflictError);
@@ -161,7 +193,10 @@ describe("AvailabilitySvc — locking and cross-flow conflict detection", () => 
 
     // Clear the direct booking from the previous test so this test isolates
     // the self-exclusion behavior.
-    await prisma.assetBooking.updateMany({ where: { id: { in: abIds } }, data: { status: "cancelled" } });
+    await prisma.assetBooking.updateMany({
+      where: { id: { in: abIds } },
+      data: { status: "cancelled" },
+    });
 
     const owned = await prisma.eventAssetTransaction.create({
       data: {
@@ -181,7 +216,12 @@ describe("AvailabilitySvc — locking and cross-flow conflict detection", () => 
     await expect(
       prisma.$transaction(async (tx) => {
         await AvailabilitySvc.validateForCheckout(tx, booking.id, [
-          { kind: "asset", itemId: asset1Id, dateRange: { start, end }, quantity: 1 },
+          {
+            kind: "asset",
+            itemId: asset1Id,
+            dateRange: { start, end },
+            quantity: 1,
+          },
         ]);
       }),
     ).resolves.not.toThrow();

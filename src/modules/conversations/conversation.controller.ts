@@ -1,8 +1,13 @@
+import { AppError, sendAppError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
 import ConversationService from "./conversation.service";
 
-function statusForError(message: string): number {
+function statusForError(err: Error): number {
+  // AppError carries its own status; message matching is the fallback for
+  // anything still thrown as a plain Error.
+  if (err instanceof AppError) return err.status;
+  const message = err.message;
   if (message === "Unauthorized") return 403;
   if (message === "Only the group creator can remove members") return 403;
   if (message === "You can't message this citizen") return 403;
@@ -37,6 +42,57 @@ export default class ConversationController {
     }
   }
 
+  // POST /conversations/inbox — open a Shared Inbox thread with a Venue or
+  // Event (ADR 0005). `guestId` only when an Event's team writes first.
+  static async startInboxConversation(req: Request, res: Response) {
+    const schema = Joi.object({
+      venueId: Joi.string(),
+      eventId: Joi.string(),
+      guestId: Joi.string(),
+    }).xor("venueId", "eventId");
+    const { error, value } = schema.validate(req.body);
+    if (error) return res.status(400).json({ message: error.message });
+
+    try {
+      const conversation = await ConversationService.startInboxConversation(
+        req.user!.userId,
+        value,
+      );
+      res.json({ success: true, data: conversation });
+    } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
+      const err = e as Error;
+      const status = err.message.endsWith("not found")
+        ? 404
+        : err.message === "Unauthorized"
+          ? 403
+          : 400;
+      res.status(status).json({ message: err.message });
+    }
+  }
+
+  // GET /conversations/inbox/suppliers?eventId= — who an Event's team can
+  // message as its Suppliers (ADR 0005).
+  static async listEventSuppliers(req: Request, res: Response) {
+    const eventId = req.query.eventId;
+    if (typeof eventId !== "string" || !eventId) {
+      return res.status(400).json({ message: "eventId is required" });
+    }
+    try {
+      const suppliers = await ConversationService.listEventSuppliers(
+        req.user!.userId,
+        eventId,
+      );
+      res.json({ success: true, data: suppliers });
+    } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
+      const err = e as Error;
+      res
+        .status(err.message === "Unauthorized" ? 403 : 400)
+        .json({ message: err.message });
+    }
+  }
+
   static async startConversation(req: Request, res: Response) {
     const schema = Joi.object({
       otherUserId: Joi.string().required(),
@@ -59,7 +115,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -74,7 +130,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -89,7 +145,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -108,7 +164,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -132,7 +188,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -147,7 +203,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -164,7 +220,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -194,7 +250,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -209,7 +265,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -225,7 +281,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -248,7 +304,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -271,7 +327,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -283,7 +339,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -298,7 +354,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -320,7 +376,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -343,7 +399,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -363,7 +419,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -383,7 +439,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -405,7 +461,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -427,7 +483,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -442,7 +498,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -458,7 +514,7 @@ export default class ConversationController {
     } catch (e: unknown) {
       const err = e as Error;
       res
-        .status(statusForError(err.message))
+        .status(statusForError(err))
         .json({ success: false, message: err.message });
     }
   }

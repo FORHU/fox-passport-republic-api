@@ -1,3 +1,4 @@
+import { AppError, notFound } from "../../utils/errors";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
 import { PaymentProvider } from "./providers/payment-provider.interface";
 import { StripeAdapter } from "./providers/stripe-adapter";
@@ -28,9 +29,11 @@ export default class CheckoutSvc {
       include: { checkouts: true },
     });
 
-    if (!invoice) throw new Error("Invoice not found");
-    if (invoice.status === "paid") throw new Error("Invoice is already paid");
-    if (invoice.status === "cancelled") throw new Error("Invoice is cancelled");
+    if (!invoice) throw notFound("Invoice");
+    if (invoice.status === "paid")
+      throw new AppError("Invoice is already paid", 400);
+    if (invoice.status === "cancelled")
+      throw new AppError("Invoice is cancelled", 400);
 
     const activeCheckouts = invoice.checkouts.filter(
       (c) => c.status === "active",
@@ -167,7 +170,7 @@ export default class CheckoutSvc {
     const invoice = await prisma.invoice.findUnique({
       where: { id: invoiceId },
     });
-    if (!invoice) throw new Error("Invoice not found");
+    if (!invoice) throw notFound("Invoice");
 
     const checkout = await prisma.$transaction((tx) =>
       this.createPendingCheckout(tx, invoiceId),
@@ -185,7 +188,7 @@ export default class CheckoutSvc {
     const checkout = await prisma.checkout.findUnique({
       where: { id: checkoutId },
     });
-    if (!checkout) throw new Error("Checkout not found");
+    if (!checkout) throw notFound("Checkout");
     return checkout;
   }
 
@@ -193,7 +196,7 @@ export default class CheckoutSvc {
     const checkout = await prisma.checkout.findUnique({
       where: { id: checkoutId },
     });
-    if (!checkout) throw new Error("Checkout not found");
+    if (!checkout) throw notFound("Checkout");
     if (checkout.status !== "active") return checkout;
 
     return prisma.checkout.update({

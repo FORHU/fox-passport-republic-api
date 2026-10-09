@@ -1,3 +1,4 @@
+import { AppError, notFound } from "../../utils/errors";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
 import PricingSvc, { PricingContext } from "../pricing/pricing.service";
 import { Prisma, InvoiceSourceType } from "@prisma/client";
@@ -42,7 +43,7 @@ export default class InvoiceSvc {
     externalTx?: AppTransactionClient,
   ) {
     if (!data.items || data.items.length === 0) {
-      throw new Error("Cannot create an invoice without items.");
+      throw new AppError("Cannot create an invoice without items.", 400);
     }
 
     const run = async (tx: AppTransactionClient) => {
@@ -63,8 +64,9 @@ export default class InvoiceSvc {
         });
 
         if (existingItem) {
-          throw new Error(
+          throw new AppError(
             `Cannot invoice ${item.sourceType} ${item.sourceId} because it is already associated with invoice ${existingItem.invoiceId} (Status: ${existingItem.invoice.status})`,
+            400,
           );
         }
       }
@@ -155,7 +157,7 @@ export default class InvoiceSvc {
       where: { id: invoiceId },
       include: { items: true, checkouts: true, payments: true },
     });
-    if (!invoice) throw new Error("Invoice not found");
+    if (!invoice) throw notFound("Invoice");
     return invoice;
   }
 
@@ -198,7 +200,7 @@ export default class InvoiceSvc {
       where: { id: invoiceId },
       include: { payments: { orderBy: { createdAt: "desc" }, take: 1 } },
     });
-    if (!invoice) throw new Error("Invoice not found");
+    if (!invoice) throw notFound("Invoice");
 
     return {
       invoiceId: invoice.id,
@@ -212,9 +214,9 @@ export default class InvoiceSvc {
     const invoice = await prisma.invoice.findUnique({
       where: { id: invoiceId },
     });
-    if (!invoice) throw new Error("Invoice not found");
+    if (!invoice) throw notFound("Invoice");
     if (invoice.status === "paid") {
-      throw new Error("Cannot cancel a paid invoice");
+      throw new AppError("Cannot cancel a paid invoice", 400);
     }
 
     return prisma.invoice.update({

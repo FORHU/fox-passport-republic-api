@@ -1,6 +1,8 @@
+import { sendServerError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
-import BookingSvc, { BookingError } from "./booking.service";
+import BookingSvc from "./booking.service";
+import { AppError } from "../../utils/errors";
 import RefundSvc from "../refund/refund.service";
 import { totalPages } from "../../utils/pagination";
 
@@ -32,15 +34,14 @@ export default class BookingCtrl {
 
       return res.status(201).json({ success: true, data: result });
     } catch (e: unknown) {
-      if (e instanceof BookingError) {
+      if (e instanceof AppError) {
         return res.status(e.status).json({
           success: false,
           message: e.message,
           ...(e.code ? { code: e.code } : {}),
         });
       }
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -72,15 +73,14 @@ export default class BookingCtrl {
 
       return res.status(201).json({ success: true, data: result });
     } catch (e: unknown) {
-      if (e instanceof BookingError) {
+      if (e instanceof AppError) {
         return res.status(e.status).json({
           success: false,
           message: e.message,
           ...(e.code ? { code: e.code } : {}),
         });
       }
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -148,8 +148,7 @@ export default class BookingCtrl {
 
       return res.status(201).json({ success: true, data: booking });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -214,8 +213,7 @@ export default class BookingCtrl {
       const availability = await BookingSvc.getAvailability(templateId);
       return res.status(200).json({ success: true, data: availability });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -284,15 +282,17 @@ export default class BookingCtrl {
         },
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
   // GET ONE
   static async getBookingById(req: Request, res: Response) {
     try {
-      const booking = await BookingSvc.getBookingById(req.params.id, req.user);
+      const booking = await BookingSvc.getBookingForViewer(
+        req.params.id,
+        req.user,
+      );
       return res.status(200).json({ success: true, data: booking });
     } catch (e: unknown) {
       const error = e as Error;
@@ -320,8 +320,7 @@ export default class BookingCtrl {
       const bookings = await BookingSvc.getUpcomingBookings(req.user!.userId);
       return res.status(200).json({ success: true, data: bookings });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -346,8 +345,7 @@ export default class BookingCtrl {
         },
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -432,7 +430,7 @@ export default class BookingCtrl {
         payoutTriggered: result.payoutTriggered,
       });
     } catch (e: unknown) {
-      if (e instanceof BookingError) {
+      if (e instanceof AppError) {
         return res
           .status(e.status)
           .json({ success: false, message: e.message });
@@ -464,13 +462,12 @@ export default class BookingCtrl {
 
       return res.status(200).json({ success: true, data: updated });
     } catch (e: unknown) {
-      if (e instanceof BookingError) {
+      if (e instanceof AppError) {
         return res
           .status(e.status)
           .json({ success: false, message: e.message });
       }
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 

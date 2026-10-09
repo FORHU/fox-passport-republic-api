@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { prisma } from "../src/utils/prisma";
 
-const refundsCreateMock = vi
-  .fn()
-  .mockImplementation(async () => ({ id: `re_test_${Math.random().toString(36).slice(2)}`, status: "succeeded" }));
+const refundsCreateMock = vi.fn().mockImplementation(async () => ({
+  id: `re_test_${Math.random().toString(36).slice(2)}`,
+  status: "succeeded",
+}));
 
 vi.mock("stripe", () => {
   return {
@@ -17,7 +18,8 @@ vi.mock("stripe", () => {
 });
 
 const AdminSvc = (await import("../src/modules/admin/admin.service")).default;
-const InvoiceSvc = (await import("../src/modules/payment/invoice.service")).default;
+const InvoiceSvc = (await import("../src/modules/payment/invoice.service"))
+  .default;
 
 describe("AdminSvc.createItemizedRefund — itemized, remaining-balance-validated, idempotent", () => {
   const runId = Math.random().toString(36).substring(7);
@@ -32,13 +34,26 @@ describe("AdminSvc.createItemizedRefund — itemized, remaining-balance-validate
 
   beforeAll(async () => {
     const payer = await prisma.user.create({
-      data: { email: `refund_payer_${runId}@test.com`, password: "pw", name: "Payer" },
+      data: {
+        email: `refund_payer_${runId}@test.com`,
+        password: "pw",
+        name: "Payer",
+      },
     });
     const provider = await prisma.user.create({
-      data: { email: `refund_provider_${runId}@test.com`, password: "pw", name: "Provider" },
+      data: {
+        email: `refund_provider_${runId}@test.com`,
+        password: "pw",
+        name: "Provider",
+      },
     });
     const admin = await prisma.user.create({
-      data: { email: `refund_admin_${runId}@test.com`, password: "pw", name: "Admin", systemRole: "admin" },
+      data: {
+        email: `refund_admin_${runId}@test.com`,
+        password: "pw",
+        name: "Admin",
+        systemRole: "admin",
+      },
     });
     payerId = payer.id;
     providerId = provider.id;
@@ -62,10 +77,18 @@ describe("AdminSvc.createItemizedRefund — itemized, remaining-balance-validate
   });
 
   afterAll(async () => {
-    await prisma.refund.deleteMany({ where: { payment: { invoiceId: { in: invoiceIds } } } });
-    await prisma.eventAssetTransaction.deleteMany({ where: { id: { in: eatIds } } });
-    await prisma.invoiceItem.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
-    await prisma.payment.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+    await prisma.refund.deleteMany({
+      where: { payment: { invoiceId: { in: invoiceIds } } },
+    });
+    await prisma.eventAssetTransaction.deleteMany({
+      where: { id: { in: eatIds } },
+    });
+    await prisma.invoiceItem.deleteMany({
+      where: { invoiceId: { in: invoiceIds } },
+    });
+    await prisma.payment.deleteMany({
+      where: { invoiceId: { in: invoiceIds } },
+    });
     await prisma.invoice.deleteMany({ where: { id: { in: invoiceIds } } });
     await prisma.event.delete({ where: { id: eventId } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
@@ -111,7 +134,10 @@ describe("AdminSvc.createItemizedRefund — itemized, remaining-balance-validate
     });
     invoiceIds.push(invoice.id);
 
-    await prisma.invoice.update({ where: { id: invoice.id }, data: { status: "paid" } });
+    await prisma.invoice.update({
+      where: { id: invoice.id },
+      data: { status: "paid" },
+    });
     await prisma.payment.create({
       data: {
         invoiceId: invoice.id,
@@ -226,7 +252,9 @@ describe("AdminSvc.createItemizedRefund — itemized, remaining-balance-validate
     });
 
     expect(second.id).toBe(first.id);
-    const count = await prisma.refund.count({ where: { assetTransactionId: transaction.id } });
+    const count = await prisma.refund.count({
+      where: { assetTransactionId: transaction.id },
+    });
     expect(count).toBe(1);
   });
 

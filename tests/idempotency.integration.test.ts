@@ -195,7 +195,8 @@ describe("IdempotencySvc — atomic claim, lease, and completion guarding", () =
     // The row must be untouched by the zombie's write — still in_progress
     // under the second worker's token, not overwritten with the zombie's
     // result.
-    const row: { status: string; responseBody: unknown }[] = await prisma.$queryRaw`
+    const row: { status: string; responseBody: unknown }[] =
+      await prisma.$queryRaw`
       SELECT status, "responseBody" FROM request_idempotency_keys
       WHERE endpoint = ${endpoint} AND "idempotencyKey" = 'key-8'
     `;
@@ -210,7 +211,8 @@ describe("IdempotencySvc — atomic claim, lease, and completion guarding", () =
       status: "succeeded",
       responseBody: { from: "second-worker" },
     });
-    const rowAfter: { status: string; responseBody: unknown }[] = await prisma.$queryRaw`
+    const rowAfter: { status: string; responseBody: unknown }[] =
+      await prisma.$queryRaw`
       SELECT status, "responseBody" FROM request_idempotency_keys
       WHERE endpoint = ${endpoint} AND "idempotencyKey" = 'key-8'
     `;

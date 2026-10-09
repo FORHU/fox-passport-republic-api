@@ -38,13 +38,17 @@ vi.mock("../src/utils/prisma", () => ({
       })),
     },
     eventVenueTransaction: {
-      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => data),
+      create: vi.fn(
+        async ({ data }: { data: Record<string, unknown> }) => data,
+      ),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     $transaction: vi.fn(async (callback: (tx: any) => any) => {
       const tx = {
         eventVenueTransaction: {
-          create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => data),
+          create: vi.fn(
+            async ({ data }: { data: Record<string, unknown> }) => data,
+          ),
         },
       };
       return callback(tx);
@@ -120,6 +124,6 @@ describe("booking verification", () => {
         endDate: "2026-01-02T10:00:00.000Z",
         guestCount: 2,
       }),
-    ).rejects.toThrow("Identity verification required before booking");
+).rejects.toThrow("Please verify your email address before booking");
   });
 });

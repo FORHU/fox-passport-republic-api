@@ -1,3 +1,4 @@
+import { AppError, sendAppError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
 import PromotionSvc from "./promotion.service";
@@ -99,6 +100,7 @@ export default class PromotionCtrl {
       const promotions = await PromotionSvc.getAll(includeInactive);
       return res.status(200).json({ success: true, data: promotions });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
@@ -113,6 +115,7 @@ export default class PromotionCtrl {
       const promotion = await PromotionSvc.getById(value.id);
       return res.status(200).json({ success: true, data: promotion });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       return res.status(404).json({ success: false, message: error.message });
     }
@@ -126,6 +129,7 @@ export default class PromotionCtrl {
       const promotion = await PromotionSvc.create(value);
       return res.status(201).json({ success: true, data: promotion });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
@@ -146,6 +150,7 @@ export default class PromotionCtrl {
       const promotion = await PromotionSvc.update(params.id, value);
       return res.status(200).json({ success: true, data: promotion });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
@@ -162,6 +167,7 @@ export default class PromotionCtrl {
         .status(200)
         .json({ success: true, message: "Promotion deactivated" });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
@@ -186,6 +192,7 @@ export default class PromotionCtrl {
       );
       return res.status(201).json({ success: true, data: vouchers });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
@@ -206,6 +213,7 @@ export default class PromotionCtrl {
       const result = await PromotionSvc.importVouchers(params.id, value.codes);
       return res.status(201).json({ success: true, data: result });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
@@ -220,6 +228,7 @@ export default class PromotionCtrl {
       const analytics = await PromotionSvc.getAnalytics(value.id);
       return res.status(200).json({ success: true, data: analytics });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
@@ -246,6 +255,7 @@ export default class PromotionCtrl {
       );
       return res.status(200).json({ success: true, data: voucher });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
     }
@@ -259,6 +269,7 @@ export default class PromotionCtrl {
       const promotions = await PromotionSvc.getAllForProvider(providerId);
       return res.status(200).json({ success: true, data: promotions });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
@@ -273,6 +284,7 @@ export default class PromotionCtrl {
       const promotion = await PromotionSvc.createOwn(providerId, value);
       return res.status(201).json({ success: true, data: promotion });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       const status = error.message === "Unauthorized" ? 403 : 400;
       return res
@@ -301,6 +313,7 @@ export default class PromotionCtrl {
       );
       return res.status(200).json({ success: true, data: promotion });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       const status = error.message === "Unauthorized" ? 403 : 400;
       return res
@@ -321,6 +334,7 @@ export default class PromotionCtrl {
         .status(200)
         .json({ success: true, message: "Promotion deactivated" });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       const status = error.message === "Unauthorized" ? 403 : 400;
       return res
@@ -350,6 +364,7 @@ export default class PromotionCtrl {
       );
       return res.status(201).json({ success: true, data: vouchers });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       const status = error.message === "Unauthorized" ? 403 : 400;
       return res
@@ -378,6 +393,7 @@ export default class PromotionCtrl {
       );
       return res.status(201).json({ success: true, data: result });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       const status = error.message === "Unauthorized" ? 403 : 400;
       return res
@@ -399,6 +415,7 @@ export default class PromotionCtrl {
       );
       return res.status(200).json({ success: true, data: analytics });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       const status = error.message === "Unauthorized" ? 403 : 400;
       return res
@@ -430,6 +447,7 @@ export default class PromotionCtrl {
       );
       return res.status(200).json({ success: true, data: voucher });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       const status = error.message === "Unauthorized" ? 403 : 400;
       return res

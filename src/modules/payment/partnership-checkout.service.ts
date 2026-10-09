@@ -1,3 +1,4 @@
+import { AppError, notFound } from "../../utils/errors";
 import Stripe from "stripe";
 import { prisma } from "../../utils/prisma";
 import InvoiceSvc from "./invoice.service";
@@ -40,21 +41,23 @@ export default class PartnershipCheckoutSvc {
       },
     });
 
-    if (!proposal) throw new Error("Partnership Proposal not found");
+    if (!proposal) throw notFound("Partnership Proposal");
     if (proposal.partnerId !== payerId) {
-      throw new Error(
+      throw new AppError(
         "Unauthorized: only the proposing partner may pay this proposal",
+        403,
       );
     }
     if (proposal.status !== "accepted")
-      throw new Error("Proposal must be accepted before payment");
+      throw new AppError("Proposal must be accepted before payment", 400);
     if (proposal.partnershipType !== PartnershipType.sponsorship) {
-      throw new Error(
+      throw new AppError(
         "Only sponsorship proposals can be processed through the standard checkout flow",
+        400,
       );
     }
     if (!proposal.proposedAmount) {
-      throw new Error("Sponsorship proposal has no payable amount");
+      throw new AppError("Sponsorship proposal has no payable amount", 400);
     }
 
     // Same reasoning as EventCheckoutSvc.createEventCheckout: serialize
@@ -71,7 +74,10 @@ export default class PartnershipCheckoutSvc {
         );
         if (existing) {
           if (existing.status === "paid") {
-            throw new Error("This sponsorship has already been paid for.");
+            throw new AppError(
+              "This sponsorship has already been paid for.",
+              409,
+            );
           }
           if (
             (REUSABLE_STATUSES as readonly string[]).includes(existing.status)
@@ -129,18 +135,20 @@ export default class PartnershipCheckoutSvc {
       where: { id: proposalId },
       include: { targetEvent: true },
     });
-    if (!proposal) throw new Error("Partnership Proposal not found");
+    if (!proposal) throw notFound("Partnership Proposal");
     if (proposal.partnerId !== requesterId) {
-      throw new Error(
+      throw new AppError(
         "Unauthorized: only the sponsoring partner may cancel this",
+        403,
       );
     }
     if (
       proposal.targetEvent &&
       proposal.targetEvent.startAt.getTime() <= Date.now()
     ) {
-      throw new Error(
+      throw new AppError(
         "The sponsored event has already started — cancellation is no longer allowed",
+        400,
       );
     }
 
@@ -152,7 +160,7 @@ export default class PartnershipCheckoutSvc {
       invoice?.status === "refunded" ||
       invoice?.status === "partially_refunded"
     ) {
-      throw new Error("This sponsorship has already been refunded.");
+      throw new AppError("This sponsorship has already been refunded.", 409);
     }
     if (!invoice || invoice.status !== "paid") {
       if (invoice && invoice.status === "pending") {
@@ -168,8 +176,9 @@ export default class PartnershipCheckoutSvc {
     const payment = fullInvoice?.payments[0];
     const invoiceItem = fullInvoice?.items[0];
     if (!fullInvoice || !payment || !invoiceItem) {
-      throw new Error(
+      throw new AppError(
         "No successful payment found for this sponsorship's invoice.",
+        400,
       );
     }
 

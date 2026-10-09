@@ -1,3 +1,5 @@
+import { AppError } from "../../utils/errors";
+
 export type TransactionKind = "asset" | "service" | "venue";
 export type TransactionAction = "confirm" | "reject" | "cancel" | "expire";
 
@@ -15,7 +17,7 @@ export function isWithinDeadline(now: Date, deadline: Date | null): boolean {
   return now.getTime() <= deadline.getTime();
 }
 
-export class InvalidTransitionError extends Error {
+export class InvalidTransitionError extends AppError {
   constructor(
     public readonly kind: TransactionKind,
     public readonly fromStatus: string,
@@ -23,21 +25,20 @@ export class InvalidTransitionError extends Error {
   ) {
     super(
       `Cannot ${action} a ${kind} transaction currently in status "${fromStatus}"`,
+      409,
+      "INVALID_TRANSITION",
     );
-    this.name = "InvalidTransitionError";
   }
 }
 
-export class TransactionActorUnauthorizedError extends Error {
+export class TransactionActorUnauthorizedError extends AppError {
   constructor(message: string) {
-    super(message);
-    this.name = "TransactionActorUnauthorizedError";
+    super(message, 403);
   }
 }
 
-export class DeadlinePassedError extends Error {
+export class DeadlinePassedError extends AppError {
   constructor(message: string) {
-    super(message);
-    this.name = "DeadlinePassedError";
+    super(message, 409, "DEADLINE_PASSED");
   }
 }

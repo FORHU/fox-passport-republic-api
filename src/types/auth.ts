@@ -23,9 +23,6 @@ export interface AuthenticatedUser {
   roleType: RoleType[];
 }
 
-/** Roles accepted by `requireRole` — either a system role or a marketplace role. */
-export type AuthorizableRole = SystemRole | RoleType;
-
 /**
  * Every value the enum has, as a lookup.
  *

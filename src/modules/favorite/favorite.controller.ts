@@ -1,3 +1,4 @@
+import { sendServerError } from "../../utils/errors";
 import { Request, Response } from "express";
 import FavoriteSvc from "./favorite.service";
 
@@ -22,8 +23,7 @@ export default class FavoriteCtrl {
       const favorites = await FavoriteSvc.getUserFavorites(req.user!.userId);
       return res.status(200).json({ success: true, data: favorites });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 
@@ -46,8 +46,7 @@ export default class FavoriteCtrl {
       );
       return res.status(200).json({ success: true, data: { isFavorite } });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 

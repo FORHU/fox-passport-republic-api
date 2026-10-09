@@ -129,7 +129,8 @@ export default class ConfirmationDeadlineSweepSvc {
     for (const row of staleVenues) await expireOne("venue", row);
 
     return {
-      candidates: staleAssets.length + staleServices.length + staleVenues.length,
+      candidates:
+        staleAssets.length + staleServices.length + staleVenues.length,
       expired,
       alreadyResolved,
       failed,

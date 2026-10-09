@@ -3,6 +3,7 @@ import { prisma } from "../../utils/prisma";
 import { AffiliationInitiator, AffiliationStatus } from "@prisma/client";
 import { VenueAffiliationPermission } from "../../types/permissions";
 import NotificationService from "../notifications/user-notification.service";
+import AppointmentAccess from "../appointment/appointment.access";
 
 export default class VenueAffiliationSvc {
   // ── Event Foxer applies to a venue ──────────────────────────────────────
@@ -108,8 +109,16 @@ export default class VenueAffiliationSvc {
   }
 
   // The party that did NOT initiate is the one who must approve/reject —
-  // an application is approved by the venue mayor, an invite by the invitee.
-  private static async assertCanDecide(id: string, requesterId: string) {
+  // an application is decided on the venue's side, an invite by the invitee.
+  // The venue's side is its mayor or an Organizer holding
+  // `venue:approve-affiliations` — except that approving one that carries an
+  // `agreedPrice` is a price decision, and stays the mayor's alone (ADR 0005).
+  // An Organizer may still reject it.
+  private static async assertCanDecide(
+    id: string,
+    requesterId: string,
+    decision: "approve" | "reject",
+  ) {
     const affiliation = await VenueAffiliationRepo.findById(id);
     if (!affiliation) throw new Error("Affiliation not found");
     if (affiliation.status !== AffiliationStatus.pending) {
@@ -121,9 +130,21 @@ export default class VenueAffiliationSvc {
 
     if (affiliation.initiatedBy === AffiliationInitiator.eventFoxer) {
       if (!isVenueMayor) {
-        throw new Error(
-          "Unauthorized: only the venue owner can decide this application",
+        const isOrganizer = await AppointmentAccess.canOnVenue(
+          affiliation.venueId,
+          requesterId,
+          "venue:approve-affiliations",
         );
+        if (!isOrganizer) {
+          throw new Error(
+            "Unauthorized: only the venue's mayor or organizers can decide this application",
+          );
+        }
+        if (decision === "approve" && affiliation.agreedPrice !== null) {
+          throw new Error(
+            "Unauthorized: this application sets a price, so only the venue's mayor can approve it",
+          );
+        }
       }
     } else if (!isInvitedEventFoxer) {
       throw new Error(
@@ -134,9 +155,9 @@ export default class VenueAffiliationSvc {
     return affiliation;
   }
 
-  // The requester is always one of the two parties on an affiliation (every
-  // caller above already enforces that) — this just names "the other one",
-  // who is who gets notified of a decision they didn't make themselves.
+  // The requester is the Event Foxer or someone on the venue's side (its
+  // mayor, or one of its Organizers) — every caller above enforces that. This
+  // names the other side, who gets told of a decision they didn't make.
   private static otherPartyId(
     affiliation: {
       eventFoxerId: string;
@@ -144,13 +165,15 @@ export default class VenueAffiliationSvc {
     },
     requesterId: string,
   ) {
-    return affiliation.venue.mayorId === requesterId
-      ? affiliation.eventFoxerId
-      : affiliation.venue.mayorId;
+    // Decided by the Event Foxer: tell the venue. Decided on the venue's side
+    // (its mayor or one of its Organizers), tell the Event Foxer.
+    return affiliation.eventFoxerId === requesterId
+      ? affiliation.venue.mayorId
+      : affiliation.eventFoxerId;
   }
 
   static async approve(id: string, requesterId: string) {
-    const affiliation = await this.assertCanDecide(id, requesterId);
+    const affiliation = await this.assertCanDecide(id, requesterId, "approve");
     const updated = await VenueAffiliationRepo.setStatus(
       id,
       AffiliationStatus.approved,
@@ -170,7 +193,7 @@ export default class VenueAffiliationSvc {
   }
 
   static async reject(id: string, requesterId: string, reason?: string) {
-    const affiliation = await this.assertCanDecide(id, requesterId);
+    const affiliation = await this.assertCanDecide(id, requesterId, "reject");
     const updated = await VenueAffiliationRepo.setStatus(
       id,
       AffiliationStatus.rejected,
@@ -289,8 +312,14 @@ export default class VenueAffiliationSvc {
   static async getForVenue(venueId: string, requesterId: string) {
     const venue = await prisma.venue.findUnique({ where: { id: venueId } });
     if (!venue) throw new Error("Venue not found");
-    if (venue.mayorId !== requesterId) {
-      throw new Error("Unauthorized: you do not own this venue");
+    if (
+      !(await AppointmentAccess.canOnVenue(
+        venueId,
+        requesterId,
+        "venue:approve-affiliations",
+      ))
+    ) {
+      throw new Error("Unauthorized: you do not run this venue");
     }
     return VenueAffiliationRepo.findForVenue(venueId);
   }

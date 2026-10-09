@@ -12,7 +12,9 @@ async function main() {
   console.log("Seeding test scenario...");
 
   // 1. Get or create a test user (Client/Host)
-  let testUser = await prisma.user.findFirst({ where: { roleType: { has: "eventFoxer" } } });
+  let testUser = await prisma.user.findFirst({
+    where: { roleType: { has: "eventFoxer" } },
+  });
   if (!testUser) {
     testUser = await prisma.user.create({
       data: {
@@ -26,7 +28,9 @@ async function main() {
   }
 
   // 2. Get or create a venue mayor
-  let venueMayor = await prisma.user.findFirst({ where: { roleType: { has: "venueFoxer" } } });
+  let venueMayor = await prisma.user.findFirst({
+    where: { roleType: { has: "venueFoxer" } },
+  });
   if (!venueMayor) {
     venueMayor = await prisma.user.create({
       data: {
@@ -78,7 +82,7 @@ async function main() {
 
   // 5. Generate a lot of Gear (Assets) and Talent (Services)
   const providerIds: string[] = [];
-  
+
   // Create some gear and talent foxers
   for (let i = 0; i < 20; i++) {
     const provider = await prisma.user.create({
@@ -152,14 +156,15 @@ async function main() {
             agreedPrice: service.price,
           },
         });
-
       }
     }
   }
 
   console.log("✅ Seed complete! You now have:");
   console.log("- A venue with in-house gear & talent.");
-  console.log("- An event with many pending/approved gear & talent transactions and bids.");
+  console.log(
+    "- An event with many pending/approved gear & talent transactions and bids.",
+  );
 }
 
 main()

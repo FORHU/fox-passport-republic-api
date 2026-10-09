@@ -98,7 +98,14 @@ export default class RoleRequestRepo {
             selfieFile: true,
           },
         },
-        investorApplication: true,
+        investorApplication: { include: { proofOfFunds: true } },
+        organizerApplication: {
+          include: {
+            validId1: true,
+            backgroundClearanceFile: true,
+            selfieFile: true,
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -115,7 +122,8 @@ export default class RoleRequestRepo {
         gearFoxerApplication: true,
         serviceFoxerApplication: true,
         performerFoxerApplication: true,
-        investorApplication: true,
+        investorApplication: { include: { proofOfFunds: true } },
+        organizerApplication: true,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -175,7 +183,14 @@ export default class RoleRequestRepo {
             selfieFile: true,
           },
         },
-        investorApplication: true,
+        investorApplication: { include: { proofOfFunds: true } },
+        organizerApplication: {
+          include: {
+            validId1: true,
+            backgroundClearanceFile: true,
+            selfieFile: true,
+          },
+        },
       },
     });
   }
@@ -209,7 +224,16 @@ export default class RoleRequestRepo {
     requestId: string,
     fileColumns: Record<string, string>,
   ) {
-    return (prisma[applicationModel as keyof typeof prisma] as any).update({
+    const applicationDelegate = prisma[
+      applicationModel as keyof typeof prisma
+    ] as unknown as {
+      update: (args: {
+        where: { requestId: string };
+        data: Record<string, string>;
+      }) => Promise<unknown>;
+    };
+
+    return applicationDelegate.update({
       where: { requestId },
       data: fileColumns,
     });

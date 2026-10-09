@@ -1,8 +1,13 @@
 import { Request, Response } from "express";
 import RoleRequestService from "./role-request.service";
-import S3Svc from "../s3/s3.service";
 import FileSvc from "../file/file.service";
-import { RequestStatus, RoleType } from "@prisma/client";
+import { signPrivateFiles } from "../../utils/private-files";
+import {
+  EventCategory,
+  RequestStatus,
+  RoleType,
+  VenueCategory,
+} from "@prisma/client";
 import {
   announceAdminQueueChanged,
   announceToUser,
@@ -16,7 +21,54 @@ const FILE_FIELD_TO_DB_COLUMN: Record<string, string> = {
   birPermitFile: "birPermitFileId",
   selfieFile: "selfieFileId",
   portfolioFile: "portfolioFileId",
+  backgroundClearanceFile: "backgroundClearanceFileId", // organizer only
 };
+
+// An Organizer's specializations are the kinds of events and venues they have
+// helped run, so they draw from both vocabularies.
+const ORGANIZER_SPECIALIZATIONS = new Set<string>([
+  ...Object.values(EventCategory),
+  ...Object.values(VenueCategory),
+]);
+
+// The Organizer role exists to vet a person before any Mayor or Event Owner
+// can appoint them (docs/adr/0005), so unlike the Foxer roles every identity
+// document is required, not optional.
+const ORGANIZER_REQUIRED_DOCUMENTS = [
+  "validId1FileId",
+  "backgroundClearanceFileId",
+  "selfieFileId",
+] as const;
+
+export function validateOrganizerApplication(
+  data: Record<string, unknown>,
+): string | null {
+  if (typeof data.bio !== "string" || data.bio.trim().length === 0) {
+    return "A short bio is required";
+  }
+  if (typeof data.location !== "string" || data.location.trim().length === 0) {
+    return "Location is required";
+  }
+  const experience = Number(data.experience);
+  if (!Number.isInteger(experience) || experience < 0 || experience > 100) {
+    return "Years of experience must be between 0 and 100";
+  }
+  data.experience = experience;
+  const specializations = data.specializations ?? [];
+  if (
+    !Array.isArray(specializations) ||
+    specializations.some((s) => !ORGANIZER_SPECIALIZATIONS.has(String(s)))
+  ) {
+    return "Specializations must be event or venue categories";
+  }
+  const missing = ORGANIZER_REQUIRED_DOCUMENTS.filter(
+    (field) => typeof data[field] !== "string" || data[field] === "",
+  );
+  if (missing.length > 0) {
+    return "A valid ID, a background clearance and a selfie are all required";
+  }
+  return null;
+}
 
 export default class RoleRequestController {
   /**
@@ -48,7 +100,7 @@ export default class RoleRequestController {
           .json({ success: false, message: "Invalid role type" });
       }
 
-      // Process each uploaded file through the 4-step pipeline
+      // Store each uploaded document
       const files = req.files as
         Record<string, Express.Multer.File[]> | undefined;
 
@@ -60,22 +112,8 @@ export default class RoleRequestController {
           const dbColumn = FILE_FIELD_TO_DB_COLUMN[fieldName];
           if (!dbColumn) continue;
 
-          // 1. GET URL TO UPLOAD — generate presigned PUT URL & S3 key
-          //    (uploadFile handles this internally: generates key + uploads)
-
-          // 2. UPLOAD THE FILE — upload file buffer to S3
-          const { key } = await S3Svc.uploadFile(userId, file);
-
-          // 3. GET CLOUDFRONT URL — get public URL for the uploaded file
-          const { url } = await S3Svc.generateDownloadUrl(key);
-
-          // 4. CREATE FILE — register file record in DB
-          const dbFile = await FileSvc.createFile({
-            name: file.originalname,
-            type: file.mimetype,
-            url,
-            uploadedBy: userId,
-          });
+          // Identity documents go to the private bucket — no public URL.
+          const dbFile = await FileSvc.storePrivateDocument(userId, file);
 
           // Inject the file ID into application data
           data[dbColumn] = dbFile.id;
@@ -136,6 +174,15 @@ export default class RoleRequestController {
         });
       }
 
+      if (roleType === RoleType.organizer) {
+        const organizerError = validateOrganizerApplication(data);
+        if (organizerError) {
+          return res
+            .status(400)
+            .json({ success: false, message: organizerError });
+        }
+      }
+
       const application = await RoleRequestService.submitApplication(
         userId,
         roleType,
@@ -175,8 +222,9 @@ export default class RoleRequestController {
   static async list(req: Request, res: Response) {
     try {
       const { status } = req.query;
-      const requests = await RoleRequestService.getRequests(
-        status as RequestStatus,
+      // Admin-only route, so the documents get their short-lived links here.
+      const requests = await signPrivateFiles(
+        await RoleRequestService.getRequests(status as RequestStatus),
       );
 
       return res.status(200).json({

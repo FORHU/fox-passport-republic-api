@@ -8,6 +8,8 @@ model User {
   address                  String?
   city                     String?
   state                    String?
+  // Barangay in the Philippines; district or neighbourhood elsewhere. Optional.
+  district                 String?
   country                  String?                      @default("Philippines")
   username                 String?                      @unique
   googleId                 String?                      @unique
@@ -23,8 +25,10 @@ model User {
   assetTransactions        EventAssetTransaction[]      @relation("AssetProvider")
   clientEvents             Event[]                      @relation("EventClient")
   organizedEvents          Event[]                      @relation("EventOrganizer")
-  organizerAssignments     EventOrganizerAssignment[]   @relation("EventOrganizerAssignmentDelegate")
-  organizerAssignmentsMade EventOrganizerAssignment[]   @relation("EventOrganizerAssignmentAssignedBy")
+  appointments             Appointment[]                @relation("AppointmentAppointee")
+  appointmentsMade         Appointment[]                @relation("AppointmentAppointedBy")
+  appointmentsEnded        Appointment[]                @relation("AppointmentEndedBy")
+  organizerEventXp         OrganizerEventXp[]
   serviceTransactions      EventServiceTransaction[]    @relation("ServiceProvider")
   eventTemplates           EventTemplate[]
   venueTransactions        EventVenueTransaction[]      @relation("VenueProvider")
@@ -46,6 +50,12 @@ model User {
   stripeChargesEnabled     Boolean                      @default(false)
   stripePayoutsEnabled     Boolean                      @default(false)
   isEmailVerified          Boolean                      @default(false)
+  // Set when an admin approves an IdentityVerification. Display-only — a
+  // "Verified" badge, never a booking requirement (booking needs only a
+  // verified email).
+  identityVerifiedAt       DateTime?
+  identityVerifications    IdentityVerification[]       @relation("IdentityApplicant")
+  identityReviews          IdentityVerification[]       @relation("IdentityReviewer")
   // Display-only — never used for pricing/charging, which always stays in
   // whatever currency the underlying row (Invoice, PlatformFeeConfig, etc)
   // was created in. Purely so the UI can show converted amounts.
@@ -58,6 +68,7 @@ model User {
   refreshTokens            RefreshToken[]
   conversationsAsA         Conversation[]               @relation("ConversationUserA")
   conversationsAsB         Conversation[]               @relation("ConversationUserB")
+  inboxConversations       Conversation[]               @relation("ConversationGuest")
   messagesSent             Message[]
   posts                    Post[]
   postComments             PostComment[]
@@ -80,6 +91,7 @@ model User {
   postMediaTags            PostMediaTag[]
   pollVotes                PollVote[]
   reportsFiled             Report[]
+  reportsResolved          Report[]                     @relation("ReportResolvedBy")
   groupConversations       ConversationParticipant[]
   messageReactions         MessageReaction[]
   conversationReads        ConversationRead[]
@@ -116,6 +128,7 @@ model RoleRequest {
   performerFoxerApplication PerformerFoxerApplication?
   eventFoxerApplication     EventFoxerApplication?
   investorApplication       InvestorApplication?
+  organizerApplication      OrganizerApplication?
   venueFoxerApplication     VenueFoxerApplication?
   reviewer                  User?                      @relation("Reviewer", fields: [reviewedBy], references: [id])
   user                      User                       @relation("Applicant", fields: [userId], references: [id], onDelete: Cascade)
@@ -367,4 +380,59 @@ model PartnerProfile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("partner_profiles")
+}
+
+// An Organizer is vetted as a person, not as a business — see
+// docs/adr/0005-organizer-role-and-appointments.md. So identity documents
+// only: no tax or business-permit files. The document fields are named
+// generically rather than after one country's paperwork (NBI, TIN, BIR);
+// `backgroundClearanceFile` is whatever police/background clearance the
+// applicant's country issues.
+model OrganizerApplication {
+  id                        String      @id @default(uuid())
+  requestId                 String      @unique
+  bio                       String
+  experience                Int
+  location                  String
+  // Values from EventCategory and VenueCategory — the kinds of events and
+  // venues this person has helped run.
+  specializations           String[]
+  validId1FileId            String?
+  backgroundClearanceFileId String?
+  selfieFileId              String?
+  createdAt                 DateTime    @default(now())
+  updatedAt                 DateTime    @updatedAt
+  request                   RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  validId1                  File?       @relation("OrganizerValidId1", fields: [validId1FileId], references: [id])
+  backgroundClearanceFile   File?       @relation("OrganizerBackgroundClearance", fields: [backgroundClearanceFileId], references: [id])
+  selfieFile                File?       @relation("OrganizerSelfie", fields: [selfieFileId], references: [id])
+
+  @@map("organizer_applications")
+}
+
+// A citizen proving who they are with a government ID, reviewed by an admin.
+// Optional and separate from role applications: it earns a "Verified" badge
+// (User.identityVerifiedAt) and unlocks nothing else.
+model IdentityVerification {
+  id              String        @id @default(uuid())
+  userId          String
+  // "passport" | "drivers_license" | "national_id" | "other" — validated in
+  // the service, kept as text so new document kinds need no migration.
+  idType          String
+  idFileId        String
+  selfieFileId    String?
+  status          RequestStatus @default(pending)
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  user            User          @relation("IdentityApplicant", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer        User?         @relation("IdentityReviewer", fields: [reviewedBy], references: [id])
+  idFile          File          @relation("IdentityIdFile", fields: [idFileId], references: [id])
+  selfieFile      File?         @relation("IdentitySelfie", fields: [selfieFileId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@map("identity_verifications")
 }

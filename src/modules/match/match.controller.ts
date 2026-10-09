@@ -1,3 +1,4 @@
+import { AppError, sendAppError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
 import MatchSvc from "./match.service";
@@ -69,6 +70,7 @@ export default class MatchController {
         clientSecret: null,
       });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       res.status(500).json({ message: error.message });
     }
@@ -81,6 +83,7 @@ export default class MatchController {
       const matches = await MatchSvc.getMyMatches(clientId);
       res.status(200).json({ success: true, data: matches });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       res.status(500).json({ message: error.message });
     }
@@ -93,6 +96,7 @@ export default class MatchController {
       await MatchSvc.acceptMatch(req.params.id, foxerId);
       res.status(200).json({ success: true, message: "Match accepted" });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       const status =
         error.message === "Unauthorized"
@@ -112,6 +116,7 @@ export default class MatchController {
       await MatchSvc.declineMatch(req.params.id, foxerId, reason);
       res.status(200).json({ success: true, message: "Match declined" });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       const status =
         error.message === "Unauthorized"
@@ -132,6 +137,7 @@ export default class MatchController {
       const result = await MatchSvc.getFoxerClientInbox(foxerId, limit, offset);
       res.status(200).json({ success: true, ...result });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       res.status(500).json({ message: error.message });
     }

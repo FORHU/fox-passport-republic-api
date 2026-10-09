@@ -1,3 +1,4 @@
+import { AppError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
 import EventCheckoutSvc, {
@@ -19,7 +20,11 @@ import { AvailabilityConflictError } from "../availability/availability.types";
  * `{ success, data }` envelope — the frontend is already built against them
  * exactly as documented there.
  */
-function statusForCheckoutError(message: string): number {
+function statusForCheckoutError(err: Error): number {
+  // Errors thrown as AppError carry their own status. The message matching
+  // below is the fallback for anything still thrown as a plain Error.
+  if (err instanceof AppError) return err.status;
+  const message = err.message;
   if (message.includes("not found")) return 404;
   if (message.startsWith("Unauthorized")) return 403;
   if (message.includes("already been paid")) return 409;
@@ -67,8 +72,12 @@ function checkoutErrorResponse(err: Error): {
     };
   }
   return {
-    status: statusForCheckoutError(err.message),
-    body: { success: false, message: err.message },
+    status: statusForCheckoutError(err),
+    body: {
+      success: false,
+      message: err.message,
+      ...(err instanceof AppError ? { code: err.code } : {}),
+    },
   };
 }
 
@@ -156,7 +165,7 @@ export default class CheckoutController {
     } catch (e: unknown) {
       const err = e as Error;
       return res
-        .status(statusForCheckoutError(err.message))
+        .status(statusForCheckoutError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -183,7 +192,7 @@ export default class CheckoutController {
     } catch (e: unknown) {
       const err = e as Error;
       return res
-        .status(statusForCheckoutError(err.message))
+        .status(statusForCheckoutError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -202,7 +211,7 @@ export default class CheckoutController {
     } catch (e: unknown) {
       const err = e as Error;
       return res
-        .status(statusForCheckoutError(err.message))
+        .status(statusForCheckoutError(err))
         .json({ success: false, message: err.message });
     }
   }
@@ -225,7 +234,12 @@ export default class CheckoutController {
       });
     } catch (e: unknown) {
       const err = e as Error;
-      const status = err.message.includes("not found") ? 404 : 400;
+      const status =
+        err instanceof AppError
+          ? err.status
+          : err.message.includes("not found")
+            ? 404
+            : 400;
       return res.status(status).json({ success: false, message: err.message });
     }
   }

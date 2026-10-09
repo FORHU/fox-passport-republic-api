@@ -241,7 +241,7 @@ describe("VenueAffiliationSvc", () => {
 
       await expect(
         VenueAffiliationSvc.approve("aff1", "organizer1"),
-      ).rejects.toThrow("only the venue owner can decide");
+      ).rejects.toThrow("only the venue's mayor or organizers can decide");
     });
 
     it("lets the invited event foxer approve an invite", async () => {
@@ -307,7 +307,9 @@ describe("VenueAffiliationSvc", () => {
     };
 
     it("lets the applicant (event foxer) cancel their own pending application", async () => {
-      (prisma.venueEventFoxerAffiliation.findUnique as any).mockResolvedValue(pendingRow);
+      (prisma.venueEventFoxerAffiliation.findUnique as any).mockResolvedValue(
+        pendingRow,
+      );
       (prisma.venueEventFoxerAffiliation.update as any).mockResolvedValue({
         ...pendingRow,
         status: "revoked",
@@ -318,7 +320,9 @@ describe("VenueAffiliationSvc", () => {
     });
 
     it("lets the inviter (venue mayor) cancel a pending invite/application", async () => {
-      (prisma.venueEventFoxerAffiliation.findUnique as any).mockResolvedValue(pendingRow);
+      (prisma.venueEventFoxerAffiliation.findUnique as any).mockResolvedValue(
+        pendingRow,
+      );
       (prisma.venueEventFoxerAffiliation.update as any).mockResolvedValue({
         ...pendingRow,
         status: "revoked",
@@ -329,7 +333,9 @@ describe("VenueAffiliationSvc", () => {
     });
 
     it("refuses a stranger (neither party) cancelling a pending affiliation", async () => {
-      (prisma.venueEventFoxerAffiliation.findUnique as any).mockResolvedValue(pendingRow);
+      (prisma.venueEventFoxerAffiliation.findUnique as any).mockResolvedValue(
+        pendingRow,
+      );
 
       await expect(
         VenueAffiliationSvc.cancel("aff1", "stranger"),
@@ -382,7 +388,9 @@ describe("VenueAffiliationSvc", () => {
     };
 
     it("lets the venue owner revoke an approved affiliation", async () => {
-      (prisma.venueEventFoxerAffiliation.findUnique as any).mockResolvedValue(approvedRow);
+      (prisma.venueEventFoxerAffiliation.findUnique as any).mockResolvedValue(
+        approvedRow,
+      );
       (prisma.venueEventFoxerAffiliation.update as any).mockResolvedValue({
         ...approvedRow,
         status: "revoked",
@@ -393,7 +401,9 @@ describe("VenueAffiliationSvc", () => {
     });
 
     it("refuses the affiliated event foxer revoking their own approved affiliation", async () => {
-      (prisma.venueEventFoxerAffiliation.findUnique as any).mockResolvedValue(approvedRow);
+      (prisma.venueEventFoxerAffiliation.findUnique as any).mockResolvedValue(
+        approvedRow,
+      );
 
       await expect(
         VenueAffiliationSvc.revoke("aff1", "organizer1"),
@@ -403,7 +413,9 @@ describe("VenueAffiliationSvc", () => {
     });
 
     it("refuses a stranger revoking someone else's approved affiliation", async () => {
-      (prisma.venueEventFoxerAffiliation.findUnique as any).mockResolvedValue(approvedRow);
+      (prisma.venueEventFoxerAffiliation.findUnique as any).mockResolvedValue(
+        approvedRow,
+      );
 
       await expect(
         VenueAffiliationSvc.revoke("aff1", "stranger"),
@@ -453,16 +465,20 @@ describe("VenueAffiliationSvc", () => {
         permissions: ["template:attach", "calendar:block"],
       });
 
-      const result = await VenueAffiliationSvc.getApprovedAffiliationWithPermission(
-        "v1",
-        "organizer1",
-        "template:attach",
-      );
+      const result =
+        await VenueAffiliationSvc.getApprovedAffiliationWithPermission(
+          "v1",
+          "organizer1",
+          "template:attach",
+        );
       expect(result).toBeNull();
     });
 
     it("re-applying to a revoked affiliation reopens it to pending, never directly to approved", async () => {
-      (prisma.venue.findUnique as any).mockResolvedValue({ id: "v1", mayorId: "mayor1" });
+      (prisma.venue.findUnique as any).mockResolvedValue({
+        id: "v1",
+        mayorId: "mayor1",
+      });
       (prisma.venueEventFoxerAffiliation.findUnique as any).mockResolvedValue({
         id: "aff1",
         status: "revoked",
@@ -485,7 +501,10 @@ describe("VenueAffiliationSvc", () => {
     });
 
     it("re-inviting to a revoked affiliation reopens it to pending, never directly to approved", async () => {
-      (prisma.venue.findUnique as any).mockResolvedValue({ id: "v1", mayorId: "mayor1" });
+      (prisma.venue.findUnique as any).mockResolvedValue({
+        id: "v1",
+        mayorId: "mayor1",
+      });
       (prisma.user.findUnique as any).mockResolvedValue({
         id: "organizer1",
         roleType: ["eventFoxer"],
@@ -500,7 +519,11 @@ describe("VenueAffiliationSvc", () => {
         initiatedBy: "venueFoxer",
       });
 
-      const result = await VenueAffiliationSvc.invite("v1", "organizer1", "mayor1");
+      const result = await VenueAffiliationSvc.invite(
+        "v1",
+        "organizer1",
+        "mayor1",
+      );
       expect(result.status).toBe("pending");
     });
   });
@@ -510,11 +533,12 @@ describe("VenueAffiliationSvc", () => {
       (prisma.venueEventFoxerAffiliation.findUnique as any).mockResolvedValue(
         null,
       );
-      const result = await VenueAffiliationSvc.getApprovedAffiliationWithPermission(
-        "v1",
-        "organizer1",
-        "template:attach",
-      );
+      const result =
+        await VenueAffiliationSvc.getApprovedAffiliationWithPermission(
+          "v1",
+          "organizer1",
+          "template:attach",
+        );
       expect(result).toBeNull();
     });
 
@@ -523,11 +547,12 @@ describe("VenueAffiliationSvc", () => {
         status: "pending",
         permissions: ["template:attach"],
       });
-      const result = await VenueAffiliationSvc.getApprovedAffiliationWithPermission(
-        "v1",
-        "organizer1",
-        "template:attach",
-      );
+      const result =
+        await VenueAffiliationSvc.getApprovedAffiliationWithPermission(
+          "v1",
+          "organizer1",
+          "template:attach",
+        );
       expect(result).toBeNull();
     });
 
@@ -536,11 +561,12 @@ describe("VenueAffiliationSvc", () => {
         status: "approved",
         permissions: ["calendar:block"],
       });
-      const result = await VenueAffiliationSvc.getApprovedAffiliationWithPermission(
-        "v1",
-        "organizer1",
-        "template:attach",
-      );
+      const result =
+        await VenueAffiliationSvc.getApprovedAffiliationWithPermission(
+          "v1",
+          "organizer1",
+          "template:attach",
+        );
       expect(result).toBeNull();
     });
 
@@ -549,11 +575,12 @@ describe("VenueAffiliationSvc", () => {
       (prisma.venueEventFoxerAffiliation.findUnique as any).mockResolvedValue(
         row,
       );
-      const result = await VenueAffiliationSvc.getApprovedAffiliationWithPermission(
-        "v1",
-        "organizer1",
-        "template:attach",
-      );
+      const result =
+        await VenueAffiliationSvc.getApprovedAffiliationWithPermission(
+          "v1",
+          "organizer1",
+          "template:attach",
+        );
       expect(result).toBe(row);
     });
   });

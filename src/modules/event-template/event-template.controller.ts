@@ -1,3 +1,4 @@
+import { AppError, sendAppError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
 import { totalPages } from "../../utils/pagination";
@@ -40,6 +41,7 @@ export default class EventTemplateCtrl {
         .status(201)
         .json({ message: "Template created successfully", template });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res.status(400).json({ message: error.message });
     }
@@ -80,6 +82,7 @@ export default class EventTemplateCtrl {
         .status(200)
         .json({ message: "Template updated successfully", template });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       const status = error.message.includes("Unauthorized")
         ? 403
@@ -101,6 +104,7 @@ export default class EventTemplateCtrl {
       );
       return res.status(200).json({ templates });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res.status(500).json({ message: error.message });
     }
@@ -121,6 +125,7 @@ export default class EventTemplateCtrl {
       });
       return res.status(200).json({ templates, total });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res.status(500).json({ message: error.message });
     }
@@ -155,6 +160,7 @@ export default class EventTemplateCtrl {
         },
       });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res.status(500).json({ message: error.message });
     }
@@ -169,6 +175,7 @@ export default class EventTemplateCtrl {
       }
       return res.status(200).json({ success: true, data: template });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res.status(404).json({ message: error.message });
     }
@@ -179,6 +186,7 @@ export default class EventTemplateCtrl {
       const template = await EventTemplateSvc.getTemplateById(req.params.id);
       return res.status(200).json({ template });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res.status(404).json({ message: error.message });
     }
@@ -214,6 +222,7 @@ export default class EventTemplateCtrl {
       );
       return res.status(200).json({ message: "Asset attached", result });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res
         .status(error.message.includes("Unauthorized") ? 403 : 400)
@@ -232,6 +241,7 @@ export default class EventTemplateCtrl {
       );
       return res.status(200).json(result);
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res
         .status(error.message.includes("Unauthorized") ? 403 : 400)
@@ -267,6 +277,7 @@ export default class EventTemplateCtrl {
       );
       return res.status(200).json({ message: "Service attached", result });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res
         .status(error.message.includes("Unauthorized") ? 403 : 400)
@@ -285,6 +296,7 @@ export default class EventTemplateCtrl {
       );
       return res.status(200).json(result);
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res
         .status(error.message.includes("Unauthorized") ? 403 : 400)
@@ -320,6 +332,7 @@ export default class EventTemplateCtrl {
       );
       return res.status(200).json({ message: "Venue attached", result });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res
         .status(error.message.includes("Unauthorized") ? 403 : 400)
@@ -338,6 +351,7 @@ export default class EventTemplateCtrl {
       );
       return res.status(200).json(result);
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res
         .status(error.message.includes("Unauthorized") ? 403 : 400)
@@ -358,6 +372,7 @@ export default class EventTemplateCtrl {
         .status(200)
         .json({ message: "Template submitted for review", template });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       if (error.message.includes("not found"))
         return res.status(404).json({ message: error.message });
@@ -378,6 +393,7 @@ export default class EventTemplateCtrl {
       announceAdminQueueChanged();
       return res.status(200).json(result);
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res
         .status(error.message.includes("Unauthorized") ? 403 : 400)
@@ -396,6 +412,7 @@ export default class EventTemplateCtrl {
       });
       return res.status(200).json(results);
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res.status(400).json({ message: error.message });
     }
@@ -427,6 +444,7 @@ export default class EventTemplateCtrl {
         .status(200)
         .json({ message: "Item matched successfully", result });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res
         .status(error.message.includes("Unauthorized") ? 403 : 400)
@@ -441,6 +459,7 @@ export default class EventTemplateCtrl {
       const data = await EventTemplateSvc.getOutgoingMatchRequests(ownerId);
       return res.status(200).json({ success: true, data });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res.status(500).json({ message: error.message });
     }
@@ -453,6 +472,7 @@ export default class EventTemplateCtrl {
       const data = await EventTemplateSvc.getIncomingMatchRequests(userId);
       return res.status(200).json({ success: true, data });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res.status(500).json({ message: error.message });
     }
@@ -477,6 +497,7 @@ export default class EventTemplateCtrl {
       });
       return res.status(200).json({ success: true, data: result });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const error = e as Error;
       return res
         .status(error.message.includes("unauthorized") ? 403 : 400)
@@ -489,6 +510,7 @@ export default class EventTemplateCtrl {
       const data = await EventTemplateSvc.getRecommendations();
       return res.status(200).json({ success: true, data });
     } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
       const err = e as Error;
       return res.status(500).json({ success: false, message: err.message });
     }

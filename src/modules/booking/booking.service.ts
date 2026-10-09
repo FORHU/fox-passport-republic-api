@@ -1,8 +1,10 @@
+import { AppError, notFound } from "../../utils/errors";
 import Stripe from "stripe";
 import BookingRepo from "./booking.repository";
 import EventRepo from "../event/event.repository";
 import EventRequestRepo from "../event-request/event-request.repository";
-import EventOrganizerRepo from "../event-organizer/event-organizer.repository";
+import AppointmentAccess from "../appointment/appointment.access";
+import OrganizerXpService from "../appointment/organizer-xp.service";
 import EventTemplateSvc from "../event-template/event-template.service";
 import PaymentSvc from "../payment/payment.service";
 import PaymentRepo from "../payment/payment.repository";
@@ -12,7 +14,7 @@ import PromotionSvc from "../promotion/promotion.service";
 import RefundSvc from "../refund/refund.service";
 import WaitlistSvc from "../waitlist/waitlist.service";
 import NotificationService from "../notifications/user-notification.service";
-import { STRIPE_SECRET_KEY } from "../../config";
+import { PLATFORM_FEE_PERCENT, STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents, formatCurrency } from "../../utils/pricing";
 import { sendBookingCancelledEmail } from "../../utils/emails/cancellation";
 import { sendBookingConfirmationEmail } from "../../utils/emails/confirmation";
@@ -29,6 +31,7 @@ import {
   PaymentStatus,
   Prisma,
   RefundStatus,
+  TransactionStatus,
   type Refund,
 } from "@prisma/client";
 import { can } from "../../types/permissions";
@@ -89,14 +92,9 @@ function announceBookingChanged(
  * phone. Mapping them from message text would have been the alternative, and
  * that is how `checkInBooking` used to do it. Mirrors `RoleAssignmentError`.
  */
-export class BookingError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly code?: string,
-  ) {
-    super(message);
-    this.name = "BookingError";
+export class BookingError extends AppError {
+  constructor(message: string, status: number, code?: string) {
+    super(message, status, code);
   }
 }
 
@@ -162,11 +160,15 @@ export default class BookingSvc {
     });
 
     if (!user) {
-      throw new Error("User not found");
+    if (!user) {
+      throw notFound("User");
     }
 
     if (user.isEmailVerified !== true) {
-      throw new Error("Identity verification required before booking");
+      throw new AppError(
+        "Please verify your email address before booking",
+        403,
+      );
     }
   }
 
@@ -234,8 +236,10 @@ export default class BookingSvc {
 
     const extraGuests = Math.max(0, guestCount - venue.capacity);
     if (extraGuests > 0 && !venue.extraGuestRate) {
-      throw new Error(
+      throw new AppError(
         `This venue only accommodates ${venue.capacity} guests and does not accept requests beyond capacity.`,
+        400,
+      );
       );
     }
     const overageAmount = venue.extraGuestRate
@@ -274,7 +278,10 @@ export default class BookingSvc {
       }
     }
     const discountedItemsTotal = itemsTotal.sub(discountAmount);
-    const platformFeeAmount = discountedItemsTotal.mul(0.05);
+    // Same configured rate as every other booking path (was a hardcoded 5%).
+    const platformFeeAmount = discountedItemsTotal.mul(
+      PLATFORM_FEE_PERCENT / 100,
+    );
     const totalAmount = discountedItemsTotal.add(platformFeeAmount);
 
     return {
@@ -302,7 +309,7 @@ export default class BookingSvc {
     const venue = await prisma.venue.findUnique({
       where: { id: data.venueId },
     });
-    if (!venue) throw new Error("Venue not found");
+    if (!venue) throw notFound("Venue");
 
     const pricing = await this.priceVenueBooking(
       venue,
@@ -361,7 +368,9 @@ export default class BookingSvc {
           event: {
             select: {
               name: true,
-              venueTransactions: { select: { venue: { select: { name: true } } } },
+              venueTransactions: {
+                select: { venue: { select: { name: true } } },
+              },
             },
           },
         },
@@ -402,9 +411,8 @@ export default class BookingSvc {
     return [
       ...bookings.map((b) => ({
         id: b.id,
-        type: (b.event?.venueTransactions?.[0]?.venue
-          ? "venue"
-          : "event") as "venue" | "event",
+        type: (b.event?.venueTransactions?.[0]?.venue ? "venue" : "event") as
+          "venue" | "event",
         title:
           b.event?.venueTransactions?.[0]?.venue?.name ??
           b.event?.name ??
@@ -449,12 +457,15 @@ export default class BookingSvc {
         where: { id: venueId },
         include: { mayor: true },
       });
-      if (!venue) throw new Error("Venue not found");
+      if (!venue) throw notFound("Venue");
 
       // A direct venue booking has no event to inherit dates from, so the
       // caller must supply them.
       if (!startDate || !endDate) {
-        throw new Error("startDate and endDate are required to book a venue");
+        throw new AppError(
+          "startDate and endDate are required to book a venue",
+          400,
+        );
       }
 
       const startAt = new Date(startDate);
@@ -533,7 +544,11 @@ export default class BookingSvc {
         : null;
       await prisma.$transaction(async (tx) => {
         await AvailabilitySvc.reserve(tx, [
-          { kind: "venue", itemId: venue.id, dateRange: { start: startAt, end: endAt } },
+          {
+            kind: "venue",
+            itemId: venue.id,
+            dateRange: { start: startAt, end: endAt },
+          },
         ]);
         await tx.eventVenueTransaction.create({
           data: {
@@ -603,9 +618,9 @@ export default class BookingSvc {
     }
 
     // ── Existing event-based booking path ────────────────────────────────
-    if (!data.eventId) throw new Error("eventId is required");
+    if (!data.eventId) throw new AppError("eventId is required", 400);
     const event = await EventRequestRepo.findById(data.eventId);
-    if (!event) throw new Error("Event not found");
+    if (!event) throw notFound("Event");
 
     // early_bird: if template has publicOpenAt in the future, only early_bird holders can book
     const { default: PassportSvc } =
@@ -618,8 +633,9 @@ export default class BookingSvc {
       const hasEarlyBird = await PassportSvc.hasPerk(userId, "early_bird");
       if (!hasEarlyBird) {
         const opensAt = new Date(template.publicOpenAt);
-        throw new Error(
+        throw new AppError(
           `Bookings open on ${opensAt.toLocaleDateString()} — Early Bird members can book now`,
+          403,
         );
       }
     }
@@ -730,7 +746,9 @@ export default class BookingSvc {
   /**
    * Bookings carry the customer's name and email, so this is scoped to what the
    * caller is party to. Admins see everything; anyone else sees bookings they
-   * made or bookings on events they organise.
+   * made, bookings on Events they own or organise (`event:view-sales`), and
+   * bookings on Events held at a Venue they are Mayor or staff of
+   * (`venue:view-bookings`) — see AppointmentAccess.
    *
    * The scope is applied with AND over the requested filters, so a filter
    * cannot widen it.
@@ -744,17 +762,44 @@ export default class BookingSvc {
     await PaymentSvc.sweepExpiredPayments();
 
     const requested = this.buildFilters(query);
+    // Asking for bookings on "my" events means every Event the viewer runs —
+    // the ones they own and the ones they organise — not only `organizerId`,
+    // which holds the Owner alone and would show an Organizer nothing.
+    if (viewer?.userId && query.hostId === viewer.userId) {
+      requested.event = AppointmentAccess.eventScope(
+        viewer.userId,
+        "event:view-sales",
+      );
+    }
 
     let where: Prisma.BookingWhereInput = requested;
     if (!can(viewer?.systemRole, "bookings:read:all")) {
-      if (!viewer?.userId) throw new Error("Unauthorized");
+      if (!viewer?.userId) throw new AppError("Unauthorized", 403);
       where = {
         AND: [
           requested,
           {
             OR: [
               { userId: viewer.userId },
-              { event: { organizerId: viewer.userId } },
+              {
+                event: AppointmentAccess.eventScope(
+                  viewer.userId,
+                  "event:view-sales",
+                ),
+              },
+              {
+                event: {
+                  venueTransactions: {
+                    some: {
+                      status: TransactionStatus.approved,
+                      venue: AppointmentAccess.venueScope(
+                        viewer.userId,
+                        "venue:view-bookings",
+                      ),
+                    },
+                  },
+                },
+              },
             ],
           },
         ],
@@ -819,7 +864,7 @@ export default class BookingSvc {
     const booking = await bookingCache.cached(`byId:${id}`, BOOKING_TTL, () =>
       BookingRepo.findById(id),
     );
-    if (!booking) throw new Error("Booking not found");
+    if (!booking) throw notFound("Booking");
 
     // Role-based visibility filtering
     const isOwner = booking.userId === userContext?.userId;
@@ -832,6 +877,63 @@ export default class BookingSvc {
     }
 
     return booking;
+  }
+
+  /**
+   * `getBookingById` for a request from outside - the route's door. The read
+   * above trusts its caller (payment confirmation, the cache specs); this one
+   * doesn't, because the route used to hand any booking, with its guest list
+   * and payments, to anyone who had its id, signed in or not.
+   *
+   * Who may see it: the guest who booked, an invited attendee with an
+   * account, an admin, and whoever runs the Event or a Venue it books - its
+   * Owner or Mayor, and staff whose Appointment lets them see bookings or
+   * check guests in. Everyone else gets "not found", so an id reveals
+   * nothing about whether the booking exists.
+   */
+  static async getBookingForViewer(id: string, viewer?: BookingViewerContext) {
+    const booking = await this.getBookingById(id, viewer);
+    const userId = viewer?.userId;
+    if (!userId) throw notFound("Booking");
+
+    if (
+      booking.userId === userId ||
+      booking.attendees.some((a) => a.userId === userId) ||
+      can(viewer?.systemRole, "bookings:read:all")
+    ) {
+      return booking;
+    }
+
+    const eventId = booking.eventId;
+    if (
+      eventId &&
+      ((await AppointmentAccess.canOnEvent(
+        eventId,
+        userId,
+        "event:view-sales",
+      )) ||
+        (await AppointmentAccess.canOnEvent(
+          eventId,
+          userId,
+          "booking:check-in",
+        )))
+    ) {
+      return booking;
+    }
+
+    for (const tx of booking.venueTransactions ?? []) {
+      if (
+        await AppointmentAccess.canOnVenue(
+          tx.venueId,
+          userId,
+          "venue:view-bookings",
+        )
+      ) {
+        return booking;
+      }
+    }
+
+    throw notFound("Booking");
   }
 
   /**
@@ -862,13 +964,15 @@ export default class BookingSvc {
     inviterId: string,
   ) {
     const booking = await BookingRepo.findById(bookingId);
-    if (!booking) throw new Error("Booking not found");
-    if (booking.isGuestListLocked) throw new Error("Guest list is locked");
+    if (!booking) throw notFound("Booking");
+    if (booking.isGuestListLocked)
+      throw new AppError("Guest list is locked", 409);
 
     // Check for duplicates
     if (data.email) {
       const existing = booking.attendees.find((a) => a.email === data.email);
-      if (existing) throw new Error("Guest with this email already invited");
+      if (existing)
+        throw new AppError("Guest with this email already invited", 409);
     }
 
     const added = await BookingRepo.addAttendee(bookingId, {
@@ -887,19 +991,20 @@ export default class BookingSvc {
 
   static async removeAttendee(attendeeId: string, userId: string) {
     const attendee = await BookingRepo.findAttendeeById(attendeeId);
-    if (!attendee) throw new Error("Attendee not found");
+    if (!attendee) throw notFound("Attendee");
 
     const booking = attendee.booking;
-    if (booking.userId !== userId) throw new Error("Unauthorized");
-    if (booking.isGuestListLocked) throw new Error("Guest list is locked");
+    if (booking.userId !== userId) throw new AppError("Unauthorized", 403);
+    if (booking.isGuestListLocked)
+      throw new AppError("Guest list is locked", 409);
 
     return BookingRepo.removeAttendee(attendeeId);
   }
 
   static async finalizeGuestList(bookingId: string, userId: string) {
     const booking = await BookingRepo.findById(bookingId);
-    if (!booking) throw new Error("Booking not found");
-    if (booking.userId !== userId) throw new Error("Unauthorized");
+    if (!booking) throw notFound("Booking");
+    if (booking.userId !== userId) throw new AppError("Unauthorized", 403);
 
     await BookingRepo.finalizeAttendees(bookingId);
     return { message: "Guest list finalized and visible to host" };
@@ -915,7 +1020,7 @@ export default class BookingSvc {
       attendee = await BookingRepo.findAttendeeById(identifier);
     }
 
-    if (!attendee) throw new Error("Attendee not found");
+    if (!attendee) throw notFound("Attendee");
 
     return BookingRepo.updateAttendee(attendee.id, {
       inviteStatus: status,
@@ -948,25 +1053,26 @@ export default class BookingSvc {
   // the payout trigger point — see docs/adr/0002-stripe-connect-payouts.md.
   static async updateStatus(id: string, status: string, requesterId: string) {
     const booking = await BookingRepo.findById(id);
-    if (!booking) throw new Error("Booking not found");
+    if (!booking) throw notFound("Booking");
 
     const isOwner = booking.userId === requesterId;
     let isOrganizer = booking.event?.organizerId === requesterId;
-    // A check-in delegate may only push a booking to `completed` (the status
-    // check-in settles to) — never `cancelled` or anything else, which stay
-    // the actual organizer's call alone. See EventOrganizerAssignment.
+    // Anyone else who may check guests in — an Organizer, a Check-in Helper,
+    // or venue staff on the day — may only push a booking to `completed` (the
+    // status check-in settles to), never `cancelled` or anything else, which
+    // stay the Event Owner's call alone. See AppointmentAccess.canOnEvent.
     if (
       !isOrganizer &&
       status === ItemBookingStatus.completed &&
       booking.event
     ) {
-      isOrganizer = await EventOrganizerRepo.isAuthorized(
+      isOrganizer = await AppointmentAccess.canOnEvent(
         booking.event.id,
         requesterId,
         "booking:check-in",
       );
     }
-    if (!isOwner && !isOrganizer) throw new Error("Unauthorized");
+    if (!isOwner && !isOrganizer) throw new AppError("Unauthorized", 403);
 
     const updated = await BookingRepo.updateStatus(
       id,
@@ -1035,25 +1141,28 @@ export default class BookingSvc {
   // Reuses the existing payout trigger in updateStatus (status -> completed).
   static async checkInAndSettle(id: string, hostId: string) {
     const booking = await BookingRepo.findById(id);
-    if (!booking) throw new Error("Booking not found");
+    if (!booking) throw notFound("Booking");
 
     const isOrganizer = booking.event?.organizerId === hostId;
     const authorized =
       isOrganizer ||
       (booking.event
-        ? await EventOrganizerRepo.isAuthorized(
+        ? await AppointmentAccess.canOnEvent(
             booking.event.id,
             hostId,
             "booking:check-in",
           )
         : false);
     if (!authorized) {
-      throw new Error("Unauthorized — you are not the host of this event");
+      throw new AppError(
+        "Unauthorized — you are not the host of this event",
+        403,
+      );
     }
 
     // Don't release a payout for an unpaid/cancelled booking.
     if (["pending", "cancelled"].includes(booking.status)) {
-      throw new Error("Booking is not confirmed/paid yet");
+      throw new AppError("Booking is not confirmed/paid yet", 409);
     }
 
     // Already settled — idempotent, no re-payout.
@@ -1063,17 +1172,22 @@ export default class BookingSvc {
 
     await BookingRepo.update(id, { checkedIn: true });
     await this.updateStatus(id, ItemBookingStatus.completed, hostId);
+    // An Organizer earns on their path for guests they check in (ADR 0005).
+    // The guard above means a guest can only ever count once.
+    if (booking.event) {
+      void OrganizerXpService.onGuestCheckedIn(booking.event.id, hostId);
+    }
 
     return { booking: await BookingRepo.findById(id), payoutTriggered: true };
   }
 
   static async confirmArrival(id: string, requesterId: string) {
     const booking = await BookingRepo.findById(id);
-    if (!booking) throw new Error("Booking not found");
+    if (!booking) throw notFound("Booking");
     if (booking.userId !== requesterId)
-      throw new Error("Only the client can confirm arrival");
+      throw new AppError("Only the client can confirm arrival", 403);
     if (!["confirmed", "pending"].includes(booking.status)) {
-      throw new Error("Booking cannot be confirmed at this stage");
+      throw new AppError("Booking cannot be confirmed at this stage", 409);
     }
     const confirmed = await BookingRepo.confirmArrival(id);
     announceBookingChanged(booking.userId, booking.event?.organizerId);
@@ -1225,6 +1339,7 @@ export default class BookingSvc {
             kind: "service" as const,
             itemId: s.serviceId,
             dateRange: escrowDateRange,
+            eventId: event.id,
           })),
       ]);
 
@@ -1348,6 +1463,7 @@ export default class BookingSvc {
             kind: input.kind,
             itemId: input.itemId,
             dateRange,
+            eventId: booking.eventId,
             quantity:
               input.kind === "asset" ? (input.quantity ?? 1) : undefined,
           },
@@ -1414,10 +1530,10 @@ export default class BookingSvc {
    */
   static async cancelWithRefunds(id: string, requesterId: string) {
     const booking = await BookingRepo.findForCancellation(id);
-    if (!booking) throw new Error("Booking not found");
-    if (booking.userId !== requesterId) throw new Error("Unauthorized");
+    if (!booking) throw notFound("Booking");
+    if (booking.userId !== requesterId) throw new AppError("Unauthorized", 403);
     if (booking.status === "cancelled")
-      throw new Error("Booking is already cancelled");
+      throw new AppError("Booking is already cancelled", 409);
 
     const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
       apiVersion: "2025-08-27.basil",
@@ -1668,19 +1784,67 @@ export default class BookingSvc {
   }
 
   /**
-   * The client reports a completed Stripe payment.
+   * The client reports a completed Stripe payment - after Stripe Elements
+   * confirms it client-side and redirects back with the PaymentIntent id,
+   * so the success page can show "paid" at once rather than waiting on
+   * `PaymentSvc.settleSucceededIntent`, the webhook path that would
+   * otherwise confirm it a few seconds later.
    *
-   * Three shapes arrive here: the transaction already exists (Stripe retried,
-   * or the client did), there is a pending payment to complete, or there is
-   * neither and the payment has to be created outright. Keeping them apart is
-   * what avoids a unique-constraint collision on `transactionId` and preserves
-   * the deposit -> full payment transition.
+   * Nothing here is taken on the client's word: this used to mark *any*
+   * booking paid from a client-supplied `{ amount, transactionId }` with no
+   * check that the transaction was real or that the caller owned the
+   * booking. It now requires the caller to be the booking's own client (or
+   * an admin), and retrieves the PaymentIntent from Stripe itself to check
+   * it actually succeeded and was created for this booking
+   * (`PaymentSvc.createPaymentIntent` is the only place that mints one, and
+   * it always stamps `metadata.bookingId`) before trusting anything about
+   * it, including its amount.
+   *
+   * Three shapes arrive here once verified: the transaction already exists
+   * (Stripe retried, or the client did), there is a pending payment to
+   * complete, or there is neither and the payment has to be created
+   * outright. Keeping them apart is what avoids a unique-constraint
+   * collision on `transactionId` and preserves the deposit -> full payment
+   * transition.
    */
   static async confirmPayment(
     bookingId: string,
     input: { amount: number; method: string; transactionId: string },
     viewer: { userId: string; email?: string; systemRole?: string },
   ) {
+    const bookingRow = await BookingRepo.findById(bookingId);
+    if (!bookingRow) throw notFound("Booking");
+    if (
+      bookingRow.userId !== viewer.userId &&
+      !can(viewer.systemRole, "bookings:read:all")
+    ) {
+      throw new AppError("Unauthorized", 403);
+    }
+
+    if (
+      input.method !== "stripe" &&
+      !String(input.transactionId).startsWith("pi_")
+    ) {
+      throw new AppError("Unsupported payment method", 400);
+    }
+    const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
+      apiVersion: "2025-08-27.basil",
+    });
+    let paymentIntent: Stripe.PaymentIntent;
+    try {
+      paymentIntent = await stripe.paymentIntents.retrieve(input.transactionId);
+    } catch {
+      throw new AppError("Could not verify this payment with Stripe", 502);
+    }
+    if (paymentIntent.status !== "succeeded") {
+      throw new AppError("This payment has not succeeded at Stripe", 409);
+    }
+    if (paymentIntent.metadata.bookingId !== bookingId) {
+      throw new AppError("This payment was not made for this booking", 403);
+    }
+    const verifiedAmount = paymentIntent.amount / 100;
+    const verifiedCurrency = paymentIntent.currency.toUpperCase();
+
     const payments = await PaymentSvc.getBookingPayments(bookingId);
     const pendingPayment = payments.find(
       (p) => p.status === PaymentStatus.pending,
@@ -1690,9 +1854,6 @@ export default class BookingSvc {
     );
 
     let payment;
-    const looksLikeStripeId =
-      String(input.transactionId).startsWith("pi_") ||
-      input.method === "stripe";
 
     if (existingTransaction) {
       if (existingTransaction.status !== PaymentStatus.paid) {
@@ -1701,47 +1862,36 @@ export default class BookingSvc {
         });
       }
 
-      await this.linkStripePayment(
-        bookingId,
-        input.transactionId,
-        looksLikeStripeId,
-      );
+      await this.linkStripePayment(bookingId, input.transactionId);
       payment = await PaymentSvc.getPaymentById(existingTransaction.id);
     } else if (pendingPayment) {
       // mark pending payment as completed
       await PaymentSvc.updatePayment(pendingPayment.id, {
         paymentStatus: PaymentStatus.paid,
       });
-      // set the transaction id to the one provided by client
+      // The transaction id Stripe itself confirmed above.
       await BookingRepo.setPaymentTransaction(pendingPayment.id, {
         transactionId: input.transactionId,
-        method: input.method,
+        method: "stripe",
       });
-      await this.linkStripePayment(
-        bookingId,
-        input.transactionId,
-        looksLikeStripeId,
-      );
+      await this.linkStripePayment(bookingId, input.transactionId);
       // Re-fetch payment so the included booking reflects the updated
       // stripePaymentId
       payment = await PaymentSvc.getPaymentById(pendingPayment.id);
     } else {
-      // No pending payment found — create a fresh completed payment record
+      // No pending payment found — create a fresh completed payment record.
+      // Amount and currency come from Stripe, not the client's report of them.
       payment = await PaymentSvc.createPayment({
         bookingId,
-        amount: input.amount,
-        currency: "PHP",
-        method: input.method,
+        amount: verifiedAmount,
+        currency: verifiedCurrency,
+        method: "stripe",
         paymentType: "full",
         paymentStatus: PaymentStatus.paid,
         transactionId: input.transactionId,
       });
 
-      await this.linkStripePayment(
-        bookingId,
-        input.transactionId,
-        looksLikeStripeId,
-      );
+      await this.linkStripePayment(bookingId, input.transactionId);
       // Ensure returned payment includes latest booking data
       payment = await PaymentSvc.getPaymentById(payment.id);
     }
@@ -1844,9 +1994,7 @@ export default class BookingSvc {
   private static async linkStripePayment(
     bookingId: string,
     transactionId: string,
-    looksLikeStripeId: boolean,
   ) {
-    if (!looksLikeStripeId) return;
     try {
       await BookingRepo.setStripePaymentId(bookingId, transactionId);
     } catch (err) {
@@ -1866,7 +2014,7 @@ export default class BookingSvc {
     const authorized =
       isOrganizer ||
       (booking.event
-        ? await EventOrganizerRepo.isAuthorized(
+        ? await AppointmentAccess.canOnEvent(
             booking.event.id,
             hostId,
             "booking:check-in",
@@ -1892,7 +2040,7 @@ export default class BookingSvc {
     const authorized =
       isOrganizer ||
       (attendee.booking.event
-        ? await EventOrganizerRepo.isAuthorized(
+        ? await AppointmentAccess.canOnEvent(
             attendee.booking.event.id,
             hostId,
             "booking:check-in",
@@ -1910,6 +2058,12 @@ export default class BookingSvc {
     }
 
     const updated = await BookingRepo.markAttendeeCheckedIn(attendee.id);
+    if (attendee.booking.event) {
+      void OrganizerXpService.onGuestCheckedIn(
+        attendee.booking.event.id,
+        hostId,
+      );
+    }
 
     // The host's door list and the guest's own booking both show this. No admin
     // emit: the admin Bookings tab lists bookings, not attendees.

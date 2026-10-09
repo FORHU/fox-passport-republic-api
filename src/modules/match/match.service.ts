@@ -1,3 +1,4 @@
+import { AppError, notFound } from "../../utils/errors";
 import { MatchConstraint, InvoiceSourceType } from "@prisma/client";
 import { eventTemplateCache, bookingCache } from "../../utils/cache-namespaces";
 import EventTransactionSvc from "../event-transaction/event-transaction.service";
@@ -8,6 +9,7 @@ import NotificationSvc from "../notifications/user-notification.service";
 import PaymentSvc from "../payment/payment.service";
 import { prisma } from "../../utils/prisma";
 import BookingRepo from "../booking/booking.repository";
+import AppointmentAccess from "../appointment/appointment.access";
 
 export default class MatchSvc {
   static async createMatchRequest(data: {
@@ -29,7 +31,7 @@ export default class MatchSvc {
 
     if (data.venueId) {
       venue = await prisma.venue.findUnique({ where: { id: data.venueId } });
-      if (!venue) throw new Error("Venue not found");
+      if (!venue) throw notFound("Venue");
     } else {
       const { templates: foxerTemplates } =
         await EventTemplateRepo.findAllTemplates({ ownerId: data.foxerId });
@@ -159,7 +161,8 @@ export default class MatchSvc {
   static async getFoxerClientInbox(foxerId: string, limit = 10, offset = 0) {
     const [events, total] = await Promise.all([
       prisma.event.findMany({
-        where: { organizerId: foxerId },
+        // The Event Owner's requests, and those of Events they organise.
+        where: AppointmentAccess.eventScope(foxerId, "event:approve-bookings"),
         select: {
           id: true,
           name: true,
@@ -178,7 +181,9 @@ export default class MatchSvc {
         take: limit,
         skip: offset,
       }),
-      prisma.event.count({ where: { organizerId: foxerId } }),
+      prisma.event.count({
+        where: AppointmentAccess.eventScope(foxerId, "event:approve-bookings"),
+      }),
     ]);
     const data = events.map(({ bookings, ...event }) => ({
       ...event,
@@ -193,10 +198,20 @@ export default class MatchSvc {
       where: { id: eventId },
       include: { bookings: { select: { id: true, stripePaymentId: true } } },
     });
-    if (!event) throw new Error("Match not found");
-    if (event.organizerId !== foxerId) throw new Error("Unauthorized");
+    if (!event) throw notFound("Match");
+    // The Event Owner or one of their Organizers (`event:approve-bookings`).
+    // Declining refunds the client, so declineMatch stays the Owner's alone.
+    if (
+      !(await AppointmentAccess.canOnEvent(
+        eventId,
+        foxerId,
+        "event:approve-bookings",
+      ))
+    ) {
+      throw new AppError("Unauthorized", 403);
+    }
     if (event.requestStatus !== "pending")
-      throw new Error("Match already processed");
+      throw new AppError("Match already processed", 409);
 
     await EventRequestRepo.updateRequestStatus(eventId, "approved");
 
@@ -216,10 +231,10 @@ export default class MatchSvc {
       where: { id: eventId },
       include: { bookings: { select: { id: true, stripePaymentId: true } } },
     });
-    if (!event) throw new Error("Match not found");
-    if (event.organizerId !== foxerId) throw new Error("Unauthorized");
+    if (!event) throw notFound("Match");
+    if (event.organizerId !== foxerId) throw new AppError("Unauthorized", 403);
     if (event.requestStatus !== "pending")
-      throw new Error("Match already processed");
+      throw new AppError("Match already processed", 409);
 
     await EventRequestRepo.rejectRequest(eventId, reason);
 

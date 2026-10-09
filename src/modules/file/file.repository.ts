@@ -22,4 +22,16 @@ export default class FileRepo {
       },
     });
   }
+
+  static async createPrivateFile(data: {
+    storageKey: string;
+    name: string;
+    type: string;
+    uploadedBy: string;
+  }) {
+    return prisma.file.create({
+      data: { ...data, url: "", isPrivate: true },
+      select: { id: true, name: true, type: true },
+    });
+  }
 }

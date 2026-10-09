@@ -12,12 +12,7 @@ const router = express.Router();
 router.get("/mine", authenticate, VenueAffiliationCtrl.getMine);
 
 // GET /v1/venue-affiliations/venue/:venueId — a mayor's view of their venue's affiliates
-router.get(
-  "/venue/:venueId",
-  authenticate,
-  requirePermissionAny(["venue:manage"]),
-  VenueAffiliationCtrl.getForVenue,
-);
+router.get("/venue/:venueId", authenticate, VenueAffiliationCtrl.getForVenue);
 
 // POST /v1/venue-affiliations/apply — Event Foxer applies to a venue
 router.post(
@@ -39,18 +34,12 @@ router.post(
 // route only checks the caller holds *a* supply-side capability; exact
 // identity (venue mayor vs. the specific invited Event Foxer) is enforced in
 // VenueAffiliationSvc.
-router.patch(
-  "/:id/approve",
-  authenticate,
-  requirePermissionAny(["venue:manage", "template:manage"]),
-  VenueAffiliationCtrl.approve,
-);
-router.patch(
-  "/:id/reject",
-  authenticate,
-  requirePermissionAny(["venue:manage", "template:manage"]),
-  VenueAffiliationCtrl.reject,
-);
+// Listing, approving and rejecting are checked per Venue in
+// VenueAffiliationSvc: the mayor or its Organizers (`venue:approve-affiliations`)
+// on the venue's side, the invited Event Foxer on theirs. On
+// validate-rbac-guards' allow-list.
+router.patch("/:id/approve", authenticate, VenueAffiliationCtrl.approve);
+router.patch("/:id/reject", authenticate, VenueAffiliationCtrl.reject);
 
 // PATCH /v1/venue-affiliations/:id/cancel — withdraws a still-pending
 // affiliation; either party (applicant or inviter) may do this, so the

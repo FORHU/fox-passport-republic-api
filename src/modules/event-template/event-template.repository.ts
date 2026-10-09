@@ -148,11 +148,29 @@ export default class EventTemplateRepo {
     const skip = (page - 1) * limit;
 
     const category = toEnum(EventCategory, filters.category);
+    // `city` and `targetCity` were accepted and then never applied, so a
+    // city-scoped browse returned every template. Match the template's own
+    // target city or the city of a venue it uses.
+    const city = (filters.targetCity ?? filters.city)?.trim();
 
     const where = {
       isPublic: true,
       status: EventTemplateStatus.published,
       ...(category && { category }),
+      ...(city && {
+        OR: [
+          { targetCity: { contains: city, mode: "insensitive" as const } },
+          {
+            templateVenues: {
+              some: {
+                venue: {
+                  city: { contains: city, mode: "insensitive" as const },
+                },
+              },
+            },
+          },
+        ],
+      }),
     };
 
     const [templates, total] = await Promise.all([
@@ -164,6 +182,9 @@ export default class EventTemplateRepo {
           category: true,
           targetCity: true,
           targetState: true,
+          targetCountry: true,
+          lat: true,
+          lng: true,
           images: { take: 1, select: { url: true } },
           templateVenues: {
             take: 1,

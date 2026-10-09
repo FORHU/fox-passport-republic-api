@@ -1,3 +1,4 @@
+import { AppError, notFound } from "../../utils/errors";
 import {
   PostType,
   FeedTab,
@@ -10,6 +11,7 @@ import PassportSvc, { XP_REWARDS } from "../passport/passport.service";
 import NotificationService from "../notifications/user-notification.service";
 import { prisma } from "../../utils/prisma";
 import { AuthenticatedUser } from "../../types/auth";
+import { can } from "../../types/permissions";
 
 export interface MediaTagInput {
   mediaUrl: string;
@@ -81,8 +83,9 @@ async function validateMediaTags(
 ) {
   for (const tag of mediaTags) {
     if (!postMediaUrls.includes(tag.mediaUrl)) {
-      throw new Error(
+      throw new AppError(
         `Media tag references a mediaUrl that isn't part of this post: ${tag.mediaUrl}`,
+        400,
       );
     }
   }
@@ -93,7 +96,7 @@ async function validateMediaTags(
     select: { id: true },
   });
   if (users.length !== userIds.length) {
-    throw new Error("One or more tagged users could not be found");
+    throw new AppError("One or more tagged users could not be found", 400);
   }
 }
 
@@ -133,7 +136,7 @@ export default class FeedService {
   static async getPostById(id: string, viewerId?: string) {
     const post = await FeedRepo.findPostById(id, viewerId);
     if (!post) {
-      throw new Error("Post not found");
+      throw notFound("Post");
     }
     return post;
   }
@@ -155,7 +158,7 @@ export default class FeedService {
     } = input;
 
     if (!content.trim() && mediaUrls.length === 0) {
-      throw new Error("Post must include text or media");
+      throw new AppError("Post must include text or media", 400);
     }
 
     if (mediaTags && mediaTags.length > 0) {
@@ -175,7 +178,10 @@ export default class FeedService {
             include: { passport: true },
           });
           if (!stamp || stamp.passport.userId !== user.userId) {
-            throw new Error("Stamp not found or does not belong to you");
+            throw new AppError(
+              "Stamp not found or does not belong to you",
+              403,
+            );
           }
         }
         break;
@@ -184,17 +190,20 @@ export default class FeedService {
       case PostType.review_share: {
         tab = FeedTab.community;
         if (!reviewId) {
-          throw new Error("reviewId is required for review_share");
+          throw new AppError("reviewId is required for review_share", 400);
         }
         const review = await prisma.review.findUnique({
           where: { id: reviewId },
           include: { booking: true },
         });
         if (!review || review.userId !== user.userId) {
-          throw new Error("Review not found or does not belong to you");
+          throw new AppError("Review not found or does not belong to you", 403);
         }
         if (review.booking && review.booking.status === "cancelled") {
-          throw new Error("Cannot share reviews from cancelled bookings");
+          throw new AppError(
+            "Cannot share reviews from cancelled bookings",
+            400,
+          );
         }
         break;
       }
@@ -202,24 +211,29 @@ export default class FeedService {
       case PostType.venue_spotlight: {
         tab = FeedTab.marketplace;
         if (!venueId) {
-          throw new Error("venueId is required for venue_spotlight");
+          throw new AppError("venueId is required for venue_spotlight", 400);
         }
         const isAuthorized =
-          user.systemRole === "admin" ||
-          user.systemRole === "admin_secretary" ||
+          can(user, "feed:post-for-anyone") ||
           user.roleType.includes("venueFoxer") ||
           user.roleType.includes("investor");
         if (!isAuthorized) {
-          throw new Error("Unauthorized: Venue Foxer or Partner role required");
+          throw new AppError(
+            "Unauthorized: Venue Foxer or Partner role required",
+            403,
+          );
         }
         const venue = await prisma.venue.findUnique({
           where: { id: venueId },
         });
         if (!venue) {
-          throw new Error("Venue not found");
+          throw notFound("Venue");
         }
-        if (venue.mayorId !== user.userId && user.systemRole !== "admin") {
-          throw new Error("You can only spotlight venues you own");
+        if (
+          venue.mayorId !== user.userId &&
+          !can(user, "feed:post-for-anyone")
+        ) {
+          throw new AppError("You can only spotlight venues you own", 400);
         }
         break;
       }
@@ -227,26 +241,29 @@ export default class FeedService {
       case PostType.gear_offering: {
         tab = FeedTab.marketplace;
         if (!assetId) {
-          throw new Error("assetId is required for gear_offering");
+          throw new AppError("assetId is required for gear_offering", 400);
         }
         const isAuthorized =
-          user.systemRole === "admin" ||
-          user.systemRole === "admin_secretary" ||
+          can(user, "feed:post-for-anyone") ||
           user.roleType.includes("gearFoxer") ||
           user.roleType.includes("investor");
         if (!isAuthorized) {
-          throw new Error(
+          throw new AppError(
             "Unauthorized: Equipment Foxer or Partner role required",
+            403,
           );
         }
         const asset = await prisma.asset.findUnique({
           where: { id: assetId },
         });
         if (!asset) {
-          throw new Error("Asset/Gear not found");
+          throw new AppError("Asset/Gear not found", 404);
         }
-        if (asset.ownerId !== user.userId && user.systemRole !== "admin") {
-          throw new Error("You can only spotlight gear you own");
+        if (
+          asset.ownerId !== user.userId &&
+          !can(user, "feed:post-for-anyone")
+        ) {
+          throw new AppError("You can only spotlight gear you own", 400);
         }
         break;
       }
@@ -254,27 +271,30 @@ export default class FeedService {
       case PostType.service_offering: {
         tab = FeedTab.marketplace;
         if (!serviceId) {
-          throw new Error("serviceId is required for service_offering");
+          throw new AppError("serviceId is required for service_offering", 400);
         }
         const isAuthorized =
-          user.systemRole === "admin" ||
-          user.systemRole === "admin_secretary" ||
+          can(user, "feed:post-for-anyone") ||
           user.roleType.includes("serviceFoxer") ||
           user.roleType.includes("performerFoxer") ||
           user.roleType.includes("investor");
         if (!isAuthorized) {
-          throw new Error(
+          throw new AppError(
             "Unauthorized: Talent Foxer, Performer Foxer, or Partner role required",
+            403,
           );
         }
         const service = await prisma.service.findUnique({
           where: { id: serviceId },
         });
         if (!service) {
-          throw new Error("Service not found");
+          throw notFound("Service");
         }
-        if (service.ownerId !== user.userId && user.systemRole !== "admin") {
-          throw new Error("You can only spotlight services you own");
+        if (
+          service.ownerId !== user.userId &&
+          !can(user, "feed:post-for-anyone")
+        ) {
+          throw new AppError("You can only spotlight services you own", 400);
         }
         break;
       }
@@ -282,24 +302,29 @@ export default class FeedService {
       case PostType.event_announcement: {
         tab = FeedTab.marketplace;
         if (!eventId) {
-          throw new Error("eventId is required for event_announcement");
+          throw new AppError("eventId is required for event_announcement", 400);
         }
         const isAuthorized =
-          user.systemRole === "admin" ||
-          user.systemRole === "admin_secretary" ||
+          can(user, "feed:post-for-anyone") ||
           user.roleType.includes("eventFoxer") ||
           user.roleType.includes("investor");
         if (!isAuthorized) {
-          throw new Error("Unauthorized: Event Foxer or Partner role required");
+          throw new AppError(
+            "Unauthorized: Event Foxer or Partner role required",
+            403,
+          );
         }
         const event = await prisma.event.findUnique({
           where: { id: eventId },
         });
         if (!event) {
-          throw new Error("Event not found");
+          throw notFound("Event");
         }
-        if (event.organizerId !== user.userId && user.systemRole !== "admin") {
-          throw new Error("You can only announce events you host");
+        if (
+          event.organizerId !== user.userId &&
+          !can(user, "feed:post-for-anyone")
+        ) {
+          throw new AppError("You can only announce events you host", 400);
         }
         break;
       }
@@ -307,9 +332,10 @@ export default class FeedService {
       case PostType.partner_announcement: {
         tab = FeedTab.partners;
         const isPartner =
-          user.systemRole === "admin" || user.roleType.includes("investor");
+          can(user, "feed:post-for-anyone") ||
+          user.roleType.includes("investor");
         if (!isPartner) {
-          throw new Error("Unauthorized: Partner Foxer role required");
+          throw new AppError("Unauthorized: Partner Foxer role required", 403);
         }
         break;
       }
@@ -320,23 +346,23 @@ export default class FeedService {
           .map((o) => o.trim())
           .filter((o) => o.length > 0);
         if (trimmedOptions.length < 2) {
-          throw new Error("A poll needs at least 2 options");
+          throw new AppError("A poll needs at least 2 options", 400);
         }
         if (trimmedOptions.length > 10) {
-          throw new Error("A poll can have at most 10 options");
+          throw new AppError("A poll can have at most 10 options", 400);
         }
         if (
           new Set(trimmedOptions.map((o) => o.toLowerCase())).size !==
           trimmedOptions.length
         ) {
-          throw new Error("Poll options must be unique");
+          throw new AppError("Poll options must be unique", 400);
         }
         trimmedPollOptions = trimmedOptions;
         break;
       }
 
       default:
-        throw new Error(`Unsupported post type: ${type}`);
+        throw new AppError(`Unsupported post type: ${type}`, 400);
     }
 
     // 2. Create the post in DB
@@ -423,15 +449,15 @@ export default class FeedService {
   ) {
     const post = await FeedRepo.findPostById(postId, user.userId);
     if (!post) {
-      throw new Error("Post not found");
+      throw notFound("Post");
     }
     if (post.type !== PostType.poll || !post.poll) {
-      throw new Error("This post is not a poll");
+      throw new AppError("This post is not a poll", 400);
     }
 
     const option = await FeedRepo.findPollOption(optionId);
     if (!option || option.pollId !== post.poll.id) {
-      throw new Error("Poll option not found");
+      throw notFound("Poll option");
     }
 
     return FeedRepo.voteOnPoll(post.poll.id, optionId, user.userId);
@@ -440,16 +466,14 @@ export default class FeedService {
   static async deletePost(postId: string, user: AuthenticatedUser) {
     const post = await FeedRepo.findPostById(postId);
     if (!post) {
-      throw new Error("Post not found");
+      throw notFound("Post");
     }
 
     const canDelete =
-      post.authorId === user.userId ||
-      user.systemRole === "admin" ||
-      user.systemRole === "admin_secretary";
+      post.authorId === user.userId || can(user, "content:moderate");
 
     if (!canDelete) {
-      throw new Error("Unauthorized to delete this post");
+      throw new AppError("Unauthorized to delete this post", 403);
     }
 
     return FeedRepo.deletePost(postId);
@@ -466,13 +490,13 @@ export default class FeedService {
   ) {
     const post = await FeedRepo.findPostById(postId, user.userId);
     if (!post) {
-      throw new Error("Post not found");
+      throw notFound("Post");
     }
     if (post.authorId !== user.userId) {
-      throw new Error("Unauthorized to edit this post");
+      throw new AppError("Unauthorized to edit this post", 403);
     }
     if (input.content !== undefined && input.content.trim().length === 0) {
-      throw new Error("Post content cannot be empty");
+      throw new AppError("Post content cannot be empty", 400);
     }
     return FeedRepo.updatePost(postId, {
       ...(input.content !== undefined ? { content: input.content.trim() } : {}),
@@ -493,10 +517,13 @@ export default class FeedService {
   ) {
     const original = await FeedRepo.findPostById(postId, user.userId);
     if (!original) {
-      throw new Error("Post not found");
+      throw notFound("Post");
     }
     if (original.originalPostId) {
-      throw new Error("Cannot repost a repost — share the original instead");
+      throw new AppError(
+        "Cannot repost a repost — share the original instead",
+        400,
+      );
     }
 
     const post = await FeedRepo.createPost({
@@ -526,7 +553,7 @@ export default class FeedService {
   static async trackShare(postId: string) {
     const post = await FeedRepo.findPostById(postId);
     if (!post) {
-      throw new Error("Post not found");
+      throw notFound("Post");
     }
     await FeedRepo.incrementShares(postId);
     return { success: true };
@@ -539,7 +566,7 @@ export default class FeedService {
   ) {
     const post = await FeedRepo.findPostById(postId, user.userId);
     if (!post) {
-      throw new Error("Post not found");
+      throw notFound("Post");
     }
 
     const result = await FeedRepo.setReaction(postId, user.userId, type);
@@ -569,7 +596,7 @@ export default class FeedService {
   static async toggleSave(postId: string, user: AuthenticatedUser) {
     const post = await FeedRepo.findPostById(postId, user.userId);
     if (!post) {
-      throw new Error("Post not found");
+      throw notFound("Post");
     }
     return FeedRepo.toggleSave(postId, user.userId);
   }
@@ -585,7 +612,7 @@ export default class FeedService {
   static async hidePost(postId: string, user: AuthenticatedUser) {
     const post = await FeedRepo.findPostById(postId, user.userId);
     if (!post) {
-      throw new Error("Post not found");
+      throw notFound("Post");
     }
     return FeedRepo.hidePost(postId, user.userId);
   }
@@ -603,7 +630,7 @@ export default class FeedService {
   ) {
     const post = await FeedRepo.findPostById(postId, viewerId);
     if (!post) {
-      throw new Error("Post not found");
+      throw notFound("Post");
     }
     return FeedRepo.findComments(postId, limit, cursor, viewerId);
   }
@@ -616,21 +643,21 @@ export default class FeedService {
   ) {
     const post = await FeedRepo.findPostById(postId, user.userId);
     if (!post) {
-      throw new Error("Post not found");
+      throw notFound("Post");
     }
 
     const trimmed = content.trim();
     if (trimmed.length === 0) {
-      throw new Error("Comment cannot be empty");
+      throw new AppError("Comment cannot be empty", 400);
     }
 
     if (parentId) {
       const parent = await FeedRepo.findCommentById(parentId);
       if (!parent || parent.postId !== postId) {
-        throw new Error("Parent comment not found");
+        throw notFound("Parent comment");
       }
       if (parent.parentId) {
-        throw new Error("Cannot reply to a reply");
+        throw new AppError("Cannot reply to a reply", 400);
       }
     }
 
@@ -676,15 +703,15 @@ export default class FeedService {
   ) {
     const comment = await FeedRepo.findCommentById(commentId);
     if (!comment) {
-      throw new Error("Comment not found");
+      throw notFound("Comment");
     }
     if (comment.authorId !== user.userId) {
-      throw new Error("Unauthorized to edit this comment");
+      throw new AppError("Unauthorized to edit this comment", 403);
     }
 
     const trimmed = content.trim();
     if (trimmed.length === 0) {
-      throw new Error("Comment cannot be empty");
+      throw new AppError("Comment cannot be empty", 400);
     }
 
     return FeedRepo.updateComment(commentId, trimmed);
@@ -693,7 +720,7 @@ export default class FeedService {
   static async deleteComment(commentId: string, user: AuthenticatedUser) {
     const comment = await FeedRepo.findCommentById(commentId);
     if (!comment) {
-      throw new Error("Comment not found");
+      throw notFound("Comment");
     }
 
     const post = await FeedRepo.findPostById(comment.postId);
@@ -701,11 +728,10 @@ export default class FeedService {
     const canDelete =
       comment.authorId === user.userId ||
       (post && post.authorId === user.userId) ||
-      user.systemRole === "admin" ||
-      user.systemRole === "admin_secretary";
+      can(user, "content:moderate");
 
     if (!canDelete) {
-      throw new Error("Unauthorized to delete this comment");
+      throw new AppError("Unauthorized to delete this comment", 403);
     }
 
     return FeedRepo.deleteComment(commentId);
@@ -714,7 +740,7 @@ export default class FeedService {
   static async toggleCommentLike(commentId: string, user: AuthenticatedUser) {
     const comment = await FeedRepo.findCommentById(commentId);
     if (!comment) {
-      throw new Error("Comment not found");
+      throw notFound("Comment");
     }
     const result = await FeedRepo.toggleCommentLike(commentId, user.userId);
 
@@ -738,10 +764,13 @@ export default class FeedService {
   ) {
     const post = await FeedRepo.findPostById(postId, user.userId);
     if (!post) {
-      throw new Error("Post not found");
+      throw notFound("Post");
     }
     if (post.authorId !== user.userId) {
-      throw new Error("Unauthorized: only the post author can tag people");
+      throw new AppError(
+        "Unauthorized: only the post author can tag people",
+        403,
+      );
     }
 
     await validateMediaTags([input], post.mediaUrls);
@@ -773,18 +802,17 @@ export default class FeedService {
   ) {
     const tag = await FeedRepo.findMediaTagById(tagId);
     if (!tag || tag.postId !== postId) {
-      throw new Error("Media tag not found");
+      throw notFound("Media tag");
     }
 
     const post = await FeedRepo.findPostById(postId);
     const canDelete =
       tag.userId === user.userId ||
       (post && post.authorId === user.userId) ||
-      user.systemRole === "admin" ||
-      user.systemRole === "admin_secretary";
+      can(user, "content:moderate");
 
     if (!canDelete) {
-      throw new Error("Unauthorized to remove this tag");
+      throw new AppError("Unauthorized to remove this tag", 403);
     }
 
     await FeedRepo.deleteMediaTag(tagId);

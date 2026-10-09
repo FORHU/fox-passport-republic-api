@@ -4,6 +4,12 @@ import {
   AvailabilityConflictError,
   RESERVING_TRANSACTION_STATUSES,
 } from "./availability.types";
+import {
+  bufferedWindow,
+  findProviderEngagements,
+  findScheduleConflict,
+  resolvePlace,
+} from "./provider-schedule";
 
 /**
  * The single choke point every asset/service reservation in this codebase
@@ -174,6 +180,91 @@ export default class AvailabilitySvc {
       throw new AvailabilityConflictError(
         `Service ${item.itemId} is not available for the requested date range`,
         "service",
+        item.itemId,
+      );
+    }
+
+    // The provider is one person across all their services, with a travel
+    // day either side of a booking in another city (see provider-schedule).
+    // Their user row is the lock for that: every service of theirs takes it,
+    // so two bookings on two different services can't both slip through.
+    const service = await tx.service.findUnique({
+      where: { id: item.itemId },
+      select: { ownerId: true },
+    });
+    if (!service) return;
+    await tx.$executeRaw`SELECT id FROM users WHERE id = ${service.ownerId} FOR UPDATE`;
+
+    const [place, engagements] = await Promise.all([
+      resolvePlace(tx, item),
+      findProviderEngagements(tx, service.ownerId, bufferedWindow(start, end), {
+        excludeBookingId,
+        excludeEventId: item.eventId,
+      }),
+    ]);
+    const clash = findScheduleConflict({ start, end }, place, engagements);
+    if (clash) {
+      throw new AvailabilityConflictError(
+        clash === "booked"
+          ? "This Foxer is already booked on one of those days"
+          : "This Foxer is booked in another city the day before or after — they need that day to travel",
+        "service",
+        item.itemId,
+      );
+    }
+  }
+
+  /**
+   * A venue has no `quantity` concept — one venue can only host one thing at
+   * a time — so this mirrors `lockAndCheckService`'s single-conflict shape,
+   * not the asset one. Unlike asset/service, there is no separate
+   * direct-booking table to also check: a direct venue booking already goes
+   * through `eventVenueTransaction` (see `BookingSvc.createBooking`'s
+   * venue branch), so that one query covers both flows.
+   */
+  private static async lockAndCheckVenue(
+    tx: AppTransactionClient,
+    item: AvailabilityCheckItem,
+    excludeBookingId: string | undefined,
+  ): Promise<void> {
+    await tx.$executeRaw`SELECT id FROM venues WHERE id = ${item.itemId} FOR UPDATE`;
+
+    const venue = await tx.venue.findUniqueOrThrow({
+      where: { id: item.itemId },
+      select: { blockedDates: true },
+    });
+
+    const { start, end } = item.dateRange;
+
+    const blockedConflict = venue.blockedDates.some(
+      (d) => d >= start && d < end,
+    );
+    if (blockedConflict) {
+      throw new AvailabilityConflictError(
+        `Venue ${item.itemId} has a manually blocked date within the requested range`,
+        "venue",
+        item.itemId,
+      );
+    }
+
+    const bookingExclusion = excludeBookingId
+      ? { OR: [{ bookingId: null }, { bookingId: { not: excludeBookingId } }] }
+      : {};
+
+    const transactionConflict = await tx.eventVenueTransaction.findFirst({
+      where: {
+        venueId: item.itemId,
+        status: { in: [...RESERVING_TRANSACTION_STATUSES] },
+        event: { startAt: { lt: end }, endAt: { gt: start } },
+        ...bookingExclusion,
+      },
+      select: { id: true },
+    });
+
+    if (transactionConflict) {
+      throw new AvailabilityConflictError(
+        `Venue ${item.itemId} is not available for the requested date range`,
+        "venue",
         item.itemId,
       );
     }

@@ -5,8 +5,8 @@ RUN corepack enable pnpm
 
 WORKDIR /app
 
-# Copy package files and prisma schema first for better caching
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Copy package files, prisma config, and schema first for better caching
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml prisma.config.js ./
 COPY prisma ./prisma/
 
 # Install dependencies using pnpm

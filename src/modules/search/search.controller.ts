@@ -1,3 +1,4 @@
+import { sendServerError } from "../../utils/errors";
 import { Request, Response } from "express";
 import SearchSvc from "./search.service";
 import { totalPages } from "../../utils/pagination";
@@ -51,8 +52,7 @@ export default class SearchCtrl {
         },
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 }

@@ -1,9 +1,11 @@
+import { AppError, notFound } from "../../utils/errors";
 import PaymentRepo, { PENDING_PAYMENT_TTL_MS } from "./payment.repository";
 import BookingRepo from "../booking/booking.repository";
 import crypto from "crypto";
 import {
   BookingStatus,
   PaymentStatus,
+  Prisma,
   TransactionStatus,
 } from "@prisma/client";
 import Stripe from "stripe";
@@ -27,6 +29,12 @@ import { bookingCache } from "../../utils/cache-namespaces";
  * and is shown "unpaid" pays twice.
  */
 const PAYMENT_TTL = 30;
+
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002"
+  );
+}
 import { toStripeCents } from "../../utils/pricing";
 import RefundSvc from "../refund/refund.service";
 import StripeConnectSvc from "../stripe-connect/stripe-connect.service";
@@ -85,8 +93,10 @@ export default class PaymentSvc {
       select: { id: true },
     });
     if (pendingVenueRequest) {
-      throw new Error(
+      throw new AppError(
         "This booking is still awaiting the Venue Foxer's approval before you can pay.",
+        400,
+      );
       );
     }
 
@@ -141,7 +151,7 @@ export default class PaymentSvc {
       () => PaymentRepo.getPaymentById(id),
     );
     if (!payment) {
-      throw new Error("Payment not found");
+      throw notFound("Payment");
     }
     return payment;
   }
@@ -156,7 +166,7 @@ export default class PaymentSvc {
       () => PaymentRepo.getPaymentByTransactionId(transactionId),
     );
     if (!payment) {
-      throw new Error("Payment not found");
+      throw notFound("Payment");
     }
     return payment;
   }
@@ -226,11 +236,11 @@ export default class PaymentSvc {
     // Check if payment exists and is not expired/cancelled
     const payment = await PaymentRepo.getPaymentById(id);
     if (!payment) {
-      throw new Error("Payment not found");
+      throw notFound("Payment");
     }
 
     if (payment.status === PaymentStatus.cancelled) {
-      throw new Error("Cannot update a cancelled payment");
+      throw new AppError("Cannot update a cancelled payment", 409);
     }
 
     if (
@@ -238,7 +248,7 @@ export default class PaymentSvc {
       Date.now() - payment.createdAt.getTime() > PENDING_PAYMENT_TTL_MS
     ) {
       await this.sweepExpiredPayments();
-      throw new Error("Payment has expired and is now cancelled");
+      throw new AppError("Payment has expired and is now cancelled", 409);
     }
 
     const updated = await PaymentRepo.updatePayment(id, {
@@ -252,7 +262,7 @@ export default class PaymentSvc {
     // `paymentType` (deposit/full) is no longer stored on `Payment` — every
     // real payment was one or the other, so the old check was always true for
     // any payment reaching `paid`; this keeps that behavior without the field.
-    const bookingId = updated.invoice.items[0]?.sourceId;
+    const bookingId = updated.invoice?.items[0]?.sourceId;
     if (data.paymentStatus === PaymentStatus.paid && bookingId) {
       // Full payment means the citizen has paid in full — it does NOT mean the event
       // has happened yet. Mirrors AssetBooking/ServiceBooking's confirmPayment, which
@@ -291,7 +301,7 @@ export default class PaymentSvc {
 
   private static async computeRemainingBalance(bookingId: string) {
     const booking = await BookingRepo.findById(bookingId);
-    if (!booking) throw new Error("Booking not found");
+    if (!booking) throw notFound("Booking");
 
     // Use the server-computed, trustworthy Event.totalAmount (itemsTotal +
     // hostMarkupAmount + platformFeeAmount) rather than re-summing only the item
@@ -437,6 +447,22 @@ export default class PaymentSvc {
   /**
    * A payment that succeeded at Stripe: record it, link it, and confirm the
    * booking if it was still waiting to be paid for.
+   *
+   * Stripe delivers at least once and retries any delivery that is not answered
+   * 2xx, so this has two jobs that pull against each other. It must be safe to
+   * run again after a partial failure, and it must let a failure that a retry
+   * could fix reach Stripe as a 5xx - swallowing it here is how a customer ends
+   * up charged with a booking still "pending" and no retry ever coming.
+   *
+   * Idempotency comes from ordering. The PaymentIntent id is attached to the
+   * payment (unique) BEFORE the payment is marked paid, so a run that dies in
+   * between leaves a payment a retry can find by that id and finish, rather
+   * than one a retry cannot tell from any other and would record a second time.
+   *
+   * A failure that is an AppError is a business outcome (the payment was
+   * cancelled or expired, the booking is gone): running it again changes
+   * nothing, so it is logged loudly for a person and the delivery is answered
+   * as handled. Anything else is treated as transient and rethrown.
    */
   private static async settleSucceededIntent(
     paymentIntent: Stripe.PaymentIntent,
@@ -452,16 +478,25 @@ export default class PaymentSvc {
       // against the state Stripe's delivery arrived at.
       const booking = await BookingRepo.findPaymentContext(bookingId);
 
-      const payments = await this.getBookingPayments(bookingId);
-      const pendingPayment = payments.find(
-        (p) => p.status === PaymentStatus.pending,
+      const recorded = await PaymentRepo.getPaymentByTransactionId(
+        paymentIntent.id,
       );
+      const pendingPayment = recorded
+        ? null
+        : (await this.getBookingPayments(bookingId)).find(
+            (p) => p.status === PaymentStatus.pending,
+          );
+      const target = recorded ?? pendingPayment;
 
-      if (pendingPayment) {
-        await this.updatePayment(pendingPayment.id, {
-          paymentStatus: PaymentStatus.paid,
-        });
-        await PaymentRepo.setTransactionId(pendingPayment.id, paymentIntent.id);
+      if (target) {
+        if (target.providerReference !== paymentIntent.id) {
+          await PaymentRepo.setTransactionId(target.id, paymentIntent.id);
+        }
+        if (target.status === PaymentStatus.pending) {
+          await this.updatePayment(target.id, {
+            paymentStatus: PaymentStatus.paid,
+          });
+        }
       } else {
         // If no pending payment found, create a completed one
         await this.createPayment({
@@ -480,38 +515,48 @@ export default class PaymentSvc {
         try {
           await BookingRepo.setStripePaymentId(bookingId, paymentIntent.id);
         } catch (err) {
+          // A unique violation means another booking already holds this id:
+          // permanent, so retrying is pointless. Anything else may pass.
+          if (!isUniqueViolation(err)) throw err;
           console.error(
-            "Failed to set booking.stripePaymentId in webhook:",
-            err,
+            "[PAYMENT-ATTENTION] stripePaymentId already belongs to another booking",
+            { bookingId, paymentIntentId: paymentIntent.id },
           );
         }
       }
 
       // Mark the booking confirmed so it can later be checked-in/settled.
-      // Only when it's still pending — never un-complete or un-cancel a booking.
+      // Only when it's still pending - never un-complete or un-cancel a booking.
       if (booking && booking.status === BookingStatus.pending) {
-        try {
-          // The repository retires the cache before this returns, which is
-          // what makes the announcement below safe: the client refetches the
-          // booking the moment the socket message lands, and a webhook that
-          // leaves it reading "unpaid" is how someone pays twice.
-          await BookingRepo.markConfirmed(bookingId);
+        // The repository retires the cache before this returns, which is
+        // what makes the announcement below safe: the client refetches the
+        // booking the moment the socket message lands, and a webhook that
+        // leaves it reading "unpaid" is how someone pays twice.
+        await BookingRepo.markConfirmed(bookingId);
 
-          // Inside the status check on purpose: Stripe retries deliveries, and
-          // a redelivery for an already-confirmed intent has changed nothing
-          // worth telling anyone about.
-          announceToUser(booking.userId, "bookings");
-          announceToUser(booking.event?.organizerId, "bookings");
-          announceToAdmins("bookings");
-        } catch (err) {
-          console.error(
-            "Failed to set booking.status to confirmed in webhook:",
-            err,
-          );
-        }
+        // Inside the status check on purpose: Stripe retries deliveries, and
+        // a redelivery for an already-confirmed intent has changed nothing
+        // worth telling anyone about.
+        announceToUser(booking.userId, "bookings");
+        announceToUser(booking.event?.organizerId, "bookings");
+        announceToAdmins("bookings");
       }
     } catch (error) {
-      console.error("Error updating payment via webhook:", error);
+      if (error instanceof AppError) {
+        console.error(
+          "[PAYMENT-ATTENTION] Stripe payment could not be applied - needs a person:",
+          JSON.stringify({
+            paymentIntentId: paymentIntent.id,
+            bookingId,
+            amount: paymentIntent.amount,
+            currency: paymentIntent.currency,
+            reason: error.message,
+            code: error.code,
+          }),
+        );
+        return;
+      }
+      throw error;
     }
   }
 

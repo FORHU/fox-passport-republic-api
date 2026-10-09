@@ -259,7 +259,9 @@ model Checkout {
 
 model Payment {
   id                String        @id @default(uuid())
-  invoiceId         String
+  invoiceId         String?
+  assetBookingId    String?
+  serviceBookingId  String?
   amount            Decimal       @db.Decimal(12, 2)
   method            String
   provider          String        @default("stripe")
@@ -269,8 +271,13 @@ model Payment {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
-  invoice Invoice  @relation(fields: [invoiceId], references: [id])
-  refunds Refund[]
+  invoice         Invoice?         @relation(fields: [invoiceId], references: [id])
+  assetBooking    AssetBooking?    @relation(fields: [assetBookingId], references: [id])
+  serviceBooking  ServiceBooking?  @relation(fields: [serviceBookingId], references: [id])
+  refunds         Refund[]
+
+  @@index([assetBookingId])
+  @@index([serviceBookingId])
 
   @@map("payments")
 }

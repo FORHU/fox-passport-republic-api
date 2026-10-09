@@ -20,6 +20,7 @@ const APPLICATION_MODEL_BY_ROLE: Record<RoleType, string> = {
   [RoleType.serviceFoxer]: "serviceFoxerApplication",
   [RoleType.performerFoxer]: "performerFoxerApplication",
   [RoleType.investor]: "investorApplication",
+  [RoleType.organizer]: "organizerApplication",
 };
 
 // Maps the document field names admins flag (and applicants resubmit) to the
@@ -32,7 +33,34 @@ const DOCUMENT_FIELD_TO_DB_COLUMN: Record<string, string> = {
   birPermitFile: "birPermitFileId",
   selfieFile: "selfieFileId",
   portfolioFile: "portfolioFileId",
+  backgroundClearanceFile: "backgroundClearanceFileId", // organizer only
 };
+
+// Every application column that points at an uploaded document.
+const DOCUMENT_COLUMNS = [
+  ...Object.values(DOCUMENT_FIELD_TO_DB_COLUMN),
+  "proofFileId", // investor proof of funds
+];
+
+/**
+ * An application may only point at files its own applicant uploaded —
+ * otherwise anyone holding a file id could attach (and get an admin to look
+ * at) someone else's document.
+ */
+async function assertOwnDocuments(userId: string, fileIds: unknown[]) {
+  const ids = [
+    ...new Set(
+      fileIds.filter((v): v is string => typeof v === "string" && v !== ""),
+    ),
+  ];
+  if (ids.length === 0) return;
+  const owned = await prisma.file.count({
+    where: { id: { in: ids }, uploadedBy: userId },
+  });
+  if (owned !== ids.length) {
+    throw new Error("One of the documents could not be found");
+  }
+}
 
 export default class RoleRequestService {
   /**
@@ -62,6 +90,10 @@ export default class RoleRequestService {
     // Convert empty strings to null so optional FK fields don't violate constraints
     const cleanedData = Object.fromEntries(
       Object.entries(applicationData).map(([k, v]) => [k, v === "" ? null : v]),
+    );
+    await assertOwnDocuments(
+      userId,
+      DOCUMENT_COLUMNS.map((column) => cleanedData[column]),
     );
 
     return RoleRequestRepo.createRequest(
@@ -214,6 +246,8 @@ export default class RoleRequestService {
         `These documents were not flagged for resubmission: ${unflagged.join(", ")}`,
       );
     }
+
+    await assertOwnDocuments(userId, Object.values(documents));
 
     const fileColumns: Record<string, string> = {};
     for (const key of submittedKeys) {

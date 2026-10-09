@@ -4,6 +4,7 @@ import {
   authenticate,
   requirePermission,
 } from "../../middleware/auth.middleware";
+import { asyncHandler } from "../../utils/async-handler";
 
 const router = express.Router();
 
@@ -32,7 +33,7 @@ router.get(
   "/",
   authenticate,
   requirePermission("users:read"),
-  UsersCtrl.getAllUsers,
+  asyncHandler(UsersCtrl.getAllUsers),
 );
 router.post(
   "/",
@@ -50,7 +51,7 @@ router.delete(
   "/:id",
   authenticate,
   requirePermission("users:manage"),
-  UsersCtrl.deleteUserById,
+  asyncHandler(UsersCtrl.deleteUserById),
 );
 
 export default router;

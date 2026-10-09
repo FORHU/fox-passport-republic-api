@@ -56,7 +56,7 @@ export default class AssetBookingSvc {
     }
 
     if (user.isEmailVerified !== true) {
-      throw new Error("Identity verification required before booking");
+      throw new Error("Please verify your email address before booking");
     }
   }
 
@@ -255,11 +255,13 @@ export default class AssetBookingSvc {
   static async getAll(filters?: {
     userId?: string;
     ownerId?: string;
+    participantId?: string;
     status?: string;
   }) {
     return AssetBookingRepo.findAll({
       userId: filters?.userId,
       ownerId: filters?.ownerId,
+      participantId: filters?.participantId,
       status: filters?.status as ItemBookingStatus | undefined,
     });
   }
@@ -287,6 +289,25 @@ export default class AssetBookingSvc {
       transactionId,
       method,
     );
+
+    await prisma.payment.upsert({
+      where: { providerReference: transactionId },
+      create: {
+        assetBookingId: id,
+        amount: booking.totalAmount,
+        method,
+        providerReference: transactionId,
+        status: "paid",
+        paidAt: new Date(),
+      },
+      update: {
+        assetBookingId: id,
+        amount: booking.totalAmount,
+        method,
+        status: "paid",
+        paidAt: new Date(),
+      },
+    });
 
     // Redemption is only counted once payment actually confirms — mirrors
     // webhook.service.ts's paid-invoice redemption, so an abandoned checkout

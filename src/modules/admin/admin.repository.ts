@@ -425,4 +425,53 @@ export default class AdminRepo {
       where: { templateId, requestStatus: "approved" },
     });
   }
+
+  static async deleteUser(userId: string) {
+    return prisma.$transaction([
+      prisma.roleRequest.updateMany({
+        where: { reviewedBy: userId },
+        data: { reviewedBy: null },
+      }),
+      prisma.identityVerification.updateMany({
+        where: { reviewedBy: userId },
+        data: { reviewedBy: null },
+      }),
+      prisma.report.updateMany({
+        where: { resolvedById: userId },
+        data: { resolvedById: null },
+      }),
+      prisma.venueEventFoxerAffiliation.updateMany({
+        where: { reviewedById: userId },
+        data: { reviewedById: null },
+      }),
+      prisma.appointment.updateMany({
+        where: { endedById: userId },
+        data: { endedById: null },
+      }),
+      prisma.bookingAttendee.updateMany({
+        where: { invitedById: userId },
+        data: { invitedById: null },
+      }),
+      prisma.file.updateMany({
+        where: { uploadedBy: userId },
+        data: { uploadedBy: null },
+      }),
+      prisma.bookingEditRequest.updateMany({
+        where: { respondedById: userId },
+        data: { respondedById: null },
+      }),
+      prisma.eventServiceBid.deleteMany({
+        where: { providerId: userId },
+      }),
+      prisma.eventAssetBid.deleteMany({
+        where: { providerId: userId },
+      }),
+      prisma.bookingEditRequest.deleteMany({
+        where: { requestedById: userId },
+      }),
+      prisma.user.delete({
+        where: { id: String(userId) },
+      }),
+    ]);
+  }
 }

@@ -45,12 +45,20 @@ export default class AssetBookingRepo {
   static async findAll(filters?: {
     userId?: string;
     ownerId?: string;
+    // Either side of the booking: the person who booked or the listing owner.
+    participantId?: string;
     status?: ItemBookingStatus;
   }) {
     return prisma.assetBooking.findMany({
       where: {
         ...(filters?.userId && { userId: filters.userId }),
         ...(filters?.ownerId && { asset: { ownerId: filters.ownerId } }),
+        ...(filters?.participantId && {
+          OR: [
+            { userId: filters.participantId },
+            { asset: { ownerId: filters.participantId } },
+          ],
+        }),
         ...(filters?.status && { status: filters.status }),
       },
       include: {
@@ -73,6 +81,12 @@ export default class AssetBookingRepo {
           },
         },
         user: { select: { id: true, name: true, email: true } },
+        payments: {
+          orderBy: { createdAt: "desc" },
+        },
+        refunds: {
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
   }
@@ -139,7 +153,10 @@ export default class AssetBookingRepo {
           status: { in: [...RESERVING_TRANSACTION_STATUSES] },
           event: { endAt: { gte: now } },
         },
-        select: { quantity: true, event: { select: { startAt: true, endAt: true } } },
+        select: {
+          quantity: true,
+          event: { select: { startAt: true, endAt: true } },
+        },
       }),
       prisma.asset.findUnique({
         where: { id: assetId },

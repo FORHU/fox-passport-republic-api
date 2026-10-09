@@ -43,12 +43,20 @@ export default class ServiceBookingRepo {
   static async findAll(filters?: {
     userId?: string;
     ownerId?: string;
+    // Either side of the booking: the person who booked or the listing owner.
+    participantId?: string;
     status?: ItemBookingStatus;
   }) {
     return prisma.serviceBooking.findMany({
       where: {
         ...(filters?.userId && { userId: filters.userId }),
         ...(filters?.ownerId && { service: { ownerId: filters.ownerId } }),
+        ...(filters?.participantId && {
+          OR: [
+            { userId: filters.participantId },
+            { service: { ownerId: filters.participantId } },
+          ],
+        }),
         ...(filters?.status && { status: filters.status }),
       },
       include: {
@@ -71,6 +79,12 @@ export default class ServiceBookingRepo {
           },
         },
         user: { select: { id: true, name: true, email: true } },
+        payments: {
+          orderBy: { createdAt: "desc" },
+        },
+        refunds: {
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
   }
@@ -111,6 +125,7 @@ export default class ServiceBookingRepo {
     });
   }
 
+<<<<<<< HEAD
   /**
    * Booked days for the citizen-facing calendar — direct bookings
    * (`serviceBooking`) alone used to be the whole answer (and only their
@@ -163,6 +178,8 @@ export default class ServiceBookingRepo {
     return [...days].sort();
   }
 
+=======
+>>>>>>> 6bcf033e32412d8248c3faea8e1c7ea38d1feaf2
   static async confirmArrival(id: string) {
     return prisma.serviceBooking.update({
       where: { id },

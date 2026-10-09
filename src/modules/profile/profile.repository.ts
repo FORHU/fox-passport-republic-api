@@ -19,10 +19,19 @@ export default class ProfileRepo {
         name: true,
         phone: true,
         imgId: true,
+        country: true,
+        state: true,
+        city: true,
+        district: true,
         systemRole: true,
         roleType: true,
+        // What the app's booking pages check before letting someone book —
+        // the same flag the booking services enforce.
+        isEmailVerified: true,
         isPrivate: true,
         preferredCurrency: true,
+        // The "Verified" badge — display only.
+        identityVerifiedAt: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -59,7 +68,10 @@ export default class ProfileRepo {
       username?: string;
       phone?: string;
       imgId?: string;
+      country?: string;
+      state?: string;
       city?: string;
+      district?: string;
       isPrivate?: boolean;
       preferredCurrency?: string;
     },
@@ -75,7 +87,10 @@ export default class ProfileRepo {
           name: true,
           phone: true,
           imgId: true,
+          country: true,
+          state: true,
           city: true,
+          district: true,
           systemRole: true,
           roleType: true,
           isPrivate: true,

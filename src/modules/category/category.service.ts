@@ -1,3 +1,4 @@
+import { AppError, notFound } from "../../utils/errors";
 import CategoryRepo from "./category.repository";
 
 export default class CategorySvc {
@@ -10,7 +11,7 @@ export default class CategorySvc {
   static async getCategoryById(id: string) {
     const category = await CategoryRepo.getCategoryById(id);
     if (!category) {
-      throw new Error("Category not found");
+      throw notFound("Category");
     }
     return category;
   }
@@ -19,7 +20,7 @@ export default class CategorySvc {
   static async getCategoryBySlug(slug: string) {
     const category = await CategoryRepo.getCategoryBySlug(slug);
     if (!category) {
-      throw new Error("Category not found");
+      throw notFound("Category");
     }
     return category;
   }
@@ -34,7 +35,7 @@ export default class CategorySvc {
     // Check if slug already exists
     const slugExists = await CategoryRepo.slugExists(data.slug);
     if (slugExists) {
-      throw new Error("Category slug already exists");
+      throw new AppError("Category slug already exists", 409);
     }
 
     // If parentCategoryId is provided, check if it exists
@@ -43,7 +44,7 @@ export default class CategorySvc {
         data.parentCategoryId,
       );
       if (!parentExists) {
-        throw new Error("Parent category not found");
+        throw new AppError("Parent category not found", 400);
       }
     }
 
@@ -63,27 +64,27 @@ export default class CategorySvc {
     // Check if category exists
     const exists = await CategoryRepo.categoryExists(id);
     if (!exists) {
-      throw new Error("Category not found");
+      throw notFound("Category");
     }
 
     // If updating slug, check if new slug is available
     if (data.slug) {
       const slugExists = await CategoryRepo.slugExists(data.slug, id);
       if (slugExists) {
-        throw new Error("Category slug already exists");
+        throw new AppError("Category slug already exists", 409);
       }
     }
 
     // If updating parent, check if parent exists and prevent circular reference
     if (data.parentCategoryId) {
       if (data.parentCategoryId === id) {
-        throw new Error("Category cannot be its own parent");
+        throw new AppError("Category cannot be its own parent", 400);
       }
       const parentExists = await CategoryRepo.categoryExists(
         data.parentCategoryId,
       );
       if (!parentExists) {
-        throw new Error("Parent category not found");
+        throw new AppError("Parent category not found", 400);
       }
     }
 
@@ -95,7 +96,7 @@ export default class CategorySvc {
     // Check if category exists
     const exists = await CategoryRepo.categoryExists(id);
     if (!exists) {
-      throw new Error("Category not found");
+      throw notFound("Category");
     }
 
     // Note: This will fail if there are listings or subcategories

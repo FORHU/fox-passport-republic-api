@@ -1,6 +1,10 @@
+import { AppError, notFound } from "../../utils/errors";
 import { prisma } from "../../utils/prisma";
 import BlockRepo from "../block/block.repository";
 import ConversationRepository from "./conversation.repository";
+import AppointmentAccess from "../appointment/appointment.access";
+import type { InboxCounterpart } from "@prisma/client";
+import type { AppointmentPermission } from "../../types/permissions";
 import {
   CreateGroupInput,
   SendMessageInput,
@@ -14,6 +18,35 @@ import {
   notifyMessageRequestAccepted,
   notifyGroupMention,
 } from "../notifications/message-notification";
+
+/**
+ * Whether a conversation is a Shared Inbox thread, and if so which Venue or
+ * Event it belongs to and which permission answers it: `venue:reply` for a
+ * Venue; for an Event, `event:message-attendees` when it is with a guest and
+ * `event:message-suppliers` when it is with a Supplier (ADR 0005).
+ */
+function inboxOf(c: {
+  inboxVenueId?: string | null;
+  inboxEventId?: string | null;
+  inboxWith?: InboxCounterpart | null;
+}): {
+  target: { venueId: string } | { eventId: string };
+  permission: AppointmentPermission;
+} | null {
+  if (c.inboxVenueId) {
+    return { target: { venueId: c.inboxVenueId }, permission: "venue:reply" };
+  }
+  if (c.inboxEventId) {
+    return {
+      target: { eventId: c.inboxEventId },
+      permission:
+        c.inboxWith === "supplier"
+          ? "event:message-suppliers"
+          : "event:message-attendees",
+    };
+  }
+  return null;
+}
 
 // Sorting the pair means the same two users always land on the same row
 // regardless of who started the conversation, so the @@unique([userAId,
@@ -196,10 +229,10 @@ export default class ConversationService {
   static async startConversation(input: StartConversationInput) {
     const { requesterId, otherUserId } = input;
     if (requesterId === otherUserId) {
-      throw new Error("Cannot start a conversation with yourself");
+      throw new AppError("Cannot start a conversation with yourself", 400);
     }
     if (!(await ConversationService.canMessage(requesterId, otherUserId))) {
-      throw new Error("You can't message this citizen");
+      throw new AppError("You can't message this citizen", 403);
     }
 
     const [userAId, userBId] = canonicalPair(requesterId, otherUserId);
@@ -240,14 +273,14 @@ export default class ConversationService {
   // The recipient explicitly accepting a pending request.
   static async acceptRequest(conversationId: string, userId: string) {
     const conversation = await ConversationRepository.findById(conversationId);
-    if (!conversation) throw new Error("Conversation not found");
+    if (!conversation) throw notFound("Conversation");
     if (conversation.userAId !== userId && conversation.userBId !== userId) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 403);
     }
 
     const result = await ConversationRepository.accept(conversationId, userId);
     if (result.count === 0) {
-      throw new Error("No pending message request from this citizen");
+      throw new AppError("No pending message request from this citizen", 404);
     }
 
     const accepter = await prisma.user.findUnique({
@@ -268,7 +301,7 @@ export default class ConversationService {
   static async declineRequest(conversationId: string, userId: string) {
     const result = await ConversationRepository.decline(conversationId, userId);
     if (result.count === 0) {
-      throw new Error("No pending message request from this citizen");
+      throw new AppError("No pending message request from this citizen", 404);
     }
     return { status: "declined" as const };
   }
@@ -301,6 +334,13 @@ export default class ConversationService {
       messages?: { content: string; senderId: string }[];
       _count?: { messages: number };
       settings?: { muted: boolean; pinnedAt: Date | null }[];
+      inboxVenueId?: string | null;
+      inboxEventId?: string | null;
+      guestId?: string | null;
+      inboxWith?: InboxCounterpart | null;
+      inboxVenue?: { id: string; name: string } | null;
+      inboxEvent?: { id: string; name: string } | null;
+      guest?: { id: string; name: string; imgId: string | null } | null;
     },
     userId: string,
   ) {
@@ -330,6 +370,31 @@ export default class ConversationService {
       isPinned: !!settings?.pinnedAt,
       pinnedAt: settings?.pinnedAt ?? null,
     };
+
+    // Shared Inbox: the guest sees the Venue or Event as the other side; its
+    // team sees the guest, labelled with whose inbox this is. Each message
+    // carries its own `sender`, which is how either side sees who wrote it.
+    const inboxTarget = c.inboxVenue ?? c.inboxEvent;
+    if (inboxTarget) {
+      const inbox = {
+        type: c.inboxVenue ? ("venue" as const) : ("event" as const),
+        id: inboxTarget.id,
+        name: inboxTarget.name,
+        // Whether the person on the other side is a guest or a Supplier.
+        with: c.inboxWith ?? ("guest" as const),
+      };
+      const viewerIsGuest = c.guestId === userId;
+      return {
+        ...base,
+        isGroup: false as const,
+        isInbox: true as const,
+        inbox,
+        viewerRole: viewerIsGuest ? ("guest" as const) : ("team" as const),
+        // The guest's side of the thread is the Venue or Event, not a person;
+        // the team's side is the guest.
+        otherUser: viewerIsGuest ? null : (c.guest ?? null),
+      };
+    }
 
     if (c.isGroup) {
       const members = (c.participants ?? [])
@@ -372,6 +437,154 @@ export default class ConversationService {
     });
   }
 
+  /**
+   * Open (or reopen) a Shared Inbox thread (ADR 0005). A guest writes to a
+   * Venue or an Event they have booked; an Event's team may also start one
+   * with one of its attendees. Either way there is one thread per guest per
+   * Venue or Event, so this finds before it creates.
+   */
+  static async startInboxConversation(
+    callerId: string,
+    input: { venueId?: string; eventId?: string; guestId?: string },
+  ) {
+    if (!!input.venueId === !!input.eventId) {
+      throw new AppError("Give a venueId or an eventId", 400);
+    }
+
+    let target: { venueId: string } | { eventId: string };
+    let label: string;
+    let guestId = callerId;
+    // A Venue's inbox only ever talks to guests.
+    let inboxWith: InboxCounterpart = "guest";
+
+    if (input.venueId) {
+      if (input.guestId) {
+        throw new AppError(
+          "A venue's team answers messages; it doesn't start them",
+          400,
+        );
+      }
+      const venue = await prisma.venue.findUnique({
+        where: { id: input.venueId },
+        select: { id: true, name: true, status: true },
+      });
+      if (!venue || venue.status !== "available") {
+        throw notFound("Venue");
+      }
+      if (
+        await AppointmentAccess.canOnVenue(venue.id, callerId, "venue:reply")
+      ) {
+        throw new AppError("This is your venue's inbox — you answer it", 400);
+      }
+      target = { venueId: venue.id };
+      label = venue.name;
+    } else {
+      const eventId = input.eventId!;
+      const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        select: { id: true, name: true },
+      });
+      if (!event) throw notFound("Event");
+
+      const [answersGuests, answersSuppliers] = await Promise.all([
+        AppointmentAccess.canOnEvent(
+          eventId,
+          callerId,
+          "event:message-attendees",
+        ),
+        AppointmentAccess.canOnEvent(
+          eventId,
+          callerId,
+          "event:message-suppliers",
+        ),
+      ]);
+      if (input.guestId) {
+        if (!answersGuests && !answersSuppliers) {
+          throw new AppError("Unauthorized", 403);
+        }
+        guestId = input.guestId;
+      } else if (answersGuests || answersSuppliers) {
+        throw new AppError("This is your event's inbox — you answer it", 400);
+      }
+
+      // Only someone this Event actually deals with - a guest with a booking
+      // or one of its Suppliers - never an Event's inbox as a way to message
+      // anyone at all. A thread keeps what it started as.
+      const existing = await ConversationRepository.findInbox(
+        { eventId },
+        guestId,
+      );
+      const [attending, supplying] = existing
+        ? [existing.inboxWith !== "supplier", existing.inboxWith === "supplier"]
+        : await Promise.all([
+            prisma.booking
+              .findFirst({
+                where: { eventId, userId: guestId },
+                select: { id: true },
+              })
+              .then(Boolean),
+            ConversationRepository.findEventSuppliers(eventId).then((rows) =>
+              rows.some((r) => r.user.id === guestId),
+            ),
+          ]);
+      if (!attending && !supplying) {
+        throw new AppError(
+          input.guestId
+            ? "That person has no booking for this event and doesn't supply it"
+            : "Only guests with a booking and its suppliers can message this event",
+          400,
+        );
+      }
+      // Starting as a guest wins when someone is both.
+      inboxWith = attending ? "guest" : "supplier";
+      // The team member starting it needs the matching permission.
+      if (
+        input.guestId &&
+        !(inboxWith === "guest" ? answersGuests : answersSuppliers)
+      ) {
+        throw new AppError("Unauthorized", 403);
+      }
+      target = { eventId };
+      label = event.name;
+    }
+
+    const existing = await ConversationRepository.findInbox(target, guestId);
+    const conversation =
+      existing ??
+      (await ConversationRepository.createInbox({
+        target,
+        guestId,
+        inboxWith,
+        initiatorId: callerId,
+        contextLabel: label,
+      }));
+
+    const shaped = await ConversationRepository.findByIdWithListShape(
+      conversation.id,
+      callerId,
+    );
+    return ConversationService.formatConversation(shaped!, callerId);
+  }
+
+  /**
+   * An Event's Suppliers, for its team to pick someone to message. Only for
+   * those who may message them (the Owner and its Organizers); the caller is
+   * left out, as an Owner may well supply their own Event.
+   */
+  static async listEventSuppliers(callerId: string, eventId: string) {
+    if (
+      !(await AppointmentAccess.canOnEvent(
+        eventId,
+        callerId,
+        "event:message-suppliers",
+      ))
+    ) {
+      throw new AppError("Unauthorized", 403);
+    }
+    const rows = await ConversationRepository.findEventSuppliers(eventId);
+    return rows.filter((r) => r.user.id !== callerId);
+  }
+
   static async setMuted(
     conversationId: string,
     userId: string,
@@ -383,7 +596,7 @@ export default class ConversationService {
       userId,
       muted,
     );
-    if (!conversation) throw new Error("Conversation not found");
+    if (!conversation) throw notFound("Conversation");
     return ConversationService.formatConversation(conversation, userId);
   }
 
@@ -398,7 +611,7 @@ export default class ConversationService {
       userId,
       pinned,
     );
-    if (!conversation) throw new Error("Conversation not found");
+    if (!conversation) throw notFound("Conversation");
     return ConversationService.formatConversation(conversation, userId);
   }
 
@@ -410,22 +623,45 @@ export default class ConversationService {
     userId: string,
   ) {
     const conversation = await ConversationRepository.findById(conversationId);
-    if (!conversation) throw new Error("Conversation not found");
+    if (!conversation) throw notFound("Conversation");
+
+    // A Shared Inbox thread has no fixed members: its guest, and whoever
+    // answers that Venue's or Event's inbox right now. Worked out here once
+    // and carried on the result, so every caller that goes on to emit or
+    // notify reaches the current team through getMemberIds unchanged.
+    const inbox = inboxOf(conversation);
+    if (inbox) {
+      const staff = await AppointmentAccess.staffIds(
+        inbox.target,
+        inbox.permission,
+      );
+      const memberIds = [
+        conversation.guestId!,
+        ...staff.filter((id) => id !== conversation.guestId),
+      ];
+      if (!memberIds.includes(userId)) throw new AppError("Unauthorized", 403);
+      return { ...conversation, memberIds };
+    }
+
     const isMember = conversation.isGroup
       ? conversation.participants.some((p) => p.userId === userId)
       : conversation.userAId === userId || conversation.userBId === userId;
-    if (!isMember) throw new Error("Unauthorized");
-    return conversation;
+    if (!isMember) throw new AppError("Unauthorized", 403);
+    return { ...conversation, memberIds: undefined };
   }
 
   // Everyone who should receive a socket emit for this conversation —
-  // all participants for a group, both sides for a 1:1.
+  // all participants for a group, both sides for a 1:1, and for a Shared
+  // Inbox thread the guest plus its current team (resolved by
+  // assertParticipant, which is the only way such a thread reaches here).
   private static getMemberIds(conversation: {
     isGroup: boolean;
     userAId: string | null;
     userBId: string | null;
     participants: { userId: string }[];
+    memberIds?: string[];
   }): string[] {
+    if (conversation.memberIds) return conversation.memberIds;
     if (conversation.isGroup) {
       return conversation.participants.map((p) => p.userId);
     }
@@ -436,7 +672,7 @@ export default class ConversationService {
 
   static async createGroupConversation(input: CreateGroupInput) {
     if (input.participantIds.length < 2) {
-      throw new Error("A group needs at least 2 other participants");
+      throw new AppError("A group needs at least 2 other participants", 400);
     }
     const conversation = await ConversationRepository.createGroup(input);
     return ConversationService.formatConversation(
@@ -451,7 +687,7 @@ export default class ConversationService {
       userId,
     );
     if (!conversation.isGroup) {
-      throw new Error("Not a group conversation");
+      throw new AppError("Not a group conversation", 400);
     }
     const leaver = await prisma.user.findUnique({
       where: { id: userId },
@@ -494,19 +730,19 @@ export default class ConversationService {
       requesterId,
     );
     if (!conversation.isGroup) {
-      throw new Error("Not a group conversation");
+      throw new AppError("Not a group conversation", 400);
     }
     if (conversation.initiatorId !== requesterId) {
-      throw new Error("Only the group creator can remove members");
+      throw new AppError("Only the group creator can remove members", 403);
     }
     if (targetUserId === requesterId) {
-      throw new Error("Use leave instead of removing yourself");
+      throw new AppError("Use leave instead of removing yourself", 400);
     }
     const isTargetMember = conversation.participants.some(
       (p) => p.userId === targetUserId,
     );
     if (!isTargetMember) {
-      throw new Error("That person is not in this group");
+      throw new AppError("That person is not in this group", 400);
     }
 
     const [requester, target] = await Promise.all([
@@ -560,7 +796,7 @@ export default class ConversationService {
       userId,
     );
     if (!conversation.isGroup) {
-      throw new Error("Not a group conversation");
+      throw new AppError("Not a group conversation", 400);
     }
     const updated = await ConversationRepository.renameGroup(
       conversationId,
@@ -585,7 +821,7 @@ export default class ConversationService {
       requesterId,
     );
     if (!conversation.isGroup) {
-      throw new Error("Not a group conversation");
+      throw new AppError("Not a group conversation", 400);
     }
     const [requester, newUsers] = await Promise.all([
       prisma.user.findUnique({
@@ -652,7 +888,7 @@ export default class ConversationService {
     // A shared post or an attachment can stand on its own (no caption) —
     // only a plain text message needs non-empty content.
     if (!trimmed && !sharedPostId && !attachmentUrls?.length) {
-      throw new Error("Message cannot be empty");
+      throw new AppError("Message cannot be empty", 400);
     }
 
     const conversation = await ConversationService.assertParticipant(
@@ -673,7 +909,7 @@ export default class ConversationService {
         otherId &&
         !(await ConversationService.canMessage(senderId, otherId))
       ) {
-        throw new Error("You can't message this citizen");
+        throw new AppError("You can't message this citizen", 403);
       }
     }
 
@@ -682,14 +918,14 @@ export default class ConversationService {
         where: { id: sharedPostId },
         select: { id: true },
       });
-      if (!post) throw new Error("Post not found");
+      if (!post) throw notFound("Post");
     }
 
     if (replyToId) {
       const replyTarget =
         await ConversationRepository.findMessageById(replyToId);
       if (!replyTarget || replyTarget.conversationId !== conversationId) {
-        throw new Error("Message not found");
+        throw notFound("Message");
       }
     }
 
@@ -819,24 +1055,24 @@ export default class ConversationService {
 
     const existing = await ConversationRepository.findMessageById(messageId);
     if (!existing || existing.conversationId !== conversationId) {
-      throw new Error("Message not found");
+      throw notFound("Message");
     }
     if (existing.senderId !== userId) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 403);
     }
     if (existing.type === "system") {
-      throw new Error("Cannot edit a system message");
+      throw new AppError("Cannot edit a system message", 400);
     }
 
     const trimmed = content.trim();
-    if (!trimmed) throw new Error("Message cannot be empty");
+    if (!trimmed) throw new AppError("Message cannot be empty", 400);
 
     const updated = await ConversationRepository.editMessage(
       messageId,
       userId,
       trimmed,
     );
-    if (!updated) throw new Error("Message not found");
+    if (!updated) throw notFound("Message");
 
     for (const id of ConversationService.getMemberIds(conversation)) {
       emitToUser(io, id, SOCKET_EVENTS.MESSAGE_EDITED, updated);
@@ -860,10 +1096,10 @@ export default class ConversationService {
 
     const message = await ConversationRepository.findMessageById(messageId);
     if (!message || message.conversationId !== conversationId) {
-      throw new Error("Message not found");
+      throw notFound("Message");
     }
     if (message.type === "system") {
-      throw new Error("Cannot pin a system message");
+      throw new AppError("Cannot pin a system message", 400);
     }
 
     const updated = await ConversationRepository.setPinnedMessage(
@@ -896,7 +1132,7 @@ export default class ConversationService {
       userId,
     );
     if (!conversation.isGroup) {
-      throw new Error("Not a group conversation");
+      throw new AppError("Not a group conversation", 400);
     }
     const updated = await ConversationRepository.setGroupPhoto(
       conversationId,
@@ -938,6 +1174,11 @@ export default class ConversationService {
       conversationId,
       userId,
     );
+    // Hiding is per side of a pair; a Shared Inbox thread has no pair, and
+    // the team's copy is shared by everyone on it.
+    if (conversation.memberIds) {
+      throw new AppError("A venue or event conversation can't be deleted", 400);
+    }
     const side = conversation.userAId === userId ? "A" : "B";
     await ConversationRepository.hideForUser(conversationId, side);
     return { success: true as const };
@@ -957,17 +1198,17 @@ export default class ConversationService {
 
     const message = await ConversationRepository.findMessageById(messageId);
     if (!message || message.conversationId !== conversationId) {
-      throw new Error("Message not found");
+      throw notFound("Message");
     }
     if (message.senderId !== userId) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 403);
     }
 
     const result = await ConversationRepository.deleteMessage(
       messageId,
       userId,
     );
-    if (result.count === 0) throw new Error("Message not found");
+    if (result.count === 0) throw notFound("Message");
 
     const payload = { conversationId, messageId };
     for (const id of ConversationService.getMemberIds(conversation)) {
@@ -990,7 +1231,7 @@ export default class ConversationService {
 
     const message = await ConversationRepository.findMessageById(messageId);
     if (!message || message.conversationId !== conversationId) {
-      throw new Error("Message not found");
+      throw notFound("Message");
     }
 
     const reactions = await ConversationRepository.setMessageReaction(

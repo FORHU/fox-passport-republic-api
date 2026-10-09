@@ -1,0 +1,97 @@
+// Someone a Mayor or Event Owner has named to help run one of their own Venues
+// or Events — see docs/adr/0005-organizer-role-and-appointments.md and the
+// Appointment / Check-in Helper entries in CONTEXT.md.
+//
+// Exactly one of `eventId` / `venueId` is set; the migration enforces that
+// with a CHECK constraint, and a partial unique index allows at most one live
+// (invited or active) Appointment per person per Venue or Event. Neither can
+// be expressed in Prisma's schema language.
+//
+// Replaces `EventOrganizerAssignment`, whose rows — any user, check-in only,
+// effective immediately — carried over as `check_in_helper` Appointments.
+model Appointment {
+  id            String                @id @default(uuid())
+  kind          AppointmentKind
+  status        AppointmentStatus
+  eventId       String?
+  venueId       String?
+  userId        String
+  appointedById String
+  // The fixed set for this kind at the time of appointment
+  // (EVENT_ORGANIZER_PERMISSIONS etc. in src/types/permissions.ts). Stored per
+  // row so choosing permissions per person can come later without a migration.
+  permissions   String[]
+  // Invitations only: an Organizer who hasn't accepted by then never can.
+  expiresAt     DateTime?
+  respondedAt   DateTime?
+  endedAt       DateTime?
+  endedById     String?
+  endReason     AppointmentEndReason?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  event       Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  venue       Venue? @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  user        User   @relation("AppointmentAppointee", fields: [userId], references: [id], onDelete: Cascade)
+  appointedBy User   @relation("AppointmentAppointedBy", fields: [appointedById], references: [id])
+  endedBy     User?  @relation("AppointmentEndedBy", fields: [endedById], references: [id])
+
+  @@index([userId, status])
+  @@index([eventId, status])
+  @@index([venueId, status])
+  @@map("appointments")
+}
+
+enum AppointmentKind {
+  // A vetted Organizer, invited and effective only once they accept.
+  organizer
+  // Anyone added by email to check guests in; effective immediately.
+  check_in_helper
+}
+
+// Stored lifecycle only. Two further states are derived when read, never
+// written, so no scheduled job has to keep them true: an `invited` row past
+// `expiresAt` is expired, and an Event Appointment stops granting anything
+// once its Event is over (see AppointmentAccess).
+enum AppointmentStatus {
+  invited
+  // An Organizer asked to join a Venue or Event that accepts requests; like
+  // `invited`, grants nothing until the other side (here the Mayor or Event
+  // Owner) accepts, and expires unanswered after the same 14 days.
+  requested
+  active
+  declined
+  ended
+}
+
+enum AppointmentEndReason {
+  // The Mayor or Event Owner removed them.
+  removed
+  // They left on their own.
+  left
+  // An admin took away their Organizer role.
+  role_revoked
+  // The Mayor or Event Owner lost the role that made them one.
+  owner_role_revoked
+}
+
+// What an Organizer has earned on the Organizer Passport path from one Event —
+// the ledger that makes those awards idempotent and caps them (ADR 0005).
+// One row per person per Event, whether they organised the Event itself or a
+// Venue it was held at. `checkInXp` is raised with a guarded increment, so
+// quick repeated scans can never pass the cap; `completedAt` is set at most
+// once, so completing an Event twice cannot pay twice.
+model OrganizerEventXp {
+  userId      String
+  eventId     String
+  checkInXp   Int       @default(0)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@id([userId, eventId])
+  @@map("organizer_event_xp")
+}

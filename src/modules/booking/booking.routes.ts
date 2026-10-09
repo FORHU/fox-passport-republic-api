@@ -1,11 +1,7 @@
 import express from "express";
 import BookingCtrl from "./booking.controller";
 import AttendeeCtrl from "./attendee.controller";
-import {
-  authenticate,
-  optionalAuth,
-  requirePermission,
-} from "../../middleware/auth.middleware";
+import { authenticate, optionalAuth } from "../../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -38,18 +34,13 @@ router.post("/:bookingId/attendees", authenticate, AttendeeCtrl.addGuest);
 router.put("/:id/attendees", authenticate, BookingCtrl.appendAttendees);
 router.delete("/attendees/:id", authenticate, AttendeeCtrl.removeGuest);
 // static routes must come before /:id dynamic routes
-router.patch(
-  "/check-in",
-  authenticate,
-  requirePermission("booking:check-in"),
-  BookingCtrl.checkInBooking,
-);
-router.patch(
-  "/attendees/check-in",
-  authenticate,
-  requirePermission("booking:check-in"),
-  BookingCtrl.checkInAttendee,
-);
+// Check-in is authorized per Event in BookingSvc via AppointmentAccess — the
+// Event Owner, their Organizers and Check-in Helpers, and the staff of the
+// Venue it is held at on the day. None of them need a global permission, so
+// a route-level `booking:check-in` here shut every helper out before the real
+// check could run. On validate-rbac-guards' allow-list.
+router.patch("/check-in", authenticate, BookingCtrl.checkInBooking);
+router.patch("/attendees/check-in", authenticate, BookingCtrl.checkInAttendee);
 router.patch(
   "/attendees/:id/respond",
   optionalAuth,
@@ -63,7 +54,7 @@ router.get("/availability", BookingCtrl.getAvailability); // must be before /:id
 router.get("/", authenticate, BookingCtrl.getAllBookings);
 router.get("/upcoming", authenticate, BookingCtrl.getUpcomingBookings); // must be before /:id
 router.get("/user/:userId", authenticate, BookingCtrl.getUserBookings);
-router.get("/:id", optionalAuth, BookingCtrl.getBookingById);
+router.get("/:id", authenticate, BookingCtrl.getBookingById); // BookingSvc.getBookingForViewer decides who
 router.post("/create", authenticate, BookingCtrl.createBooking);
 router.post("/:id/confirm", authenticate, BookingCtrl.confirmBooking);
 

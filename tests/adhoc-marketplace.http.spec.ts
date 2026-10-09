@@ -24,17 +24,32 @@ describe("Ad-hoc marketplace HTTP endpoints — authorization", () => {
 
   beforeAll(async () => {
     owner = await prisma.user.create({
-      data: { email: `http_adhoc_owner_${runId}@test.com`, password: "pw", name: "Owner" },
+      data: {
+        email: `http_adhoc_owner_${runId}@test.com`,
+        password: "pw",
+        name: "Owner",
+      },
     });
     provider = await prisma.user.create({
-      data: { email: `http_adhoc_provider_${runId}@test.com`, password: "pw", name: "Provider" },
+      data: {
+        email: `http_adhoc_provider_${runId}@test.com`,
+        password: "pw",
+        name: "Provider",
+      },
     });
     stranger = await prisma.user.create({
-      data: { email: `http_adhoc_stranger_${runId}@test.com`, password: "pw", name: "Stranger" },
+      data: {
+        email: `http_adhoc_stranger_${runId}@test.com`,
+        password: "pw",
+        name: "Stranger",
+      },
     });
 
     const sign = (u: any) =>
-      jwt.sign({ userId: u.id, email: u.email, systemRole: "user", roleType: [] }, ACCESS_TOKEN_SECRET);
+      jwt.sign(
+        { userId: u.id, email: u.email, systemRole: "user", roleType: [] },
+        ACCESS_TOKEN_SECRET,
+      );
     ownerToken = sign(owner);
     providerToken = sign(provider);
     strangerToken = sign(stranger);
@@ -88,11 +103,15 @@ describe("Ad-hoc marketplace HTTP endpoints — authorization", () => {
   });
 
   afterAll(async () => {
-    await prisma.eventAssetTransaction.deleteMany({ where: { eventId: { in: eventIds } } });
+    await prisma.eventAssetTransaction.deleteMany({
+      where: { eventId: { in: eventIds } },
+    });
     await prisma.booking.deleteMany({ where: { id: { in: bookingIds } } });
     await prisma.event.deleteMany({ where: { id: { in: eventIds } } });
     await prisma.asset.deleteMany({ where: { id: { in: assetIds } } });
-    await prisma.user.deleteMany({ where: { id: { in: [owner.id, provider.id, stranger.id] } } });
+    await prisma.user.deleteMany({
+      where: { id: { in: [owner.id, provider.id, stranger.id] } },
+    });
     await prisma.$executeRaw`DELETE FROM request_idempotency_keys WHERE endpoint = 'POST /bookings/:id/items'`;
   });
 
@@ -185,12 +204,13 @@ describe("Ad-hoc marketplace HTTP endpoints — authorization", () => {
       expect(res.status).toBe(400);
     });
 
-    it("400s (via TransactionActorUnauthorizedError) for someone who is not the item's provider", async () => {
+    it("403s (via TransactionActorUnauthorizedError) for someone who is not the item's provider", async () => {
       const res = await request(app)
         .patch(`/api/v1/event-transactions/${transactionId}/review`)
         .set("Authorization", `Bearer ${strangerToken}`)
         .send({ type: "asset", action: "confirm" });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe("FORBIDDEN");
       expect(res.body.message).toMatch(/only the provider/i);
     });
 
