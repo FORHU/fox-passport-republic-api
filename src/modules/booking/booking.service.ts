@@ -160,7 +160,6 @@ export default class BookingSvc {
     });
 
     if (!user) {
-    if (!user) {
       throw notFound("User");
     }
 
@@ -239,7 +238,6 @@ export default class BookingSvc {
       throw new AppError(
         `This venue only accommodates ${venue.capacity} guests and does not accept requests beyond capacity.`,
         400,
-      );
       );
     }
     const overageAmount = venue.extraGuestRate

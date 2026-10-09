@@ -49,7 +49,6 @@ enum ReportStatus {
   dismissed
   actioned
 }
-}
 
 model Post {
   id         String         @id @default(uuid())

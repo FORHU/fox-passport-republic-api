@@ -125,7 +125,6 @@ export default class ServiceBookingRepo {
     });
   }
 
-<<<<<<< HEAD
   /**
    * Booked days for the citizen-facing calendar — direct bookings
    * (`serviceBooking`) alone used to be the whole answer (and only their
@@ -142,7 +141,10 @@ export default class ServiceBookingRepo {
         where: {
           serviceId,
           status: { notIn: ["cancelled", "disputed"] },
-          OR: [{ endDate: { gte: now } }, { endDate: null, scheduledDate: { gte: now } }],
+          OR: [
+            { endDate: { gte: now } },
+            { endDate: null, scheduledDate: { gte: now } },
+          ],
         },
         select: { scheduledDate: true, endDate: true },
       }),
@@ -178,8 +180,6 @@ export default class ServiceBookingRepo {
     return [...days].sort();
   }
 
-=======
->>>>>>> 6bcf033e32412d8248c3faea8e1c7ea38d1feaf2
   static async confirmArrival(id: string) {
     return prisma.serviceBooking.update({
       where: { id },

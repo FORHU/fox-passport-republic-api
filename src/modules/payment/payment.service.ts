@@ -97,7 +97,6 @@ export default class PaymentSvc {
         "This booking is still awaiting the Venue Foxer's approval before you can pay.",
         400,
       );
-      );
     }
 
     const paymentIntent = await stripe.paymentIntents.create({

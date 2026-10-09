@@ -20,7 +20,6 @@ import {
   findProviderEngagements,
   providerBlockedDays,
 } from "../availability/provider-schedule";
-import { sendBookingConfirmationEmail } from "../../utils/emails/confirmation";
 import {
   announceToAdmins,
   announceToUser,

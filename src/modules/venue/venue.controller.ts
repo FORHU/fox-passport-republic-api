@@ -415,34 +415,6 @@ export default class VenueCtrl {
     }
   }
 
-  // Public — days a venue can't be booked for, within the requested window:
-  // manually blocked dates unioned with every live booking's date range. Used
-  // by both the citizen's booking calendar (to grey days out) and the venue
-  // Foxer's own dashboard (to see demand).
-  static async getUnavailableDates(req: Request, res: Response) {
-    const schema = Joi.object({
-      start: Joi.date().iso().required(),
-      end: Joi.date().iso().required(),
-    });
-
-    const { error, value } = schema.validate(req.query);
-    if (error) {
-      return res.status(400).json({ message: error.message });
-    }
-
-    try {
-      const result = await VenueSvc.getUnavailableDates(
-        req.params.id,
-        value.start,
-        value.end,
-      );
-      return res.status(200).json(result);
-    } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ message: error.message || error });
-    }
-  }
-
   // Normalizes an incoming date to UTC midnight so "block Dec 25" always
   // compares equal to itself regardless of what time of day the request
   // carried — blockedDates is a calendar of days, not timestamps.
