@@ -17,6 +17,8 @@ model User {
   address                  String?
   city                     String?
   state                    String?
+  // Barangay in the Philippines; district or neighbourhood elsewhere. Optional.
+  district                 String?
   country                  String?                      @default("Philippines")
   googleId                 String?                      @unique
   phone                    String?

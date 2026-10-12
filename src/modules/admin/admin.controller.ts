@@ -94,6 +94,31 @@ export default class AdminCtrl {
     }
   }
 
+  static async deleteUser(req: Request, res: Response) {
+    try {
+      const actor = {
+        userId: req.user!.userId,
+        email: req.user!.email,
+      };
+      const reason =
+        typeof req.body?.reason === "string" ? req.body.reason : undefined;
+      const result = await AdminSvc.deleteUser(actor, req.params.id, reason);
+      return res.status(200).json({
+        success: true,
+        message: "User account deleted successfully",
+        data: result,
+      });
+    } catch (e: unknown) {
+      if (e instanceof AppError) {
+        return res
+          .status(e.status)
+          .json({ success: false, message: e.message, code: e.code });
+      }
+      const err = e as Error;
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
   // ─── DISPUTES ────────────────────────────────────────────────────────────
 
   static async getDisputes(req: Request, res: Response) {

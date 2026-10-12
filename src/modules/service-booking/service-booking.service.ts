@@ -15,11 +15,11 @@ import PromotionSvc from "../promotion/promotion.service";
 import RefundSvc from "../refund/refund.service";
 import { isPerformerServiceCategory } from "../../types/permissions";
 import AvailabilitySvc from "../availability/availability.service";
+import { sendBookingConfirmationEmail } from "../../utils/emails/confirmation";
 import {
   findProviderEngagements,
   providerBlockedDays,
 } from "../availability/provider-schedule";
-import { sendBookingConfirmationEmail } from "../../utils/emails/confirmation";
 import {
   announceToAdmins,
   announceToUser,

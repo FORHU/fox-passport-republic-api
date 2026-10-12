@@ -36,6 +36,12 @@ router.patch(
   requirePermission("roles:assign"),
   AdminCtrl.changeRoleTypes,
 );
+router.delete(
+  "/users/:id",
+  authenticate,
+  requirePermission("users:manage"),
+  AdminCtrl.deleteUser,
+);
 
 // Stats
 router.get(

@@ -26,7 +26,6 @@ export default class ReportsController {
         .status(400)
         .json({ success: false, message: "Invalid targetType filter" });
     }
-
     try {
       const result = await ReportsService.getAdminReports(
         Number(req.query.page ?? 1),

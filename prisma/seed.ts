@@ -10,6 +10,7 @@ import {
   seedAssets,
   seedServices,
   seedEvents,
+  seedGlobeStressEvents,
   seedBookings,
   seedReviews,
   seedItemBookings,
@@ -119,6 +120,14 @@ async function main() {
 
   // 5. Seed Events (templates + approved events)
   await seedEvents(prisma, users);
+
+  // Keep synthetic global listings opt-in so normal seeds stay representative.
+  if (process.env.SEED_GLOBE_STRESS_EVENTS === "1") {
+    const host = users.find((user) => user.email === "host@example.com");
+    if (!host)
+      throw new Error("host@example.com not found for globe stress seeding");
+    await seedGlobeStressEvents(prisma, host.id);
+  }
 
   // 6. Seed Bookings (pre-existing confirmed bookings for approved events)
   await seedBookings(prisma, users);

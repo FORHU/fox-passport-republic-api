@@ -214,7 +214,12 @@ export default class UsersCtrl {
 
   // DELETE
   static async deleteUserById(req: Request, res: Response) {
-    await UsersSvc.deleteUser(req.params.id);
+    const actor = req.user
+      ? { userId: req.user.userId, email: req.user.email }
+      : undefined;
+    const reason =
+      typeof req.body?.reason === "string" ? req.body.reason : undefined;
+    await UsersSvc.deleteUser(req.params.id, actor, reason);
     return res.status(204).send();
   }
 }

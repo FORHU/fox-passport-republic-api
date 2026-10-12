@@ -5,6 +5,7 @@ export * from "./international-venue.seeder";
 export * from "./asset.seeder";
 export * from "./service.seeder";
 export * from "./event.seeder";
+export * from "./globe-stress.seeder";
 export * from "./booking.seeder";
 export * from "./review.seeder";
 export * from "./item-booking.seeder";

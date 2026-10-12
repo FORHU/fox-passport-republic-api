@@ -124,6 +124,6 @@ describe("booking verification", () => {
         endDate: "2026-01-02T10:00:00.000Z",
         guestCount: 2,
       }),
-    ).rejects.toThrow("Please verify your email address before booking");
+).rejects.toThrow("Please verify your email address before booking");
   });
 });

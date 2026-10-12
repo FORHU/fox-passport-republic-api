@@ -1,5 +1,4 @@
 import { AppError } from "../../utils/errors";
-
 export type AvailabilityItemKind = "asset" | "service" | "venue";
 
 export interface AvailabilityCheckItem {

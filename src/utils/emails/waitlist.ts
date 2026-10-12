@@ -15,7 +15,7 @@ export async function sendWaitlistSpotAvailableEmail({
   const bookingUrl = `${FRONTEND_URL}/events/${templateId}`;
 
   const inner = `
-    <span style="display:inline-block;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;background:#d4ff00;color:#111114;">Waitlist</span>
+    <span style="display:inline-block;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;background:#d4ff00;color:#111114;border:1px solid #9fbf00;">Waitlist</span>
 
     <h1 style="margin: 18px 0 8px; font-size: 26px; font-weight: 800; color: #111114; letter-spacing: -0.5px;">
       A spot opened up!

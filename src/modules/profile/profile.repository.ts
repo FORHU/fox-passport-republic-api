@@ -20,7 +20,14 @@ export default class ProfileRepo {
         name: true,
         phone: true,
         imgId: true,
+<<<<<<< HEAD
         city: true,
+=======
+        country: true,
+        state: true,
+        city: true,
+        district: true,
+>>>>>>> 841b84588c6987824b25d0fdbb3fc14b6d98baa8
         systemRole: true,
         roleType: true,
         // What the app's booking pages check before letting someone book —
@@ -105,7 +112,10 @@ export default class ProfileRepo {
       username?: string;
       phone?: string;
       imgId?: string;
+      country?: string;
+      state?: string;
       city?: string;
+      district?: string;
       isPrivate?: boolean;
       preferredCurrency?: string;
     },
@@ -120,7 +130,10 @@ export default class ProfileRepo {
             // Legacy dual-write
             ...(data.phone !== undefined && { phone: data.phone }),
             ...(data.imgId !== undefined && { imgId: data.imgId }),
+            ...(data.country !== undefined && { country: data.country }),
+            ...(data.state !== undefined && { state: data.state }),
             ...(data.city !== undefined && { city: data.city }),
+            ...(data.district !== undefined && { district: data.district }),
             ...(data.isPrivate !== undefined && { isPrivate: data.isPrivate }),
             ...(data.preferredCurrency !== undefined && {
               preferredCurrency: data.preferredCurrency,
@@ -133,6 +146,7 @@ export default class ProfileRepo {
             name: true,
             systemRole: true,
             roleType: true,
+            district: true,
             updatedAt: true,
           },
         });
@@ -144,12 +158,16 @@ export default class ProfileRepo {
             phone: data.phone,
             imgId: data.imgId,
             city: data.city,
+            state: data.state,
+            country: data.country ?? "Philippines",
             isPrivate: data.isPrivate ?? false,
           },
           update: {
             ...(data.phone !== undefined && { phone: data.phone }),
             ...(data.imgId !== undefined && { imgId: data.imgId }),
             ...(data.city !== undefined && { city: data.city }),
+            ...(data.state !== undefined && { state: data.state }),
+            ...(data.country !== undefined && { country: data.country }),
             ...(data.isPrivate !== undefined && { isPrivate: data.isPrivate }),
           },
         });
@@ -173,6 +191,8 @@ export default class ProfileRepo {
           phone: profile.phone,
           imgId: profile.imgId,
           city: profile.city,
+          state: profile.state,
+          country: profile.country,
           isPrivate: profile.isPrivate,
           preferredCurrency:
             settings?.preferredCurrency ?? data.preferredCurrency ?? "PHP",
