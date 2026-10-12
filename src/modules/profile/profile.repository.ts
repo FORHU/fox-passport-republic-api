@@ -20,14 +20,10 @@ export default class ProfileRepo {
         name: true,
         phone: true,
         imgId: true,
-<<<<<<< HEAD
-        city: true,
-=======
         country: true,
         state: true,
         city: true,
         district: true,
->>>>>>> 841b84588c6987824b25d0fdbb3fc14b6d98baa8
         systemRole: true,
         roleType: true,
         // What the app's booking pages check before letting someone book —
