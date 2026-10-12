@@ -24,11 +24,23 @@ export default class FollowRepo {
     return result;
   }
 
+  // [MIGRATION-FLAG: Stage 3 Switch] Read isPrivate from profile with fallback to legacy user.isPrivate
   static async getUserBasic(userId: string) {
-    return prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, isPrivate: true },
+      select: {
+        id: true,
+        name: true,
+        isPrivate: true,
+        profile: { select: { isPrivate: true } },
+      },
     });
+    if (!user) return null;
+    return {
+      id: user.id,
+      name: user.name,
+      isPrivate: user.profile?.isPrivate ?? user.isPrivate ?? false,
+    };
   }
 
   static async findRow(followerId: string, followingId: string) {

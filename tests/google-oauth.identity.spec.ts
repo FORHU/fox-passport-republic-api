@@ -43,6 +43,8 @@ vi.mock("../src/utils/redis.util", () => ({
 }));
 
 const repo = vi.hoisted(() => ({
+  findOAuthAccount: vi.fn(),
+  linkOAuthAccount: vi.fn(),
   findUserByGoogleId: vi.fn(),
   findUserByEmail: vi.fn(),
   findUserByUsername: vi.fn(),
@@ -114,6 +116,8 @@ beforeEach(() => {
   tokens.calls.length = 0;
   redis.store.clear();
   redis.available.value = true;
+  repo.findOAuthAccount.mockResolvedValue(null);
+  repo.linkOAuthAccount.mockResolvedValue({});
   repo.findUserByGoogleId.mockResolvedValue(null);
   repo.findUserByEmail.mockResolvedValue(null);
   repo.findUserByUsername.mockResolvedValue(null);
