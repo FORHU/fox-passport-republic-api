@@ -88,9 +88,10 @@ app.disable("x-powered-by");
 // Initialize setup
 setup();
 
-// Better Auth handler for /api/auth/*
+// Better Auth handler for /api/auth/* and /api/v1/auth/*
 app.all("/api/auth/*", toNodeHandler(auth));
-console.log("✅ Better Auth router mounted");
+app.all("/api/v1/auth/*", toNodeHandler(auth));
+console.log("✅ Better Auth router mounted at /api/auth and /api/v1/auth");
 
 app.use("/api", router);
 console.log("✅ Main router mounted");
