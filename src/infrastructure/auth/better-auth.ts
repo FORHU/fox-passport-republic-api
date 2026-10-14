@@ -60,7 +60,5 @@ export const auth = betterAuth({
       },
     },
   },
-  plugins: [
-    bearer(),
-  ],
+  plugins: [bearer()],
 });

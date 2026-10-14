@@ -58,7 +58,8 @@ export const registerSocketGateway = (io: Server) => {
         return next(new Error("Invalid or expired token"));
       }
       socket.userId = session.user.id;
-      socket.systemRole = (session.user as Record<string, unknown>).systemRole as SystemRole;
+      socket.systemRole = (session.user as Record<string, unknown>)
+        .systemRole as SystemRole;
       return next();
     } catch {
       return next(new Error("Invalid or expired token"));

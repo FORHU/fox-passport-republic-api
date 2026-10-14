@@ -28,8 +28,12 @@ export const authenticate = async (
     req.user = {
       userId: session.user.id,
       email: session.user.email,
-      systemRole: ((session.user as Record<string, unknown>).systemRole as SystemRole) || "user",
-      roleType: ((session.user as Record<string, unknown>).roleType as RoleType[]) || [],
+      systemRole:
+        ((session.user as Record<string, unknown>).systemRole as SystemRole) ||
+        "user",
+      roleType:
+        ((session.user as Record<string, unknown>).roleType as RoleType[]) ||
+        [],
     };
 
     next();
@@ -59,8 +63,12 @@ export const optionalAuth = async (
       req.user = {
         userId: session.user.id,
         email: session.user.email,
-        systemRole: ((session.user as Record<string, unknown>).systemRole as SystemRole) || "user",
-        roleType: ((session.user as Record<string, unknown>).roleType as RoleType[]) || [],
+        systemRole:
+          ((session.user as Record<string, unknown>)
+            .systemRole as SystemRole) || "user",
+        roleType:
+          ((session.user as Record<string, unknown>).roleType as RoleType[]) ||
+          [],
       };
     }
 
