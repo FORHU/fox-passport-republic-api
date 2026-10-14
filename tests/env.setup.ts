@@ -37,6 +37,15 @@ if (fs.existsSync(testEnv)) {
  * rather than wiping real data. Unit specs that mock Prisma are unaffected.
  */
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
+
+if (!process.env.BETTER_AUTH_SECRET) {
+  process.env.BETTER_AUTH_SECRET =
+    process.env.ACCESS_TOKEN_SECRET || "ci-better-auth-secret-minimum-32-chars-long";
+}
+if (!process.env.BETTER_AUTH_URL) {
+  process.env.BETTER_AUTH_URL = "http://localhost:5000/api/auth";
+}
+
 const url = process.env.DATABASE_URL;
 if (url) {
   const parsed = new URL(url);
