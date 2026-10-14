@@ -90,7 +90,10 @@ setup();
 
 // Better Auth handler for /api/auth/* and /api/v1/auth/*
 app.all("/api/auth/*", toNodeHandler(auth));
-app.all("/api/v1/auth/*", toNodeHandler(auth));
+app.all("/api/v1/auth/*", (req, res) => {
+  req.url = req.url.replace(/^\/api\/v1\/auth/, "/api/auth");
+  return toNodeHandler(auth)(req, res);
+});
 console.log("✅ Better Auth router mounted at /api/auth and /api/v1/auth");
 
 app.use("/api", router);
