@@ -8,6 +8,8 @@ import { isDev, CORS_ORIGINS } from "./config";
 import { createErrorHandler } from "./middleware/error.middleware";
 import cors from "cors";
 import setup from "./setup";
+import { toNodeHandler } from "better-auth/node";
+import { auth } from "./infrastructure/auth/better-auth";
 
 const app = express();
 
@@ -85,6 +87,10 @@ app.disable("x-powered-by");
 
 // Initialize setup
 setup();
+
+// Better Auth handler for /api/auth/*
+app.all("/api/auth/*", toNodeHandler(auth));
+console.log("✅ Better Auth router mounted");
 
 app.use("/api", router);
 console.log("✅ Main router mounted");

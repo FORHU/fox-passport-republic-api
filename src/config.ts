@@ -37,18 +37,18 @@ export const MAILER_TRANSPORT_SECURE =
   process.env.MAILER_TRANSPORT_SECURE === "true";
 export const MAILER_EMAIL = process.env.MAILER_EMAIL as string;
 export const MAILER_PASSWORD = process.env.MAILER_PASSWORD as string;
-// Validated rather than cast: a missing secret used to 500 every login instead
-// of refusing to start, and a leftover dev value started up silently.
-export const ACCESS_TOKEN_SECRET = requireSecret(
-  "ACCESS_TOKEN_SECRET",
-  process.env.ACCESS_TOKEN_SECRET,
+export const BETTER_AUTH_SECRET = requireSecret(
+  "BETTER_AUTH_SECRET",
+  process.env.BETTER_AUTH_SECRET,
   { isDev },
 );
-export const REFRESH_TOKEN_SECRET = requireSecret(
-  "REFRESH_TOKEN_SECRET",
-  process.env.REFRESH_TOKEN_SECRET,
-  { isDev },
-);
+export const BETTER_AUTH_URL =
+  process.env.BETTER_AUTH_URL || `http://localhost:${PORT}`;
+
+export const ACCESS_TOKEN_SECRET =
+  process.env.ACCESS_TOKEN_SECRET || BETTER_AUTH_SECRET;
+export const REFRESH_TOKEN_SECRET =
+  process.env.REFRESH_TOKEN_SECRET || BETTER_AUTH_SECRET;
 
 // `expiresIn` accepts a number of seconds or an ms-style string ("15m", "7d").
 // Env vars are always strings, so narrow to the string half of that union

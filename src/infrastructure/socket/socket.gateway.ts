@@ -1,6 +1,5 @@
 import { Server, Socket } from "socket.io";
-import jwt from "jsonwebtoken";
-import { ACCESS_TOKEN_SECRET } from "../../config";
+import { auth } from "../auth/better-auth";
 import { redeemSocketTicket } from "../../modules/auth/socket-ticket.service";
 import { ADMIN_ROOM, SOCKET_EVENTS, userRoom } from "./socket.constants";
 import { emitToUser } from "./socket.utils";
@@ -52,12 +51,14 @@ export const registerSocketGateway = (io: Server) => {
       .replace(/"/g, "");
 
     try {
-      const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET) as {
-        userId: string;
-        systemRole?: SystemRole;
-      };
-      socket.userId = decoded.userId;
-      socket.systemRole = decoded.systemRole;
+      const headers = new Headers();
+      headers.set("authorization", `Bearer ${token}`);
+      const session = await auth.api.getSession({ headers });
+      if (!session || !session.user) {
+        return next(new Error("Invalid or expired token"));
+      }
+      socket.userId = session.user.id;
+      socket.systemRole = (session.user as Record<string, unknown>).systemRole as SystemRole;
       return next();
     } catch {
       return next(new Error("Invalid or expired token"));
