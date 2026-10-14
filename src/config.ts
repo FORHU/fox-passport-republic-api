@@ -119,6 +119,13 @@ export const CLOUD_FRONT_DOMAIN = process.env.CLOUD_FRONT_DOMAIN as
 export const AWS_S3_PRIVATE_BUCKET = process.env.AWS_S3_PRIVATE_BUCKET as
   string | undefined;
 
+// Amazon SQS Queues (replaces RabbitMQ for async event/job processing)
+export const AWS_SQS_PAYMENT_QUEUE_URL = process.env
+  .AWS_SQS_PAYMENT_QUEUE_URL as string | undefined;
+export const AWS_SQS_NOTIFICATION_QUEUE_URL = process.env
+  .AWS_SQS_NOTIFICATION_QUEUE_URL as string | undefined;
+export const SQS_ENDPOINT = process.env.SQS_ENDPOINT as string | undefined;
+
 export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY as string;
 export const STRIPE_WEBHOOK_SECRET = process.env
   .STRIPE_WEBHOOK_SECRET as string;

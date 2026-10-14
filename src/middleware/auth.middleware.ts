@@ -26,8 +26,8 @@ export const authenticate = async (
         userId: session.user.id,
         email: session.user.email,
         systemRole:
-          ((session.user as Record<string, unknown>).systemRole as SystemRole) ||
-          "user",
+          ((session.user as Record<string, unknown>)
+            .systemRole as SystemRole) || "user",
         roleType:
           ((session.user as Record<string, unknown>).roleType as RoleType[]) ||
           [],

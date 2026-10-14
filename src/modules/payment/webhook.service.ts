@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import PaymentPayoutSvc from "./payout.service";
+import { SqsService } from "../../infrastructure/queue/sqs.service";
 
 export default class WebhookSvc {
   /**
@@ -54,12 +55,14 @@ export default class WebhookSvc {
 
   /**
    * Synchronizes Invoice and Checkout status based on a successful payment intent.
+   * Records the selected payment method and publishes payment event to SQS.
    */
   static async handlePaymentSuccess(
     providerSessionId: string,
     providerReference: string,
     amountPaid: number,
     _currency: string,
+    paymentMethod = "card",
   ) {
     const invoiceId = await prisma.$transaction(async (tx) => {
       // 1. Find the active checkout
@@ -75,17 +78,18 @@ export default class WebhookSvc {
         data: { status: "completed" },
       });
 
-      // 3. Create or update the Payment record
+      // 3. Create or update the Payment record with selected method
       const _payment = await tx.payment.upsert({
         where: { providerReference },
         update: {
           status: "paid",
           paidAt: new Date(),
+          method: paymentMethod,
         },
         create: {
           invoiceId: checkout.invoiceId,
           amount: amountPaid,
-          method: "card", // Simplified for V1
+          method: paymentMethod,
           provider: checkout.provider,
           providerReference,
           status: "paid",
@@ -162,6 +166,24 @@ export default class WebhookSvc {
     // Stripe transfers outside) its own transaction, and re-reads the
     // invoice/payment rows the block above just committed.
     await PaymentPayoutSvc.allocatePayouts(invoiceId);
+
+    // Dispatch payment lifecycle event to Amazon SQS for asynchronous processing
+    try {
+      await SqsService.sendPaymentEvent({
+        eventType: "payment.succeeded",
+        invoiceId,
+        providerReference,
+        amount: amountPaid,
+        currency: _currency,
+        method: paymentMethod,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (sqsErr) {
+      console.error(
+        "[WebhookSvc] Non-fatal: Failed to enqueue payment event to SQS:",
+        sqsErr,
+      );
+    }
   }
 
   /**
