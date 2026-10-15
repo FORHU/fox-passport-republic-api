@@ -1,4 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+let sessionCounter = 0;
+vi.mock("stripe", () => {
+  return {
+    default: class {
+      checkout = {
+        sessions: {
+          create: vi.fn().mockImplementation(async (payload) => ({
+            id: `cs_test_${++sessionCounter}`,
+            url: "https://checkout.stripe.com/test-session",
+            ...payload,
+          })),
+        },
+      };
+    },
+  };
+});
+
 import { SqsService, PaymentQueueEvent, NotificationQueueEvent } from "../src/infrastructure/queue/sqs.service";
 import { StripeAdapter } from "../src/modules/payment/providers/stripe-adapter";
 import WebhookSvc from "../src/modules/payment/webhook.service";
