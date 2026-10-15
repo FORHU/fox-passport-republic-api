@@ -42,9 +42,9 @@ export const authenticate = async (
       req.cookies?.["better-auth.session_token"];
     const token =
       authHeader && authHeader.startsWith("Bearer ")
-        ? authHeader.substring(7).trim()
+        ? authHeader.substring(7).trim().replace(/"/g, "")
         : typeof cookieToken === "string"
-          ? cookieToken
+          ? cookieToken.replace(/"/g, "")
           : null;
 
     if (token) {
@@ -64,14 +64,24 @@ export const authenticate = async (
           };
           return next();
         }
-      } catch {
-        // Not a valid JWT token
+      } catch (err: unknown) {
+        const error = err as Error;
+        if (error.name === "TokenExpiredError") {
+          return res.status(401).json({
+            success: false,
+            message: "Token expired",
+          });
+        }
+        return res.status(401).json({
+          success: false,
+          message: "Invalid token",
+        });
       }
     }
 
     return res.status(401).json({
       success: false,
-      message: "No token provided or invalid session",
+      message: "No token provided",
     });
   } catch {
     return res.status(401).json({

@@ -38,6 +38,9 @@ if (fs.existsSync(testEnv)) {
  */
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 
+if (!process.env.ACCESS_TOKEN_SECRET) {
+  process.env.ACCESS_TOKEN_SECRET = "accesssecret123";
+}
 if (!process.env.BETTER_AUTH_SECRET) {
   process.env.BETTER_AUTH_SECRET =
     process.env.ACCESS_TOKEN_SECRET || "ci-better-auth-secret-minimum-32-chars-long";
