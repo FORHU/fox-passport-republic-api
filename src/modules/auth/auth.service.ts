@@ -64,7 +64,10 @@ export default class AuthSvc {
         },
       });
     } catch (accErr) {
-      console.warn("Could not create Better Auth credential account on register:", accErr);
+      console.warn(
+        "Could not create Better Auth credential account on register:",
+        accErr,
+      );
     }
 
     // Fire-and-forget — badge failure must never block registration
@@ -205,7 +208,10 @@ export default class AuthSvc {
         });
       }
     } catch (accErr) {
-      console.warn("Could not sync Better Auth credential account on login:", accErr);
+      console.warn(
+        "Could not sync Better Auth credential account on login:",
+        accErr,
+      );
     }
 
     // Generate tokens with role
