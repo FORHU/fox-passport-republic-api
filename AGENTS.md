@@ -1,13 +1,38 @@
 # FoxPassport Republic API Rules
 
-## 1. Mandatory Branching & Checkpoint Safety
-- **Always Create a Dedicated Branch**: Before modifying or creating code for any new feature, bug fix, or optimization, **always create and checkout a dedicated Git branch** (e.g., `feat/<name>`, `fix/<name>`, `perf/<topic>`). Never develop directly on `main` or `master`.
-- **Working Tree & Dirty State Protocol**:
-  - Before taking any action, run `git status` and `git diff` to identify all uncommitted files.
-  - **Never automatically stash, commit, reset, or discard (`git checkout .`, `git reset --hard`, `git clean`) existing uncommitted work.**
-  - If the task can be safely isolated without disturbing existing work, proceed on a dedicated branch.
-  - If isolation is unclear or the task touches overlapping files, stop and ask the user for clarification before modifying them.
-- **Establish Baseline Checkpoints**: Commit or tag a clean baseline state before starting risky, complex, or multi-step changes so work can be rolled back safely.
+## 1. Git Branching and Work Safety
+
+### Inspect Before Editing
+- Before making any changes, inspect `git status`, the current branch, and `git diff`.
+- Check for uncommitted changes and understand whether they belong to the current task.
+- Never discard, reset, clean, stash, or commit existing work without explicit authorization.
+
+### Dedicated Branches Are Mandatory
+- Before implementing a new feature, bug fix, refactor, optimization, or other code change, create or switch to a dedicated task branch.
+- Never develop directly on `main`, `master`, or a shared integration branch.
+- Use descriptive branch names:
+  - `feat/<short-description>` — new features
+  - `fix/<short-description>` — bug fixes
+  - `perf/<short-description>` — performance improvements
+  - `refactor/<short-description>` — refactoring
+  - `docs/<short-description>` — documentation
+  - `test/<short-description>` — tests
+
+### Preserve Existing Work
+- If the current branch contains unrelated uncommitted changes, do not automatically commit, stash, or move them.
+- If the task can be safely isolated, create the task branch while preserving the existing working tree.
+- If existing changes overlap with the requested task or their ownership is unclear, stop and ask for clarification before editing.
+- Before switching branches, check whether doing so could carry uncommitted changes into another task.
+
+### Branch Creation and Checkpoints
+- Check whether the intended branch already exists before creating it.
+- If it exists, inspect its status and history before deciding whether to reuse it.
+- Never reset or overwrite an existing branch to make it match a preferred starting point.
+- For risky or multi-step changes, establish a recoverable baseline when the working tree is clean and it is safe to do so. Do not commit unrelated changes to create a checkpoint.
+
+### Completion
+- Report the branch used in the task completion summary.
+- Do not merge into protected or shared branches, push changes, or open a pull request unless requested or authorized by the project's workflow.
 
 ---
 
