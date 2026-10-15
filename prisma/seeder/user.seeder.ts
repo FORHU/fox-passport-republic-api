@@ -265,6 +265,7 @@ export async function seedUsers(prisma: PrismaClient) {
           city: (u as any).city,
           state: (u as any).state,
           country: (u as any).country,
+          isEmailVerified: true,
         },
         create: {
           email: u.email,
@@ -276,8 +277,29 @@ export async function seedUsers(prisma: PrismaClient) {
           city: (u as any).city,
           state: (u as any).state,
           country: (u as any).country,
+          isEmailVerified: true,
         },
       });
+
+      // Upsert Better Auth credential Account record
+      const existingAccount = await prisma.account.findFirst({
+        where: { userId: created.id, providerId: "credential" },
+      });
+      if (existingAccount) {
+        await prisma.account.update({
+          where: { id: existingAccount.id },
+          data: { password: hashed },
+        });
+      } else {
+        await prisma.account.create({
+          data: {
+            userId: created.id,
+            accountId: created.id,
+            providerId: "credential",
+            password: hashed,
+          },
+        });
+      }
 
       console.log(
         `✓ ${created.email} — roles: [${u.roleType.join(", ") || u.systemRole}]`,
