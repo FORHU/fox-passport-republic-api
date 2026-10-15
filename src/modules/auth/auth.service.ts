@@ -23,6 +23,7 @@ import {
 import { permissionsForUser } from "../../types/permissions";
 
 import { ACCESS_TOKEN_SECRET, ACCESS_TOKEN_EXPIRY, isDev } from "../../config";
+import { prisma } from "../../utils/prisma";
 
 export default class AuthSvc {
   static async register(data: {
@@ -52,6 +53,22 @@ export default class AuthSvc {
       name: data.name,
       mobileNumber: data.mobileNumber,
     });
+
+    try {
+      await prisma.account.create({
+        data: {
+          userId: user.id,
+          accountId: user.id,
+          providerId: "credential",
+          password: hashedPassword,
+        },
+      });
+    } catch (accErr) {
+      console.warn(
+        "Could not create Better Auth credential account on register:",
+        accErr,
+      );
+    }
 
     // Fire-and-forget — badge failure must never block registration
     import("../passport/passport.service")
@@ -174,6 +191,28 @@ export default class AuthSvc {
 
     // Update login status
     await AuthRepo.updateUserLoginStatus(user.id);
+
+    // Sync credentials to Better Auth Account if not yet migrated
+    try {
+      const existingAccount = await prisma.account.findFirst({
+        where: { userId: user.id, providerId: "credential" },
+      });
+      if (!existingAccount && user.password) {
+        await prisma.account.create({
+          data: {
+            userId: user.id,
+            accountId: user.id,
+            providerId: "credential",
+            password: user.password,
+          },
+        });
+      }
+    } catch (accErr) {
+      console.warn(
+        "Could not sync Better Auth credential account on login:",
+        accErr,
+      );
+    }
 
     // Generate tokens with role
     const accessToken = jwt.sign(

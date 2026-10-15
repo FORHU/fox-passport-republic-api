@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { prisma } from "../src/utils/prisma";
 import { RoleType, SystemRole } from "@prisma/client";
+import { ACCESS_TOKEN_SECRET } from "../src/config";
 
 /**
  * This file is imported only by the specs that *write* to the database, and
@@ -29,7 +30,8 @@ if (!databaseName.replace(/\?.*$/, "").endsWith("_test")) {
   );
 }
 
-const TEST_SECRET = process.env.ACCESS_TOKEN_SECRET || "accesssecret123";
+const TEST_SECRET =
+  process.env.ACCESS_TOKEN_SECRET || ACCESS_TOKEN_SECRET || "accesssecret123";
 
 export function createTestToken(
   userId: string,

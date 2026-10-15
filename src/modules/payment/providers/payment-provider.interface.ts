@@ -3,11 +3,13 @@ import type Stripe from "stripe";
 export interface CheckoutSessionData {
   providerSessionId: string;
   url: string;
+  allowedMethods?: string[];
 }
 
 export interface PaymentStatusData {
   status: "pending" | "processing" | "paid" | "failed" | "cancelled";
   providerReference?: string;
+  paymentMethod?: string;
 }
 
 export interface RefundData {
@@ -17,7 +19,7 @@ export interface RefundData {
 
 export interface PaymentProvider {
   /**
-   * Creates a checkout session that the user can use to pay.
+   * Creates a checkout session that the user can use to pay with multiple payment choices.
    */
   createCheckout(
     invoiceId: string,
@@ -26,6 +28,7 @@ export interface PaymentProvider {
     successUrl: string,
     cancelUrl: string,
     idempotencyKey?: string,
+    allowedMethods?: string[],
   ): Promise<CheckoutSessionData>;
 
   /**

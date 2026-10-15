@@ -265,6 +265,7 @@ export default class PaymentController {
             typeof session.payment_intent === "string"
               ? session.payment_intent
               : (session.payment_intent?.id ?? session.id);
+          const paymentMethod = session.payment_method_types?.[0] || "card";
           await WebhookSvc.handlePaymentSuccess(
             session.id,
             providerReference,
@@ -273,6 +274,7 @@ export default class PaymentController {
             // how `StripeAdapter.createCheckout` sent it (`amount * 100`).
             (session.amount_total ?? 0) / 100,
             session.currency ?? "php",
+            paymentMethod,
           );
         },
       );
