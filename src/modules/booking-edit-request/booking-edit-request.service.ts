@@ -81,14 +81,14 @@ export default class BookingEditRequestSvc {
       });
       const feePercent = hasLowerFees
         ? 0
-        : (pricingRule?.percentage
-            ? pricingRule.percentage.toNumber()
-            : PLATFORM_FEE_PERCENT);
+        : pricingRule?.percentage
+          ? pricingRule.percentage.toNumber()
+          : PLATFORM_FEE_PERCENT;
       const fixedFee = hasLowerFees
         ? 0
-        : (pricingRule?.fixedAmount
-            ? pricingRule.fixedAmount.toNumber()
-            : 0);
+        : pricingRule?.fixedAmount
+          ? pricingRule.fixedAmount.toNumber()
+          : 0;
       return itemsTotal + itemsTotal * (feePercent / 100) + fixedFee;
     }
 
@@ -113,14 +113,14 @@ export default class BookingEditRequestSvc {
     });
     const feePercent = hasLowerFees
       ? 0
-      : (pricingRule?.percentage
-          ? pricingRule.percentage.toNumber()
-          : PLATFORM_FEE_PERCENT);
+      : pricingRule?.percentage
+        ? pricingRule.percentage.toNumber()
+        : PLATFORM_FEE_PERCENT;
     const fixedFee = hasLowerFees
       ? 0
-      : (pricingRule?.fixedAmount
-          ? pricingRule.fixedAmount.toNumber()
-          : 0);
+      : pricingRule?.fixedAmount
+        ? pricingRule.fixedAmount.toNumber()
+        : 0;
     return itemsTotal + itemsTotal * (feePercent / 100) + fixedFee;
   }
 

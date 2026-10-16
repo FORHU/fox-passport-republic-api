@@ -372,8 +372,7 @@ export default class EventTemplateSvc {
 
     const itemsTotal = this.calculateItemsTotal(template, exclusions);
     const hostMarkupAmount = itemsTotal * ((template.hostMarkupPct ?? 0) / 100);
-    const platformFeeAmount =
-      (itemsTotal + hostMarkupAmount) * (feePct / 100);
+    const platformFeeAmount = (itemsTotal + hostMarkupAmount) * (feePct / 100);
     const totalAmount = itemsTotal + hostMarkupAmount + platformFeeAmount;
 
     return {
