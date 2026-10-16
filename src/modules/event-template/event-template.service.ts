@@ -72,6 +72,8 @@ interface PricedItem {
 export interface TemplateForPricing {
   /** Percentage the Host adds on top of the summed item prices. */
   hostMarkupPct?: number | null;
+  /** Optional per-template platform fee override percentage (e.g. 0.05 or 5). */
+  platformFeePct?: number | null;
   templateAssets?:
     | (PricedItem & {
         quantity?: number | null;
@@ -352,7 +354,7 @@ export default class EventTemplateSvc {
       excludedServiceIds?: string[];
       excludedVenueIds?: string[];
     },
-    platformFeePercent: number = PLATFORM_FEE_PERCENT,
+    platformFeePercent?: number,
   ): {
     itemsTotal: number;
     hostMarkupAmount: number;
@@ -360,10 +362,17 @@ export default class EventTemplateSvc {
     totalAmount: number;
     estimatedTotal: number;
   } {
+    const feePct =
+      platformFeePercent ??
+      (template.platformFeePct != null
+        ? template.platformFeePct <= 1
+          ? template.platformFeePct * 100
+          : template.platformFeePct
+        : PLATFORM_FEE_PERCENT);
+
     const itemsTotal = this.calculateItemsTotal(template, exclusions);
     const hostMarkupAmount = itemsTotal * ((template.hostMarkupPct ?? 0) / 100);
-    const platformFeeAmount =
-      (itemsTotal + hostMarkupAmount) * (platformFeePercent / 100);
+    const platformFeeAmount = (itemsTotal + hostMarkupAmount) * (feePct / 100);
     const totalAmount = itemsTotal + hostMarkupAmount + platformFeeAmount;
 
     return {

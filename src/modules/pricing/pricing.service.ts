@@ -1,5 +1,6 @@
 import { prisma } from "../../utils/prisma";
 import { PlatformFeeConfig, Prisma } from "@prisma/client";
+import { PLATFORM_FEE_PERCENT } from "../../config";
 type Decimal = Prisma.Decimal;
 
 export interface PricingContext {
@@ -16,6 +17,7 @@ export interface PricingContext {
   assetId?: string;
   serviceId?: string;
   venueId?: string;
+  hasLowerFees?: boolean;
 }
 
 export interface PricingBreakdown {
@@ -507,28 +509,46 @@ export default class PricingSvc {
     const discountedSubtotal = subtotalNum - discountAmount;
 
     // 3. Platform Fee
-    const resolvedRule = await this.resolvePricingRule(context);
     let platformFeeAmount = 0;
     let appliedRule = null;
 
-    if (resolvedRule) {
-      const percentageNum = resolvedRule.percentage
-        ? resolvedRule.percentage.toNumber()
-        : 0;
-      const fixedAmountNum = resolvedRule.fixedAmount
-        ? resolvedRule.fixedAmount.toNumber()
-        : 0;
-
-      platformFeeAmount =
-        (discountedSubtotal * percentageNum) / 100 + fixedAmountNum;
-
+    if (context.hasLowerFees) {
       appliedRule = {
-        ruleId: resolvedRule.id,
-        name: resolvedRule.name,
-        percentage: percentageNum,
-        fixedAmount: fixedAmountNum,
-        amount: platformFeeAmount,
+        name: "Passport Level 3 Perk (0% Platform Fee)",
+        percentage: 0,
+        fixedAmount: 0,
+        amount: 0,
       };
+    } else {
+      const resolvedRule = await this.resolvePricingRule(context);
+      if (resolvedRule) {
+        const percentageNum = resolvedRule.percentage
+          ? resolvedRule.percentage.toNumber()
+          : 0;
+        const fixedAmountNum = resolvedRule.fixedAmount
+          ? resolvedRule.fixedAmount.toNumber()
+          : 0;
+
+        platformFeeAmount =
+          (discountedSubtotal * percentageNum) / 100 + fixedAmountNum;
+
+        appliedRule = {
+          ruleId: resolvedRule.id,
+          name: resolvedRule.name,
+          percentage: percentageNum,
+          fixedAmount: fixedAmountNum,
+          amount: platformFeeAmount,
+        };
+      } else {
+        const percentageNum = PLATFORM_FEE_PERCENT;
+        platformFeeAmount = (discountedSubtotal * percentageNum) / 100;
+        appliedRule = {
+          name: "Standard Platform Fee",
+          percentage: percentageNum,
+          fixedAmount: 0,
+          amount: platformFeeAmount,
+        };
+      }
     }
 
     // 4. Final Amount

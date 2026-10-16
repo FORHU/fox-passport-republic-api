@@ -24,7 +24,7 @@ totalAmount        = itemsTotal + hostMarkupAmount + platformFeeAmount
 
 `EventTemplateSvc.calculateTotalsBreakdown` (`src/modules/event-template/event-template.service.ts:347-375`), called from `BookingSvc.bookFromTemplate` (`src/modules/booking/booking.service.ts:776-836`). The citizen only ever supplies `templateId` + dates + exclusions — never a price. All four numbers land on `Event` (`totalAmount`, `itemsTotal`, `hostMarkupAmount`, `platformFeeAmount`).
 
-**Gap:** `platformFeePercent` here always comes from the global env constant `PLATFORM_FEE_PERCENT` (`src/config.ts`, default 5%) — **not** from the per-template `EventTemplate.platformFeePct` column (schema default 0.05). `bookFromTemplate` never passes that column into the calculation. The per-template override exists in the schema but is currently write-only and has no effect.
+**Resolution (Oct 2026):** `EventTemplateSvc.calculateTotalsBreakdown` now resolves `template.platformFeePct` (falling back to `PLATFORM_FEE_PERCENT`, default 5%) and computes dynamic breakdown accordingly. Direct single-provider bookings and booking edit requests also resolve rules dynamically via `PricingSvc.resolvePricingRule` with `PLATFORM_FEE_PERCENT` fallback.
 
 ### 1b. Direct single-provider bookings (Asset / Service / Venue) — no Host Markup
 
@@ -139,7 +139,7 @@ Two mechanisms, not equivalent:
 1. **Booking-level dispute** — the booker reports a dispute (`AssetBookingSvc.dispute`/`ServiceBookingSvc.dispute`), moving status to `disputed`. This is what actually blocks a payout: it keeps the booking from ever reaching `completed`, which is the trigger `PayoutSvc` waits for.
 2. **Refund dispute queue** — `AdminSvc.getDisputes` reads disputed `Refund` rows; an admin approves (retries the refund) or rejects.
 
-**Gap:** `AdminSvc.resolveAssetBookingDispute`/`resolveServiceBookingDispute` write the booking status directly via plain `prisma.assetBooking.update`/`.serviceBooking.update` calls — they bypass `AssetBookingSvc.updateStatus`/`ServiceBookingSvc.updateStatus`, which is where the payout-on-`completed` trigger actually lives. If an admin resolves a dispute by setting status to `completed`, **the provider's payout does not automatically fire.** Reads like an oversight, not a deliberate choice — an admin ruling in the provider's favor should presumably still pay them.
+**Resolution (Oct 2026):** `AdminSvc.resolveAssetBookingDispute` and `AdminSvc.resolveServiceBookingDispute` now explicitly invoke `PayoutSvc.createPayoutsForAssetBooking` / `PayoutSvc.createPayoutsForServiceBooking` when the admin resolves the dispute with status `completed` (in the provider's favor), guaranteeing payouts are unblocked and created.
 
 ---
 
@@ -153,13 +153,11 @@ Validated and priced by `PricingSvc.validateAndCalculateVoucher` — active wind
 
 ## Summary of gaps worth someone's attention
 
-1. **`EventTemplate.platformFeePct` is write-only** — the per-template fee override is never actually used; every template gets the flat global rate. (§1a)
+1. **`EventTemplate.platformFeePct` is write-only** — *(Resolved Oct 2026)* Now honored in `calculateTotalsBreakdown` with fallback to `PLATFORM_FEE_PERCENT`. (§1a)
 2. **Client-suppliable `totalAmount` on direct venue bookings** — the one place in the system where "never trust the client's price" isn't enforced. (§1b)
 3. **Central Payment never charges Host Markup.** Confirm whether that's intentional. (§1c)
 4. **Central Payment pays out immediately on payment success, with no completion/dispute gate** — a real divergence from ADR-0002's rationale, not just an implementation detail. (§2)
 5. **The `lockedAt`/`releasedAt`/`stripeTransferId` escrow fields on `Event*Transaction` are dead code.** Don't design against them; `Payout.status` is the real state machine. (§2)
-6. **Admin dispute resolution can silently skip the payout trigger** by writing booking status directly instead of through the service layer that fires it. (§6)
-
-None of these were fixed as part of writing this doc — it's a map of what's there today, not a changeset.
+6. **Admin dispute resolution can silently skip the payout trigger** — *(Resolved Oct 2026)* Admin dispute resolution services now invoke `PayoutSvc` directly on `completed` resolutions. (§6)
 
 See `PRICING-ADMINISTRATION-PRODUCT.md` for the product-management position on gaps 1 and 3 above (platform fee and voucher/promotion configuration) — it treats "the schema supports it" and "an administrator can operate it" as two different completion states, and sets Platform Fee Administration as Priority 1 for closing the gap.

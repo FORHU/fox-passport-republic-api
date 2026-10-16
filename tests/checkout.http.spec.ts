@@ -419,8 +419,8 @@ describe("Central Payment checkout — HTTP layer", () => {
         ],
         subtotalAmount: 2000,
         discountAmount: 0,
-        platformFeeAmount: 0,
-        grossAmount: 2000,
+        platformFeeAmount: 100,
+        grossAmount: 2100,
       });
 
       const after = await prisma.invoice.count();

@@ -276,10 +276,17 @@ export default class BookingSvc {
       }
     }
     const discountedItemsTotal = itemsTotal.sub(discountAmount);
-    // Same configured rate as every other booking path (was a hardcoded 5%).
-    const platformFeeAmount = discountedItemsTotal.mul(
-      PLATFORM_FEE_PERCENT / 100,
-    );
+    // Dynamically resolve fee rule from PlatformFeeConfig with fallback to configured rate.
+    const pricingRule = await PricingSvc.resolvePricingRule(voucherContext);
+    const feePct = pricingRule?.percentage
+      ? pricingRule.percentage.toNumber()
+      : PLATFORM_FEE_PERCENT;
+    const fixedFee = pricingRule?.fixedAmount
+      ? pricingRule.fixedAmount.toNumber()
+      : 0;
+    const platformFeeAmount = discountedItemsTotal
+      .mul(feePct / 100)
+      .add(fixedFee);
     const totalAmount = discountedItemsTotal.add(platformFeeAmount);
 
     return {

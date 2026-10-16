@@ -375,5 +375,43 @@ describe("PricingSvc", () => {
       expect(breakdown.platformFee?.amount).toBe(28);
       expect(breakdown.finalAmount).toBe(928);
     });
+
+    it("should fall back to standard platform fee (5%) when no rule matches", async () => {
+      (prisma.platformFeeConfig.findMany as any).mockResolvedValue([]);
+
+      const breakdown = await PricingSvc.calculatePrice(1000, {
+        transactionType: "venue",
+      });
+
+      expect(breakdown.subtotal).toBe(1000);
+      expect(breakdown.discountedSubtotal).toBe(1000);
+      // PLATFORM_FEE_PERCENT default 5% of 1000 = 50
+      expect(breakdown.platformFee?.amount).toBe(50);
+      expect(breakdown.platformFee?.name).toBe("Standard Platform Fee");
+      expect(breakdown.finalAmount).toBe(1050);
+    });
+
+    it("should apply 0% platform fee when hasLowerFees perk is present", async () => {
+      const mockRules = [
+        {
+          id: "rule-1",
+          name: "Standard 5%",
+          percentage: new Decimal(5),
+          fixedAmount: new Decimal(0),
+        },
+      ];
+      (prisma.platformFeeConfig.findMany as any).mockResolvedValue(mockRules);
+
+      const breakdown = await PricingSvc.calculatePrice(1000, {
+        transactionType: "asset",
+        hasLowerFees: true,
+      });
+
+      expect(breakdown.subtotal).toBe(1000);
+      expect(breakdown.discountedSubtotal).toBe(1000);
+      expect(breakdown.platformFee?.amount).toBe(0);
+      expect(breakdown.platformFee?.percentage).toBe(0);
+      expect(breakdown.finalAmount).toBe(1000);
+    });
   });
 });

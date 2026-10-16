@@ -143,9 +143,18 @@ export default class ServiceBookingSvc {
       service.ownerId,
       "service_lower_fees",
     );
-    const effectiveFeePercent = ownerHasLowerFees ? 0 : PLATFORM_FEE_PERCENT;
-    const platformFeeAmount =
-      discountedItemsTotal * (effectiveFeePercent / 100);
+    const pricingRule = await PricingSvc.resolvePricingRule(voucherContext);
+    const feePct = ownerHasLowerFees
+      ? 0
+      : pricingRule?.percentage
+        ? pricingRule.percentage.toNumber()
+        : PLATFORM_FEE_PERCENT;
+    const fixedFee = ownerHasLowerFees
+      ? 0
+      : pricingRule?.fixedAmount
+        ? pricingRule.fixedAmount.toNumber()
+        : 0;
+    const platformFeeAmount = discountedItemsTotal * (feePct / 100) + fixedFee;
     const totalAmount = discountedItemsTotal + platformFeeAmount;
 
     return {

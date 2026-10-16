@@ -70,7 +70,7 @@ beforeEach(() => {
   db.booking.findUnique.mockResolvedValue({
     id: "b1",
     userId: "u1",
-    status: "confirmed",
+    status: "completed",
     event: { venueTransactions: [] },
   });
   db.review.findFirst.mockResolvedValue(null);
@@ -139,6 +139,21 @@ describe("the checks that were already there still hold", () => {
 
     await expect(ReviewSvc.createReview(VALID)).rejects.toThrow(
       /pending or cancelled/i,
+    );
+  });
+
+  it("refuses a confirmed booking that has not been attended yet", async () => {
+    db.booking.findUnique.mockResolvedValue({
+      id: "b1",
+      userId: "u1",
+      status: "confirmed",
+      checkedIn: false,
+      endAt: new Date(Date.now() + 86400000), // future date
+      event: { venueTransactions: [] },
+    });
+
+    await expect(ReviewSvc.createReview(VALID)).rejects.toThrow(
+      /completed or attended/i,
     );
   });
 
