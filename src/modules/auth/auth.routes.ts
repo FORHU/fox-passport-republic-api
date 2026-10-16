@@ -30,7 +30,11 @@ router.post(
 router.get("/google", AuthCtrl.googleRedirect);
 router.get("/google/callback", AuthCtrl.googleCallback);
 router.post("/google/exchange", asyncHandler(AuthCtrl.googleExchange));
-router.post("/google/mobile", loginRateLimit, asyncHandler(AuthCtrl.googleMobile));
+router.post(
+  "/google/mobile",
+  loginRateLimit,
+  asyncHandler(AuthCtrl.googleMobile),
+);
 router.get("/facebook", AuthCtrl.facebookRedirect);
 router.get("/facebook/callback", AuthCtrl.facebookCallback);
 router.post("/facebook/exchange", asyncHandler(AuthCtrl.facebookExchange));
