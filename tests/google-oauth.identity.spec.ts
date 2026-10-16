@@ -87,6 +87,7 @@ vi.mock("../src/config", () => ({
   GOOGLE_CLIENT_ID: "client-id",
   GOOGLE_CLIENT_SECRET: "client-secret",
   GOOGLE_CALLBACK_URL: "https://api.example.com/api/v1/auth/google/callback",
+  GOOGLE_MOBILE_CLIENT_IDS: ["mobile-android-client", "mobile-ios-client"],
   ACCESS_TOKEN_SECRET: "test-access-secret",
   ACCESS_TOKEN_EXPIRY: "15m",
 }));
@@ -359,6 +360,50 @@ describe("the exchange code", () => {
     // the URL, which is the thing being fixed.
     await expect(GoogleAuthSvc.stashSession(session)).rejects.toThrow(
       /unavailable/i,
+    );
+  });
+});
+
+describe("native mobile ID tokens", () => {
+  it("accepts audiences for the web client and every mobile client", async () => {
+    google.verifyIdToken.mockResolvedValue({
+      getPayload: () => ({
+        sub: "google-id",
+        email: VICTIM.email,
+        email_verified: true,
+      }),
+    });
+    repo.findUserByEmail.mockResolvedValue(VICTIM);
+
+    await GoogleAuthSvc.handleIdToken("mobile-id-token");
+
+    expect(google.verifyIdToken).toHaveBeenCalledWith({
+      idToken: "mobile-id-token",
+      audience: ["client-id", "mobile-android-client", "mobile-ios-client"],
+    });
+  });
+
+  it("applies the same unverified-email refusal as the redirect flow", async () => {
+    google.verifyIdToken.mockResolvedValue({
+      getPayload: () => ({
+        sub: "attacker-google-id",
+        email: VICTIM.email,
+        email_verified: false,
+      }),
+    });
+    repo.findUserByEmail.mockResolvedValue(VICTIM);
+
+    await expect(GoogleAuthSvc.handleIdToken("mobile-id-token")).rejects.toThrow(
+      /not verified/i,
+    );
+    expect(repo.linkGoogleId).not.toHaveBeenCalled();
+  });
+
+  it("propagates a verification failure (wrong audience, bad signature)", async () => {
+    google.verifyIdToken.mockRejectedValue(new Error("Wrong recipient"));
+
+    await expect(GoogleAuthSvc.handleIdToken("forged")).rejects.toThrow(
+      /wrong recipient/i,
     );
   });
 });

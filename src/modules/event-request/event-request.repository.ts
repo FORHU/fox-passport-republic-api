@@ -26,13 +26,34 @@ export default class EventRequestRepo {
     },
   } as const;
 
-  // Public landing page — approved events only
+  // Public landing page — only events their client explicitly published.
   static async findAllApproved() {
     return prisma.event.findMany({
-      where: { requestStatus: "approved" },
-      include: {
-        template: EventRequestRepo.templateInclude,
-        host: { select: { name: true, email: true } },
+      where: {
+        isPublic: true,
+        requestStatus: "approved",
+        eventStatus: { notIn: [EventStatus.cancelled, EventStatus.completed] },
+        startAt: { gte: new Date() },
+      },
+      select: {
+        id: true,
+        name: true,
+        eventCategory: true,
+        startAt: true,
+        endAt: true,
+        guestCount: true,
+        totalAmount: true,
+        targetCity: true,
+        targetState: true,
+        targetCountry: true,
+        template: {
+          select: {
+            name: true,
+            category: true,
+            images: { take: 1, select: { url: true } },
+          },
+        },
+        host: { select: { name: true } },
       },
       orderBy: { startAt: "asc" },
     });

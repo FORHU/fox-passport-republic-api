@@ -125,6 +125,7 @@ model Event {
   voucherRedemption    VoucherRedemption?
   eventStatus          EventStatus                @default(pending)
   requestStatus        RequestStatus              @default(pending)
+  isPublic             Boolean                    @default(false)
   rejectionReason      String?
   targetCity           String?
   targetState          String?

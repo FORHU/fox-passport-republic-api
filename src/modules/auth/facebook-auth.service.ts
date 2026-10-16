@@ -85,13 +85,50 @@ export default class FacebookAuthSvc {
       throw new Error("Facebook did not return an access token");
     }
 
+    const profile = await FacebookAuthSvc.fetchProfile(fbAccessToken);
+    return FacebookAuthSvc.signInFromProfile(profile);
+  }
+
+  /**
+   * Native mobile sign-in: the app obtains a Facebook user access token
+   * on-device with the platform SDK and posts it here.
+   *
+   * Unlike the redirect flow, this server did not mint the token, so it must
+   * prove the token was issued to *this* app — otherwise a token a user granted
+   * to some other app would sign them in here. `debug_token` answers that:
+   * the token must be valid and its `app_id` must be ours.
+   */
+  static async handleAccessToken(userAccessToken: string) {
+    if (!FACEBOOK_APP_ID || !FACEBOOK_APP_SECRET) {
+      throw new Error("Facebook OAuth is not configured on this server");
+    }
+
+    const debugRes = await axios.get(
+      "https://graph.facebook.com/v21.0/debug_token",
+      {
+        params: {
+          input_token: userAccessToken,
+          access_token: `${FACEBOOK_APP_ID}|${FACEBOOK_APP_SECRET}`,
+        },
+      },
+    );
+    const info = debugRes.data?.data;
+    if (!info?.is_valid || String(info.app_id) !== FACEBOOK_APP_ID) {
+      throw new Error("Facebook access token is not valid for this app");
+    }
+
+    const profile = await FacebookAuthSvc.fetchProfile(userAccessToken);
+    return FacebookAuthSvc.signInFromProfile(profile);
+  }
+
+  /** Verified profile for a Graph API user access token. */
+  private static async fetchProfile(fbAccessToken: string) {
     // Compute appsecret_proof for secure Graph API communication
     const appsecretProof = crypto
-      .createHmac("sha256", FACEBOOK_APP_SECRET)
+      .createHmac("sha256", FACEBOOK_APP_SECRET as string)
       .update(fbAccessToken)
       .digest("hex");
 
-    // Retrieve verified profile details
     const profileRes = await axios.get("https://graph.facebook.com/v21.0/me", {
       params: {
         fields: "id,name,first_name,last_name,email,picture.type(large)",
@@ -99,8 +136,15 @@ export default class FacebookAuthSvc {
         appsecret_proof: appsecretProof,
       },
     });
+    return profileRes.data;
+  }
 
-    const profile = profileRes.data;
+  /** Shared by the redirect and the native flows once the profile is known. */
+  private static async signInFromProfile(profile: {
+    email?: string;
+    name?: string;
+    first_name?: string;
+  }) {
     if (!profile?.email) {
       throw new Error(
         "Facebook did not share a verified email address. Please allow the email permission to sign in.",

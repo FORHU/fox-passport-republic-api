@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
+import type { TokenPayload } from "google-auth-library";
 import AuthRepo from "./auth.repository";
 import redisUtil from "../../utils/redis.util";
 import { issueRefreshToken, revokeAllForUser } from "./refresh-token.service";
@@ -10,6 +11,7 @@ import {
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
   GOOGLE_CALLBACK_URL,
+  GOOGLE_MOBILE_CLIENT_IDS,
   ACCESS_TOKEN_SECRET,
   ACCESS_TOKEN_EXPIRY,
 } from "../../config";
@@ -118,7 +120,33 @@ export default class GoogleAuthSvc {
       audience: GOOGLE_CLIENT_ID,
     });
 
-    const payload = ticket.getPayload();
+    return GoogleAuthSvc.signInFromPayload(ticket.getPayload());
+  }
+
+  /**
+   * Native mobile sign-in: the app obtains a Google ID token on-device with
+   * the platform SDK and posts it here instead of going through the browser
+   * redirect. The token is verified exactly like the one the redirect flow
+   * receives — signature, expiry, and `aud` — then handed to the same
+   * find-or-create logic, so the two entry paths cannot drift apart.
+   *
+   * `aud` is checked against the web client ID plus every configured mobile
+   * client ID; a token minted for any other app is rejected.
+   */
+  static async handleIdToken(idToken: string) {
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      throw new Error("Google OAuth is not configured on this server");
+    }
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: [GOOGLE_CLIENT_ID, ...GOOGLE_MOBILE_CLIENT_IDS],
+    });
+
+    return GoogleAuthSvc.signInFromPayload(ticket.getPayload());
+  }
+
+  /** Shared by the redirect and the native flows once the token is verified. */
+  private static async signInFromPayload(payload: TokenPayload | undefined) {
     if (!payload?.sub || !payload.email) {
       throw new Error("Google account is missing required profile data");
     }

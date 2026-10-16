@@ -13,6 +13,7 @@ import {
 import {
   FRONTEND_URL,
   CORS_ORIGINS,
+  MOBILE_REDIRECT_ORIGINS,
   isDev,
   FACEBOOK_CALLBACK_URL,
 } from "../../config";
@@ -76,7 +77,13 @@ const LOCAL_ORIGIN =
   /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?$/;
 
 function isAllowedOrigin(origin: string): boolean {
-  return CORS_ORIGINS.includes(origin) || (isDev && LOCAL_ORIGIN.test(origin));
+  return (
+    CORS_ORIGINS.includes(origin) ||
+    // The native app's registered redirect target (e.g. `foxpassport://app`).
+    // Exact match only — a prefix or pattern here would be an open redirect.
+    MOBILE_REDIRECT_ORIGINS.includes(origin) ||
+    (isDev && LOCAL_ORIGIN.test(origin))
+  );
 }
 
 /**
@@ -499,6 +506,55 @@ export default class AuthCtrl {
 
     setSessionCookies(res, session);
     return res.status(200).json({ data: session });
+  }
+
+  /**
+   * Native mobile sign-in with a Google ID token obtained on-device.
+   *
+   * Responds with the session in the body and sets no cookies: a native client
+   * authenticates with a bearer token and keeps its tokens in the platform
+   * keystore. The response matches the redirect flow's exchange
+   * (`{ data: { accessToken, refreshToken, isNewUser, user } }`).
+   */
+  static async googleMobile(req: Request, res: Response) {
+    const { idToken } = req.body ?? {};
+    if (typeof idToken !== "string" || idToken.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "idToken is required" });
+    }
+
+    try {
+      const session = await GoogleAuthSvc.handleIdToken(idToken);
+      return res.status(200).json({ data: session });
+    } catch (e: unknown) {
+      // Deliberately generic: which check failed (audience, signature,
+      // unverified email) is not something to hand an unauthenticated caller.
+      console.warn("Google mobile sign-in rejected:", (e as Error).message);
+      return res
+        .status(401)
+        .json({ success: false, message: "Google sign-in failed" });
+    }
+  }
+
+  /** Native mobile sign-in with a Facebook user access token. */
+  static async facebookMobile(req: Request, res: Response) {
+    const { accessToken } = req.body ?? {};
+    if (typeof accessToken !== "string" || accessToken.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "accessToken is required" });
+    }
+
+    try {
+      const session = await FacebookAuthSvc.handleAccessToken(accessToken);
+      return res.status(200).json({ data: session });
+    } catch (e: unknown) {
+      console.warn("Facebook mobile sign-in rejected:", (e as Error).message);
+      return res
+        .status(401)
+        .json({ success: false, message: "Facebook sign-in failed" });
+    }
   }
 
   static facebookRedirect(req: Request, res: Response) {

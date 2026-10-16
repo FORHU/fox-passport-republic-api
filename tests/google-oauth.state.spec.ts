@@ -30,6 +30,7 @@ const svc = vi.hoisted(() => ({
 
 vi.mock("../src/config", () => ({
   FRONTEND_URL: "https://app.example.com",
+  MOBILE_REDIRECT_ORIGINS: ["foxpassport://app"],
   isDev: false,
   ACCESS_TOKEN_SECRET: "test-access-secret",
   ACCESS_TOKEN_EXPIRY: "15m",

@@ -5,7 +5,7 @@ import FavoriteSvc from "./favorite.service";
 export default class FavoriteCtrl {
   static async toggleFavorite(req: Request, res: Response) {
     try {
-      const { targetId, type } = req.body; // type: 'venue' or 'event'
+      const { targetId, type } = req.body;
       const result = await FavoriteSvc.toggleFavorite(
         req.user!.userId,
         targetId,
@@ -31,12 +31,16 @@ export default class FavoriteCtrl {
     try {
       const { targetId, type } = req.query as {
         targetId?: string;
-        type?: "venue" | "event";
+        type?: "venue" | "event" | "public_event";
       };
-      if (!targetId || (type !== "venue" && type !== "event")) {
+      if (
+        !targetId ||
+        (type !== "venue" && type !== "event" && type !== "public_event")
+      ) {
         return res.status(400).json({
           success: false,
-          message: "targetId and type ('venue' | 'event') are required",
+          message:
+            "targetId and type ('venue' | 'event' | 'public_event') are required",
         });
       }
       const isFavorite = await FavoriteSvc.checkFavorite(

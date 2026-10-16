@@ -28,13 +28,9 @@ export default class FavoriteRepo {
 
   // LIST USER FAVORITES
   //
-  // `entityId`/`entityType` are a polymorphic reference (a favorite can point
-  // at a Venue or an EventTemplate), not a Prisma relation — `include` can't
-  // join across that, so the previous `include: {}` here never returned
-  // anything for `venue`/`event`. The target listings are batch-fetched by
-  // id below and merged back in, and the Prisma field names are mapped to
-  // `targetId`/`type` to match what every frontend consumer of this
-  // endpoint already reads (`f.targetId`, `f.type`).
+  // `entityId`/`entityType` are polymorphic references, not Prisma relations.
+  // Targets are batch-fetched below and the Prisma field names are mapped to
+  // `targetId`/`type` to match what frontend consumers already read.
   static async getUserFavorites(userId: string) {
     const favorites = await prisma.favorite.findMany({
       where: { userId: String(userId) },
@@ -49,8 +45,11 @@ export default class FavoriteRepo {
     const eventIds = favorites
       .filter((f) => f.entityType === "event")
       .map((f) => f.entityId);
+    const publicEventIds = favorites
+      .filter((f) => f.entityType === "public_event")
+      .map((f) => f.entityId);
 
-    const [venues, templates] = await Promise.all([
+    const [venues, templates, publicEvents] = await Promise.all([
       venueIds.length
         ? prisma.venue.findMany({
             where: { id: { in: venueIds } },
@@ -66,10 +65,39 @@ export default class FavoriteRepo {
             },
           })
         : Promise.resolve([]),
+      publicEventIds.length
+        ? prisma.event.findMany({
+            where: {
+              id: { in: publicEventIds },
+              isPublic: true,
+              requestStatus: "approved",
+              eventStatus: { notIn: ["cancelled", "completed"] },
+              startAt: { gte: new Date() },
+            },
+            select: {
+              id: true,
+              name: true,
+              eventCategory: true,
+              startAt: true,
+              endAt: true,
+              guestCount: true,
+              totalAmount: true,
+              targetCity: true,
+              template: {
+                select: {
+                  images: { take: 1, select: { url: true } },
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
     ]);
 
     const venueById = new Map(venues.map((v) => [v.id, v]));
     const templateById = new Map(templates.map((t) => [t.id, t]));
+    const publicEventById = new Map(
+      publicEvents.map((event) => [event.id, event]),
+    );
 
     return favorites.map((f) => {
       const base = {
@@ -109,6 +137,25 @@ export default class FavoriteRepo {
                 state: template.targetState,
                 price: template.templateVenues[0]?.venue?.price ?? null,
                 images: template.images,
+              }
+            : undefined,
+        };
+      }
+
+      if (f.entityType === "public_event") {
+        const event = publicEventById.get(f.entityId);
+        return {
+          ...base,
+          event: event
+            ? {
+                id: event.id,
+                name: event.name,
+                category: event.eventCategory,
+                city: event.targetCity,
+                startAt: event.startAt,
+                guestCount: event.guestCount,
+                price: event.totalAmount,
+                images: event.template?.images ?? [],
               }
             : undefined,
         };

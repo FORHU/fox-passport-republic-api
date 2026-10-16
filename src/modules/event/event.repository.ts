@@ -1,7 +1,121 @@
 import { Prisma } from "@prisma/client";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
 
+export interface PublicEventFilters {
+  city?: string;
+  query?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minCapacity?: number;
+  fromDate?: Date;
+  toDate?: Date;
+  sortBy?: "date_asc" | "date_desc" | "price_asc" | "price_desc";
+  page: number;
+  limit: number;
+  now: Date;
+}
+
 export default class EventRepo {
+  static async findPublicEvents(filters: PublicEventFilters) {
+    const where: Prisma.EventWhereInput = {
+      isPublic: true,
+      requestStatus: "approved",
+      eventStatus: { notIn: ["cancelled", "completed"] },
+      startAt: {
+        gte:
+          filters.fromDate != null && filters.fromDate > filters.now
+            ? filters.fromDate
+            : filters.now,
+        ...(filters.toDate ? { lt: filters.toDate } : {}),
+      },
+      ...(filters.city
+        ? {
+            targetCity: {
+              contains: filters.city,
+              mode: "insensitive",
+            },
+          }
+        : {}),
+      ...(filters.query
+        ? {
+            name: { contains: filters.query, mode: "insensitive" },
+          }
+        : {}),
+      ...(filters.minPrice != null || filters.maxPrice != null
+        ? {
+            totalAmount: {
+              ...(filters.minPrice != null ? { gte: filters.minPrice } : {}),
+              ...(filters.maxPrice != null ? { lte: filters.maxPrice } : {}),
+            },
+          }
+        : {}),
+      ...(filters.minCapacity != null
+        ? { guestCount: { gte: filters.minCapacity } }
+        : {}),
+    };
+    const orderBy: Prisma.EventOrderByWithRelationInput[] =
+      filters.sortBy === "date_desc"
+        ? [{ startAt: "desc" }]
+        : filters.sortBy === "price_asc"
+          ? [{ totalAmount: "asc" }, { startAt: "asc" }]
+          : filters.sortBy === "price_desc"
+            ? [{ totalAmount: "desc" }, { startAt: "asc" }]
+            : [{ startAt: "asc" }];
+    const skip = (filters.page - 1) * filters.limit;
+
+    const [events, total] = await Promise.all([
+      prisma.event.findMany({
+        where,
+        orderBy,
+        skip,
+        take: filters.limit,
+        select: {
+          id: true,
+          name: true,
+          eventCategory: true,
+          startAt: true,
+          endAt: true,
+          guestCount: true,
+          totalAmount: true,
+          targetCity: true,
+          targetState: true,
+          targetCountry: true,
+          template: {
+            select: {
+              images: { take: 1, select: { url: true } },
+            },
+          },
+        },
+      }),
+      prisma.event.count({ where }),
+    ]);
+
+    return { events, total };
+  }
+
+  static async setPublicVisibility(
+    id: string,
+    clientId: string,
+    isPublic: boolean,
+    now: Date,
+  ) {
+    const result = await prisma.event.updateMany({
+      where: {
+        id,
+        clientId,
+        ...(isPublic
+          ? {
+              requestStatus: "approved",
+              eventStatus: { notIn: ["cancelled", "completed"] },
+              startAt: { gt: now },
+            }
+          : {}),
+      },
+      data: { isPublic },
+    });
+    return result.count;
+  }
+
   /**
    * Events a given host organises, newest first.
    *
@@ -28,6 +142,7 @@ export default class EventRepo {
           name: true,
           startAt: true,
           eventStatus: true,
+          isPublic: true,
           targetCity: true,
         },
       }),

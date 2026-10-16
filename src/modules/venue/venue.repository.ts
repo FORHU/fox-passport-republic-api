@@ -138,6 +138,11 @@ export default class VenueRepo {
     category?: VenueCategory;
     lightweight?: boolean;
     search?: string;
+    city?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    minCapacity?: number;
+    sortBy?: "price_asc" | "price_desc";
   }) {
     const mayorId = filters?.mayorId ?? filters?.hostId;
     const page = filters?.page ?? 1;
@@ -158,6 +163,20 @@ export default class VenueRepo {
     const where: Prisma.VenueWhereInput = {
       ...(mayorId ? { mayorId } : {}),
       ...(filters?.category ? { category: filters.category } : {}),
+      ...(filters?.city
+        ? { city: { contains: filters.city, mode: "insensitive" as const } }
+        : {}),
+      ...(filters?.minPrice != null || filters?.maxPrice != null
+        ? {
+            price: {
+              ...(filters.minPrice != null ? { gte: filters.minPrice } : {}),
+              ...(filters.maxPrice != null ? { lte: filters.maxPrice } : {}),
+            },
+          }
+        : {}),
+      ...(filters?.minCapacity != null
+        ? { capacity: { gte: filters.minCapacity } }
+        : {}),
       ...(filters?.search
         ? {
             OR: [
@@ -184,7 +203,12 @@ export default class VenueRepo {
 
     const queryArgs: Prisma.VenueFindManyArgs = {
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy:
+        filters?.sortBy === "price_asc"
+          ? { price: "asc" }
+          : filters?.sortBy === "price_desc"
+            ? { price: "desc" }
+            : { createdAt: "desc" },
       skip,
       take: limit,
     };

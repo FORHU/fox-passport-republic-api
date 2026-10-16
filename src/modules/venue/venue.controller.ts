@@ -153,6 +153,29 @@ export default class VenueCtrl {
   // READ Venues Controller with optional query parameters for filtering
   // `hostId` accepted as a deprecated alias for `mayorId` (see venue.repository.ts)
   static async getVenues(req: Request, res: Response) {
+    const filterSchema = Joi.object({
+      city: Joi.string().trim().max(120),
+      minPrice: Joi.number().min(0),
+      maxPrice: Joi.number().min(0),
+      minCapacity: Joi.number().integer().min(1),
+      sortBy: Joi.string().valid("price_asc", "price_desc"),
+    }).unknown(true);
+    const { error: filterError, value: filterValues } = filterSchema.validate(
+      req.query,
+      { convert: true },
+    );
+    if (filterError)
+      return res.status(400).json({ message: filterError.message });
+    if (
+      filterValues.minPrice != null &&
+      filterValues.maxPrice != null &&
+      filterValues.minPrice > filterValues.maxPrice
+    ) {
+      return res
+        .status(400)
+        .json({ message: "minPrice must not exceed maxPrice" });
+    }
+
     try {
       const {
         mayorId: _mayorId,
@@ -193,6 +216,17 @@ export default class VenueCtrl {
         ...(parsedWest != null && !isNaN(parsedWest) && { west: parsedWest }),
         ...(category && { category: category as VenueCategory }),
         ...(search && typeof search === "string" && { search }),
+        ...(filterValues.city && { city: filterValues.city }),
+        ...(filterValues.minPrice != null && {
+          minPrice: filterValues.minPrice,
+        }),
+        ...(filterValues.maxPrice != null && {
+          maxPrice: filterValues.maxPrice,
+        }),
+        ...(filterValues.minCapacity != null && {
+          minCapacity: filterValues.minCapacity,
+        }),
+        ...(filterValues.sortBy && { sortBy: filterValues.sortBy }),
         lightweight: isLightweight,
       });
       return res.status(200).json({ venues, total });

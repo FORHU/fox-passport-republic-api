@@ -240,6 +240,11 @@ export default class VenueSvc {
     category?: VenueCategory;
     lightweight?: boolean;
     search?: string;
+    city?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    minCapacity?: number;
+    sortBy?: "price_asc" | "price_desc";
   }) {
     // Only the database read is cached. The enrichment below reaches into
     // `passport` for perks and badges, which live on their own lifetime and are
@@ -262,6 +267,12 @@ export default class VenueSvc {
       "venue_spotlight",
       "mayorId",
     );
+    if (filters?.sortBy) {
+      sorted.sort((a, b) => {
+        const difference = Number(a.price) - Number(b.price);
+        return filters.sortBy === "price_asc" ? difference : -difference;
+      });
+    }
     // Add city_badge / mayor_verified badge for each venue owner
     const enriched = await PassportSvc.enrichWithOwnerBadge(
       sorted,

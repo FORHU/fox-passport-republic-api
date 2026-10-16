@@ -26,6 +26,17 @@ export const CORS_ORIGINS = (
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);
+// Exact redirect targets the native mobile app registers (custom URL scheme or
+// an https app link). Social sign-in redirects the system browser back to
+// `<origin>/auth/<provider>/callback?xc=...`, and the app intercepts it. Kept
+// apart from CORS_ORIGINS: these never make cross-origin requests, they are
+// only ever somewhere to send a redirect, and each must match exactly.
+export const MOBILE_REDIRECT_ORIGINS = (
+  process.env.MOBILE_REDIRECT_ORIGINS || "foxpassport://app"
+)
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
 export const SECRET_KEY = process.env.SECRET_KEY as string;
 export const isDev = process.env.NODE_ENV !== "production";
 export const MAILER_TRANSPORT_HOST = process.env
@@ -155,6 +166,15 @@ if (Boolean(googleClientId) !== Boolean(googleClientSecret)) {
 
 export const GOOGLE_CLIENT_ID = googleClientId;
 export const GOOGLE_CLIENT_SECRET = googleClientSecret;
+// Extra OAuth client IDs (Android / iOS / web-for-mobile) whose ID tokens the
+// native mobile sign-in endpoint accepts. A mobile ID token's `aud` is the
+// mobile client's ID, not the web client's, so each one must be listed here.
+export const GOOGLE_MOBILE_CLIENT_IDS = (
+  process.env.GOOGLE_MOBILE_CLIENT_IDS || ""
+)
+  .split(",")
+  .map((id) => id.trim())
+  .filter(Boolean);
 if (!GOOGLE_CLIENT_ID) {
   console.warn(
     "⚠️  GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set — Google sign-in will fail.",

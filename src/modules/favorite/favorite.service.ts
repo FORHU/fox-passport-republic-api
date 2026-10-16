@@ -4,7 +4,7 @@ export default class FavoriteSvc {
   static async toggleFavorite(
     userId: string,
     targetId: string,
-    type: "venue" | "event",
+    type: "venue" | "event" | "public_event",
   ) {
     return FavoriteRepo.toggleFavorite(userId, targetId, type);
   }
@@ -16,7 +16,7 @@ export default class FavoriteSvc {
   static async checkFavorite(
     userId: string,
     targetId: string,
-    type: "venue" | "event",
+    type: "venue" | "event" | "public_event",
   ) {
     // Implement check logic or call repo if added
     return FavoriteRepo.isFavorite(userId, targetId, type);
@@ -25,7 +25,7 @@ export default class FavoriteSvc {
   static async addFavorite(
     userId: string,
     targetId: string,
-    type: "venue" | "event",
+    type: "venue" | "event" | "public_event",
   ) {
     // Explicitly add if not exists
     return FavoriteRepo.toggleFavorite(userId, targetId, type); // For now reuse toggle as it handles existence
