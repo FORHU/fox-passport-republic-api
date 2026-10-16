@@ -112,6 +112,7 @@ model User {
   bookingEditRequests      BookingEditRequest[]
   venueAffiliations        VenueEventFoxerAffiliation[] @relation("VenueAffiliationEventFoxer")
   venueAffiliationReviews  VenueEventFoxerAffiliation[] @relation("VenueAffiliationReviewer")
+  eventRegistrations       EventRegistration[]
 
   @@map("users")
 }

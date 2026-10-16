@@ -149,6 +149,9 @@ model Event {
   inboxConversations   Conversation[]
   eventServiceBids     EventServiceBid[]
   eventAssetBids       EventAssetBid[]
+  isPublic             Boolean                    @default(false)
+  maxAttendees         Int?
+  registrations        EventRegistration[]
 
   @@map("events")
 }
@@ -334,4 +337,29 @@ model EventAssetBid {
   targetRequirement EventTemplateAsset @relation(fields: [eventTemplateAssetId], references: [id])
 
   @@map("event_asset_bids")
+}
+
+enum RegistrationStatus {
+  registered
+  cancelled
+  attended
+}
+
+model EventRegistration {
+  id           String             @id @default(uuid())
+  eventId      String
+  userId       String
+  status       RegistrationStatus @default(registered)
+  ticketCode   String             @unique
+  checkedIn    Boolean            @default(false)
+  checkedInAt  DateTime?
+  registeredAt DateTime           @default(now())
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_registrations")
 }
