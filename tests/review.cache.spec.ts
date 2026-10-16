@@ -81,7 +81,7 @@ const db = vi.hoisted(() => ({
     findUnique: vi.fn(async () => ({
       id: "b1",
       userId: "u1",
-      status: "confirmed",
+      status: "completed",
       event: { venueTransactions: [] },
     })),
   },

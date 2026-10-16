@@ -594,6 +594,15 @@ export default class AdminSvc {
   ) {
     const booking = await AdminRepo.updateAssetBookingStatus(id, resolution);
 
+    if (resolution === ItemBookingStatus.completed) {
+      try {
+        const { default: PayoutSvc } = await import("../payout/payout.service");
+        await PayoutSvc.createPayoutsForAssetBooking(id);
+      } catch (err) {
+        console.error(`Payout failed for resolved asset booking ${id}:`, err);
+      }
+    }
+
     announceToAdmins("disputes");
     await this.invalidateQueues();
     announceToUser(booking.userId, "bookings");
@@ -606,6 +615,15 @@ export default class AdminSvc {
     resolution: ItemBookingStatus,
   ) {
     const booking = await AdminRepo.updateServiceBookingStatus(id, resolution);
+
+    if (resolution === ItemBookingStatus.completed) {
+      try {
+        const { default: PayoutSvc } = await import("../payout/payout.service");
+        await PayoutSvc.createPayoutsForServiceBooking(id);
+      } catch (err) {
+        console.error(`Payout failed for resolved service booking ${id}:`, err);
+      }
+    }
 
     announceToAdmins("disputes");
     await this.invalidateQueues();

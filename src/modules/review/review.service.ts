@@ -88,6 +88,15 @@ export default class ReviewSvc {
       if (booking.status === "cancelled" || booking.status === "pending") {
         throw new Error("Cannot review a booking that is pending or cancelled");
       }
+      const isAttendedOrFinished =
+        booking.status === "completed" ||
+        booking.checkedIn === true ||
+        (booking.endAt && new Date(booking.endAt) <= new Date());
+      if (!isAttendedOrFinished) {
+        throw new Error(
+          "Reviews are only allowed after a booking has been completed or attended",
+        );
+      }
       const existing = await prisma.review.findFirst({
         where: { bookingId: String(bookingId) },
       });

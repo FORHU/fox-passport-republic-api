@@ -12,6 +12,7 @@ import ServiceBookingRepo from "../service-booking/service-booking.repository";
 import BookingRepo from "../booking/booking.repository";
 import PaymentRepo from "../payment/payment.repository";
 import { calculateItemsTotal, toStripeCents } from "../../utils/pricing";
+import PricingSvc from "../pricing/pricing.service";
 import { PLATFORM_FEE_PERCENT, STRIPE_SECRET_KEY } from "../../config";
 import NotificationService from "../notifications/user-notification.service";
 import {
@@ -74,8 +75,21 @@ export default class BookingEditRequestSvc {
         billingRate: asset.billingRate,
       });
       const hasLowerFees = await PassportSvc.hasPerk(ownerId, "lower_fees");
-      const feePercent = hasLowerFees ? 0 : PLATFORM_FEE_PERCENT;
-      return itemsTotal + itemsTotal * (feePercent / 100);
+      const pricingRule = await PricingSvc.resolvePricingRule({
+        transactionType: "asset",
+        assetId: listingId,
+      });
+      const feePercent = hasLowerFees
+        ? 0
+        : (pricingRule?.percentage
+            ? pricingRule.percentage.toNumber()
+            : PLATFORM_FEE_PERCENT);
+      const fixedFee = hasLowerFees
+        ? 0
+        : (pricingRule?.fixedAmount
+            ? pricingRule.fixedAmount.toNumber()
+            : 0);
+      return itemsTotal + itemsTotal * (feePercent / 100) + fixedFee;
     }
 
     const service = await prisma.service.findUnique({
@@ -93,8 +107,21 @@ export default class BookingEditRequestSvc {
       ownerId,
       "service_lower_fees",
     );
-    const feePercent = hasLowerFees ? 0 : PLATFORM_FEE_PERCENT;
-    return itemsTotal + itemsTotal * (feePercent / 100);
+    const pricingRule = await PricingSvc.resolvePricingRule({
+      transactionType: "service",
+      serviceId: listingId,
+    });
+    const feePercent = hasLowerFees
+      ? 0
+      : (pricingRule?.percentage
+          ? pricingRule.percentage.toNumber()
+          : PLATFORM_FEE_PERCENT);
+    const fixedFee = hasLowerFees
+      ? 0
+      : (pricingRule?.fixedAmount
+          ? pricingRule.fixedAmount.toNumber()
+          : 0);
+    return itemsTotal + itemsTotal * (feePercent / 100) + fixedFee;
   }
 
   // Mirrors BookingSvc.priceVenueBooking's rate-multiplier formula exactly,
@@ -124,7 +151,18 @@ export default class BookingEditRequestSvc {
               ? Math.ceil(days / 30)
               : 1;
     const itemsTotal = venue.price.toNumber() * rateMultiplier;
-    const platformFeeAmount = itemsTotal * 0.05;
+    const pricingRule = await PricingSvc.resolvePricingRule({
+      transactionType: "venue",
+      venueId,
+      category: venue.category,
+    });
+    const feePct = pricingRule?.percentage
+      ? pricingRule.percentage.toNumber()
+      : PLATFORM_FEE_PERCENT;
+    const fixedFee = pricingRule?.fixedAmount
+      ? pricingRule.fixedAmount.toNumber()
+      : 0;
+    const platformFeeAmount = itemsTotal * (feePct / 100) + fixedFee;
     return itemsTotal + platformFeeAmount;
   }
 
