@@ -127,7 +127,7 @@ model UserProfile {
   country   String?  @default("Philippines")
   isPrivate Boolean  @default(false)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -139,7 +139,7 @@ model UserSettings {
   userId            String   @unique
   preferredCurrency String   @default("PHP")
   createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  updatedAt         DateTime @default(now()) @updatedAt
 
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -155,7 +155,7 @@ model PaymentAccount {
   stripeAccountId          String?  @unique
   stripeOnboardingComplete Boolean  @default(false)
   createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  updatedAt                DateTime @default(now()) @updatedAt
 
   user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -168,7 +168,7 @@ model UserActivity {
   lastActiveAt DateTime?
   lastSeenAt   DateTime?
   createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  updatedAt    DateTime  @default(now()) @updatedAt
 
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -190,7 +190,7 @@ model OAuthAccount {
   displayName       String?
   avatarUrl         String?
   createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  updatedAt         DateTime      @default(now()) @updatedAt
 
   user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
