@@ -44,6 +44,7 @@ export default class VenueRepo {
     address: string;
     city: string;
     state?: string;
+    district?: string;
     country: string;
     lat?: number;
     lng?: number;
@@ -267,6 +268,7 @@ export default class VenueRepo {
       address: string;
       city: string;
       state?: string;
+      district?: string;
       country: string;
       lat: number;
       lng: number;

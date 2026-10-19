@@ -246,6 +246,7 @@ export default class BookingRepo {
         status: true,
         stripePaymentId: true,
         userId: true,
+        eventId: true,
         event: { select: { organizerId: true } },
       },
     });

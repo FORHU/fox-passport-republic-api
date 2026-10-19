@@ -21,9 +21,14 @@ import { createClient } from "redis";
  * `REDIS_PORT` is the port this process dials. In `docker-compose.yml` the
  * published host port is `REDIS_HOST_PORT`, deliberately a different name - one
  * variable meaning both things is how a mismatch becomes invisible.
+ *
+ * `REDIS_URL` wins when set. It is the form managed Redis hands out, and a
+ * `rediss://` URL is the only way to get TLS - node-redis turns it on from the
+ * scheme.
  */
 function redisConfig() {
   return {
+    url: process.env.REDIS_URL || undefined,
     host: process.env.REDIS_HOST || "127.0.0.1",
     port: Number(process.env.REDIS_PORT || 6379),
     password: process.env.REDIS_PASSWORD || undefined,
@@ -75,14 +80,16 @@ class RedisUtil {
     // Everything here is fail-soft, so a wrong port is not an error - it is an
     // API that quietly runs with no cache and per-process rate limits. The
     // address is the one thing that makes that diagnosable from the logs.
-    const { host, port, password } = redisConfig();
-    const target = `${host}:${port}`;
+    const { url, host, port, password } = redisConfig();
+    // Never log a URL as-is: it carries the password. A regex rather than
+    // `new URL()`, which would throw here - outside the fail-soft `try`.
+    const target = url ? url.replace(/\/\/[^@/]*@/, "//") : `${host}:${port}`;
 
     try {
       this.client = createClient({
+        url,
         socket: {
-          host,
-          port,
+          ...(url ? {} : { host, port }),
           reconnectStrategy: (retries) => {
             const delay = reconnectDelay(retries, this.everConnected);
             if (delay === false) {
@@ -91,7 +98,7 @@ class RedisUtil {
             return delay;
           },
         },
-        password,
+        password: url ? undefined : password,
         /**
          * Fail commands immediately while the socket is down instead of
          * queueing them for a reconnect that may be minutes away.

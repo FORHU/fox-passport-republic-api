@@ -46,7 +46,10 @@ export const saveOTP = async (email: string, otp: string): Promise<void> => {
   await client.set(`${OTP_PREFIX}${email}`, otp, { EX: OTP_TTL_SECONDS });
 };
 
-// getDel atomically gets and deletes — prevents the same OTP being used twice
+// A wrong guess leaves the code in place, so a typo doesn't force a new email;
+// guessing is capped by `otpVerifyRateLimit`. The code is deleted only on a
+// match, and only the request whose `del` removed it wins - so it stays
+// single-use even when two correct submissions race.
 export const verifyOTP = async (
   email: string,
   otp: string,
@@ -56,8 +59,10 @@ export const verifyOTP = async (
     throw new Error(
       "OTP service is temporarily unavailable. Please try again.",
     );
-  const stored = await client.getDel(`${OTP_PREFIX}${email}`);
-  return stored === otp;
+  const key = `${OTP_PREFIX}${email}`;
+  const stored = await client.get(key);
+  if (stored !== otp) return false;
+  return (await client.del(key)) === 1;
 };
 
 export const deleteOTP = async (email: string): Promise<void> => {

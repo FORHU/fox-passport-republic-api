@@ -27,6 +27,7 @@
     "@aws-sdk/client-sqs": "^3.1151.0",
     "@aws-sdk/s3-request-presigner": "^3.998.0",
     "@faker-js/faker": "^9.9.0",
+    "@jobuntux/psgc": "0.2.1",
     "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "^7.4.2",
     "@types/pg": "^8.16.0",

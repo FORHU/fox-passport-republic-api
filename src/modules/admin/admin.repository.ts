@@ -301,9 +301,11 @@ export default class AdminRepo {
     });
   }
 
+  // Dispute resolution only: matching on `disputed` stops a resolve call from
+  // completing (and paying out) a booking nobody disputed.
   static async updateAssetBookingStatus(id: string, status: ItemBookingStatus) {
     return prisma.assetBooking.update({
-      where: { id },
+      where: { id, status: ItemBookingStatus.disputed },
       data: { status },
       include: { asset: { select: { ownerId: true } } },
     });
@@ -314,7 +316,7 @@ export default class AdminRepo {
     status: ItemBookingStatus,
   ) {
     return prisma.serviceBooking.update({
-      where: { id },
+      where: { id, status: ItemBookingStatus.disputed },
       data: { status },
       include: { service: { select: { ownerId: true } } },
     });

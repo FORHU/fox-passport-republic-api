@@ -48,11 +48,17 @@ import venueAffiliationRoutes from "../modules/venue-affiliation/venue-affiliati
 import appointmentRoutes from "../modules/appointment/appointment.routes";
 import calendarRoutes from "../modules/calendar/calendar.routes";
 import identityVerificationRoutes from "../modules/identity-verification/identity-verification.routes";
+import redisUtil from "../utils/redis.util";
 
 const router = express.Router();
 
+// Stays 200 when Redis is down - the API runs without it - but says so, so an
+// uptime monitor can alert on `redis: "down"`.
 router.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok" });
+  res.status(200).json({
+    status: "ok",
+    redis: redisUtil.getClient()?.isReady ? "up" : "down",
+  });
 });
 
 router.get("/v1", (req, res) => {
