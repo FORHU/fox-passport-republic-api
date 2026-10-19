@@ -90,6 +90,8 @@ model Venue {
   address              String
   city                 String
   state                String?
+  // Barangay in the Philippines; district or neighbourhood elsewhere. Optional.
+  district             String?
   country              String
   // Centroid of `boundary`, derived and stored server-side — never written
   // directly by a client. Kept for display/marker use (venue detail map,

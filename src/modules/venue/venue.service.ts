@@ -17,6 +17,7 @@ import {
   polygonsOverlap,
   pointInPolygon,
 } from "../../utils/geo";
+import { isPhAddress, isPhilippines } from "../locations/ph-geo";
 
 /**
  * Five minutes.
@@ -46,6 +47,36 @@ const ORGANIZER_EDITABLE_VENUE_FIELDS = new Set<string>([
   "floorPlanUrls",
   "seatingLayoutUrls",
 ]);
+
+/**
+ * A venue is found by its address, so publishing one needs a street and, in
+ * the Philippines, a real province → city/municipality → barangay chain from
+ * the PSGC list. Drafts are exempt: they can be saved half-filled.
+ */
+function assertPublishableAddress(v: {
+  address?: string | null;
+  country?: string | null;
+  state?: string | null;
+  city?: string | null;
+  district?: string | null;
+}) {
+  if (!v.address?.trim()) {
+    throw new AppError("A street address is required to publish a venue", 400);
+  }
+  if (!isPhilippines(v.country)) return;
+  if (!v.state || !v.city || !v.district) {
+    throw new AppError(
+      "Province, city or municipality, and barangay are required for a venue in the Philippines",
+      400,
+    );
+  }
+  if (!isPhAddress(v.state, v.city, v.district)) {
+    throw new AppError(
+      `${v.district}, ${v.city}, ${v.state} is not a recognised barangay - pick each one from the list`,
+      400,
+    );
+  }
+}
 
 export default class VenueSvc {
   /**
@@ -91,6 +122,7 @@ export default class VenueSvc {
     address: string;
     city: string;
     state?: string;
+    district?: string;
     country: string;
     boundary?: LngLat[];
     imgIds: string[];
@@ -151,6 +183,7 @@ export default class VenueSvc {
     let centroid: { lat: number; lng: number } | undefined;
 
     if (finalStatus !== VenueStatus.draft) {
+      assertPublishableAddress(data);
       if (!data.boundary) {
         throw new AppError(
           "A service-area boundary is required to publish a venue",
@@ -448,6 +481,7 @@ export default class VenueSvc {
       address: string;
       city: string;
       state?: string;
+      district?: string;
       country: string;
       boundary: LngLat[];
       imgIds: string[];
@@ -537,6 +571,23 @@ export default class VenueSvc {
     let centroid: { lat: number; lng: number } | undefined;
 
     if (finalStatus !== VenueStatus.draft) {
+      // Checked when the address moves or a draft goes out - not on every
+      // edit, so a live venue saved before this rule can still have its
+      // description changed.
+      const addressChanged = (
+        ["address", "country", "state", "city", "district"] as const
+      ).some(
+        (k) => data[k] !== undefined && data[k] !== (venue[k] ?? undefined),
+      );
+      if (addressChanged || venue.status === VenueStatus.draft) {
+        assertPublishableAddress({
+          address: data.address ?? venue.address,
+          country: data.country ?? venue.country,
+          state: data.state ?? venue.state,
+          city: data.city ?? venue.city,
+          district: data.district ?? venue.district,
+        });
+      }
       if (!resolvedBoundary) {
         throw new AppError(
           "A service-area boundary is required to publish a venue",

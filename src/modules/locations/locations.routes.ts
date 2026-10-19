@@ -10,6 +10,7 @@ router.get("/search", LocationsCtrl.searchLocations);
 router.get("/countries", LocationsCtrl.countries);
 router.get("/countries/:countryCode/states", LocationsCtrl.states);
 router.get("/countries/:countryCode/cities", LocationsCtrl.cities);
+router.get("/countries/:countryCode/barangays", LocationsCtrl.barangays);
 router.get("/nearest", LocationsCtrl.nearest);
 
 export default router;
