@@ -1,0 +1,20 @@
+name: Health check (staging)
+
+# The API keeps running without Redis - no cache, per-process rate limits, and
+# no email codes or social login - so nothing else would say it is down. A
+# failed scheduled run is what GitHub emails about.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: API and Redis are up
+        run: |
+          BODY=$(curl -fsS -m 15 https://dev.foxpassport.com/api/health)
+          echo "$BODY"
+          echo "$BODY" | jq -e '.status == "ok" and .redis == "up"' > /dev/null

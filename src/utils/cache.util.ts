@@ -84,11 +84,12 @@ function shaped<T>(value: T): Jsonified<T> {
 /**
  * Redis being down is one event, not one event per request.
  *
- * `redis.util` stops reconnecting after three attempts but keeps handing out
- * the dead client, so `getClient()` never returns null again and every cached
- * read keeps trying and failing. Warning on each of them buries the line that
- * explains the outage under thousands that repeat it. The rate-limit store
- * already warns exactly once for this reason; this is the same latch.
+ * Once Redis has connected, `redis.util` keeps reconnecting through an outage
+ * and keeps handing out the same client, which fails each command fast while
+ * the socket is down - so every cached read fails. Warning on each of them
+ * buries the line that explains the outage under thousands that repeat it.
+ * The rate-limit store already warns exactly once for this reason; this is the
+ * same latch.
  *
  * It resets on the first success, so a Redis that comes back and goes away
  * again is reported again.
