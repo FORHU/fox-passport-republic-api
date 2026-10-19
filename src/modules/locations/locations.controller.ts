@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import LocationsSvc, { GeoDirectory } from "./locations.service";
+import { phBarangays } from "./ph-geo";
 
 // Reference data that changes only with a dataset upgrade.
 const ONE_DAY = "public, max-age=86400";
@@ -41,12 +42,31 @@ export default class LocationsCtrl {
 
   // GET /locations/countries/:countryCode/cities?state=XX
   // Without `state`, the whole country — for countries with no states.
-  static cities(req: Request, res: Response) {
+  static async cities(req: Request, res: Response) {
     const state = typeof req.query.state === "string" ? req.query.state : "";
+    // An hour, not a day: approved venues add cities to this list.
+    res.set("Cache-Control", "public, max-age=3600");
+    return res.status(200).json({
+      status: "success",
+      data: await LocationsSvc.cities(
+        req.params.countryCode,
+        state || undefined,
+      ),
+    });
+  }
+
+  // GET /locations/countries/PH/barangays?state=XX&city=Name — Philippines
+  // only; any other country has no barangay list and gets [].
+  static barangays(req: Request, res: Response) {
+    const state = typeof req.query.state === "string" ? req.query.state : "";
+    const city = typeof req.query.city === "string" ? req.query.city : "";
     res.set("Cache-Control", ONE_DAY);
     return res.status(200).json({
       status: "success",
-      data: GeoDirectory.cities(req.params.countryCode, state || undefined),
+      data:
+        req.params.countryCode.toUpperCase() === "PH" && state && city
+          ? phBarangays(state, city)
+          : [],
     });
   }
 

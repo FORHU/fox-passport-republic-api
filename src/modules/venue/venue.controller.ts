@@ -23,6 +23,7 @@ interface CreateVenuePayload {
   address: string;
   city: string;
   state?: string;
+  district?: string;
   country: string;
   boundary?: LngLat[];
   imgIds: string[];
@@ -68,6 +69,7 @@ export default class VenueCtrl {
       address: Joi.string().required(),
       city: Joi.string().required(),
       state: Joi.string().optional(),
+      district: Joi.string().allow("").optional(),
       country: Joi.string().required(),
       // A draft doesn't need a boundary yet; anything else does — see
       // VenueSvc.createVenue for the matching runtime check (which also
@@ -231,6 +233,7 @@ export default class VenueCtrl {
       address: Joi.string().optional(),
       city: Joi.string().optional(),
       state: Joi.string().optional(),
+      district: Joi.string().allow("").optional(),
       country: Joi.string().optional(),
       boundary: Joi.array()
         .items(
