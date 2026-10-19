@@ -137,16 +137,15 @@ export default class AssetBookingSvc {
     const pricingRule = await PricingSvc.resolvePricingRule(voucherContext);
     const feePct = ownerHasLowerFees
       ? 0
-      : (pricingRule?.percentage
-          ? pricingRule.percentage.toNumber()
-          : PLATFORM_FEE_PERCENT);
+      : pricingRule?.percentage
+        ? pricingRule.percentage.toNumber()
+        : PLATFORM_FEE_PERCENT;
     const fixedFee = ownerHasLowerFees
       ? 0
-      : (pricingRule?.fixedAmount
-          ? pricingRule.fixedAmount.toNumber()
-          : 0);
-    const platformFeeAmount =
-      discountedItemsTotal * (feePct / 100) + fixedFee;
+      : pricingRule?.fixedAmount
+        ? pricingRule.fixedAmount.toNumber()
+        : 0;
+    const platformFeeAmount = discountedItemsTotal * (feePct / 100) + fixedFee;
     const totalAmount = discountedItemsTotal + platformFeeAmount;
 
     return {
