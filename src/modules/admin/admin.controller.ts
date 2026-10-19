@@ -282,6 +282,15 @@ export default class AdminCtrl {
       return res.status(200).json({ success: true, data: booking });
     } catch (e: unknown) {
       const error = e as Error;
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        return res.status(404).json({
+          success: false,
+          message: "No disputed booking with that id",
+        });
+      }
       return res.status(400).json({ success: false, message: error.message });
     }
   }
@@ -322,6 +331,15 @@ export default class AdminCtrl {
       return res.status(200).json({ success: true, data: booking });
     } catch (e: unknown) {
       const error = e as Error;
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        return res.status(404).json({
+          success: false,
+          message: "No disputed booking with that id",
+        });
+      }
       return res.status(400).json({ success: false, message: error.message });
     }
   }

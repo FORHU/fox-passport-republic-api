@@ -1,7 +1,12 @@
 import Stripe from "stripe";
 import ServiceBookingRepo from "./service-booking.repository";
 import { prisma } from "../../utils/prisma";
-import { BillingRate, ItemBookingStatus, RefundStatus } from "@prisma/client";
+import {
+  ServiceBooking,
+  BillingRate,
+  ItemBookingStatus,
+  RefundStatus,
+} from "@prisma/client";
 import {
   calculateItemsTotal,
   formatCurrency,
@@ -535,15 +540,19 @@ export default class ServiceBookingSvc {
     return disputed;
   }
 
-  /** Mirrors AssetBookingSvc.providerCancel exactly — see its comment. */
-  static async providerCancel(id: string, providerId: string, reason: string) {
-    const booking = await ServiceBookingRepo.findById(id);
-    if (!booking) throw new Error("Service booking not found");
-    if (booking.service?.ownerId !== providerId)
-      throw new Error("Only the owner can cancel this booking");
-    if (["completed", "cancelled", "disputed"].includes(booking.status))
-      throw new Error("Booking cannot be cancelled at this stage");
-
+  /**
+   * Refunds everything that was paid, through Stripe, and records it. Used when
+   * the customer is not at fault: the provider cancelled, or an admin ruled for
+   * the customer on a dispute. A Stripe failure is recorded as a failed refund
+   * for the admin refunds queue rather than thrown.
+   */
+  static async refundInFull(
+    booking: Pick<
+      ServiceBooking,
+      "id" | "paymentStatus" | "paymentTransactionId" | "totalAmount"
+    >,
+    reason: string,
+  ) {
     if (
       booking.paymentStatus === "paid" &&
       booking.paymentTransactionId?.startsWith("pi_")
@@ -555,30 +564,42 @@ export default class ServiceBookingSvc {
         });
         await prisma.refund.create({
           data: {
-            serviceBookingId: id,
+            serviceBookingId: booking.id,
             amount: booking.totalAmount,
             providerReference: sr.id,
             status:
               sr.status === "succeeded"
                 ? RefundStatus.succeeded
                 : RefundStatus.pending,
-            reason: `Provider cancelled: ${reason}`,
+            reason,
           },
         });
       } catch (e: unknown) {
         const err = e as Error;
-        console.error(`Provider-cancel refund failed for ${id}`, err);
+        console.error(`Full refund failed for ${booking.id}`, err);
         await prisma.refund.create({
           data: {
-            serviceBookingId: id,
+            serviceBookingId: booking.id,
             amount: booking.totalAmount,
             providerReference: null,
             status: RefundStatus.failed,
-            reason: `Provider cancelled: ${reason}`,
+            reason,
           },
         });
       }
     }
+  }
+
+  /** Mirrors AssetBookingSvc.providerCancel exactly — see its comment. */
+  static async providerCancel(id: string, providerId: string, reason: string) {
+    const booking = await ServiceBookingRepo.findById(id);
+    if (!booking) throw new Error("Service booking not found");
+    if (booking.service?.ownerId !== providerId)
+      throw new Error("Only the owner can cancel this booking");
+    if (["completed", "cancelled", "disputed"].includes(booking.status))
+      throw new Error("Booking cannot be cancelled at this stage");
+
+    await this.refundInFull(booking, `Provider cancelled: ${reason}`);
 
     const cancelled = await ServiceBookingRepo.providerCancel(id, reason);
     PromotionSvc.releaseRedemption({ serviceBookingId: id }).catch((e) =>

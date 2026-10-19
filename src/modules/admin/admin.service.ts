@@ -603,6 +603,16 @@ export default class AdminSvc {
       }
     }
 
+    // Ruled for the customer: they get back everything they paid.
+    if (resolution === ItemBookingStatus.cancelled) {
+      const { default: AssetBookingSvc } =
+        await import("../asset-booking/asset-booking.service");
+      await AssetBookingSvc.refundInFull(
+        booking,
+        "Dispute resolved in the customer's favor",
+      );
+    }
+
     announceToAdmins("disputes");
     await this.invalidateQueues();
     announceToUser(booking.userId, "bookings");
@@ -623,6 +633,16 @@ export default class AdminSvc {
       } catch (err) {
         console.error(`Payout failed for resolved service booking ${id}:`, err);
       }
+    }
+
+    // Ruled for the customer: they get back everything they paid.
+    if (resolution === ItemBookingStatus.cancelled) {
+      const { default: ServiceBookingSvc } =
+        await import("../service-booking/service-booking.service");
+      await ServiceBookingSvc.refundInFull(
+        booking,
+        "Dispute resolved in the customer's favor",
+      );
     }
 
     announceToAdmins("disputes");

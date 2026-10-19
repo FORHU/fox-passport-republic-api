@@ -1,7 +1,12 @@
 import Stripe from "stripe";
 import AssetBookingRepo from "./asset-booking.repository";
 import { prisma } from "../../utils/prisma";
-import { BillingRate, ItemBookingStatus, RefundStatus } from "@prisma/client";
+import {
+  AssetBooking,
+  BillingRate,
+  ItemBookingStatus,
+  RefundStatus,
+} from "@prisma/client";
 import {
   calculateItemsTotal,
   formatCurrency,
@@ -540,6 +545,56 @@ export default class AssetBookingSvc {
   }
 
   /**
+   * Refunds everything that was paid, through Stripe, and records it. Used when
+   * the customer is not at fault: the provider cancelled, or an admin ruled for
+   * the customer on a dispute. A Stripe failure is recorded as a failed refund
+   * for the admin refunds queue rather than thrown.
+   */
+  static async refundInFull(
+    booking: Pick<
+      AssetBooking,
+      "id" | "paymentStatus" | "paymentTransactionId" | "totalAmount"
+    >,
+    reason: string,
+  ) {
+    if (
+      booking.paymentStatus === "paid" &&
+      booking.paymentTransactionId?.startsWith("pi_")
+    ) {
+      try {
+        const sr = await stripe.refunds.create({
+          payment_intent: booking.paymentTransactionId,
+          amount: toStripeCents(booking.totalAmount.toNumber()),
+        });
+        await prisma.refund.create({
+          data: {
+            assetBookingId: booking.id,
+            amount: booking.totalAmount,
+            providerReference: sr.id,
+            status:
+              sr.status === "succeeded"
+                ? RefundStatus.succeeded
+                : RefundStatus.pending,
+            reason,
+          },
+        });
+      } catch (e: unknown) {
+        const err = e as Error;
+        console.error(`Full refund failed for ${booking.id}`, err);
+        await prisma.refund.create({
+          data: {
+            assetBookingId: booking.id,
+            amount: booking.totalAmount,
+            providerReference: null,
+            status: RefundStatus.failed,
+            reason,
+          },
+        });
+      }
+    }
+  }
+
+  /**
    * The owner cancels because they can't deliver (gear broke, double-booked,
    * etc.) — unlike `cancel()` above (either party, no refund logic at all
    * today), this always refunds 100% of whatever was paid. No cancellation-
@@ -555,41 +610,7 @@ export default class AssetBookingSvc {
     if (["completed", "cancelled", "disputed"].includes(booking.status))
       throw new Error("Booking cannot be cancelled at this stage");
 
-    if (
-      booking.paymentStatus === "paid" &&
-      booking.paymentTransactionId?.startsWith("pi_")
-    ) {
-      try {
-        const sr = await stripe.refunds.create({
-          payment_intent: booking.paymentTransactionId,
-          amount: toStripeCents(booking.totalAmount.toNumber()),
-        });
-        await prisma.refund.create({
-          data: {
-            assetBookingId: id,
-            amount: booking.totalAmount,
-            providerReference: sr.id,
-            status:
-              sr.status === "succeeded"
-                ? RefundStatus.succeeded
-                : RefundStatus.pending,
-            reason: `Provider cancelled: ${reason}`,
-          },
-        });
-      } catch (e: unknown) {
-        const err = e as Error;
-        console.error(`Provider-cancel refund failed for ${id}`, err);
-        await prisma.refund.create({
-          data: {
-            assetBookingId: id,
-            amount: booking.totalAmount,
-            providerReference: null,
-            status: RefundStatus.failed,
-            reason: `Provider cancelled: ${reason}`,
-          },
-        });
-      }
-    }
+    await this.refundInFull(booking, `Provider cancelled: ${reason}`);
 
     const cancelled = await AssetBookingRepo.providerCancel(id, reason);
     PromotionSvc.releaseRedemption({ assetBookingId: id }).catch((e) =>
