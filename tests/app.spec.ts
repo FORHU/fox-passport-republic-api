@@ -12,7 +12,10 @@ describe("App", () => {
   it("should expose a health endpoint", async () => {
     const res = await request(app).get("/api/health");
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: "ok" });
+    expect(res.body).toEqual({
+      status: "ok",
+      redis: expect.stringMatching(/^(up|down)$/),
+    });
   });
 
   it("should 404 unknown API routes as JSON", async () => {
