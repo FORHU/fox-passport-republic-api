@@ -19,15 +19,18 @@ name: Deploy Dev
 #      RABBITMQ_URL come from the host — do NOT set them here.
 
 on:
+  # Dev tracks main. Without this the dev container only changes when somebody
+  # remembers to dispatch, and it silently falls behind: on 2026-10-16 ilovelawyer
+  # dev was 24h and several merges stale while production deployed on every merge,
+  # which read as "changes not propagating" rather than as a missing trigger.
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       ref:
         description: "Branch, tag or SHA to deploy"
         required: true
         default: main
-  # Uncomment once a dev branch exists and the team wants push-to-deploy.
-  # push:
-  #   branches: [dev]
 
 concurrency:
   group: forhu-dev-foxpassport
@@ -68,7 +71,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_DEV_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_DEV_DEPLOY_ROLE_ARN || 'arn:aws:iam::617163942417:role/forhu-deploy' }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Resolve image tag
@@ -120,6 +123,12 @@ jobs:
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           FACEBOOK_APP_SECRET: ${{ secrets.FACEBOOK_APP_SECRET }}
+          # better-auth, added by the devs after this workflow was written. The API
+          # refuses to start without the secret — "every token this process issues
+          # or verifies depends on it" — so a deploy without it crash-loops rather
+          # than degrading. BETTER_AUTH_URL is the origin it issues cookies for.
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          BETTER_AUTH_URL: ${{ vars.BETTER_AUTH_URL || secrets.BETTER_AUTH_URL }}
         run: |
           set -euo pipefail
           umask 077
@@ -141,7 +150,8 @@ jobs:
 
           for k in ACCESS_TOKEN_SECRET REFRESH_TOKEN_SECRET SECRET_KEY \
                    MAILER_PASSWORD STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET \
-                   GOOGLE_CLIENT_SECRET FACEBOOK_APP_SECRET; do
+                   GOOGLE_CLIENT_SECRET FACEBOOK_APP_SECRET \
+                   BETTER_AUTH_SECRET BETTER_AUTH_URL; do
             v="${!k:-}"
             [ -n "$v" ] && printf '%s=%s\n' "$k" "$v" >> env.tmp
           done
