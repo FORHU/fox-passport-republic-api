@@ -1,7 +1,8 @@
 # Local stack for the Fox Passport API.
 #
-# `docker compose up -d` starts the backing services only — Postgres, Redis and
-# pgAdmin — which is what you want while running the API itself with `pnpm dev`.
+# `docker compose up -d` starts the backing services only — Postgres, Redis,
+# pgAdmin and MinIO (the web app's static images) — which is what you want while
+# running the API itself with `pnpm dev`.
 # The API container is behind a profile so it does not fight `pnpm dev` for port
 # 6002:
 #
@@ -84,6 +85,54 @@ services:
     networks:
       - fox_network
 
+  # Serves the web app's static brand images (NEXT_PUBLIC_ASSETS_URL =
+  # http://localhost:9000/<ASSETS_BUCKET>/static).
+  # API uploads are unaffected — they only go here if S3_ENDPOINT is set.
+  #
+  # Bitnami's archived build: minio/minio and quay.io/minio/* are no longer
+  # publicly pullable. Same server; its entrypoint starts it with data under
+  # /bitnami/minio/data, so no `command` is needed. This release ships no web
+  # console — manage the bucket with `mc` (bitnamilegacy/minio-client).
+  minio:
+    image: bitnamilegacy/minio:latest
+    container_name: local_minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "${MINIO_PORT:-9000}:9000" # S3 API
+    volumes:
+      - minio_data:/bitnami/minio/data
+    restart: unless-stopped
+    networks:
+      - fox_network
+
+  # One-shot: creates the bucket so the app never has to, and makes objects
+  # readable without a signature — matching how the real bucket is served.
+  #
+  # Retries in a loop rather than relying on a healthcheck, because the minio
+  # server image does not reliably ship a tool to health-check itself with.
+  #
+  # ASSETS_BUCKET, not AWS_S3_BUCKET: the latter is the API's real upload
+  # bucket, and sharing the name would quietly create that bucket here.
+  minio-init:
+    image: bitnamilegacy/minio-client:latest
+    container_name: local_minio_init
+    restart: "no"
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}; do
+        echo 'waiting for minio'; sleep 1;
+      done;
+      mc mb --ignore-existing local/${ASSETS_BUCKET:-fox-passport-dev};
+      mc anonymous set download local/${ASSETS_BUCKET:-fox-passport-dev};
+      echo 'minio ready';
+      "
+    networks:
+      - fox_network
+
   api:
     # Not started by a bare `docker compose up`. Use `--profile app`.
     profiles: ["app"]
@@ -114,6 +163,7 @@ services:
 volumes:
   pgdata:
   redisdata:
+  minio_data:
 
 networks:
   fox_network:
