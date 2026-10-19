@@ -1,6 +1,5 @@
 import { Server, Socket } from "socket.io";
-import jwt from "jsonwebtoken";
-import { ACCESS_TOKEN_SECRET } from "../../config";
+import { auth } from "../auth/better-auth";
 import { redeemSocketTicket } from "../../modules/auth/socket-ticket.service";
 import { ADMIN_ROOM, SOCKET_EVENTS, userRoom } from "./socket.constants";
 import { emitToUser } from "./socket.utils";
@@ -52,12 +51,15 @@ export const registerSocketGateway = (io: Server) => {
       .replace(/"/g, "");
 
     try {
-      const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET) as {
-        userId: string;
-        systemRole?: SystemRole;
-      };
-      socket.userId = decoded.userId;
-      socket.systemRole = decoded.systemRole;
+      const headers = new Headers();
+      headers.set("authorization", `Bearer ${token}`);
+      const session = await auth.api.getSession({ headers });
+      if (!session || !session.user) {
+        return next(new Error("Invalid or expired token"));
+      }
+      socket.userId = session.user.id;
+      socket.systemRole = (session.user as Record<string, unknown>)
+        .systemRole as SystemRole;
       return next();
     } catch {
       return next(new Error("Invalid or expired token"));
@@ -118,9 +120,18 @@ export const registerSocketGateway = (io: Server) => {
       if (socket.userId) {
         const userId = socket.userId;
         if (markOffline(userId)) {
-          const lastActiveAt = new Date();
+          const now = new Date();
+          // [MIGRATION-FLAG: Stage 3 Switch] Update modular UserActivity presence timestamp
+          prisma.userActivity
+            .upsert({
+              where: { userId },
+              create: { userId, lastSeenAt: now, lastActiveAt: now },
+              update: { lastSeenAt: now },
+            })
+            .catch(() => {});
+          // [MIGRATION-FLAG: Stage 3 Switch] Legacy dual-write
           prisma.user
-            .update({ where: { id: userId }, data: { lastActiveAt } })
+            .update({ where: { id: userId }, data: { lastActiveAt: now } })
             .catch(() => {});
           ConversationService.getPartnerIds(userId)
             .then((partnerIds) => {
@@ -128,7 +139,7 @@ export const registerSocketGateway = (io: Server) => {
                 emitToUser(io, partnerId, SOCKET_EVENTS.PRESENCE_UPDATE, {
                   userId,
                   online: false,
-                  lastActiveAt: lastActiveAt.toISOString(),
+                  lastActiveAt: now.toISOString(),
                 });
               }
             })

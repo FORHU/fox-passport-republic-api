@@ -1,78 +1,160 @@
 import { Request, Response, NextFunction } from "express";
+import { fromNodeHeaders } from "better-auth/node";
 import jwt from "jsonwebtoken";
-import { ACCESS_TOKEN_SECRET } from "../config";
-import { toAuthenticatedUser } from "../types/auth";
+import { auth } from "../infrastructure/auth/better-auth";
 import { can, Permission } from "../types/permissions";
+import { ACCESS_TOKEN_SECRET } from "../config";
+import type { SystemRole, RoleType } from "@prisma/client";
 
 /**
  * Authentication Middleware
- * Verifies JWT token and attaches user info to request
+ * Verifies Better Auth session (Bearer token or cookie) and attaches user info to request.
+ * Falls back to legacy JWT verification for existing integration test suites.
  */
-export const authenticate = (
+export const authenticate = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
+    const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+    });
+
+    if (session && session.user) {
+      req.user = {
+        userId: session.user.id,
+        email: session.user.email,
+        systemRole:
+          ((session.user as Record<string, unknown>)
+            .systemRole as SystemRole) || "user",
+        roleType:
+          ((session.user as Record<string, unknown>).roleType as RoleType[]) ||
+          [],
+      };
+      return next();
+    }
+
+    // Fallback: verify legacy JWT tokens (used by existing test suites & seed tokens)
     const authHeader = req.headers.authorization;
+    const cookieToken =
+      (req.cookies && req.cookies.fox_token) ||
+      req.cookies?.["better-auth.session_token"];
+    const token =
+      authHeader && authHeader.startsWith("Bearer ")
+        ? authHeader.substring(7).trim().replace(/"/g, "")
+        : typeof cookieToken === "string"
+          ? cookieToken.replace(/"/g, "")
+          : null;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({
-        success: false,
-        message: "No token provided",
-      });
-    }
-
-    const token = authHeader.substring(7).replace(/"/g, ""); // Remove 'Bearer ' and any accidental quotes
-
-    const user = toAuthenticatedUser(jwt.verify(token, ACCESS_TOKEN_SECRET));
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid token",
-      });
-    }
-
-    req.user = user;
-
-    next();
-  } catch (e: unknown) {
-    const error = e as Error;
-    if (error.name === "TokenExpiredError") {
-      return res.status(401).json({
-        success: false,
-        message: "Token expired",
-      });
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET) as {
+          userId: string;
+          email: string;
+          systemRole?: SystemRole;
+          roleType?: RoleType[];
+        };
+        if (decoded && decoded.userId) {
+          req.user = {
+            userId: decoded.userId,
+            email: decoded.email,
+            systemRole: decoded.systemRole || "user",
+            roleType: decoded.roleType || [],
+          };
+          return next();
+        }
+      } catch (err: unknown) {
+        const error = err as Error;
+        if (error.name === "TokenExpiredError") {
+          return res.status(401).json({
+            success: false,
+            message: "Token expired",
+          });
+        }
+        return res.status(401).json({
+          success: false,
+          message: "Invalid token",
+        });
+      }
     }
 
     return res.status(401).json({
       success: false,
-      message: "Invalid token",
+      message: "No token provided",
+    });
+  } catch {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired session",
     });
   }
 };
 
 /**
  * Optional Authentication Middleware
- * Attaches user info if token exists, but doesn't require it
+ * Attaches user info if session exists, but doesn't require it
  */
-export const optionalAuth = (
+export const optionalAuth = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const authHeader = req.headers.authorization;
+    const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+    });
 
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.substring(7).replace(/"/g, "");
-      const user = toAuthenticatedUser(jwt.verify(token, ACCESS_TOKEN_SECRET));
-      if (user) req.user = user;
+    if (session && session.user) {
+      req.user = {
+        userId: session.user.id,
+        email: session.user.email,
+        systemRole:
+          ((session.user as Record<string, unknown>)
+            .systemRole as SystemRole) || "user",
+        roleType:
+          ((session.user as Record<string, unknown>).roleType as RoleType[]) ||
+          [],
+      };
+      return next();
+    }
+
+    // Fallback: verify legacy JWT tokens
+    const authHeader = req.headers.authorization;
+    const cookieToken =
+      (req.cookies && req.cookies.fox_token) ||
+      req.cookies?.["better-auth.session_token"];
+    const token =
+      authHeader && authHeader.startsWith("Bearer ")
+        ? authHeader.substring(7).trim()
+        : typeof cookieToken === "string"
+          ? cookieToken
+          : null;
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET) as {
+          userId: string;
+          email: string;
+          systemRole?: SystemRole;
+          roleType?: RoleType[];
+        };
+        if (decoded && decoded.userId) {
+          req.user = {
+            userId: decoded.userId,
+            email: decoded.email,
+            systemRole: decoded.systemRole || "user",
+            roleType: decoded.roleType || [],
+          };
+        }
+      } catch {
+        // Ignore invalid optional token
+      }
     }
 
     next();
   } catch {
-    // Don't fail if token is invalid in optional auth
+    // Don't fail if token/session is invalid in optional auth
     next();
   }
 };

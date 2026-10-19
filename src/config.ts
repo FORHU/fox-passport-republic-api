@@ -48,18 +48,18 @@ export const MAILER_TRANSPORT_SECURE =
   process.env.MAILER_TRANSPORT_SECURE === "true";
 export const MAILER_EMAIL = process.env.MAILER_EMAIL as string;
 export const MAILER_PASSWORD = process.env.MAILER_PASSWORD as string;
-// Validated rather than cast: a missing secret used to 500 every login instead
-// of refusing to start, and a leftover dev value started up silently.
-export const ACCESS_TOKEN_SECRET = requireSecret(
-  "ACCESS_TOKEN_SECRET",
-  process.env.ACCESS_TOKEN_SECRET,
+export const BETTER_AUTH_SECRET = requireSecret(
+  "BETTER_AUTH_SECRET",
+  process.env.BETTER_AUTH_SECRET,
   { isDev },
 );
-export const REFRESH_TOKEN_SECRET = requireSecret(
-  "REFRESH_TOKEN_SECRET",
-  process.env.REFRESH_TOKEN_SECRET,
-  { isDev },
-);
+export const BETTER_AUTH_URL =
+  process.env.BETTER_AUTH_URL || `http://localhost:${PORT}`;
+
+export const ACCESS_TOKEN_SECRET =
+  process.env.ACCESS_TOKEN_SECRET || BETTER_AUTH_SECRET;
+export const REFRESH_TOKEN_SECRET =
+  process.env.REFRESH_TOKEN_SECRET || BETTER_AUTH_SECRET;
 
 // `expiresIn` accepts a number of seconds or an ms-style string ("15m", "7d").
 // Env vars are always strings, so narrow to the string half of that union
@@ -129,6 +129,13 @@ export const CLOUD_FRONT_DOMAIN = process.env.CLOUD_FRONT_DOMAIN as
 // keeps local setups working but is not private — set it everywhere real.
 export const AWS_S3_PRIVATE_BUCKET = process.env.AWS_S3_PRIVATE_BUCKET as
   string | undefined;
+
+// Amazon SQS Queues (replaces RabbitMQ for async event/job processing)
+export const AWS_SQS_PAYMENT_QUEUE_URL = process.env
+  .AWS_SQS_PAYMENT_QUEUE_URL as string | undefined;
+export const AWS_SQS_NOTIFICATION_QUEUE_URL = process.env
+  .AWS_SQS_NOTIFICATION_QUEUE_URL as string | undefined;
+export const SQS_ENDPOINT = process.env.SQS_ENDPOINT as string | undefined;
 
 export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY as string;
 export const STRIPE_WEBHOOK_SECRET = process.env

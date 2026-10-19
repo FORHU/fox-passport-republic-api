@@ -80,6 +80,9 @@ describe("a mail failure during password reset", () => {
     vi.doMock("../src/config", () => ({
       ACCESS_TOKEN_SECRET: "test-access-secret",
       ACCESS_TOKEN_EXPIRY: "15m",
+      DATABASE_URL: "postgresql://mock:mock@localhost:5432/mock",
+      BETTER_AUTH_SECRET: "test-secret-that-is-at-least-32-chars-long",
+      BETTER_AUTH_URL: "http://localhost:6002",
       isDev,
     }));
     vi.doMock("../src/modules/auth/auth.repository", () => ({

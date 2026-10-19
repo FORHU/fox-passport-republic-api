@@ -283,7 +283,7 @@ describe("Central Payment & Checkout Integration Tests", () => {
       expect(result.url).toBe("http://checkout.url");
       expect(result.invoice.subtotalAmount.toNumber()).toBe(5000);
       expect(result.invoice.discountAmount.toNumber()).toBe(500);
-      expect(result.invoice.grossAmount.toNumber()).toBe(4500); // Wait, plus platform fee? If platform fee is 0.
+      expect(result.invoice.grossAmount.toNumber()).toBe(4725); // 4500 discounted subtotal + 5% platform fee (225)
     });
   });
 

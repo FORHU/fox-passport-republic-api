@@ -8,6 +8,8 @@ import { isDev, CORS_ORIGINS } from "./config";
 import { createErrorHandler } from "./middleware/error.middleware";
 import cors from "cors";
 import setup from "./setup";
+import { toNodeHandler } from "better-auth/node";
+import { auth } from "./infrastructure/auth/better-auth";
 
 const app = express();
 
@@ -85,6 +87,42 @@ app.disable("x-powered-by");
 
 // Initialize setup
 setup();
+
+// Better Auth handler for /api/auth/* and /api/v1/auth/*
+app.all("/api/auth/*", toNodeHandler(auth));
+
+// Mount Better Auth at /api/v1/auth only for Better Auth actions (sign-in, sign-up, session, etc.),
+// allowing legacy auth endpoints (/login, /register, etc.) to fall through to the main router.
+const legacyAuthPaths = new Set([
+  "/login",
+  "/register",
+  "/verify-email",
+  "/logout",
+  "/refresh-token",
+  "/forgot-password",
+  "/reset-password",
+  "/resend-verification-otp",
+  "/google",
+  "/google/callback",
+  "/google/exchange",
+  "/facebook",
+  "/facebook/callback",
+  "/facebook/exchange",
+  "/socket-ticket",
+]);
+
+app.all("/api/v1/auth/*", (req, res, next) => {
+  const subPath = req.path.replace(/^\/api\/v1\/auth/, "");
+  if (
+    legacyAuthPaths.has(subPath) ||
+    Array.from(legacyAuthPaths).some((p) => subPath.startsWith(p + "/"))
+  ) {
+    return next();
+  }
+  req.url = req.url.replace(/^\/api\/v1\/auth/, "/api/auth");
+  return toNodeHandler(auth)(req, res);
+});
+console.log("✅ Better Auth router mounted at /api/auth and /api/v1/auth");
 
 app.use("/api", router);
 console.log("✅ Main router mounted");

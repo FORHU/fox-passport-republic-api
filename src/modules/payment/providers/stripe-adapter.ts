@@ -19,28 +19,38 @@ export class StripeAdapter implements PaymentProvider {
     successUrl: string,
     cancelUrl: string,
     idempotencyKey?: string,
+    allowedMethods?: string[],
   ): Promise<CheckoutSessionData> {
-    const session = await stripe.checkout.sessions.create(
-      {
-        payment_method_types: ["card"],
-        line_items: [
-          {
-            price_data: {
-              currency: currency.toLowerCase(),
-              product_data: {
-                name: `Invoice ${invoiceId}`,
-              },
-              // Stripe expects amount in smallest currency unit (e.g., cents for PHP/USD)
-              unit_amount: Math.round(amount * 100),
+    const sessionPayload: Stripe.Checkout.SessionCreateParams = {
+      line_items: [
+        {
+          price_data: {
+            currency: currency.toLowerCase(),
+            product_data: {
+              name: `Invoice ${invoiceId}`,
             },
-            quantity: 1,
+            // Stripe expects amount in smallest currency unit (e.g., cents for PHP/USD)
+            unit_amount: Math.round(amount * 100),
           },
-        ],
-        mode: "payment",
-        success_url: successUrl,
-        cancel_url: cancelUrl,
-        client_reference_id: invoiceId,
-      },
+          quantity: 1,
+        },
+      ],
+      mode: "payment",
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      client_reference_id: invoiceId,
+    };
+
+    // If explicit payment methods are specified, pass them;
+    // otherwise omitting payment_method_types lets Stripe Checkout dynamically
+    // present all multi-choice payment methods configured in the dashboard (Cards, GCash, Maya, GrabPay, etc.)
+    if (allowedMethods && allowedMethods.length > 0) {
+      sessionPayload.payment_method_types =
+        allowedMethods as Stripe.Checkout.SessionCreateParams.PaymentMethodType[];
+    }
+
+    const session = await stripe.checkout.sessions.create(
+      sessionPayload,
       idempotencyKey ? { idempotencyKey } : undefined,
     );
 
@@ -51,13 +61,16 @@ export class StripeAdapter implements PaymentProvider {
     return {
       providerSessionId: session.id,
       url: session.url,
+      allowedMethods: allowedMethods || ["automatic_multi_choice"],
     };
   }
 
   async getPaymentStatus(
     providerSessionId: string,
   ): Promise<PaymentStatusData> {
-    const session = await stripe.checkout.sessions.retrieve(providerSessionId);
+    const session = await stripe.checkout.sessions.retrieve(providerSessionId, {
+      expand: ["payment_intent"],
+    });
 
     let status: PaymentStatusData["status"] = "pending";
 
@@ -67,11 +80,21 @@ export class StripeAdapter implements PaymentProvider {
       status = "failed";
     }
 
-    const providerReference = session.payment_intent as string | undefined;
+    const intent =
+      typeof session.payment_intent === "object" &&
+      session.payment_intent !== null
+        ? (session.payment_intent as Stripe.PaymentIntent)
+        : null;
+
+    const providerReference =
+      intent?.id ?? (session.payment_intent as string | undefined);
+    const paymentMethod =
+      intent?.payment_method_types?.[0] || session.payment_method_types?.[0];
 
     return {
       status,
       providerReference,
+      paymentMethod,
     };
   }
 
