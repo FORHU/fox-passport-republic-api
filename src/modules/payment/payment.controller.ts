@@ -1,10 +1,18 @@
 import { sendServerError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
-import { Prisma } from "@prisma/client";
+import { PaymentStatus, Prisma } from "@prisma/client";
 import PaymentSvc from "./payment.service";
 import WebhookSvc from "./webhook.service";
 import Stripe from "stripe";
+
+/**
+ * The statuses a hand-written payment record may carry, read from the enum.
+ * The list used to be typed out and included `"completed"`, which isn't a
+ * `PaymentStatus`, and left out `paid`, so marking a payment paid by hand
+ * failed with a 500.
+ */
+const PAYMENT_STATUSES = Object.values(PaymentStatus);
 
 export default class PaymentController {
   // GET ALL PAYMENTS
@@ -65,8 +73,9 @@ export default class PaymentController {
         return res.status(400).json({ message: error.message });
       }
 
-      const payment = await PaymentSvc.getPaymentByTransactionId(
+      const payment = await PaymentSvc.getPaymentByTransactionIdForViewer(
         value.transactionId,
+        req.user!,
       );
       return res.status(200).json({
         success: true,
@@ -87,7 +96,7 @@ export default class PaymentController {
         paymentMethod: Joi.string().required(),
         paymentType: Joi.string().valid("deposit", "full").required(),
         paymentStatus: Joi.string()
-          .valid("pending", "completed", "failed", "refunded", "cancelled")
+          .valid(...PAYMENT_STATUSES)
           .optional(),
         gatewayResponse: Joi.string().optional(),
       });
@@ -128,7 +137,7 @@ export default class PaymentController {
 
       const bodySchema = Joi.object({
         paymentStatus: Joi.string()
-          .valid("pending", "completed", "failed", "refunded", "cancelled")
+          .valid(...PAYMENT_STATUSES)
           .optional(),
         gatewayResponse: Joi.string().optional(),
       });
@@ -161,6 +170,7 @@ export default class PaymentController {
         return res.status(400).json({ message: error.message });
       }
 
+      await PaymentSvc.assertCanViewBookingPayments(value.bookingId, req.user!);
       const payments = await PaymentSvc.getBookingPayments(value.bookingId);
       return res.status(200).json({
         success: true,
@@ -184,6 +194,7 @@ export default class PaymentController {
         return res.status(400).json({ message: error.message });
       }
 
+      await PaymentSvc.assertCanViewBookingPayments(value.bookingId, req.user!);
       const balance = await PaymentSvc.getRemainingBalance(value.bookingId);
       return res.status(200).json({
         success: true,

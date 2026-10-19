@@ -1,6 +1,8 @@
 import { AppError, notFound } from "../../utils/errors";
 import PaymentRepo, { PENDING_PAYMENT_TTL_MS } from "./payment.repository";
 import BookingRepo from "../booking/booking.repository";
+import AppointmentAccess from "../appointment/appointment.access";
+import { can } from "../../types/permissions";
 import crypto from "crypto";
 import {
   BookingStatus,
@@ -29,6 +31,12 @@ import { bookingCache } from "../../utils/cache-namespaces";
  * and is shown "unpaid" pays twice.
  */
 const PAYMENT_TTL = 30;
+
+/** Caller identity for the payment reads that check who is asking. */
+export interface PaymentViewer {
+  userId: string;
+  systemRole?: string;
+}
 
 function isUniqueViolation(err: unknown): boolean {
   return (
@@ -168,6 +176,70 @@ export default class PaymentSvc {
       throw notFound("Payment");
     }
     return payment;
+  }
+
+  /**
+   * Who may see what was paid for a booking: the person who booked it, an
+   * admin with `payments:read:all`, and whoever may see the Event's sales -
+   * its Owner, or staff whose Appointment grants `event:view-sales`.
+   *
+   * Narrower than `BookingSvc.getBookingForViewer` on purpose. An invited
+   * attendee can see the booking they're on but not what the booker paid, and
+   * check-in helpers and venue staff need the guest list, not the money.
+   *
+   * These routes used to need only a sign-in, so any user holding a booking id
+   * could read its payments and balance. Everyone else now gets the same "not
+   * found" a missing booking gives, so an id reveals nothing about whether the
+   * booking exists.
+   */
+  static async assertCanViewBookingPayments(
+    bookingId: string,
+    viewer: PaymentViewer,
+  ): Promise<void> {
+    if (can(viewer.systemRole, "payments:read:all")) return;
+
+    const booking = await BookingRepo.findPaymentContext(bookingId);
+    if (!booking) throw notFound("Booking");
+    if (booking.userId === viewer.userId) return;
+    if (
+      await AppointmentAccess.canOnEvent(
+        booking.eventId,
+        viewer.userId,
+        "event:view-sales",
+      )
+    ) {
+      return;
+    }
+
+    throw notFound("Booking");
+  }
+
+  /**
+   * `getPaymentByTransactionId`, for a caller who has to be allowed to see it:
+   * the payer, an admin, or anyone `assertCanViewBookingPayments` lets see a
+   * booking the payment's invoice covers. Everyone else gets "not found".
+   */
+  static async getPaymentByTransactionIdForViewer(
+    transactionId: string,
+    viewer: PaymentViewer,
+  ) {
+    const payment = await this.getPaymentByTransactionId(transactionId);
+    if (can(viewer.systemRole, "payments:read:all")) return payment;
+    if (payment.invoice?.payer?.id === viewer.userId) return payment;
+
+    for (const item of payment.invoice?.items ?? []) {
+      if (!item.sourceId) continue;
+      try {
+        await this.assertCanViewBookingPayments(item.sourceId, viewer);
+        return payment;
+      } catch (err) {
+        // A refusal means "not this booking, try the next one". Anything else
+        // (the database being down, say) is a real failure.
+        if (!(err instanceof AppError && err.status === 404)) throw err;
+      }
+    }
+
+    throw notFound("Payment");
   }
 
   // CREATE PAYMENT
