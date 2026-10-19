@@ -25,8 +25,21 @@ router.get(
   authenticate,
   PaymentCtrl.getRemainingBalance,
 );
-router.post("/create", authenticate, PaymentCtrl.createPayment);
-router.put("/:id", authenticate, PaymentCtrl.updatePayment);
+// Hand-written payment records. These used to need only a sign-in, so any
+// user could mark anyone's payment refunded or add one to any booking. Stripe's
+// webhook writes the real ones; these are admin bookkeeping.
+router.post(
+  "/create",
+  authenticate,
+  requirePermission("payments:manage"),
+  PaymentCtrl.createPayment,
+);
+router.put(
+  "/:id",
+  authenticate,
+  requirePermission("payments:manage"),
+  PaymentCtrl.updatePayment,
+);
 
 // Admin only
 router.get(

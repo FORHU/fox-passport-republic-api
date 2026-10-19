@@ -41,6 +41,12 @@ export const PERMISSIONS = [
   "bookings:read:all",
   /** May see the global payments listing. */
   "payments:read:all",
+  /**
+   * May write payment records by hand - create one, or set its status.
+   * Real payments are written by Stripe's webhook; this is bookkeeping for
+   * the cases it doesn't cover, so it is not a citizen capability.
+   */
+  "payments:manage",
   /** May work the disputes queue and resolve a dispute. */
   "disputes:resolve",
   /** May issue, retry and resolve refunds. */
@@ -268,6 +274,7 @@ const GRANTS: Record<SystemRole, readonly Permission[]> = {
     "policies:manage",
     "bookings:read:all",
     "payments:read:all",
+    "payments:manage",
     "disputes:resolve",
     "refunds:manage",
     "event:manage-organizers",
