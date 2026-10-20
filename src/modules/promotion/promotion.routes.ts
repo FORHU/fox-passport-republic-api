@@ -51,6 +51,12 @@ router.post(
   PromotionCtrl.importVouchers,
 );
 router.get(
+  "/:id/history",
+  authenticate,
+  requirePermission("promotions:manage"),
+  PromotionCtrl.history,
+);
+router.get(
   "/:id/analytics",
   authenticate,
   requirePermission("promotions:manage"),
