@@ -133,15 +133,7 @@ Administrators should eventually be able to:
 
 ### Platform Fees
 
-- [ ] create a fee rule
-- [ ] update a fee rule
-- [ ] activate/deactivate a fee rule
-- [ ] define percentage or fixed fees
-- [ ] assign transaction types
-- [ ] assign categories
-- [ ] assign subcategories
-- [ ] define priority
-- [ ] review the currently effective rule
+Built: `platform-fee-config` module (`GET /preview` shows the effective rule) and the admin `AdminPlatformFeeConfigs` screen.
 
 ### Host Markup
 
@@ -157,25 +149,11 @@ and:
 
 ### Promotions
 
-- [ ] create promotions
-- [ ] define discount type
-- [ ] define discount amount
-- [ ] define minimum subtotal
-- [ ] define maximum discount
-- [ ] define validity
-- [ ] define usage limits
-- [ ] define category restrictions
-- [ ] activate/deactivate promotions
+Built: `promotion` module and the admin `AdminPromotions` screen.
 
 ### Vouchers
 
-- [ ] create voucher codes
-- [ ] assign promotions
-- [ ] define validity
-- [ ] define usage limits
-- [ ] define category restrictions
-- [ ] deactivate vouchers
-- [ ] inspect redemption activity
+Built: vouchers inherit validity, limits and category from their promotion; redemptions via `GET /:id/analytics`.
 
 ---
 
@@ -215,28 +193,20 @@ Recommended priority:
 
 ### Priority 1 — Platform Fee Administration
 
-Enable authorized administrators to manage:
-
-- [ ] percentage/fixed fees
-- [ ] category
-- [ ] subcategory
-- [ ] transaction type
-- [ ] priority
-- [ ] activation
+Built (see §5).
 
 ### Priority 2 — Promotion Management
 
-- [ ] Enable administrators to create and manage discount rules.
+Built (see §5).
 
 ### Priority 3 — Voucher Management
 
-- [ ] Enable administrators to create redeemable voucher codes linked to promotions.
+Built (see §5).
 
 ### Priority 4 — Pricing Visibility and Audit
 
 Provide:
 
-- [ ] effective pricing-rule visibility
 - [ ] configuration history
 - [ ] who changed a rule
 - [ ] when it changed
