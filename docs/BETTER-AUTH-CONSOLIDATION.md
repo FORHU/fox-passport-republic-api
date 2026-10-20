@@ -80,9 +80,9 @@ until the cleanup phase, because installed mobile apps keep calling them.
 
 ### Phase 2 — Web: every auth call goes through Better Auth
 
-- [ ] `useAuth`: drop the `/auth/login` fallback; register, verify, resend,
-      forgot, reset, logout through `authClient`
-- [ ] Google/Facebook buttons → `authClient.signIn.social`
+- [x] `useAuth`: drop the `/auth/login` fallback; register, verify, resend,
+      forgot, reset, logout through `authClient` (app #143)
+- [x] Google/Facebook buttons → `authClient.signIn.social` (app #143)
 - [ ] `/api/proxy`: remove refresh-and-replay and the `fox_*` cookies; forward
       the Better Auth cookie only
 - [ ] Route guard: Better Auth cookies only — **after** existing `fox_token`
@@ -91,15 +91,28 @@ until the cleanup phase, because installed mobile apps keep calling them.
 - [ ] Browser pass on dev.foxpassport.com: sign up, verify, sign in, refresh,
       second device stays signed in, forgot/reset, Google, Facebook, sign out
 
-### Phase 3 — Mobile: same, then release
+### Phase 3a — Mobile: everything but browser social sign-in (mobile PR)
 
-- [ ] Drop `/auth/refresh-token`; rely on the bearer session token
-- [ ] Verify / resend / forgot / reset → `emailOTP` endpoints
-- [ ] Native Google/Facebook → `sign-in/social` with the ID token (replaces the
-      non-existent `/auth/google/mobile`)
+- [x] Drop `/auth/refresh-token`; rely on the bearer session token. A 401 on a
+      signed-in request ends the session (what already happened: the custom
+      refresh always refused a Better Auth token)
+- [x] Verify / resend / forgot / reset → `emailOTP` endpoints
+- [x] Native Google/Facebook → `sign-in/social` with the provider token (replaces
+      the non-existent `/auth/google/mobile`)
 - [ ] Release the new app version
 
-### Phase 4 — API cleanup (once the old mobile version is out of use)
+### Phase 3b — Mobile: native-only social sign-in
+
+Today mobile's working social path is the **browser redirect** (`/auth/google`
+→ app scheme → `/auth/google/exchange`), all custom. Better Auth has no drop-in
+for a Flutter app scheme, and native sign-in is the cleaner end state, so:
+
+- [ ] Google/Facebook native credentials and the app ID rename off
+      `com.example.*` (already listed as missing in the mobile port plan)
+- [ ] Make native the only social path; drop the browser flow
+- [ ] Release; only then can Phase 4 delete the custom social endpoints
+
+### Phase 4 — API cleanup (once old mobile versions are out of use, and 3b shipped)
 
 - [ ] Delete the custom auth routes, `refresh-token.service.ts`,
       `auth.cookies.ts`, the Google/Facebook services and the JWT fallback
