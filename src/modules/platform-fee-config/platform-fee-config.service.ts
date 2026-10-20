@@ -1,4 +1,9 @@
 import PlatformFeeConfigRepo from "./platform-fee-config.repository";
+import {
+  recordChange,
+  listAuditForTarget,
+  type AuditActor,
+} from "../audit/audit.service";
 import PricingSvc from "../pricing/pricing.service";
 
 /**
@@ -82,16 +87,22 @@ export default class PlatformFeeConfigSvc {
     return toApi(rule);
   }
 
-  static async create(data: FeeRuleInput) {
+  static async create(data: FeeRuleInput, actor?: AuditActor) {
     assertValidRule(data);
     const rule = await PlatformFeeConfigRepo.create({
       ...data,
       name: data.name.trim(),
     });
-    return toApi(rule);
+    const current = toApi(rule);
+    await recordChange(actor, "feeRule.create", rule.id, { current });
+    return current;
   }
 
-  static async update(id: string, data: Partial<FeeRuleInput>) {
+  static async update(
+    id: string,
+    data: Partial<FeeRuleInput>,
+    actor?: AuditActor,
+  ) {
     const existing = await PlatformFeeConfigRepo.findById(id);
     if (!existing) throw new Error("Fee rule not found");
 
@@ -120,13 +131,27 @@ export default class PlatformFeeConfigSvc {
       ...data,
       name: data.name?.trim(),
     });
-    return toApi(rule);
+    const current = toApi(rule);
+    await recordChange(actor, "feeRule.update", id, {
+      previous: toApi(existing),
+      current,
+    });
+    return current;
   }
 
-  static async remove(id: string) {
+  static async remove(id: string, actor?: AuditActor) {
     const existing = await PlatformFeeConfigRepo.findById(id);
     if (!existing) throw new Error("Fee rule not found");
-    return PlatformFeeConfigRepo.softDelete(id);
+    const result = await PlatformFeeConfigRepo.softDelete(id);
+    await recordChange(actor, "feeRule.deactivate", id, {
+      previous: toApi(existing),
+    });
+    return result;
+  }
+
+  /** Who changed this rule, when, and from what to what — newest first. */
+  static history(id: string) {
+    return listAuditForTarget(id);
   }
 
   /** Which rule would currently win for this context — same resolver Central Payment checkout uses. */

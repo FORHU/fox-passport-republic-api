@@ -93,6 +93,11 @@ const UPDATE_OWN_BODY_SCHEMA = Joi.object({
   autoApply: Joi.boolean().optional(),
 }).min(1);
 
+const actorOf = (req: Request) => ({
+  userId: req.user!.userId,
+  email: req.user!.email,
+});
+
 export default class PromotionCtrl {
   static async getAll(req: Request, res: Response) {
     try {
@@ -126,7 +131,7 @@ export default class PromotionCtrl {
       const { error, value } = CREATE_BODY_SCHEMA.validate(req.body);
       if (error) return res.status(400).json({ message: error.message });
 
-      const promotion = await PromotionSvc.create(value);
+      const promotion = await PromotionSvc.create(value, actorOf(req));
       return res.status(201).json({ success: true, data: promotion });
     } catch (e: unknown) {
       if (e instanceof AppError) return sendAppError(res, e, { success: true });
@@ -147,7 +152,11 @@ export default class PromotionCtrl {
       const { error, value } = UPDATE_BODY_SCHEMA.validate(req.body);
       if (error) return res.status(400).json({ message: error.message });
 
-      const promotion = await PromotionSvc.update(params.id, value);
+      const promotion = await PromotionSvc.update(
+        params.id,
+        value,
+        actorOf(req),
+      );
       return res.status(200).json({ success: true, data: promotion });
     } catch (e: unknown) {
       if (e instanceof AppError) return sendAppError(res, e, { success: true });
@@ -162,7 +171,7 @@ export default class PromotionCtrl {
       const { error, value } = schema.validate(req.params);
       if (error) return res.status(400).json({ message: error.message });
 
-      await PromotionSvc.remove(value.id);
+      await PromotionSvc.remove(value.id, actorOf(req));
       return res
         .status(200)
         .json({ success: true, message: "Promotion deactivated" });
@@ -189,6 +198,7 @@ export default class PromotionCtrl {
         params.id,
         value.count,
         value.prefix,
+        actorOf(req),
       );
       return res.status(201).json({ success: true, data: vouchers });
     } catch (e: unknown) {
@@ -210,12 +220,30 @@ export default class PromotionCtrl {
       const { error, value } = IMPORT_VOUCHERS_SCHEMA.validate(req.body);
       if (error) return res.status(400).json({ message: error.message });
 
-      const result = await PromotionSvc.importVouchers(params.id, value.codes);
+      const result = await PromotionSvc.importVouchers(
+        params.id,
+        value.codes,
+        actorOf(req),
+      );
       return res.status(201).json({ success: true, data: result });
     } catch (e: unknown) {
       if (e instanceof AppError) return sendAppError(res, e, { success: true });
       const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  static async history(req: Request, res: Response) {
+    try {
+      const schema = Joi.object({ id: Joi.string().uuid().required() });
+      const { error, value } = schema.validate(req.params);
+      if (error) return res.status(400).json({ message: error.message });
+
+      const entries = await PromotionSvc.history(value.id);
+      return res.status(200).json({ success: true, data: entries });
+    } catch (e: unknown) {
+      const error = e as Error;
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
@@ -252,6 +280,7 @@ export default class PromotionCtrl {
       const voucher = await PromotionSvc.setVoucherActive(
         params.voucherId,
         value.active,
+        actorOf(req),
       );
       return res.status(200).json({ success: true, data: voucher });
     } catch (e: unknown) {
@@ -281,7 +310,11 @@ export default class PromotionCtrl {
       const { error, value } = CREATE_OWN_BODY_SCHEMA.validate(req.body);
       if (error) return res.status(400).json({ message: error.message });
 
-      const promotion = await PromotionSvc.createOwn(providerId, value);
+      const promotion = await PromotionSvc.createOwn(
+        providerId,
+        value,
+        actorOf(req),
+      );
       return res.status(201).json({ success: true, data: promotion });
     } catch (e: unknown) {
       if (e instanceof AppError) return sendAppError(res, e, { success: true });
@@ -310,6 +343,7 @@ export default class PromotionCtrl {
         providerId,
         params.id,
         value,
+        actorOf(req),
       );
       return res.status(200).json({ success: true, data: promotion });
     } catch (e: unknown) {
@@ -329,7 +363,7 @@ export default class PromotionCtrl {
       const { error, value } = schema.validate(req.params);
       if (error) return res.status(400).json({ message: error.message });
 
-      await PromotionSvc.removeOwn(providerId, value.id);
+      await PromotionSvc.removeOwn(providerId, value.id, actorOf(req));
       return res
         .status(200)
         .json({ success: true, message: "Promotion deactivated" });
@@ -361,6 +395,7 @@ export default class PromotionCtrl {
         params.id,
         value.count,
         value.prefix,
+        actorOf(req),
       );
       return res.status(201).json({ success: true, data: vouchers });
     } catch (e: unknown) {
@@ -390,6 +425,7 @@ export default class PromotionCtrl {
         providerId,
         params.id,
         value.codes,
+        actorOf(req),
       );
       return res.status(201).json({ success: true, data: result });
     } catch (e: unknown) {
@@ -444,6 +480,7 @@ export default class PromotionCtrl {
         providerId,
         params.voucherId,
         value.active,
+        actorOf(req),
       );
       return res.status(200).json({ success: true, data: voucher });
     } catch (e: unknown) {

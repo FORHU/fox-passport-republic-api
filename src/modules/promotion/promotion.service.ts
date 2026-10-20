@@ -1,6 +1,11 @@
 import { AppError, notFound } from "../../utils/errors";
 import crypto from "crypto";
 import PromotionRepo from "./promotion.repository";
+import {
+  recordChange,
+  listAuditForTarget,
+  type AuditActor,
+} from "../audit/audit.service";
 import AssetRepo from "../asset/asset.repository";
 import ServiceRepo from "../service/service.repository";
 import VenueRepo from "../venue/venue.repository";
@@ -121,17 +126,23 @@ export default class PromotionSvc {
     return toApi(promo);
   }
 
-  static async create(data: PromotionInput) {
+  static async create(data: PromotionInput, actor?: AuditActor) {
     assertValidPromotion(data);
     const promo = await PromotionRepo.create({
       ...data,
       name: data.name.trim(),
     });
     if (data.autoApply) await this.ensureAutoApplyVoucher(promo.id);
-    return toApi(promo);
+    const current = toApi(promo);
+    await recordChange(actor, "promotion.create", promo.id, { current });
+    return current;
   }
 
-  static async update(id: string, data: Partial<PromotionInput>) {
+  static async update(
+    id: string,
+    data: Partial<PromotionInput>,
+    actor?: AuditActor,
+  ) {
     const existing = await PromotionRepo.findById(id);
     if (!existing) throw notFound("Promotion");
 
@@ -153,13 +164,27 @@ export default class PromotionSvc {
       name: data.name?.trim(),
     });
     if (data.autoApply) await this.ensureAutoApplyVoucher(id);
-    return toApi(promo);
+    const current = toApi(promo);
+    await recordChange(actor, "promotion.update", id, {
+      previous: toApi(existing),
+      current,
+    });
+    return current;
   }
 
-  static async remove(id: string) {
+  static async remove(id: string, actor?: AuditActor) {
     const existing = await PromotionRepo.findById(id);
     if (!existing) throw notFound("Promotion");
-    return PromotionRepo.softDelete(id);
+    const result = await PromotionRepo.softDelete(id);
+    await recordChange(actor, "promotion.deactivate", id, {
+      previous: toApi(existing),
+    });
+    return result;
+  }
+
+  /** Who changed this promotion or its vouchers, when, and how — newest first. */
+  static history(id: string) {
+    return listAuditForTarget(id);
   }
 
   /** Generates `count` unique voucher codes for a promotion, optionally with a shared prefix (e.g. "SUMMER-"). */
@@ -167,6 +192,7 @@ export default class PromotionSvc {
     promotionId: string,
     count: number,
     prefix?: string,
+    actor?: AuditActor,
   ) {
     const promo = await PromotionRepo.findById(promotionId);
     if (!promo) throw notFound("Promotion");
@@ -187,11 +213,24 @@ export default class PromotionSvc {
       codes.push(code);
     }
 
-    return PromotionRepo.createVouchers(promotionId, codes);
+    const vouchers = await PromotionRepo.createVouchers(promotionId, codes);
+    await recordChange(actor, "voucher.generate", promotionId, { codes });
+    return vouchers;
   }
 
-  static async setVoucherActive(voucherId: string, active: boolean) {
-    return PromotionRepo.setVoucherActive(voucherId, active);
+  static async setVoucherActive(
+    voucherId: string,
+    active: boolean,
+    actor?: AuditActor,
+  ) {
+    const voucher = await PromotionRepo.setVoucherActive(voucherId, active);
+    // Filed under the promotion, so its history lists its codes too.
+    await recordChange(actor, "voucher.setActive", voucher.promotionId, {
+      voucherId,
+      code: voucher.code,
+      active,
+    });
+    return voucher;
   }
 
   /**
@@ -202,7 +241,11 @@ export default class PromotionSvc {
    * within the batch or against an existing code are skipped, not fatal —
    * the caller gets back exactly which ones were actually created.
    */
-  static async importVouchers(promotionId: string, rawCodes: string[]) {
+  static async importVouchers(
+    promotionId: string,
+    rawCodes: string[],
+    actor?: AuditActor,
+  ) {
     const promo = await PromotionRepo.findById(promotionId);
     if (!promo) throw notFound("Promotion");
 
@@ -224,6 +267,10 @@ export default class PromotionSvc {
       toCreate.length > 0
         ? await PromotionRepo.createVouchers(promotionId, toCreate)
         : [];
+    await recordChange(actor, "voucher.import", promotionId, {
+      codes: toCreate,
+      skipped,
+    });
     return { created, skipped };
   }
 
@@ -341,7 +388,11 @@ export default class PromotionSvc {
     return promo;
   }
 
-  static async createOwn(providerId: string, data: OwnPromotionInput) {
+  static async createOwn(
+    providerId: string,
+    data: OwnPromotionInput,
+    actor?: AuditActor,
+  ) {
     const scope = await this.resolveOwnScope(
       providerId,
       data.assetId,
@@ -370,13 +421,16 @@ export default class PromotionSvc {
       autoApply: data.autoApply ?? false,
     });
     if (data.autoApply) await this.ensureAutoApplyVoucher(promo.id);
-    return toApi(promo);
+    const current = toApi(promo);
+    await recordChange(actor, "promotion.create", promo.id, { current });
+    return current;
   }
 
   static async updateOwn(
     providerId: string,
     id: string,
     data: Partial<OwnPromotionInput>,
+    actor?: AuditActor,
   ) {
     const existing = await this.getOwnedById(providerId, id);
 
@@ -420,12 +474,21 @@ export default class PromotionSvc {
       autoApply: data.autoApply,
     });
     if (data.autoApply) await this.ensureAutoApplyVoucher(id);
-    return toApi(promo);
+    const current = toApi(promo);
+    await recordChange(actor, "promotion.update", id, {
+      previous: toApi(existing),
+      current,
+    });
+    return current;
   }
 
-  static async removeOwn(providerId: string, id: string) {
-    await this.getOwnedById(providerId, id);
-    return PromotionRepo.softDelete(id);
+  static async removeOwn(providerId: string, id: string, actor?: AuditActor) {
+    const existing = await this.getOwnedById(providerId, id);
+    const result = await PromotionRepo.softDelete(id);
+    await recordChange(actor, "promotion.deactivate", id, {
+      previous: toApi(existing),
+    });
+    return result;
   }
 
   static async generateVouchersOwn(
@@ -433,22 +496,24 @@ export default class PromotionSvc {
     promotionId: string,
     count: number,
     prefix?: string,
+    actor?: AuditActor,
   ) {
     await this.getOwnedById(providerId, promotionId);
-    return this.generateVouchers(promotionId, count, prefix);
+    return this.generateVouchers(promotionId, count, prefix, actor);
   }
 
   static async setVoucherActiveOwn(
     providerId: string,
     voucherId: string,
     active: boolean,
+    actor?: AuditActor,
   ) {
     const voucher = await PromotionRepo.findVoucherWithPromotion(voucherId);
     if (!voucher) throw notFound("Voucher");
     if (voucher.promotion.providerId !== providerId) {
       throw new AppError("Unauthorized", 403);
     }
-    return PromotionRepo.setVoucherActive(voucherId, active);
+    return this.setVoucherActive(voucherId, active, actor);
   }
 
   /**
@@ -481,8 +546,9 @@ export default class PromotionSvc {
     providerId: string,
     promotionId: string,
     rawCodes: string[],
+    actor?: AuditActor,
   ) {
     await this.getOwnedById(providerId, promotionId);
-    return this.importVouchers(promotionId, rawCodes);
+    return this.importVouchers(promotionId, rawCodes, actor);
   }
 }
