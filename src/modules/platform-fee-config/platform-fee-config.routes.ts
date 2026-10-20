@@ -28,6 +28,12 @@ router.get(
   requirePermission("fees:manage"),
   PlatformFeeConfigCtrl.getById,
 );
+router.get(
+  "/:id/history",
+  authenticate,
+  requirePermission("fees:manage"),
+  PlatformFeeConfigCtrl.history,
+);
 router.post(
   "/",
   authenticate,

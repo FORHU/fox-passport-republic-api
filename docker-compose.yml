@@ -107,8 +107,11 @@ services:
     networks:
       - fox_network
 
-  # One-shot: creates the bucket so the app never has to, and makes objects
-  # readable without a signature — matching how the real bucket is served.
+  # One-shot: creates the bucket so the app never has to, makes objects
+  # readable without a signature — matching how the real bucket is served —
+  # and uploads the web app's static images (fox-passport-republic-app/
+  # static-assets, their source of truth) under static/. Re-run after an image
+  # changes: `docker compose up minio-init`.
   #
   # Retries in a loop rather than relying on a healthcheck, because the minio
   # server image does not reliably ship a tool to health-check itself with.
@@ -128,8 +131,16 @@ services:
       done;
       mc mb --ignore-existing local/${ASSETS_BUCKET:-fox-passport-dev};
       mc anonymous set download local/${ASSETS_BUCKET:-fox-passport-dev};
+      if [ -n \"$$(ls -A /static-assets 2>/dev/null)\" ]; then
+        mc mirror --overwrite --remove --exclude README.md /static-assets local/${ASSETS_BUCKET:-fox-passport-dev}/static;
+      else
+        echo 'no static-assets found - set STATIC_ASSETS_DIR or clone fox-passport-republic-app next to this repo';
+      fi;
       echo 'minio ready';
       "
+    # The web repo is expected next to this one; override with STATIC_ASSETS_DIR.
+    volumes:
+      - ${STATIC_ASSETS_DIR:-../fox-passport-republic-app/static-assets}:/static-assets:ro
     networks:
       - fox_network
 

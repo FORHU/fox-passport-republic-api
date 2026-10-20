@@ -5,6 +5,11 @@ import PlatformFeeConfigSvc, {
   KNOWN_CATEGORIES,
 } from "./platform-fee-config.service";
 
+const actorOf = (req: Request) => ({
+  userId: req.user!.userId,
+  email: req.user!.email,
+});
+
 const CREATE_BODY_SCHEMA = Joi.object({
   name: Joi.string().trim().required(),
   transactionType: Joi.string()
@@ -74,6 +79,20 @@ export default class PlatformFeeConfigCtrl {
     }
   }
 
+  static async history(req: Request, res: Response) {
+    try {
+      const schema = Joi.object({ id: Joi.string().uuid().required() });
+      const { error, value } = schema.validate(req.params);
+      if (error) return res.status(400).json({ message: error.message });
+
+      const entries = await PlatformFeeConfigSvc.history(value.id);
+      return res.status(200).json({ success: true, data: entries });
+    } catch (e: unknown) {
+      const error = e as Error;
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
   static async preview(req: Request, res: Response) {
     try {
       const schema = Joi.object({
@@ -99,7 +118,7 @@ export default class PlatformFeeConfigCtrl {
       const { error, value } = CREATE_BODY_SCHEMA.validate(req.body);
       if (error) return res.status(400).json({ message: error.message });
 
-      const rule = await PlatformFeeConfigSvc.create(value);
+      const rule = await PlatformFeeConfigSvc.create(value, actorOf(req));
       return res.status(201).json({ success: true, data: rule });
     } catch (e: unknown) {
       const error = e as Error;
@@ -119,7 +138,11 @@ export default class PlatformFeeConfigCtrl {
       const { error, value } = UPDATE_BODY_SCHEMA.validate(req.body);
       if (error) return res.status(400).json({ message: error.message });
 
-      const rule = await PlatformFeeConfigSvc.update(params.id, value);
+      const rule = await PlatformFeeConfigSvc.update(
+        params.id,
+        value,
+        actorOf(req),
+      );
       return res.status(200).json({ success: true, data: rule });
     } catch (e: unknown) {
       const error = e as Error;
@@ -133,7 +156,7 @@ export default class PlatformFeeConfigCtrl {
       const { error, value } = schema.validate(req.params);
       if (error) return res.status(400).json({ message: error.message });
 
-      await PlatformFeeConfigSvc.remove(value.id);
+      await PlatformFeeConfigSvc.remove(value.id, actorOf(req));
       return res
         .status(200)
         .json({ success: true, message: "Fee rule deactivated" });

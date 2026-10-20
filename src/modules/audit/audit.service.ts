@@ -47,3 +47,40 @@ export async function recordAudit(entry: AuditEntry): Promise<void> {
     console.error("AUDIT WRITE FAILED", JSON.stringify(entry), e);
   }
 }
+
+/** Who made a change, as `req.user` carries it. */
+export interface AuditActor {
+  userId: string;
+  email: string;
+}
+
+/**
+ * An allowed configuration change: `metadata` carries `previous` and/or
+ * `current` snapshots, so the history answers "what was it before" without
+ * replaying anything. No actor (an internal caller, a seed) records nothing.
+ */
+export async function recordChange(
+  actor: AuditActor | undefined,
+  action: string,
+  targetId: string,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  if (!actor) return;
+  await recordAudit({
+    actorId: actor.userId,
+    actorEmail: actor.email,
+    action,
+    targetId,
+    outcome: "allowed",
+    metadata,
+  });
+}
+
+/** Newest first: the change history of one record. */
+export function listAuditForTarget(targetId: string, limit = 100) {
+  return prisma.auditLog.findMany({
+    where: { targetId },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+}
