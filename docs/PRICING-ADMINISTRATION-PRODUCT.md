@@ -205,13 +205,9 @@ Built (see §5).
 
 ### Priority 4 — Pricing Visibility and Audit
 
-Provide:
-
-- [ ] configuration history
-- [ ] who changed a rule
-- [ ] when it changed
-- [ ] previous value
-- [ ] current value
+Built (20 Oct, api #130 / app #121): every fee rule, promotion and voucher change is
+recorded in `AuditLog` with who, when, and the previous and current values;
+`GET /:id/history` serves it, and both admin screens show it.
 
 This becomes increasingly important as transaction volume grows.
 
