@@ -111,7 +111,16 @@ export async function seedUsers(prisma: PrismaClient) {
         name: "Admin User",
         username: "admin",
         systemRole: "admin",
-        roleType: [],
+        // Every supply role too, so one login can reach every foxer screen.
+        roleType: [
+          "venueFoxer",
+          "eventFoxer",
+          "gearFoxer",
+          "serviceFoxer",
+          "performerFoxer",
+          "investor",
+          "organizer",
+        ],
       },
       {
         email: "secretary@example.com",
