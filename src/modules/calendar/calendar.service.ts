@@ -11,7 +11,9 @@ export type CalendarRole =
 export interface CalendarEntry {
   /** Stable across refetches: "<source>:<row id>". */
   id: string;
-  kind: "event" | "asset" | "service";
+  /** `block` is a day the venue's owner closed themselves; only sent when
+   * the caller asks for blocks. */
+  kind: "event" | "asset" | "service" | "block";
   role: CalendarRole;
   title: string;
   start: Date;
@@ -19,6 +21,23 @@ export interface CalendarEntry {
   status: string;
   /** Where the viewer manages or reviews it, if anywhere. */
   href: string | null;
+  /** For a `venue` entry (and a block): which of the viewer's venues. */
+  venueId?: string;
+  venueName?: string;
+  /**
+   * For a `venue` entry: where the booking stands with the venue, as the
+   * transaction's status. `pending_provider_confirmation` is waiting for the
+   * venue to reply, `pending` is held (dates reserved, not yet confirmed or
+   * paid) and `approved` is confirmed. Kept apart from `status`, which stays
+   * the event's, so existing readers are unaffected.
+   */
+  venueStatus?: string;
+}
+
+export interface CalendarOptions {
+  /** Also return the days the viewer's venues have blocked. Off by default so
+   * a reader that does not know about `block` entries never sees one. */
+  includeBlocks?: boolean;
 }
 
 // Long enough for a year view plus a margin; short enough that one call
@@ -49,6 +68,7 @@ export default class CalendarSvc {
     userId: string,
     from: Date,
     to: Date,
+    options: CalendarOptions = {},
   ): Promise<CalendarEntry[]> {
     if (!(from < to)) throw new AppError("`from` must be before `to`", 400);
     if (to.getTime() - from.getTime() > MAX_RANGE_DAYS * 24 * 60 * 60 * 1000) {
@@ -113,9 +133,13 @@ export default class CalendarSvc {
         where: {
           ...eventOverlap,
           ...notCancelledEvent,
+          // Every booking that holds the venue's dates: awaiting the venue's
+          // reply and held pending payment as well as confirmed (the same
+          // statuses availability reserves on), so the venue's owner sees a
+          // request the moment it is made, not only once it is approved.
           venueTransactions: {
             some: {
-              status: TransactionStatus.approved,
+              status: { in: [...RESERVING_TRANSACTION_STATUSES] },
               venue: AppointmentAccess.venueScope(
                 userId,
                 "venue:view-bookings",
@@ -130,8 +154,11 @@ export default class CalendarSvc {
           endAt: true,
           eventStatus: true,
           venueTransactions: {
-            where: { status: TransactionStatus.approved },
-            select: { venue: { select: { name: true } } },
+            where: { status: { in: [...RESERVING_TRANSACTION_STATUSES] } },
+            select: {
+              status: true,
+              venue: { select: { id: true, name: true } },
+            },
             take: 1,
           },
         },
@@ -252,7 +279,8 @@ export default class CalendarSvc {
       });
     }
     for (const e of venueEvents) {
-      const venueName = e.venueTransactions[0]?.venue.name;
+      const held = e.venueTransactions[0];
+      const venueName = held?.venue.name;
       addEvent(e.id, {
         id: `venue-event:${e.id}`,
         kind: "event",
@@ -262,10 +290,17 @@ export default class CalendarSvc {
         end: e.endAt,
         status: e.eventStatus,
         href: "/creator-dashboard/venues",
+        venueId: held?.venue.id,
+        venueName,
+        venueStatus: held?.status,
       });
     }
 
     const entries: CalendarEntry[] = [...events.values()];
+
+    if (options.includeBlocks) {
+      entries.push(...(await this.blockedDays(userId, from, to)));
+    }
 
     for (const a of rentedAssets) {
       entries.push({
@@ -341,5 +376,56 @@ export default class CalendarSvc {
     }
 
     return entries.sort((a, b) => a.start.getTime() - b.start.getTime());
+  }
+
+  /**
+   * The days between `from` and `to` that venues the viewer manages have
+   * closed themselves, one entry per venue per day. The Mayor, and an
+   * appointed Organizer with the calendar permission, manage a venue's
+   * calendar (the same scope the venue's own availability screen uses).
+   */
+  private static async blockedDays(
+    userId: string,
+    from: Date,
+    to: Date,
+  ): Promise<CalendarEntry[]> {
+    const venues = await prisma.venue.findMany({
+      where: {
+        AND: [
+          AppointmentAccess.venueScope(userId, "venue:calendar"),
+          { blockedDates: { isEmpty: false } },
+        ],
+      },
+      select: { id: true, name: true, blockedDates: true },
+    });
+
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const entries: CalendarEntry[] = [];
+    for (const venue of venues) {
+      for (const blocked of venue.blockedDates) {
+        // A blocked day is a calendar date, whatever time of day it is
+        // stored at.
+        const day = Date.UTC(
+          blocked.getUTCFullYear(),
+          blocked.getUTCMonth(),
+          blocked.getUTCDate(),
+        );
+        if (day + DAY_MS <= from.getTime() || day >= to.getTime()) continue;
+        const iso = new Date(day).toISOString().slice(0, 10);
+        entries.push({
+          id: `venue-block:${venue.id}:${iso}`,
+          kind: "block",
+          role: "venue",
+          title: `Blocked · ${venue.name}`,
+          start: new Date(day),
+          end: new Date(day + DAY_MS),
+          status: "blocked",
+          href: `/creator-dashboard/venues/${venue.id}/edit`,
+          venueId: venue.id,
+          venueName: venue.name,
+        });
+      }
+    }
+    return entries;
   }
 }
