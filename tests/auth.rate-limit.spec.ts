@@ -139,25 +139,6 @@ describe("otp send rate limit", () => {
   });
 });
 
-describe("refresh rate limit", () => {
-  it("serves ordinary refreshes and stops a probing run", async () => {
-    const { refreshRateLimit: limiter } = await freshLimiters();
-    const ok = appWith(limiter, () => 200);
-
-    for (let i = 0; i < 60; i++) {
-      expect((await post(ok, {})).status).toBe(200);
-    }
-
-    const { refreshRateLimit: other } = await freshLimiters();
-    const failing = appWith(other, () => 401);
-
-    for (let i = 0; i < 60; i++) {
-      await post(failing, {});
-    }
-    expect((await post(failing, {})).status).toBe(429);
-  });
-});
-
 describe("requests naming no account", () => {
   it("are not pooled into one shared budget", async () => {
     const { loginRateLimit: limiter } = await freshLimiters();

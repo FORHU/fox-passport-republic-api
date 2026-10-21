@@ -1,4 +1,6 @@
 import * as dotenv from "dotenv";
+import { vi } from "vitest";
+import { readTestSession } from "./helpers/test-session";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -38,12 +40,9 @@ if (fs.existsSync(testEnv)) {
  */
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 
-if (!process.env.ACCESS_TOKEN_SECRET) {
-  process.env.ACCESS_TOKEN_SECRET = "accesssecret123";
-}
 if (!process.env.BETTER_AUTH_SECRET) {
   process.env.BETTER_AUTH_SECRET =
-    process.env.ACCESS_TOKEN_SECRET || "ci-better-auth-secret-minimum-32-chars-long";
+    "ci-better-auth-secret-minimum-32-chars-long";
 }
 if (!process.env.BETTER_AUTH_URL) {
   process.env.BETTER_AUTH_URL = "http://localhost:5000/api/auth";
@@ -63,3 +62,23 @@ if (url) {
     );
   }
 }
+
+// Tests that call routes as a given user send `Bearer test.<payload>` (see
+// helpers/test-session.ts). Those resolve here; everything else reaches the
+// real Better Auth, so specs that sign in for real are unaffected.
+vi.mock("../src/infrastructure/auth/better-auth", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../src/infrastructure/auth/better-auth")
+    >();
+  const realGetSession = actual.auth.api.getSession;
+  const getSession = (async (ctx: { headers: Headers }) =>
+    readTestSession(ctx.headers.get("authorization")) ??
+    realGetSession(
+      ctx as Parameters<typeof realGetSession>[0],
+    )) as typeof realGetSession;
+  return {
+    ...actual,
+    auth: { ...actual.auth, api: { ...actual.auth.api, getSession } },
+  };
+});

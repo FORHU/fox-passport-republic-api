@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import request from "supertest";
-import jwt from "jsonwebtoken";
-import { ACCESS_TOKEN_SECRET } from "../src/config";
+import { signTestSession } from "./helpers/test-session";
 import { prisma } from "../src/utils/prisma";
 
 // Mock Stripe the same way tests/payment.integration.test.ts does — real
@@ -79,33 +78,24 @@ describe("Central Payment checkout — HTTP layer", () => {
       },
     });
 
-    clientToken = jwt.sign(
-      {
-        userId: client.id,
-        email: client.email,
-        systemRole: "user",
-        roleType: [],
-      },
-      ACCESS_TOKEN_SECRET,
-    );
-    otherToken = jwt.sign(
-      {
-        userId: otherUser.id,
-        email: otherUser.email,
-        systemRole: "user",
-        roleType: [],
-      },
-      ACCESS_TOKEN_SECRET,
-    );
-    adminToken = jwt.sign(
-      {
-        userId: admin.id,
-        email: admin.email,
-        systemRole: "admin",
-        roleType: [],
-      },
-      ACCESS_TOKEN_SECRET,
-    );
+    clientToken = signTestSession({
+      userId: client.id,
+      email: client.email,
+      systemRole: "user",
+      roleType: [],
+    });
+    otherToken = signTestSession({
+      userId: otherUser.id,
+      email: otherUser.email,
+      systemRole: "user",
+      roleType: [],
+    });
+    adminToken = signTestSession({
+      userId: admin.id,
+      email: admin.email,
+      systemRole: "admin",
+      roleType: [],
+    });
   });
 
   afterAll(async () => {

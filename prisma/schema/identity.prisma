@@ -38,8 +38,6 @@ model User {
   paymentAccount           PaymentAccount?
   activity                 UserActivity?
   image                    String?
-  oauthAccounts            OAuthAccount[]
-  refreshTokens            RefreshToken[]
   sessions                 Session[]
   accounts                 Account[]
 
@@ -173,30 +171,6 @@ model UserActivity {
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_activity")
-}
-
-enum OAuthProvider {
-  GOOGLE
-  FACEBOOK
-  APPLE
-}
-
-model OAuthAccount {
-  id                String        @id @default(uuid())
-  userId            String
-  provider          OAuthProvider
-  providerAccountId String        // Provider's unique user identifier
-  email             String?
-  displayName       String?
-  avatarUrl         String?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @default(now()) @updatedAt
-
-  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-  @@map("oauth_accounts")
 }
 
 model RoleRequest {
@@ -386,39 +360,6 @@ model EventFoxerApplication {
   files           File[]      @relation("EventFoxerPortfolioMany")
 
   @@map("event_foxer_applications")
-}
-
-/// An issued refresh token, so a session can actually be ended.
-///
-/// Refresh was previously a stateless `jwt.verify`: nothing was stored, so
-/// `POST /auth/logout` could only return 200 and hope the client discarded the
-/// token. A refresh token that leaked stayed valid for its full 30 days with no
-/// way to revoke it. Recording the jti makes logout real and gives us a lever
-/// if a token is ever suspected stolen.
-///
-/// The token itself is never stored - only its jti, which is enough to check
-/// revocation and useless to an attacker who reads the table.
-model RefreshToken {
-  id        String    @id @default(uuid())
-  jti       String    @unique
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  revokedAt DateTime?
-  createdAt DateTime  @default(now())
-  userAgent String?
-  ip        String?
-
-  // Rotation. `rotatedAt` is set only when this token was exchanged for a
-  // successor; `revokedAt` alone means logout or a password change. Reuse
-  // detection has to tell those apart: presenting a logged-out token is
-  // ordinary, presenting a rotated one is evidence of a copy.
-  rotatedAt     DateTime?
-  replacedByJti String?
-
-  @@index([userId])
-  @@index([expiresAt])
-  @@map("refresh_tokens")
 }
 
 model Session {

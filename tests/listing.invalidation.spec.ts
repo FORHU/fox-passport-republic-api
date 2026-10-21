@@ -278,24 +278,3 @@ describe("AdminRepo retires the namespace it approves into", () => {
     expect(version(namespace)).toBeGreaterThan(before);
   });
 });
-
-/**
- * The exception, pinned so that it stays deliberate rather than becoming an
- * oversight somebody "fixes".
- *
- * `updateUserLoginStatus` runs on every sign-in and writes `updatedAt` and
- * nothing else. Retiring the user namespace from there would throw away every
- * cached foxer listing each time anybody logged in anywhere - a cache whose hit
- * rate falls as the site gets busier.
- */
-describe("the one write that deliberately does not retire", () => {
-  it("a sign-in does not cool the user listings", async () => {
-    const AuthRepo = (await import("../src/modules/auth/auth.repository"))
-      .default;
-    const before = version("user");
-
-    await AuthRepo.updateUserLoginStatus("u1");
-
-    expect(version("user")).toBe(before);
-  });
-});

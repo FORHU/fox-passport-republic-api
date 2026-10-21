@@ -26,26 +26,12 @@ async function main() {
   console.log("2c. Users missing user_activity:", missingActivity.length);
 
   // Verification 3: Detect dangling references
-  const danglingOAuth: any[] = await prisma.$queryRawUnsafe(
-    `SELECT id FROM "oauth_accounts" WHERE "userId" NOT IN (SELECT id FROM "users");`
-  );
-  console.log("3a. Dangling oauth_accounts:", danglingOAuth.length);
-
   const danglingPayment: any[] = await prisma.$queryRawUnsafe(
     `SELECT id FROM "payment_accounts" WHERE "userId" NOT IN (SELECT id FROM "users");`
   );
-  console.log("3b. Dangling payment_accounts:", danglingPayment.length);
+  console.log("3. Dangling payment_accounts:", danglingPayment.length);
 
-  // Verification 4: Duplicate OAuth identities
-  const duplicateOAuth: any[] = await prisma.$queryRawUnsafe(
-    `SELECT "provider", "providerAccountId", COUNT(*) 
-     FROM "oauth_accounts" 
-     GROUP BY "provider", "providerAccountId" 
-     HAVING COUNT(*) > 1;`
-  );
-  console.log("4. Duplicate OAuth identities:", duplicateOAuth.length);
-
-  // Verification 5: Duplicate Stripe accounts
+  // Verification 4: Duplicate Stripe accounts
   const duplicateStripe: any[] = await prisma.$queryRawUnsafe(
     `SELECT "stripeAccountId", COUNT(*) 
      FROM "payment_accounts" 
@@ -53,13 +39,13 @@ async function main() {
      GROUP BY "stripeAccountId" 
      HAVING COUNT(*) > 1;`
   );
-  console.log("5. Duplicate Stripe accounts:", duplicateStripe.length);
+  console.log("4. Duplicate Stripe accounts:", duplicateStripe.length);
 
   const totalUsers = await prisma.user.count();
   const totalProfiles = await prisma.userProfile.count();
   const totalSettings = await prisma.userSettings.count();
   const totalActivity = await prisma.userActivity.count();
-  const totalOAuth = await prisma.oAuthAccount.count();
+  const totalAccounts = await prisma.account.count();
   const totalPayment = await prisma.paymentAccount.count();
 
   console.log("\n=== Total Records ===");

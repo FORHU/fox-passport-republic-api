@@ -53,8 +53,8 @@ vi.mock("../src/utils/prisma", () => ({
   },
 }));
 
-vi.mock("../src/modules/auth/refresh-token.service", () => ({
-  revokeAllForUser: vi.fn(async (id: string) => {
+vi.mock("../src/modules/auth/sessions.service", () => ({
+  revokeAllSessions: vi.fn(async (id: string) => {
     db.revoked.push(id);
     return 2;
   }),

@@ -21,7 +21,7 @@ import { toStripeCents } from "../../utils/pricing";
 import IdempotencySvc from "../idempotency/idempotency.service";
 import { AppError } from "../../utils/errors";
 import { recordAudit } from "../audit/audit.service";
-import { revokeAllForUser } from "../auth/refresh-token.service";
+import { revokeAllSessions } from "../auth/sessions.service";
 import AppointmentService from "../appointment/appointment.service";
 import { userCache } from "../../utils/cache-namespaces";
 
@@ -950,8 +950,8 @@ export default class AdminSvc {
     // Delete user and dependent references
     await AdminRepo.deleteUser(target.id);
 
-    // Revoke all refresh tokens and sessions
-    const sessionsRevoked = await revokeAllForUser(target.id);
+    // End every session
+    const sessionsRevoked = await revokeAllSessions(target.id);
 
     // Record audit log
     await recordAudit({

@@ -72,14 +72,11 @@ describe("the password hash cannot leave by accident", () => {
     expect(client).toMatch(/omit:\s*\{\s*user:\s*\{\s*password:\s*true/);
   });
 
-  it("only the three known call sites opt back in", () => {
+  it("only the known call site opts back in", () => {
     // A bare query cannot leak the hash; asking for it takes `omit:
     // { password: false }` or an explicit `select`. Both are greppable, and
     // this pins how many places do it so a fourth has to be deliberate.
-    const files = [
-      "modules/auth/auth.repository.ts",
-      "modules/profile/profile.repository.ts",
-    ];
+    const files = ["modules/profile/profile.repository.ts"];
     const optIns = files.flatMap((f) => {
       const text = src(f);
       return [
@@ -87,7 +84,7 @@ describe("the password hash cannot leave by accident", () => {
         ...text.matchAll(/password:\s*true/g),
       ];
     });
-    expect(optIns.length).toBe(2);
+    expect(optIns.length).toBe(1);
   });
 
   it("findUserById returns an explicit field list, not the whole row", () => {

@@ -1,8 +1,7 @@
-import jwt from "jsonwebtoken";
+import { signTestSession } from "./helpers/test-session";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { SystemRole } from "@prisma/client";
-import { ACCESS_TOKEN_SECRET } from "../src/config";
 import apiApp from "../src/app";
 import { REQUIRED_PERMISSIONS } from "../src/middleware/auth.middleware";
 import { can, type Permission } from "../src/types/permissions";
@@ -88,15 +87,12 @@ collect(
 const SYSTEM_ROLES = Object.values(SystemRole);
 
 function tokenFor(systemRole: SystemRole) {
-  return jwt.sign(
-    {
-      userId: `matrix-${systemRole}`,
-      email: `${systemRole}@matrix.test`,
-      systemRole,
-      roleType: [],
-    },
-    ACCESS_TOKEN_SECRET,
-  );
+  return signTestSession({
+    userId: `matrix-${systemRole}`,
+    email: `${systemRole}@matrix.test`,
+    systemRole,
+    roleType: [],
+  });
 }
 
 const holds = (systemRole: SystemRole, route: ProtectedRoute) =>
