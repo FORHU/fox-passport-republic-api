@@ -1,7 +1,11 @@
 import { Request, Response } from "express";
 import Joi from "joi";
-import ProfileSvc from "./profile.service";
+import ProfileSvc, { USERNAME_TAKEN } from "./profile.service";
 import { SUPPORTED_CURRENCIES } from "../fx/fx.service";
+
+// Kept in step with the web's usernameSchema / phoneSchema (shared/lib/schema.ts).
+const USERNAME_PATTERN = /^[a-z0-9._]{3,30}$/;
+const PHONE_PATTERN = /^\+?\d{8,15}$/;
 
 export default class ProfileCtrl {
   // Get current user profile
@@ -44,8 +48,27 @@ export default class ProfileCtrl {
 
       const schema = Joi.object({
         name: Joi.string().optional(),
-        username: Joi.string().optional(),
-        phone: Joi.string().optional(),
+        username: Joi.string()
+          .trim()
+          .lowercase()
+          .pattern(USERNAME_PATTERN)
+          .optional()
+          .messages({
+            "string.pattern.base":
+              "Usernames need 3–30 characters and can only use letters, numbers, dots and underscores.",
+          }),
+        // "" (or null) clears the number. Spaces, dashes and brackets are
+        // formatting, so they are stripped before the digit check.
+        phone: Joi.string()
+          .trim()
+          .allow("", null)
+          .replace(/[\s()-]/g, "")
+          .pattern(PHONE_PATTERN)
+          .optional()
+          .messages({
+            "string.pattern.base":
+              "Enter a phone number like +63 917 123 4567 (8–15 digits).",
+          }),
         profileImage: Joi.string().uri().optional(),
         country: Joi.string().allow("").optional(),
         state: Joi.string().allow("").optional(),
@@ -59,9 +82,11 @@ export default class ProfileCtrl {
 
       const { error, value } = schema.validate(req.body);
       if (error) {
+        // `field` lets the form put the message under the input it is about.
         return res.status(400).json({
           success: false,
           message: error.message,
+          field: error.details[0]?.path[0],
         });
       }
 
@@ -76,6 +101,7 @@ export default class ProfileCtrl {
       return res.status(400).json({
         success: false,
         message: error.message || "Failed to update profile",
+        ...(error.message === USERNAME_TAKEN && { field: "username" }),
       });
     }
   }

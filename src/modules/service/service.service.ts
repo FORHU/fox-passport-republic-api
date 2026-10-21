@@ -82,6 +82,7 @@ export default class ServiceSvc {
   static async browseServices(filters: {
     ownerCity?: string;
     maxPrice?: number;
+    q?: string;
     page?: number;
     limit: number;
   }) {

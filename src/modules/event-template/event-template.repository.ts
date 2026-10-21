@@ -12,6 +12,7 @@ import {
   VenueStatus,
 } from "@prisma/client";
 import { toEnum } from "../../utils/enums";
+import { cityNeedle, eventCategoriesMatching } from "../../utils/search-terms";
 
 /**
  * Template update payload. `imgIds` is not a column — callers pass image IDs
@@ -134,12 +135,63 @@ export default class EventTemplateRepo {
 
   // Public browse for the search page — supports category / targetCity / isPublic.
   // maxPrice is applied post-query in the service (needs server-computed totalAmount).
+  static buildPublicTemplateWhere(filters: {
+    category?: string;
+    targetCity?: string;
+    city?: string;
+    q?: string;
+  }) {
+    const category = toEnum(EventCategory, filters.category);
+    // `city` and `targetCity` were accepted and then never applied, so a
+    // city-scoped browse returned every template. Match the template's own
+    // target city or the city of a venue it uses.
+    const city = cityNeedle(filters.targetCity ?? filters.city);
+    const inCity = (c: string) => [
+      { targetCity: { contains: c, mode: "insensitive" as const } },
+      {
+        templateVenues: {
+          some: {
+            venue: { city: { contains: c, mode: "insensitive" as const } },
+          },
+        },
+      },
+    ];
+
+    // The search box sent `q` here and it was ignored, so the event list
+    // never narrowed. Match a name, a city or a kind of event.
+    const term = filters.q?.trim();
+    const termCity = cityNeedle(term);
+    const termCategories = eventCategoriesMatching(term);
+    const searchOr = term
+      ? [
+          { name: { contains: term, mode: "insensitive" as const } },
+          { owner: { name: { contains: term, mode: "insensitive" as const } } },
+          ...(termCity ? inCity(termCity) : []),
+          ...(termCategories.length > 0
+            ? [{ category: { in: termCategories } }]
+            : []),
+        ]
+      : [];
+
+    const anyOf = [
+      ...(city ? [{ OR: inCity(city) }] : []),
+      ...(searchOr.length > 0 ? [{ OR: searchOr }] : []),
+    ];
+    return {
+      isPublic: true,
+      status: EventTemplateStatus.published,
+      ...(category && { category }),
+      ...(anyOf.length > 0 && { AND: anyOf }),
+    };
+  }
+
   static async findPublicTemplatesLite(filters: {
     category?: string;
     targetCity?: string;
     city?: string;
     isPublic?: boolean;
     maxPrice?: number;
+    q?: string;
     page?: number;
     limit: number;
   }) {
@@ -147,31 +199,7 @@ export default class EventTemplateRepo {
     const limit = filters.limit;
     const skip = (page - 1) * limit;
 
-    const category = toEnum(EventCategory, filters.category);
-    // `city` and `targetCity` were accepted and then never applied, so a
-    // city-scoped browse returned every template. Match the template's own
-    // target city or the city of a venue it uses.
-    const city = (filters.targetCity ?? filters.city)?.trim();
-
-    const where = {
-      isPublic: true,
-      status: EventTemplateStatus.published,
-      ...(category && { category }),
-      ...(city && {
-        OR: [
-          { targetCity: { contains: city, mode: "insensitive" as const } },
-          {
-            templateVenues: {
-              some: {
-                venue: {
-                  city: { contains: city, mode: "insensitive" as const },
-                },
-              },
-            },
-          },
-        ],
-      }),
-    };
+    const where = this.buildPublicTemplateWhere(filters);
 
     const [templates, total] = await Promise.all([
       prisma.eventTemplate.findMany({
