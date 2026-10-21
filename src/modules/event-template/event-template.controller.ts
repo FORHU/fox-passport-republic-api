@@ -134,7 +134,7 @@ export default class EventTemplateCtrl {
   // Public — no auth required, searchable browse for the public /search page
   static async browsePublic(req: Request, res: Response) {
     try {
-      const { category, targetCity, city, maxPrice, isPublic, page, limit } =
+      const { category, targetCity, city, maxPrice, isPublic, page, limit, q } =
         req.query;
       const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
       const limitNum = limit ? Math.min(Number(limit), 50) : 50;
@@ -146,6 +146,7 @@ export default class EventTemplateCtrl {
         maxPrice: maxPrice ? Number(maxPrice) : undefined,
         isPublic:
           isPublic === "false" ? false : isPublic === "true" ? true : undefined,
+        q: typeof q === "string" && q.trim() ? q.trim() : undefined,
         page: pageNum,
         limit: limitNum,
       });

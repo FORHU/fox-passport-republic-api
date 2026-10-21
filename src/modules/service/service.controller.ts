@@ -134,13 +134,14 @@ export default class ServiceCtrl {
   // owner's city, price filters the item itself; only serviceFoxer-owned services).
   static async browseServices(req: Request, res: Response) {
     try {
-      const { city, maxPrice, page, limit } = req.query;
+      const { city, maxPrice, page, limit, q } = req.query;
       const parsedLimit = limit ? Math.min(Number(limit), 50) : 10;
       const parsedPage = page ? Number(page) : 1;
 
       const { services, total } = await ServiceSvc.browseServices({
         ...(city && { ownerCity: String(city) }),
         ...(maxPrice && { maxPrice: Number(maxPrice) }),
+        ...(typeof q === "string" && q.trim() && { q: q.trim() }),
         page: parsedPage,
         limit: parsedLimit,
       });

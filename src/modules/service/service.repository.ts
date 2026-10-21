@@ -1,5 +1,6 @@
 import { prisma } from "../../utils/prisma";
 import { serviceCache } from "../../utils/cache-namespaces";
+import { cityNeedle } from "../../utils/search-terms";
 import {
   BillingRate,
   ServiceStatus,
@@ -68,6 +69,7 @@ export default class ServiceRepo {
   static async findPublicServices(filters: {
     ownerCity?: string;
     maxPrice?: number;
+    q?: string;
     page?: number;
     limit: number;
   }) {
@@ -75,6 +77,9 @@ export default class ServiceRepo {
     const limit = filters.limit;
     const skip = (page - 1) * limit;
 
+    const ownerCity = cityNeedle(filters.ownerCity);
+    const term = filters.q?.trim();
+    const termCity = cityNeedle(term);
     const where = {
       status: ServiceStatus.available,
       deletedAt: null,
@@ -87,10 +92,26 @@ export default class ServiceRepo {
         roleType: {
           hasSome: ["serviceFoxer", "performerFoxer"] as RoleType[],
         },
-        ...(filters.ownerCity && {
-          city: { contains: filters.ownerCity, mode: "insensitive" as const },
+        ...(ownerCity && {
+          city: { contains: ownerCity, mode: "insensitive" as const },
         }),
       },
+      // The search box: the service's name, its owner's name or city.
+      ...(term && {
+        OR: [
+          { name: { contains: term, mode: "insensitive" as const } },
+          { owner: { name: { contains: term, mode: "insensitive" as const } } },
+          ...(termCity
+            ? [
+                {
+                  owner: {
+                    city: { contains: termCity, mode: "insensitive" as const },
+                  },
+                },
+              ]
+            : []),
+        ],
+      }),
     };
 
     const [services, total] = await Promise.all([
