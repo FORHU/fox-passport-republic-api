@@ -13,19 +13,40 @@ import {
   AWS_S3_BUCKET,
   AWS_S3_PRIVATE_BUCKET,
   CLOUD_FRONT_DOMAIN,
+  S3_CDN_URL,
   S3_ENDPOINT,
   S3_FORCE_PATH_STYLE,
 } from "../config";
 
-const s3Client = new S3Client({
+// Static keys only when both are set (local MinIO, or running off AWS). On an
+// AWS host none are configured: the instance role grants S3 and the SDK's
+// default provider chain resolves it. Passing an empty credentials object
+// would skip that chain and fail every upload with "Resolved credential
+// object is not valid" — see .github/workflows/deploy-dev.yml.
+const staticCredentials =
+  AWS_ACCESS_KEY && AWS_SECRET_ACCESS_KEY
+    ? { accessKeyId: AWS_ACCESS_KEY, secretAccessKey: AWS_SECRET_ACCESS_KEY }
+    : undefined;
+
+if (!staticCredentials && (AWS_ACCESS_KEY || AWS_SECRET_ACCESS_KEY)) {
+  console.warn(
+    "[s3] Only one of AWS_ACCESS_KEY / AWS_SECRET_ACCESS_KEY is set — ignoring " +
+      "it and using the default AWS credential chain. Set both or neither.",
+  );
+}
+
+export const s3ClientConfig = {
   region: AWS_REGION,
-  credentials: {
-    accessKeyId: AWS_ACCESS_KEY,
-    secretAccessKey: AWS_SECRET_ACCESS_KEY,
-  },
+  ...(staticCredentials && { credentials: staticCredentials }),
   ...(S3_ENDPOINT && { endpoint: S3_ENDPOINT }),
   ...(S3_FORCE_PATH_STYLE && { forcePathStyle: true }),
-});
+};
+
+const s3Client = new S3Client(s3ClientConfig);
+
+// The public CDN in front of the media bucket. S3_CDN_URL is what deployed
+// environments set; CLOUD_FRONT_DOMAIN is the older name, still honoured.
+const CDN_URL = S3_CDN_URL || CLOUD_FRONT_DOMAIN;
 
 // ULTIMATE CHECKSUM KILLER:
 // This middleware runs just before signing and removes the Checksum property
@@ -88,8 +109,8 @@ export async function uploadToS3(params: {
 
 export async function getGetObjectPresignedUrl(params: { key: string }) {
   const { key } = params;
-  if (CLOUD_FRONT_DOMAIN) {
-    const normalizedDomain = CLOUD_FRONT_DOMAIN.replace(/\/+$/, "");
+  if (CDN_URL) {
+    const normalizedDomain = CDN_URL.replace(/\/+$/, "");
     const normalizedKey = key.replace(/^\/+/, "");
     return `${normalizedDomain}/${normalizedKey}`;
   }
