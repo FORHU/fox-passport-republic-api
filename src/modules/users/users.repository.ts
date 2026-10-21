@@ -3,6 +3,7 @@ import { prisma } from "../../utils/prisma";
 import { userCache } from "../../utils/cache-namespaces";
 import { SystemRole, RoleType } from "@prisma/client";
 import { totalPages } from "../../utils/pagination";
+import { cityNeedle, eventCategoriesMatching } from "../../utils/search-terms";
 
 export default class UsersRepo {
   /**
@@ -134,6 +135,45 @@ export default class UsersRepo {
       status: "available" as const,
       price: { lte: maxPrice },
     };
+    const cityCore = cityNeedle(city);
+    const term = search?.trim();
+    const termCity = cityNeedle(term);
+    const termCategories = eventCategoriesMatching(term);
+    // The search box is "search anything": a name, a city or a kind of event.
+    const searchWhere = term
+      ? {
+          OR: [
+            { name: { contains: term, mode: "insensitive" as const } },
+            { username: { contains: term, mode: "insensitive" as const } },
+            ...(termCity
+              ? [{ city: { contains: termCity, mode: "insensitive" as const } }]
+              : []),
+            ...(termCategories.length > 0
+              ? [
+                  {
+                    foxerSpecializations: {
+                      some: { category: { in: termCategories } },
+                    },
+                  },
+                ]
+              : []),
+          ],
+        }
+      : undefined;
+    const priceWhere =
+      maxPrice !== undefined
+        ? {
+            OR: [
+              { services: { some: deletableItemWhere } },
+              { assets: { some: deletableItemWhere } },
+              { venues: { some: venueItemWhere } },
+            ],
+          }
+        : undefined;
+    // Both are ORs, so they go under AND rather than overwriting each other.
+    const anyOf = [searchWhere, priceWhere].filter(
+      (w): w is NonNullable<typeof w> => w !== undefined,
+    );
     return {
       roleType:
         roleTypes && roleTypes.length > 0
@@ -151,21 +191,10 @@ export default class UsersRepo {
             },
           }
         : {}),
-      ...(city
-        ? { city: { contains: city, mode: "insensitive" as const } }
+      ...(cityCore
+        ? { city: { contains: cityCore, mode: "insensitive" as const } }
         : {}),
-      ...(search
-        ? { name: { contains: search, mode: "insensitive" as const } }
-        : {}),
-      ...(maxPrice !== undefined
-        ? {
-            OR: [
-              { services: { some: deletableItemWhere } },
-              { assets: { some: deletableItemWhere } },
-              { venues: { some: venueItemWhere } },
-            ],
-          }
-        : {}),
+      ...(anyOf.length > 0 ? { AND: anyOf } : {}),
     };
   }
 

@@ -186,6 +186,7 @@ export default class EventTemplateSvc {
     city?: string;
     maxPrice?: number;
     isPublic?: boolean;
+    q?: string;
     page?: number;
     limit?: number;
   }) {
@@ -199,6 +200,7 @@ export default class EventTemplateSvc {
           city: filters.city,
           maxPrice: filters.maxPrice,
           isPublic: filters.isPublic,
+          q: filters.q,
           page: filters.page,
           limit: filters.limit ?? 50,
         }),

@@ -85,6 +85,7 @@ export default class AssetSvc {
   static async browseAssets(filters: {
     ownerCity?: string;
     maxPrice?: number;
+    q?: string;
     page?: number;
     limit: number;
   }) {
