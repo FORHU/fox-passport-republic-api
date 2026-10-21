@@ -3,6 +3,8 @@ import { permissionsForUser } from "../../types/permissions";
 import { revokeAllSessions } from "../auth/sessions.service";
 import { hashPassword, verifyPassword } from "../../utils/password";
 
+export const USERNAME_TAKEN = "Username already taken";
+
 export default class ProfileSvc {
   // Get user profile
   static async getProfile(userId: string) {
@@ -25,7 +27,7 @@ export default class ProfileSvc {
     data: {
       name?: string;
       username?: string;
-      phone?: string;
+      phone?: string | null;
       profileImage?: string;
       country?: string;
       state?: string;
@@ -43,13 +45,15 @@ export default class ProfileSvc {
       );
 
       if (existingUser) {
-        throw new Error("Username already taken");
+        throw new Error(USERNAME_TAKEN);
       }
     }
 
-    const { profileImage, ...rest } = data;
+    const { profileImage, phone, ...rest } = data;
     return ProfileRepo.updateProfile(userId, {
       ...rest,
+      // An empty phone clears it: stored as null, not "".
+      ...(phone !== undefined ? { phone: phone || null } : {}),
       ...(profileImage !== undefined ? { imgId: profileImage } : {}),
     } as Parameters<typeof ProfileRepo.updateProfile>[1]);
   }

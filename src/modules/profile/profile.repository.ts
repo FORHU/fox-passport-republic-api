@@ -114,7 +114,7 @@ export default class ProfileRepo {
     data: {
       name?: string;
       username?: string;
-      phone?: string;
+      phone?: string | null;
       imgId?: string;
       country?: string;
       state?: string;
