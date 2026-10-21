@@ -1,7 +1,6 @@
-import jwt from "jsonwebtoken";
+import { signTestSession } from "./helpers/test-session";
 import { prisma } from "../src/utils/prisma";
 import { RoleType, SystemRole } from "@prisma/client";
-import { ACCESS_TOKEN_SECRET } from "../src/config";
 
 /**
  * This file is imported only by the specs that *write* to the database, and
@@ -30,16 +29,13 @@ if (!databaseName.replace(/\?.*$/, "").endsWith("_test")) {
   );
 }
 
-const TEST_SECRET =
-  process.env.ACCESS_TOKEN_SECRET || ACCESS_TOKEN_SECRET || "accesssecret123";
-
 export function createTestToken(
   userId: string,
   email = "test@test.com",
   roleType: RoleType[] = [],
   systemRole: SystemRole = "user",
 ) {
-  return jwt.sign({ userId, systemRole, roleType, email }, TEST_SECRET);
+  return signTestSession({ userId, systemRole, roleType, email });
 }
 
 export async function seedTestUser(email = "waitlist-test@test.com") {

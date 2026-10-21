@@ -1,5 +1,4 @@
 import * as dotenv from "dotenv";
-import type { SignOptions } from "jsonwebtoken";
 import { requireSecret } from "./utils/require-secret";
 dotenv.config();
 
@@ -45,45 +44,6 @@ export const BETTER_AUTH_SECRET = requireSecret(
 export const BETTER_AUTH_URL =
   process.env.BETTER_AUTH_URL || `http://localhost:${PORT}`;
 
-export const ACCESS_TOKEN_SECRET =
-  process.env.ACCESS_TOKEN_SECRET || BETTER_AUTH_SECRET;
-export const REFRESH_TOKEN_SECRET =
-  process.env.REFRESH_TOKEN_SECRET || BETTER_AUTH_SECRET;
-
-// `expiresIn` accepts a number of seconds or an ms-style string ("15m", "7d").
-// Env vars are always strings, so narrow to the string half of that union
-// rather than widening to `any`.
-type TokenExpiry = Extract<SignOptions["expiresIn"], string>;
-
-export const ACCESS_TOKEN_EXPIRY = (process.env.ACCESS_TOKEN_EXPIRY ??
-  "15m") as TokenExpiry;
-export const REFRESH_TOKEN_EXPIRY = (process.env.REFRESH_TOKEN_EXPIRY ??
-  "7d") as TokenExpiry;
-
-/**
- * `REFRESH_TOKEN_EXPIRY` in milliseconds.
- *
- * Everything that needs to know how long a session lasts derives it from here
- * rather than restating it: the refresh token's own `expiresIn`, its database
- * row's `expiresAt`, and the browser cookie's `Max-Age`. Each of those has been
- * wrong at some point by being written out separately - a hardcoded 30 days
- * once overrode the configured 7d, and the access cookie once outlived the JWT
- * inside it by nearly seven days.
- *
- * Lives in config rather than beside the refresh-token service because the
- * cookie module needs it too, and that service reaches for Prisma.
- */
-export function refreshTokenTtlMs(): number {
-  const raw = String(REFRESH_TOKEN_EXPIRY ?? "7d").trim();
-  const match = /^(\d+)\s*([smhd])$/.exec(raw);
-  if (!match) return 7 * 24 * 60 * 60 * 1000;
-
-  const value = Number(match[1]);
-  const unit = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 }[
-    match[2] as "s" | "m" | "h" | "d"
-  ];
-  return value * unit;
-}
 /*
  * Redis configuration is deliberately NOT here. Four `REDIS_*` constants used
  * to sit in this file with nothing reading them - `redis.util` read
@@ -167,21 +127,6 @@ if (!GOOGLE_CLIENT_ID) {
     "⚠️  GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set — Google sign-in will fail.",
   );
 }
-export const GOOGLE_CALLBACK_URL = (
-  process.env.GOOGLE_CALLBACK_URL ||
-  `http://localhost:${PORT}/api/v1/auth/google/callback`
-).trim();
-
-if (GOOGLE_CLIENT_ID) {
-  try {
-    const callbackUrl = new URL(GOOGLE_CALLBACK_URL);
-    if (!/^https?:$/.test(callbackUrl.protocol)) throw new Error();
-  } catch {
-    throw new Error(
-      "GOOGLE_CALLBACK_URL must be an absolute http(s) URL when Google OAuth is configured.",
-    );
-  }
-}
 
 // Meta / Facebook sign-in configuration
 const facebookAppId = process.env.FACEBOOK_APP_ID?.trim() || undefined;
@@ -195,18 +140,3 @@ if (Boolean(facebookAppId) !== Boolean(facebookAppSecret)) {
 
 export const FACEBOOK_APP_ID = facebookAppId;
 export const FACEBOOK_APP_SECRET = facebookAppSecret;
-export const FACEBOOK_CALLBACK_URL = (
-  process.env.FACEBOOK_CALLBACK_URL ||
-  `http://localhost:${PORT}/api/v1/auth/facebook/callback`
-).trim();
-
-if (FACEBOOK_APP_ID) {
-  try {
-    const callbackUrl = new URL(FACEBOOK_CALLBACK_URL);
-    if (!/^https?:$/.test(callbackUrl.protocol)) throw new Error();
-  } catch {
-    throw new Error(
-      "FACEBOOK_CALLBACK_URL must be an absolute http(s) URL when Facebook OAuth is configured.",
-    );
-  }
-}

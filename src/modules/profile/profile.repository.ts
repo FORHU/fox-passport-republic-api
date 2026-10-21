@@ -76,15 +76,23 @@ export default class ProfileRepo {
     };
   }
 
+  /**
+   * The user and their sign-in password hash. The hash lives on the Better Auth
+   * credential account — the one sign-in and password reset use — not on
+   * `User.password`, which nothing updates any more. `password` is null for an
+   * account that signs in only with Google/Facebook.
+   */
   static async findUserForPasswordCheck(userId: string) {
-    return prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: String(userId) },
-      select: {
-        id: true,
-        password: true,
-        passwordHash: true,
-      },
+      select: { id: true },
     });
+    if (!user) return null;
+    const credential = await prisma.account.findFirst({
+      where: { userId: user.id, providerId: "credential" },
+      select: { password: true },
+    });
+    return { id: user.id, password: credential?.password ?? null };
   }
 
   static async findByUsernameExcludingUserId(
@@ -199,16 +207,12 @@ export default class ProfileRepo {
     );
   }
 
-  // [MIGRATION-FLAG: Stage 3 Switch] Dual-write password and passwordHash
+  /** Sets the sign-in password on the Better Auth credential account. */
   static async updatePasswordHash(userId: string, passwordHash: string) {
     return this.retiring(
-      prisma.user.update({
-        where: { id: String(userId) },
-        data: {
-          password: passwordHash,
-          passwordHash: passwordHash,
-        },
-        select: { id: true },
+      prisma.account.updateMany({
+        where: { userId: String(userId), providerId: "credential" },
+        data: { password: passwordHash },
       }),
     );
   }

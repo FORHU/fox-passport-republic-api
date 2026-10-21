@@ -158,22 +158,6 @@ export const registerRateLimit = [
 ];
 
 /**
- * Refresh. Generous, because a shared IP legitimately refreshes often - one
- * request per user per 15 minutes, and the proxy already collapses parallel
- * refreshes. Failure-only, so the budget is spent only by tokens that do not
- * work: the shape of someone probing for a valid one.
- */
-export const refreshRateLimit = [
-  perIp({
-    windowMs: FIFTEEN_MINUTES,
-    limit: 60,
-    message: TOO_MANY_REQUESTS,
-    prefix: "refresh",
-    failuresOnly: true,
-  }),
-];
-
-/**
  * Endpoints that send mail - forgot-password, resend-verification-otp.
  *
  * Counted in full rather than failure-only, because here the successful request

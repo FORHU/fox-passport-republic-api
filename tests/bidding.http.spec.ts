@@ -2,9 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import app from "../src/app";
 import { prisma } from "../src/utils/prisma";
-import jwt from "jsonwebtoken";
-
-import { ACCESS_TOKEN_SECRET } from "../src/config";
+import { signTestSession } from "./helpers/test-session";
 
 describe("Bidding API (Supertest)", () => {
   let userToken: string;
@@ -36,18 +34,16 @@ describe("Bidding API (Supertest)", () => {
     });
     unprivilegedUserId = unprivileged.id;
 
-    userToken = jwt.sign(
-      { userId: user.id, email: user.email, roleType: user.roleType },
-      ACCESS_TOKEN_SECRET,
-    );
-    unprivilegedToken = jwt.sign(
-      {
-        userId: unprivileged.id,
-        email: unprivileged.email,
-        roleType: unprivileged.roleType,
-      },
-      ACCESS_TOKEN_SECRET,
-    );
+    userToken = signTestSession({
+      userId: user.id,
+      email: user.email,
+      roleType: user.roleType,
+    });
+    unprivilegedToken = signTestSession({
+      userId: unprivileged.id,
+      email: unprivileged.email,
+      roleType: unprivileged.roleType,
+    });
   });
 
   afterAll(async () => {

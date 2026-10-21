@@ -1,162 +1,63 @@
 import { Request, Response, NextFunction } from "express";
 import { fromNodeHeaders } from "better-auth/node";
-import jwt from "jsonwebtoken";
 import { auth } from "../infrastructure/auth/better-auth";
 import { can, Permission } from "../types/permissions";
-import { ACCESS_TOKEN_SECRET } from "../config";
 import type { SystemRole, RoleType } from "@prisma/client";
 
 /**
- * Authentication Middleware
- * Verifies Better Auth session (Bearer token or cookie) and attaches user info to request.
- * Falls back to legacy JWT verification for existing integration test suites.
+ * The signed-in user behind this request, from the Better Auth session —
+ * `Authorization: Bearer <session token>` (mobile, the web proxy) or the
+ * session cookie. Null when there is none, or it has expired or been revoked.
  */
+async function sessionUser(req: Request): Promise<Request["user"] | null> {
+  const session = await auth.api.getSession({
+    headers: fromNodeHeaders(req.headers),
+  });
+  if (!session?.user) return null;
+  const user = session.user as Record<string, unknown>;
+  return {
+    userId: session.user.id,
+    email: session.user.email,
+    systemRole: (user.systemRole as SystemRole) || "user",
+    roleType: (user.roleType as RoleType[]) || [],
+  };
+}
+
+/** Requires a signed-in user; answers 401 otherwise. */
 export const authenticate = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const session = await auth.api.getSession({
-      headers: fromNodeHeaders(req.headers),
-    });
-
-    if (session && session.user) {
-      req.user = {
-        userId: session.user.id,
-        email: session.user.email,
-        systemRole:
-          ((session.user as Record<string, unknown>)
-            .systemRole as SystemRole) || "user",
-        roleType:
-          ((session.user as Record<string, unknown>).roleType as RoleType[]) ||
-          [],
-      };
+    const user = await sessionUser(req);
+    if (user) {
+      req.user = user;
       return next();
     }
-
-    // Fallback: verify legacy JWT tokens (used by existing test suites & seed tokens)
-    const authHeader = req.headers.authorization;
-    const cookieToken =
-      (req.cookies && req.cookies.fox_token) ||
-      req.cookies?.["better-auth.session_token"];
-    const token =
-      authHeader && authHeader.startsWith("Bearer ")
-        ? authHeader.substring(7).trim().replace(/"/g, "")
-        : typeof cookieToken === "string"
-          ? cookieToken.replace(/"/g, "")
-          : null;
-
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET) as {
-          userId: string;
-          email: string;
-          systemRole?: SystemRole;
-          roleType?: RoleType[];
-        };
-        if (decoded && decoded.userId) {
-          req.user = {
-            userId: decoded.userId,
-            email: decoded.email,
-            systemRole: decoded.systemRole || "user",
-            roleType: decoded.roleType || [],
-          };
-          return next();
-        }
-      } catch (err: unknown) {
-        const error = err as Error;
-        if (error.name === "TokenExpiredError") {
-          return res.status(401).json({
-            success: false,
-            message: "Token expired",
-          });
-        }
-        return res.status(401).json({
-          success: false,
-          message: "Invalid token",
-        });
-      }
-    }
-
-    return res.status(401).json({
-      success: false,
-      message: "No token provided",
-    });
+    return res
+      .status(401)
+      .json({ success: false, message: "Not authenticated" });
   } catch {
-    return res.status(401).json({
-      success: false,
-      message: "Invalid or expired session",
-    });
+    return res
+      .status(401)
+      .json({ success: false, message: "Invalid or expired session" });
   }
 };
 
-/**
- * Optional Authentication Middleware
- * Attaches user info if session exists, but doesn't require it
- */
+/** Attaches the user when there is one; never refuses the request. */
 export const optionalAuth = async (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction,
 ) => {
   try {
-    const session = await auth.api.getSession({
-      headers: fromNodeHeaders(req.headers),
-    });
-
-    if (session && session.user) {
-      req.user = {
-        userId: session.user.id,
-        email: session.user.email,
-        systemRole:
-          ((session.user as Record<string, unknown>)
-            .systemRole as SystemRole) || "user",
-        roleType:
-          ((session.user as Record<string, unknown>).roleType as RoleType[]) ||
-          [],
-      };
-      return next();
-    }
-
-    // Fallback: verify legacy JWT tokens
-    const authHeader = req.headers.authorization;
-    const cookieToken =
-      (req.cookies && req.cookies.fox_token) ||
-      req.cookies?.["better-auth.session_token"];
-    const token =
-      authHeader && authHeader.startsWith("Bearer ")
-        ? authHeader.substring(7).trim()
-        : typeof cookieToken === "string"
-          ? cookieToken
-          : null;
-
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET) as {
-          userId: string;
-          email: string;
-          systemRole?: SystemRole;
-          roleType?: RoleType[];
-        };
-        if (decoded && decoded.userId) {
-          req.user = {
-            userId: decoded.userId,
-            email: decoded.email,
-            systemRole: decoded.systemRole || "user",
-            roleType: decoded.roleType || [],
-          };
-        }
-      } catch {
-        // Ignore invalid optional token
-      }
-    }
-
-    next();
+    const user = await sessionUser(req);
+    if (user) req.user = user;
   } catch {
-    // Don't fail if token/session is invalid in optional auth
-    next();
+    // An unreadable session on an optional route is just "signed out".
   }
+  next();
 };
 
 /**
