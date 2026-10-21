@@ -9,6 +9,7 @@ import {
 } from "@prisma/client";
 import { getVenueCoords } from "./city-coords";
 import { hashPassword } from "../../src/utils/password";
+import { ensureCredentialAccount } from "./credential-account";
 
 const SEED_PASSWORD = "Password123!";
 
@@ -36,6 +37,8 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Makati",
         state: "Metro Manila",
         country: "Philippines",
+        // Login refuses an unverified email.
+        isEmailVerified: true,
       },
       create: {
         email: "partner@example.com",
@@ -53,8 +56,11 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Makati",
         state: "Metro Manila",
         country: "Philippines",
+        isEmailVerified: true,
       },
     });
+    // Without this, Better Auth's email sign-in cannot find the password.
+    await ensureCredentialAccount(prisma, partner.id, hashedPassword);
     console.log(
       `✓ Partner user: ${partner.email} — roles: [venueFoxer, eventFoxer, gearFoxer, serviceFoxer, investor]`,
     );

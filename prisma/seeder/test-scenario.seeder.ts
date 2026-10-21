@@ -3,6 +3,10 @@ import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { faker } from "@faker-js/faker";
+import { hashPassword } from "../../src/utils/password";
+import { ensureCredentialAccount } from "./credential-account";
+
+const SEED_PASSWORD = "Password123!";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -10,6 +14,10 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log("Seeding test scenario...");
+
+  // A real hash and a Better Auth credential Account for every user made here,
+  // so each can sign in (the emails are random, so only by looking one up).
+  const password = await hashPassword(SEED_PASSWORD);
 
   // 1. Get or create a test user (Client/Host)
   let testUser = await prisma.user.findFirst({
@@ -20,11 +28,13 @@ async function main() {
       data: {
         email: faker.internet.email(),
         username: faker.internet.userName(),
-        password: "hashedpassword123",
+        password,
+        isEmailVerified: true,
         roleType: ["eventFoxer"],
         name: "Test Event Foxer",
       },
     });
+    await ensureCredentialAccount(prisma, testUser.id, password);
   }
 
   // 2. Get or create a venue mayor
@@ -36,11 +46,13 @@ async function main() {
       data: {
         email: faker.internet.email(),
         username: faker.internet.userName(),
-        password: "hashedpassword123",
+        password,
+        isEmailVerified: true,
         roleType: ["venueFoxer"],
         name: "Test Venue Mayor",
       },
     });
+    await ensureCredentialAccount(prisma, venueMayor.id, password);
   }
 
   // 3. Create a test Venue
@@ -89,11 +101,13 @@ async function main() {
       data: {
         email: faker.internet.email(),
         username: faker.internet.userName(),
-        password: "hashedpassword123",
+        password,
+        isEmailVerified: true,
         roleType: i % 2 === 0 ? ["gearFoxer"] : ["serviceFoxer"],
         name: faker.person.fullName(),
       },
     });
+    await ensureCredentialAccount(prisma, provider.id, password);
     providerIds.push(provider.id);
   }
 

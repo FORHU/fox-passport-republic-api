@@ -8,6 +8,7 @@ import {
   VENUE_ORGANIZER_PERMISSIONS,
 } from "../../src/types/permissions";
 import { assertSchemaIsMigrated } from "../preflight";
+import { ensureCredentialAccount } from "./credential-account";
 
 /**
  * The Organizer scenario — docs/adr/0005-organizer-role-and-appointments.md.
@@ -121,6 +122,8 @@ async function seedCast() {
       },
       select: { id: true },
     });
+    // Better Auth's email sign-in reads this, not `User.password`.
+    await ensureCredentialAccount(prisma, user.id, password);
     ids[key] = user.id;
   }
   return ids;
