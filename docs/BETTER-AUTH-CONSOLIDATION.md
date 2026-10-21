@@ -80,23 +80,32 @@ until the cleanup phase, because installed mobile apps keep calling them.
 
 ### Phase 2 — Web: every auth call goes through Better Auth
 
-- [ ] `useAuth`: drop the `/auth/login` fallback; register, verify, resend,
-      forgot, reset, logout through `authClient`
-- [ ] Google/Facebook buttons → `authClient.signIn.social`
-- [ ] `/api/proxy`: remove refresh-and-replay and the `fox_*` cookies; forward
-      the Better Auth cookie only
-- [ ] Route guard: Better Auth cookies only — **after** existing `fox_token`
-      sessions have had time to expire (refresh TTL), or keep `fox_token` one
-      release longer
-- [ ] Browser pass on dev.foxpassport.com: sign up, verify, sign in, refresh,
-      second device stays signed in, forgot/reset, Google, Facebook, sign out
+- [x] `useAuth`: drop the `/auth/login` fallback; register, verify, resend,
+      forgot, reset, logout through `authClient` (app #143, #146)
+- [x] Google/Facebook buttons → `authClient.signIn.social` (app #143)
+- [x] `/api/proxy`: remove refresh-and-replay and the `fox_*` cookies; forward
+      the Better Auth cookie only (app #146)
+- [x] Route guard: Better Auth cookies only (app #146; done early — no
+      production users to wait for). The guard checks the cookie is present;
+      the API decides whether the session is valid
+- [x] Browser pass, local, on the `staging` code (21 Oct), 18/18: sign up →
+      emailed code → verify; sign in sets only the Better Auth cookie;
+      `/booking` survives reload; second device signs in and both stay valid;
+      forgot → code → reset → the API refuses both other devices; old password
+      refused, new one works; sign-out → API refuses the session, `/booking`
+      redirects to sign-in
+- [ ] Same pass on dev.foxpassport.com once `staging` is delivered to `main`,
+      plus Google and Facebook with real accounts (Facebook sign-in failed
+      live on 20 Oct — open)
 
 ### Phase 3 — Mobile: same, then release
 
-- [ ] Drop `/auth/refresh-token`; rely on the bearer session token
-- [ ] Verify / resend / forgot / reset → `emailOTP` endpoints
-- [ ] Native Google/Facebook → `sign-in/social` with the ID token (replaces the
-      non-existent `/auth/google/mobile`)
+- [x] Drop `/auth/refresh-token`; rely on the bearer session token (mobile #138, #142)
+- [x] Verify / resend / forgot / reset → `emailOTP` endpoints (mobile #138)
+- [x] Native Google/Facebook → `sign-in/social` with the ID token; browser
+      redirect flow removed (mobile #138, #142)
+- [ ] Native social on a device: needs the Google/Facebook app credentials and
+      a real application ID (still `com.example.flutter_template`)
 - [ ] Release the new app version
 
 ### Phase 4 — API cleanup (once the old mobile version is out of use)
