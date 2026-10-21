@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import jwt from "jsonwebtoken";
+import { signTestSession } from "./helpers/test-session";
 import request from "supertest";
-import { ACCESS_TOKEN_SECRET } from "../src/config";
 import { AppError } from "../src/utils/errors";
 
 const db = vi.hoisted(() => ({
@@ -69,8 +68,8 @@ vi.mock("../src/utils/prisma", () => ({
   },
 }));
 
-vi.mock("../src/modules/auth/refresh-token.service", () => ({
-  revokeAllForUser: vi.fn(async (id: string) => {
+vi.mock("../src/modules/auth/sessions.service", () => ({
+  revokeAllSessions: vi.fn(async (id: string) => {
     db.revoked.push(id);
     return 2;
   }),
@@ -93,15 +92,12 @@ import apiApp from "../src/app";
 const admin = { userId: "admin-1", email: "admin@example.com" };
 
 function tokenFor(user: { id: string; email: string; systemRole: string }) {
-  return jwt.sign(
-    {
+  return signTestSession({
       userId: user.id,
       email: user.email,
       systemRole: user.systemRole,
       roleType: [],
-    },
-    ACCESS_TOKEN_SECRET,
-  );
+    });
 }
 
 beforeEach(() => {
@@ -228,15 +224,12 @@ describe("Admin delete user HTTP endpoint", () => {
   });
 
   it("DELETE /api/v1/admin/users/:id rejects admin_secretary with 403", async () => {
-    const secToken = jwt.sign(
-      {
+    const secToken = signTestSession({
         userId: "sec-1",
         email: "sec@example.com",
         systemRole: "admin_secretary",
         roleType: [],
-      },
-      ACCESS_TOKEN_SECRET,
-    );
+      });
     const res = await request(apiApp)
       .delete("/api/v1/admin/users/user-1")
       .set("Authorization", `Bearer ${secToken}`);

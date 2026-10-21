@@ -3,7 +3,7 @@ import { RoleType, SystemRole } from "@prisma/client";
 import { userCache } from "../../utils/cache-namespaces";
 import { prisma } from "../../utils/prisma";
 import { recordAudit } from "../audit/audit.service";
-import { revokeAllForUser } from "../auth/refresh-token.service";
+import { revokeAllSessions } from "../auth/sessions.service";
 import AppointmentService from "../appointment/appointment.service";
 import AdminSvc from "./admin.service";
 import {
@@ -169,7 +169,7 @@ export default class RoleAssignmentSvc {
     // A role change is what the public foxer listings filter on.
     await userCache.invalidateAll();
 
-    const revoked = await revokeAllForUser(target.id);
+    const revoked = await revokeAllSessions(target.id);
 
     await recordAudit({
       actorId: actor.userId,
@@ -246,7 +246,7 @@ export default class RoleAssignmentSvc {
       actor.userId,
     );
 
-    const revoked = await revokeAllForUser(target.id);
+    const revoked = await revokeAllSessions(target.id);
 
     await recordAudit({
       actorId: actor.userId,

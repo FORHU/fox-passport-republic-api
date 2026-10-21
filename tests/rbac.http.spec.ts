@@ -1,8 +1,7 @@
 import express from "express";
-import jwt from "jsonwebtoken";
+import { signTestSession } from "./helpers/test-session";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
-import { ACCESS_TOKEN_SECRET } from "../src/config";
 import apiApp from "../src/app";
 import {
   authenticate,
@@ -10,15 +9,12 @@ import {
 } from "../src/middleware/auth.middleware";
 
 function token(systemRole: "user" | "admin_secretary" | "admin") {
-  return jwt.sign(
-    {
-      userId: `rbac-${systemRole}`,
-      email: `${systemRole}@test.local`,
-      systemRole,
-      roleType: [],
-    },
-    ACCESS_TOKEN_SECRET,
-  );
+  return signTestSession({
+    userId: `rbac-${systemRole}`,
+    email: `${systemRole}@test.local`,
+    systemRole,
+    roleType: [],
+  });
 }
 
 function makeApp() {
@@ -37,7 +33,7 @@ describe("RBAC HTTP boundary", () => {
     const response = await request(makeApp()).get("/admin/queue");
 
     expect(response.status).toBe(401);
-    expect(response.body.message).toBe("No token provided");
+    expect(response.body.message).toBe("Not authenticated");
   });
 
   it("rejects an authenticated citizen without queue permission with 403", async () => {

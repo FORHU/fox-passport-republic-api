@@ -10,6 +10,12 @@ import cors from "cors";
 import setup from "./setup";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./infrastructure/auth/better-auth";
+import {
+  loginRateLimit,
+  registerRateLimit,
+  otpSendRateLimit,
+  otpVerifyRateLimit,
+} from "./middleware/rate-limit.middleware";
 
 const app = express();
 
@@ -88,37 +94,37 @@ app.disable("x-powered-by");
 // Initialize setup
 setup();
 
-// Better Auth handler for /api/auth/* and /api/v1/auth/*
+// Sign-in is Better Auth's, reached at /api/auth/* (web) and /api/v1/auth/*
+// (mobile's base URL). The credential endpoints keep the limits the custom
+// /auth/login, /register and OTP routes had - per IP and per account - so they
+// sit in front of the handler; express.json() above has already parsed the
+// email they key on. See docs/BETTER-AUTH-CONSOLIDATION.md.
+const both = (path: string) => [`/api/auth${path}`, `/api/v1/auth${path}`];
+app.post(both("/sign-in/email"), loginRateLimit);
+app.post(both("/sign-up/email"), registerRateLimit);
+app.post(
+  [
+    ...both("/email-otp/send-verification-otp"),
+    ...both("/email-otp/request-password-reset"),
+    ...both("/forget-password/email-otp"),
+  ],
+  otpSendRateLimit,
+);
+app.post(
+  [
+    ...both("/email-otp/verify-email"),
+    ...both("/email-otp/reset-password"),
+    ...both("/email-otp/check-verification-otp"),
+  ],
+  otpVerifyRateLimit,
+);
+
 app.all("/api/auth/*", toNodeHandler(auth));
 
-// Mount Better Auth at /api/v1/auth only for Better Auth actions (sign-in, sign-up, session, etc.),
-// allowing legacy auth endpoints (/login, /register, etc.) to fall through to the main router.
-const legacyAuthPaths = new Set([
-  "/login",
-  "/register",
-  "/verify-email",
-  "/logout",
-  "/refresh-token",
-  "/forgot-password",
-  "/reset-password",
-  "/resend-verification-otp",
-  "/google",
-  "/google/callback",
-  "/google/exchange",
-  "/facebook",
-  "/facebook/callback",
-  "/facebook/exchange",
-  "/socket-ticket",
-]);
-
+// Everything under /api/v1/auth is Better Auth's except the realtime socket
+// ticket, which is ours and lives on the main router.
 app.all("/api/v1/auth/*", (req, res, next) => {
-  const subPath = req.path.replace(/^\/api\/v1\/auth/, "");
-  if (
-    legacyAuthPaths.has(subPath) ||
-    Array.from(legacyAuthPaths).some((p) => subPath.startsWith(p + "/"))
-  ) {
-    return next();
-  }
+  if (req.path === "/api/v1/auth/socket-ticket") return next();
   req.url = req.url.replace(/^\/api\/v1\/auth/, "/api/auth");
   return toNodeHandler(auth)(req, res);
 });

@@ -101,11 +101,17 @@ until the cleanup phase, because installed mobile apps keep calling them.
 
 ### Phase 4 — API cleanup (once the old mobile version is out of use)
 
-- [ ] Delete the custom auth routes, `refresh-token.service.ts`,
-      `auth.cookies.ts`, the Google/Facebook services and the JWT fallback
-- [ ] Migrations: drop `refresh_tokens`, `oauth_accounts`, `User.otpCode`,
-      `User.otpExpiry`
-- [ ] Remove `ACCESS_TOKEN_SECRET` / `REFRESH_TOKEN_SECRET` from config and deploy env
+Done early on 21 Oct: the mobile app is unpublished, so there is no old
+version to wait for.
+
+- [x] Delete the custom auth routes, `refresh-token.service.ts`,
+      `auth.cookies.ts`, the Google/Facebook services and the JWT fallback.
+      `/auth` keeps only the socket ticket; sign-out-everywhere deletes Better
+      Auth sessions; profile password change/delete use the credential Account
+- [x] Migrations: drop `refresh_tokens`, `oauth_accounts` (`User.otpCode` /
+      `User.otpExpiry` were already gone)
+- [x] Remove `ACCESS_TOKEN_SECRET` / `REFRESH_TOKEN_SECRET` from config and
+      deploy env; drop `jsonwebtoken`
 
 ## Decisions
 

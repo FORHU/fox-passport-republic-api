@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import app from "../src/app";
 import { prisma } from "../src/utils/prisma";
+import redisUtil from "../src/utils/redis.util";
 
 describe("Better Auth - Exhaustive Flow & Brute Security Tests", () => {
   const testEmail = `brute.test.${Date.now()}@example.com`;
@@ -13,6 +14,18 @@ describe("Better Auth - Exhaustive Flow & Brute Security Tests", () => {
   let sessionCookies: string[] = [];
 
   beforeAll(async () => {
+    // The sign-in limits in front of Better Auth key on the client IP, which is
+    // 127.0.0.1 for every run, and keep their counts in Redis. Start from zero
+    // so an earlier local run's brute-force attempts cannot lock this one out.
+    await redisUtil.initialize().catch(() => {});
+    const redis = redisUtil.getClient();
+    if (redis) {
+      for await (const keys of redis.scanIterator({ MATCH: "rl:login:*" })) {
+        const batch = Array.isArray(keys) ? keys : [keys];
+        if (batch.length) await redis.del(batch);
+      }
+    }
+
     // Clean up any lingering test records
     await prisma.session.deleteMany({
       where: { user: { email: { startsWith: "brute.test." } } },
@@ -145,7 +158,11 @@ describe("Better Auth - Exhaustive Flow & Brute Security Tests", () => {
       expect(res.status).toBeGreaterThanOrEqual(400);
     });
 
-    it("should immediately succeed when correct credentials are provided after brute attempts", async () => {
+    // The per-account sign-in limit (app.ts, loginRateLimit: 10 failures per
+    // 15 minutes) sits in front of Better Auth. After a brute-force run the
+    // account is locked for the window — even the right password is refused —
+    // which is the point. The session from the earlier sign-in is unaffected.
+    it("locks the account after a brute-force run, even for the right password", async () => {
       const res = await request(app)
         .post("/api/auth/sign-in/email")
         .send({
@@ -153,10 +170,8 @@ describe("Better Auth - Exhaustive Flow & Brute Security Tests", () => {
           password: testPassword,
         });
 
-      expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty("token");
-      // Update session token for downstream checks
-      sessionToken = res.body.token;
+      expect(res.status).toBe(429);
+      expect(res.body).not.toHaveProperty("token");
     });
   });
 

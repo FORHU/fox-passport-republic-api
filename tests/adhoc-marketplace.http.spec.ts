@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
-import jwt from "jsonwebtoken";
-import { ACCESS_TOKEN_SECRET } from "../src/config";
+import { signTestSession } from "./helpers/test-session";
 import { prisma } from "../src/utils/prisma";
 import app from "../src/app";
 
@@ -46,10 +45,12 @@ describe("Ad-hoc marketplace HTTP endpoints — authorization", () => {
     });
 
     const sign = (u: any) =>
-      jwt.sign(
-        { userId: u.id, email: u.email, systemRole: "user", roleType: [] },
-        ACCESS_TOKEN_SECRET,
-      );
+      signTestSession({
+        userId: u.id,
+        email: u.email,
+        systemRole: "user",
+        roleType: [],
+      });
     ownerToken = sign(owner);
     providerToken = sign(provider);
     strangerToken = sign(stranger);

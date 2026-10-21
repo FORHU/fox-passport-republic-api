@@ -1,6 +1,6 @@
 import ProfileRepo from "./profile.repository";
 import { permissionsForUser } from "../../types/permissions";
-import { revokeAllForUser } from "../auth/refresh-token.service";
+import { revokeAllSessions } from "../auth/sessions.service";
 import { hashPassword, verifyPassword } from "../../utils/password";
 
 export default class ProfileSvc {
@@ -67,7 +67,7 @@ export default class ProfileSvc {
       throw new Error("User not found");
     }
 
-    const passwordToCheck = user.passwordHash || user.password;
+    const passwordToCheck = user.password;
     if (!passwordToCheck) {
       throw new Error(
         "This account does not have a password set (signed in with a social account).",
@@ -89,12 +89,9 @@ export default class ProfileSvc {
     // Update password
     await ProfileRepo.updatePasswordHash(userId, hashedPassword);
 
-    // A password change must not leave older sessions alive. Note this revokes
-    // the caller's own session too - we do not know their jti here, only their
-    // userId - so the client is signed out and must log in with the new
-    // password. That is the safe default; keeping the current session alive
-    // would need the jti threaded through from the request.
-    await revokeAllForUser(userId);
+    // A password change must not leave older sessions alive. This ends the
+    // caller's own session too, so they sign in again with the new password.
+    await revokeAllSessions(userId);
 
     return { message: "Password changed successfully" };
   }
@@ -108,7 +105,7 @@ export default class ProfileSvc {
       throw new Error("User not found");
     }
 
-    const passwordToCheck = user.passwordHash || user.password;
+    const passwordToCheck = user.password;
     if (!passwordToCheck) {
       throw new Error(
         "Social login accounts must contact support to delete their account.",
