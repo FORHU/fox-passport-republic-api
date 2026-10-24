@@ -1,5 +1,6 @@
 import { prisma } from "../../utils/prisma";
 import {
+  Prisma,
   PartnershipProposal,
   PartnershipProposalStatus,
   PartnershipType,
@@ -9,6 +10,7 @@ import {
 } from "@prisma/client";
 import { AuthenticatedUser } from "../../types/auth";
 import InvoiceSvc from "../payment/invoice.service";
+import { badRequest, forbidden, notFound } from "../../utils/errors";
 
 export interface ProposalPayment {
   required: boolean;
@@ -125,7 +127,7 @@ export class PartnershipSvc {
     const hasVenue = !!data.targetVenueId;
 
     if (!(hasEvent !== hasVenue)) {
-      throw new Error(
+      throw badRequest(
         "A Partnership Proposal must target exactly one Event or Venue.",
       );
     }
@@ -134,12 +136,12 @@ export class PartnershipSvc {
       const event = await prisma.event.findUnique({
         where: { id: data.targetEventId! },
       });
-      if (!event) throw new Error("Target Event not found.");
+      if (!event) throw notFound("Target Event");
     } else {
       const venue = await prisma.venue.findUnique({
         where: { id: data.targetVenueId! },
       });
-      if (!venue) throw new Error("Target Venue not found.");
+      if (!venue) throw notFound("Target Venue");
     }
 
     return prisma.partnershipProposal.create({
@@ -157,28 +159,51 @@ export class PartnershipSvc {
     });
   }
 
+  /**
+   * Who may see a proposal: the Partner who sent it, and the owner of what it
+   * targets (the Event's organizer or the Venue's mayor). The same people the
+   * accept/reject/withdraw paths and `computeActions` already recognise.
+   */
+  private static visibleTo(
+    viewerId: string,
+  ): Prisma.PartnershipProposalWhereInput {
+    return {
+      OR: [
+        { partnerId: viewerId },
+        { targetVenue: { mayorId: viewerId } },
+        { targetEvent: { organizerId: viewerId } },
+      ],
+    };
+  }
+
   static async getProposal(
     id: string,
-    viewerId?: string,
+    viewerId: string,
   ): Promise<ProposalWithPayment> {
-    const proposal = await prisma.partnershipProposal.findUnique({
-      where: { id },
+    // A proposal the viewer isn't party to answers the same as one that
+    // doesn't exist, so ids can't be probed.
+    const proposal = await prisma.partnershipProposal.findFirst({
+      where: { AND: [{ id }, this.visibleTo(viewerId)] },
       include: { targetEvent: true, targetVenue: true },
     });
-    if (!proposal) throw new Error("Proposal not found");
+    if (!proposal) throw notFound("Proposal");
     return this.attachViewerFields(proposal, viewerId);
   }
 
+  /**
+   * The viewer's proposals: ones they sent and ones aimed at what they own.
+   * The optional filters narrow that set; they can never widen it.
+   */
   static async listProposals(
     params: {
       partnerId?: string;
       targetEventId?: string;
       targetVenueId?: string;
     },
-    viewerId?: string,
+    viewerId: string,
   ): Promise<ProposalWithPayment[]> {
     const proposals = await prisma.partnershipProposal.findMany({
-      where: params,
+      where: { AND: [params, this.visibleTo(viewerId)] },
       orderBy: { createdAt: "desc" },
       include: { targetEvent: true, targetVenue: true },
     });
@@ -196,13 +221,15 @@ export class PartnershipSvc {
         where: { id },
       });
 
-      if (!proposal) throw new Error("Proposal not found.");
+      if (!proposal) throw notFound("Proposal");
       if (proposal.status !== PartnershipProposalStatus.pending) {
-        throw new Error(`Cannot accept a proposal that is ${proposal.status}.`);
+        throw badRequest(
+          `Cannot accept a proposal that is ${proposal.status}.`,
+        );
       }
 
       if (proposal.partnerId === caller.userId) {
-        throw new Error("A Partner cannot accept their own proposal.");
+        throw badRequest("A Partner cannot accept their own proposal.");
       }
 
       // Verify ownership
@@ -211,7 +238,7 @@ export class PartnershipSvc {
           where: { id: proposal.targetEventId },
         });
         if (!event || event.organizerId !== caller.userId) {
-          throw new Error(
+          throw forbidden(
             "Unauthorized: Only the Event organizer can accept this proposal.",
           );
         }
@@ -221,7 +248,7 @@ export class PartnershipSvc {
         });
         // Checking VenueFoxer rights
         if (!venue || venue.mayorId !== caller.userId) {
-          throw new Error(
+          throw forbidden(
             "Unauthorized: Only the Venue owner can accept this proposal.",
           );
         }
@@ -259,10 +286,10 @@ export class PartnershipSvc {
     const proposal = await prisma.partnershipProposal.findUnique({
       where: { id },
     });
-    if (!proposal) throw new Error("Proposal not found.");
+    if (!proposal) throw notFound("Proposal");
 
     if (proposal.status !== PartnershipProposalStatus.pending) {
-      throw new Error(`Cannot reject a proposal that is ${proposal.status}.`);
+      throw badRequest(`Cannot reject a proposal that is ${proposal.status}.`);
     }
 
     if (proposal.targetEventId) {
@@ -270,7 +297,7 @@ export class PartnershipSvc {
         where: { id: proposal.targetEventId },
       });
       if (!event || event.organizerId !== caller.userId) {
-        throw new Error(
+        throw forbidden(
           "Unauthorized: Only the Event organizer can reject this proposal.",
         );
       }
@@ -279,7 +306,7 @@ export class PartnershipSvc {
         where: { id: proposal.targetVenueId },
       });
       if (!venue || venue.mayorId !== caller.userId) {
-        throw new Error(
+        throw forbidden(
           "Unauthorized: Only the Venue owner can reject this proposal.",
         );
       }
@@ -298,16 +325,18 @@ export class PartnershipSvc {
     const proposal = await prisma.partnershipProposal.findUnique({
       where: { id },
     });
-    if (!proposal) throw new Error("Proposal not found.");
+    if (!proposal) throw notFound("Proposal");
 
     if (proposal.partnerId !== partnerId) {
-      throw new Error(
+      throw forbidden(
         "Unauthorized: Only the proposing Partner can withdraw this proposal.",
       );
     }
 
     if (proposal.status !== PartnershipProposalStatus.pending) {
-      throw new Error(`Cannot withdraw a proposal that is ${proposal.status}.`);
+      throw badRequest(
+        `Cannot withdraw a proposal that is ${proposal.status}.`,
+      );
     }
 
     return prisma.partnershipProposal.update({

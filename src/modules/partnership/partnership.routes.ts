@@ -7,8 +7,10 @@ import {
 
 const router = Router();
 
-router.get("/proposals", PartnershipController.listProposals);
-router.get("/proposals/:id", PartnershipController.getProposal);
+// Reads are scoped to the viewer (proposals they sent or that target what they
+// own), so they need a signed-in user. They were public, and unscoped.
+router.get("/proposals", authenticate, PartnershipController.listProposals);
+router.get("/proposals/:id", authenticate, PartnershipController.getProposal);
 
 router.post(
   "/proposals",
