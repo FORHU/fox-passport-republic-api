@@ -107,6 +107,8 @@ describe("createErrorHandler", () => {
   it.each([
     ["P2025", 404, "Record not found"],
     ["P2002", 409, "This record already exists"],
+    ["P2020", 400, "A value is too large or out of range."],
+    ["P2000", 400, "A value is too long."],
   ])(
     "maps Prisma %s to %i without leaking table details",
     (code, expected, msg) => {
@@ -121,6 +123,18 @@ describe("createErrorHandler", () => {
       expect(JSON.stringify(body)).not.toContain("email");
     },
   );
+
+  it("maps a Prisma validation error to a 400 without its query text", () => {
+    const err = new Prisma.PrismaClientValidationError(
+      "Invalid `prisma.partnershipProposal.create()` invocation: Argument `proposedBenefits`",
+      { clientVersion: "test" },
+    );
+    const { status, body } = run(true, err);
+
+    expect(status).toBe(400);
+    expect(body.message).toBe("The request was not valid.");
+    expect(JSON.stringify(body)).not.toContain("partnershipProposal");
+  });
 
   it("treats an unmapped Prisma error as a 500", () => {
     const err = new Prisma.PrismaClientKnownRequestError("connection lost", {
@@ -163,6 +177,24 @@ describe("sendServerError", () => {
       success: false,
       message: "Booking not found",
       code: "NOT_FOUND",
+    });
+  });
+
+  // Controllers that catch their own errors used to answer these with a 500
+  // carrying Prisma's message in dev ("numeric field overflow" on a huge
+  // partnership amount, quoting the call and the source path).
+  it("maps a recognised Prisma error the way the global handler does", () => {
+    const err = new Prisma.PrismaClientKnownRequestError(
+      "Invalid `prisma.partnershipProposal.create()` invocation: Value out of range for the type: numeric field overflow",
+      { code: "P2020", clientVersion: "test" },
+    );
+    const { status, body } = send(err, { success: true });
+
+    expect(status).toBe(400);
+    expect(body).toEqual({
+      success: false,
+      message: "A value is too large or out of range.",
+      code: "BAD_REQUEST",
     });
   });
 

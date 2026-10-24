@@ -47,7 +47,7 @@ const ROOT_DIR = path.resolve(__dirname, "../src/modules");
 const REPORT_ONLY = process.argv.includes("--report");
 // Existing ownership-guarded routes are tracked separately while the route
 // audit is completed. New unguarded routes must not increase this number.
-const MAX_UNGUARDED_ROUTES = 180;
+const MAX_UNGUARDED_ROUTES = 178;
 
 /**
  * Routes that are `authenticate`d but deliberately have no `requirePermission`
@@ -109,6 +109,11 @@ const ALLOW_LIST = new Set([
   // attendees, admins, and the Event's or booked Venue's Owner and staff.
   // No single global permission describes that set.
   "booking.routes.ts GET /:id",
+  // Partnership proposals: scoped per proposal in PartnershipSvc.visibleTo —
+  // the proposing Partner, or the target Event's organizer or Venue's mayor.
+  // No single global permission describes that set.
+  "partnership.routes.ts GET /proposals",
+  "partnership.routes.ts GET /proposals/:id",
   // Seeing and rejecting bids: checked per Event in BiddingSvc (Owner or
   // Organizers). Accepting still requires `bid:manage` and ownership.
   "bidding.routes.ts GET /service/event/:eventId",
