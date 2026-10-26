@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import BookingRepo from "./booking.repository";
 import EventRepo from "../event/event.repository";
 import EventRequestRepo from "../event-request/event-request.repository";
+import EventRequestSvc from "../event-request/event-request.service";
 import AppointmentAccess from "../appointment/appointment.access";
 import OrganizerXpService from "../appointment/organizer-xp.service";
 import EventTemplateSvc from "../event-template/event-template.service";
@@ -1083,6 +1084,9 @@ export default class BookingSvc {
       id,
       status as ItemBookingStatus,
     );
+    // Check-in settles a booking through here, so this is where its Event
+    // reaches `completed`.
+    await EventRequestSvc.syncStatusFromBookings(booking.eventId);
 
     if (status === ItemBookingStatus.completed) {
       // Payout failures must never fail the status-update response — log and move on.
@@ -1591,6 +1595,7 @@ export default class BookingSvc {
 
     if (completedPayments.length === 0) {
       const updated = await BookingRepo.cancel(id);
+      await EventRequestSvc.syncStatusFromBookings(booking.eventId);
       PromotionSvc.releaseRedemption({ eventId: booking.eventId }).catch((e) =>
         console.error(
           `Failed to release voucher redemption for event ${booking.eventId}`,
@@ -1695,6 +1700,7 @@ export default class BookingSvc {
     }
 
     const updated = await BookingRepo.cancel(id);
+    await EventRequestSvc.syncStatusFromBookings(booking.eventId);
     PromotionSvc.releaseRedemption({ eventId: booking.eventId }).catch((e) =>
       console.error(
         `Failed to release voucher redemption for event ${booking.eventId}`,

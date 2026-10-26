@@ -1,9 +1,6 @@
 import express from "express";
 import EventRequestCtrl from "./event-request.controller";
-import {
-  authenticate,
-  requirePermission,
-} from "../../middleware/auth.middleware";
+import { authenticate } from "../../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -17,24 +14,10 @@ router.post("/", authenticate, EventRequestCtrl.spawnRequest);
 router.get("/my", authenticate, EventRequestCtrl.listMyRequests);
 router.get("/:id", authenticate, EventRequestCtrl.getById);
 
-// Admin only
-router.patch(
-  "/:id/approve",
-  authenticate,
-  requirePermission("queue:decide"),
-  EventRequestCtrl.approve,
-);
-router.patch(
-  "/:id/reject",
-  authenticate,
-  requirePermission("queue:decide"),
-  EventRequestCtrl.reject,
-);
-router.patch(
-  "/:id/complete",
-  authenticate,
-  requirePermission("queue:decide"),
-  EventRequestCtrl.complete,
-);
+// Approving and rejecting an Event is `PATCH /admin/events/:id/approve|reject`
+// (admin.routes.ts), which also publishes the template, notifies and
+// announces. The duplicates that sat here did none of that and had no caller.
+// Nothing marks an Event completed by hand either: its status follows its
+// bookings (EventRequestSvc.syncStatusFromBookings).
 
 export default router;

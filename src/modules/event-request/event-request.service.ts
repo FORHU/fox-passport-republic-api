@@ -1,4 +1,4 @@
-import { EventCategory } from "@prisma/client";
+import { EventCategory, EventStatus } from "@prisma/client";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
 import { toEnum } from "../../utils/enums";
 import EventRequestRepo from "./event-request.repository";
@@ -160,19 +160,60 @@ export default class EventRequestSvc {
     return updated;
   }
 
-  static async completeEvent(id: string) {
-    const request = await EventRequestRepo.findById(id);
-    if (!request) throw new Error("Request not found");
-    const result = await EventRequestRepo.updateStatus(id, "completed");
+  /**
+   * An Event's status follows its bookings, so nobody has to mark it. It used
+   * to change only through `PATCH /event-requests/:id/complete`, which nothing
+   * called, so every Event stayed `pending` for good and Organizers never got
+   * their completion XP.
+   *
+   *   every booking cancelled               -> cancelled
+   *   every booking completed or cancelled  -> completed (check-in settles a booking)
+   *   any booking checked in                -> ongoing
+   *
+   * Forward only: a finished Event is never reopened. The status change is one
+   * conditional write, so only the call that actually moves the Event to
+   * `completed` pays its XP. Called after a booking changes; never throws, so
+   * it can't fail the booking change that triggered it.
+   */
+  static async syncStatusFromBookings(eventId: string) {
+    try {
+      const bookings = await EventRequestRepo.bookingStatuses(eventId);
+      if (bookings.length === 0) return;
 
+      const done = (s: string) => s === "completed" || s === "cancelled";
+      let next: EventStatus | null = null;
+      if (bookings.every((b) => b.status === "cancelled")) {
+        next = EventStatus.cancelled;
+      } else if (bookings.every((b) => done(b.status))) {
+        next = EventStatus.completed;
+      } else if (bookings.some((b) => b.checkedIn)) {
+        next = EventStatus.ongoing;
+      }
+      if (!next) return;
+
+      const from: EventStatus[] =
+        next === EventStatus.ongoing
+          ? [EventStatus.draft, EventStatus.pending]
+          : [EventStatus.draft, EventStatus.pending, EventStatus.ongoing];
+      const moved = await EventRequestRepo.advanceStatus(eventId, from, next);
+      if (moved && next === EventStatus.completed) {
+        await this.onCompleted(eventId);
+      }
+    } catch (e) {
+      console.error(`Event status sync failed for ${eventId}`, e);
+    }
+  }
+
+  private static async onCompleted(eventId: string) {
     // Organizers of the Event, and of the Venue it was held at, earn on the
     // Organizer path (ADR 0005). Idempotent, and never throws.
-    void OrganizerXpService.onEventCompleted(id);
+    void OrganizerXpService.onEventCompleted(eventId);
 
-    // Award completeEvent XP to the event organizer (eventFoxer path)
-    // `hostId` was a second fallback here, but Event has no such column — the
-    // organizer FK is the only one.
-    const organizerId = request.organizerId;
+    // completeEvent XP to the Event Foxer who organised it (eventFoxer path).
+    // Not idempotent itself: the conditional write in syncStatusFromBookings
+    // is what makes it run once.
+    const event = await EventRequestRepo.findById(eventId);
+    const organizerId = event?.organizerId;
     if (organizerId) {
       import("../passport/passport.service")
         .then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
@@ -184,8 +225,6 @@ export default class EventRequestSvc {
         })
         .catch(() => {});
     }
-
-    return result;
   }
 
   static async getMyRequests(clientId: string) {
