@@ -1,4 +1,4 @@
-import { AppError, sendAppError } from "../../utils/errors";
+import { AppError, sendAppError, sendServerError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
 import { totalPages } from "../../utils/pagination";
@@ -221,6 +221,14 @@ export default class EventTemplateCtrl {
         value.agreedPrice,
         value.isOptional,
       );
+      await EventTemplateSvc.recordItemChange(
+        ownerId,
+        req.params.id,
+        "add",
+        "asset",
+        value.assetId,
+        value.description,
+      );
       return res.status(200).json({ message: "Asset attached", result });
     } catch (e: unknown) {
       if (e instanceof AppError) return sendAppError(res, e);
@@ -231,6 +239,18 @@ export default class EventTemplateCtrl {
     }
   }
 
+  // GET /event-templates/:id/history — the package's History, owner only.
+  static async history(req: Request, res: Response) {
+    try {
+      const ownerId = req.user?.userId;
+      if (!ownerId) return res.status(401).json({ message: "Unauthorized" });
+      const entries = await EventTemplateSvc.history(req.params.id, ownerId);
+      return res.status(200).json({ success: true, data: entries });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: true });
+    }
+  }
+
   static async removeAsset(req: Request, res: Response) {
     try {
       const ownerId = req.user?.userId;
@@ -238,6 +258,13 @@ export default class EventTemplateCtrl {
       const result = await EventTemplateSvc.removeAsset(
         req.params.id,
         ownerId,
+        req.params.assetId,
+      );
+      await EventTemplateSvc.recordItemChange(
+        ownerId,
+        req.params.id,
+        "remove",
+        "asset",
         req.params.assetId,
       );
       return res.status(200).json(result);
@@ -276,6 +303,14 @@ export default class EventTemplateCtrl {
         value.agreedPrice,
         value.isOptional,
       );
+      await EventTemplateSvc.recordItemChange(
+        ownerId,
+        req.params.id,
+        "add",
+        "service",
+        value.serviceId,
+        value.description,
+      );
       return res.status(200).json({ message: "Service attached", result });
     } catch (e: unknown) {
       if (e instanceof AppError) return sendAppError(res, e);
@@ -293,6 +328,13 @@ export default class EventTemplateCtrl {
       const result = await EventTemplateSvc.removeService(
         req.params.id,
         ownerId,
+        req.params.serviceId,
+      );
+      await EventTemplateSvc.recordItemChange(
+        ownerId,
+        req.params.id,
+        "remove",
+        "service",
         req.params.serviceId,
       );
       return res.status(200).json(result);
@@ -331,6 +373,14 @@ export default class EventTemplateCtrl {
         value.agreedPrice,
         value.isOptional,
       );
+      await EventTemplateSvc.recordItemChange(
+        ownerId,
+        req.params.id,
+        "add",
+        "venue",
+        value.venueId,
+        value.description,
+      );
       return res.status(200).json({ message: "Venue attached", result });
     } catch (e: unknown) {
       if (e instanceof AppError) return sendAppError(res, e);
@@ -348,6 +398,13 @@ export default class EventTemplateCtrl {
       const result = await EventTemplateSvc.removeVenue(
         req.params.id,
         ownerId,
+        req.params.venueId,
+      );
+      await EventTemplateSvc.recordItemChange(
+        ownerId,
+        req.params.id,
+        "remove",
+        "venue",
         req.params.venueId,
       );
       return res.status(200).json(result);
