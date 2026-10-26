@@ -2,6 +2,7 @@ import express from "express";
 import UsersCtrl from "./users.controller";
 import {
   authenticate,
+  optionalAuth,
   requirePermission,
 } from "../../middleware/auth.middleware";
 import { asyncHandler } from "../../utils/async-handler";
@@ -12,8 +13,10 @@ const router = express.Router();
 router.get("/foxers", UsersCtrl.getFoxers);
 router.get("/foxers/me/stats", authenticate, UsersCtrl.getFoxerStats);
 router.get("/foxers/:id", UsersCtrl.getFoxerById);
-router.get("/profile/:id", UsersCtrl.getPublicProfile);
-router.get("/:id/public", UsersCtrl.getPublicProfile);
+// Public, but read with the session when there is one: the person viewing
+// their own profile sees their stamps in full (UsersSvc.getPublicProfile).
+router.get("/profile/:id", optionalAuth, UsersCtrl.getPublicProfile);
+router.get("/:id/public", optionalAuth, UsersCtrl.getPublicProfile);
 router.get("/:id/presence", authenticate, UsersCtrl.getPresence);
 
 // Authenticated routes
