@@ -373,14 +373,16 @@ export default class EventTemplateCtrl {
         value.agreedPrice,
         value.isOptional,
       );
-      await EventTemplateSvc.recordItemChange(
-        ownerId,
-        req.params.id,
-        "add",
-        "venue",
-        value.venueId,
-        value.description,
-      );
+      if (!("alreadyAttached" in result)) {
+        await EventTemplateSvc.recordItemChange(
+          ownerId,
+          req.params.id,
+          "add",
+          "venue",
+          value.venueId,
+          value.description,
+        );
+      }
       return res.status(200).json({ message: "Venue attached", result });
     } catch (e: unknown) {
       if (e instanceof AppError) return sendAppError(res, e);

@@ -666,6 +666,14 @@ export default class EventTemplateSvc {
     const template = await EventTemplateRepo.findTemplateById(templateId);
     if (!template) throw notFound("Template");
 
+    // Event Studio re-sends the package's venue on every Publish. Attaching it
+    // again used to add a second row for the same venue, which every total
+    // then counted twice. Already there: nothing to do.
+    const already = template.templateVenues.find(
+      (tv) => tv.venueId === venueId,
+    );
+    if (already) return { ...already, alreadyAttached: true as const };
+
     const venue = await prisma.venue.findUnique({ where: { id: venueId } });
     if (!venue) throw notFound("Venue");
 

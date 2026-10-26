@@ -15,6 +15,7 @@ const repo = vi.hoisted(() => ({
     templateVenues: [],
   })),
   historyNames: vi.fn(),
+  attachVenue: vi.fn(),
 }));
 vi.mock("../src/modules/event-template/event-template.repository", () => ({
   default: repo,
@@ -171,5 +172,17 @@ describe("history", () => {
       },
     ]);
     expect(JSON.stringify(entries)).not.toContain("@example.com");
+  });
+});
+
+describe("attachVenue", () => {
+  it("does not add a venue the package already has (Publish re-sends it)", async () => {
+    repo.findTemplateById.mockResolvedValue({
+      ...structuredClone(PACKAGE),
+      templateVenues: [{ id: "tv1", venueId: "v1" }],
+    });
+    const result = await EventTemplateSvc.attachVenue("t1", "foxer", "v1");
+    expect(result).toMatchObject({ id: "tv1", alreadyAttached: true });
+    expect(repo.attachVenue).not.toHaveBeenCalled();
   });
 });
