@@ -21,7 +21,10 @@ import { sendBookingCancelledEmail } from "../../utils/emails/cancellation";
 import { sendBookingConfirmationEmail } from "../../utils/emails/confirmation";
 import { prisma } from "../../utils/prisma";
 import AvailabilitySvc from "../availability/availability.service";
-import { AvailabilityConflictError } from "../availability/availability.types";
+import {
+  AvailabilityConflictError,
+  type AvailabilityCheckItem,
+} from "../availability/availability.types";
 import IdempotencySvc from "../idempotency/idempotency.service";
 import crypto from "crypto";
 import {
@@ -97,6 +100,24 @@ export class BookingError extends AppError {
   constructor(message: string, status: number, code?: string) {
     super(message, status, code);
   }
+}
+
+/**
+ * A package's availability clash, as a sentence for the guest. The checks
+ * name the item by id ("Venue 3f2a… is not available"), which means nothing
+ * to them; the Foxer travel message is already written for people.
+ */
+function toPackageConflict(err: unknown): unknown {
+  if (!(err instanceof AvailabilityConflictError)) return err;
+  const message =
+    err.kind === "venue"
+      ? "This venue is already booked on those dates. Please choose other dates."
+      : err.kind === "asset"
+        ? "Some of this package's gear is already booked on those dates. Please choose other dates."
+        : err.message.startsWith("Service ")
+          ? "One of this package's Foxers is already booked on those dates. Please choose other dates."
+          : err.message;
+  return new BookingError(message, 409, "AVAILABILITY_CONFLICT");
 }
 
 /**
@@ -1281,6 +1302,68 @@ export default class BookingSvc {
       targetCountry: template.targetCountry ?? undefined,
     });
 
+    // What this booking takes off the calendar: every included asset, service
+    // and venue, for the booked dates. Venues are on it: they used to be left
+    // off, so two package bookings (or a package and a direct venue booking)
+    // could take the same venue on the same night. Excluded items
+    // (included: false) consume nothing.
+    const dateRange = { start: input.startAt, end: input.endAt };
+    const reservations: AvailabilityCheckItem[] = [
+      ...template.templateAssets
+        .filter(
+          (ta) =>
+            ta.assetId &&
+            ta.asset?.ownerId &&
+            !excludedAssetIds.includes(ta.id),
+        )
+        .map((ta) => ({
+          kind: "asset" as const,
+          itemId: ta.assetId!,
+          dateRange,
+          quantity: ta.quantity ?? 1,
+        })),
+      ...template.templateServices
+        .filter(
+          (ts) =>
+            ts.serviceId &&
+            ts.service?.ownerId &&
+            !excludedServiceIds.includes(ts.id),
+        )
+        .map((ts) => ({
+          kind: "service" as const,
+          itemId: ts.serviceId!,
+          dateRange,
+          eventId: event.id,
+        })),
+      ...template.templateVenues
+        .filter(
+          (tv) =>
+            tv.venueId &&
+            tv.venue?.mayorId &&
+            !excludedVenueIds.includes(tv.id),
+        )
+        .map((tv) => ({
+          kind: "venue" as const,
+          itemId: tv.venueId!,
+          dateRange,
+        })),
+    ];
+
+    // Checked before the booking (and its payment) exist, so the usual clash
+    // leaves nothing behind but this Event, which is removed. The inputs are
+    // the ones the locked reserve below sees, so the two cannot disagree; that
+    // one still decides, for two bookings racing for the same date.
+    try {
+      await prisma.$transaction((tx) =>
+        AvailabilitySvc.reserve(tx, reservations),
+      );
+    } catch (err) {
+      await EventRepo.deleteUnbooked(event.id).catch((e) =>
+        console.error(`Failed to remove unbooked event ${event.id}`, e),
+      );
+      throw toPackageConflict(err);
+    }
+
     const booking = await this.createBooking({
       userId: input.userId,
       eventId: event.id,
@@ -1325,35 +1408,24 @@ export default class BookingSvc {
           status: tv.matched ? ("approved" as const) : ("pending" as const),
         })),
     };
-    const escrowDateRange = { start: input.startAt, end: input.endAt };
-
-    // AvailabilitySvc.reserve runs under its own row lock, in the same
-    // transaction as the inserts below — venues are excluded (Phase A
-    // affiliation approval already gates venue access, not this date/
-    // quantity mechanism), and excluded items (included: false) never
-    // consume inventory since the customer chose not to include them.
-    await prisma.$transaction(async (tx) => {
-      await AvailabilitySvc.reserve(tx, [
-        ...escrowRows.assets
-          .filter((a) => a.included)
-          .map((a) => ({
-            kind: "asset" as const,
-            itemId: a.assetId,
-            dateRange: escrowDateRange,
-            quantity: a.quantity ?? 1,
-          })),
-        ...escrowRows.services
-          .filter((s) => s.included)
-          .map((s) => ({
-            kind: "service" as const,
-            itemId: s.serviceId,
-            dateRange: escrowDateRange,
-            eventId: event.id,
-          })),
-      ]);
-
-      return EventRepo.createEscrowTransactions(tx, escrowRows);
-    });
+    // The reserve that decides: under its row locks, in the same transaction
+    // as the inserts, so nothing can book the same dates in between.
+    try {
+      await prisma.$transaction(async (tx) => {
+        await AvailabilitySvc.reserve(tx, reservations);
+        return EventRepo.createEscrowTransactions(tx, escrowRows);
+      });
+    } catch (err) {
+      // Lost a race for the dates after the check above passed. The booking
+      // and its pending payment already exist; cancel the booking rather than
+      // leave it open with no items (the payment expires with it).
+      if (err instanceof AvailabilityConflictError) {
+        await BookingRepo.cancel(booking.id).catch((e) =>
+          console.error(`Failed to cancel unreserved booking ${booking.id}`, e),
+        );
+      }
+      throw toPackageConflict(err);
+    }
 
     // The one bump left in this service. `BookingRepo` retired the cache when
     // the booking was created - before these rows existed - and they were
