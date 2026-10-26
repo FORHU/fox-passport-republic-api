@@ -65,64 +65,6 @@ export default class EventRequestCtrl {
     }
   }
 
-  static async approve(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      if (!req.user)
-        return res
-          .status(401)
-          .json({ success: false, message: "Unauthorized" });
-      const { userId, systemRole } = req.user;
-      const updated = await EventRequestSvc.approveRequest(
-        id,
-        userId,
-        systemRole,
-      );
-
-      return res.status(200).json({ success: true, data: updated });
-    } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(400).json({ success: false, message: error.message });
-    }
-  }
-
-  static async reject(req: Request, res: Response) {
-    const schema = Joi.object({ reason: Joi.string().optional() });
-    const { error, value } = schema.validate(req.body);
-    if (error)
-      return res.status(400).json({ success: false, message: error.message });
-    try {
-      const { id } = req.params;
-      if (!req.user)
-        return res
-          .status(401)
-          .json({ success: false, message: "Unauthorized" });
-      const { userId, systemRole } = req.user;
-      const updated = await EventRequestSvc.rejectRequest(
-        id,
-        value.reason,
-        userId,
-        systemRole,
-      );
-
-      return res.status(200).json({ success: true, data: updated });
-    } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(400).json({ success: false, message: error.message });
-    }
-  }
-
-  static async complete(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const updated = await EventRequestSvc.completeEvent(id);
-      return res.status(200).json({ success: true, data: updated });
-    } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(400).json({ success: false, message: error.message });
-    }
-  }
-
   static async listApproved(req: Request, res: Response) {
     try {
       const events = await EventRequestSvc.findAllApproved();

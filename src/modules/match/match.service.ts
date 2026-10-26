@@ -244,6 +244,7 @@ export default class MatchSvc {
       }
       await BookingRepo.cancel(booking.id);
     }
+    await EventRequestSvc.syncStatusFromBookings(eventId);
 
     if (event.clientId) {
       await NotificationSvc.create({
