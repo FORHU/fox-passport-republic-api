@@ -2,6 +2,7 @@ import { prisma, AppTransactionClient } from "../../utils/prisma";
 import { Prisma, BookingStatus, PaymentStatus } from "@prisma/client";
 import { BookingWithRelations } from "../../types/prisma.d";
 import { bookingCache } from "../../utils/cache-namespaces";
+import { RESERVING_TRANSACTION_STATUSES } from "../availability/availability.types";
 
 export default class BookingRepo {
   /**
@@ -228,6 +229,38 @@ export default class BookingRepo {
       },
       select: { startAt: true },
     });
+  }
+
+  /**
+   * When this package's venues are taken, from now on: by any booking that
+   * holds them (another package, a direct venue booking, one still awaiting
+   * the Mayor), and by dates the venue blocked by hand. The same rows and
+   * statuses the venue check at booking time reads (lockAndCheckVenue).
+   * Optional venues are left out: a guest can drop one, so its dates do not
+   * close the whole package; booking still checks them.
+   */
+  static async findVenueTakenByTemplate(templateId: string) {
+    const templateVenues = await prisma.eventTemplateVenue.findMany({
+      where: { templateId, isOptional: false, venueId: { not: null } },
+      select: { venue: { select: { id: true, blockedDates: true } } },
+    });
+    const venues = templateVenues.flatMap((tv) => (tv.venue ? [tv.venue] : []));
+    if (venues.length === 0) return { ranges: [], blockedDates: [] };
+
+    const now = new Date();
+    const taken = await prisma.eventVenueTransaction.findMany({
+      where: {
+        venueId: { in: venues.map((v) => v.id) },
+        status: { in: [...RESERVING_TRANSACTION_STATUSES] },
+        event: { endAt: { gt: now } },
+      },
+      select: { event: { select: { startAt: true, endAt: true } } },
+    });
+
+    return {
+      ranges: taken.map((t) => t.event),
+      blockedDates: venues.flatMap((v) => v.blockedDates),
+    };
   }
 
   /**

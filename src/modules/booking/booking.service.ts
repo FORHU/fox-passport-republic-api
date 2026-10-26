@@ -98,6 +98,23 @@ export class BookingError extends AppError {
   }
 }
 
+/** A date as the booking page's calendar keys it: its UTC day, "2027-06-01". */
+const dayKey = (d: Date) => d.toISOString().split("T")[0];
+
+/**
+ * Every calendar day a booking from `start` to `end` touches. `end` itself is
+ * exclusive, so an event ending at midnight does not close the next day.
+ */
+function daysCovered(start: Date, end: Date): string[] {
+  const days: string[] = [];
+  const day = new Date(dayKey(start));
+  while (day < end) {
+    days.push(dayKey(day));
+    day.setUTCDate(day.getUTCDate() + 1);
+  }
+  return days.length > 0 ? days : [dayKey(start)];
+}
+
 /**
  * A booking that did not exist a moment ago.
  *
@@ -838,15 +855,27 @@ export default class BookingSvc {
       `availability:${templateId}`,
       AVAILABILITY_TTL,
       async () => {
-        const bookings =
-          await BookingRepo.findBookedStartsByTemplate(templateId);
+        const [bookings, venueTaken] = await Promise.all([
+          BookingRepo.findBookedStartsByTemplate(templateId),
+          BookingRepo.findVenueTakenByTemplate(templateId),
+        ]);
+        // Every day this package's venue is taken elsewhere or blocked, so
+        // the date picker closes it up front instead of the booking failing
+        // with AVAILABILITY_CONFLICT. Past days are dropped here; the
+        // package's own bookings are already future-only from the query.
+        const today = dayKey(new Date());
+        const venueDays = [
+          ...venueTaken.ranges.flatMap((r) => daysCovered(r.startAt, r.endAt)),
+          ...venueTaken.blockedDates.map(dayKey),
+        ].filter((d) => d >= today);
 
         return {
           bookedDates: [
-            ...new Set(
-              bookings.map((b) => b.startAt.toISOString().split("T")[0]),
-            ),
-          ],
+            ...new Set([
+              ...bookings.map((b) => dayKey(b.startAt)),
+              ...venueDays,
+            ]),
+          ].sort(),
         };
       },
     );

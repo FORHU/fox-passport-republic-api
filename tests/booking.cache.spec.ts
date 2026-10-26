@@ -47,6 +47,10 @@ const repo = vi.hoisted(() => ({
   findUpcomingByUserId: vi.fn(async () => []),
   findById: vi.fn(),
   findBookedStartsByTemplate: vi.fn(async () => []),
+  findVenueTakenByTemplate: vi.fn(async () => ({
+    ranges: [],
+    blockedDates: [],
+  })),
   confirmArrival: vi.fn(),
 }));
 
