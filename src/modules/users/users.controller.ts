@@ -107,7 +107,10 @@ export default class UsersCtrl {
   // READ PUBLIC CITIZEN PROFILE
   static async getPublicProfile(req: Request, res: Response) {
     try {
-      const profile = await UsersSvc.getPublicProfile(req.params.id);
+      const profile = await UsersSvc.getPublicProfile(
+        req.params.id,
+        req.user?.userId,
+      );
       return res.status(200).json({ success: true, data: profile });
     } catch (e: unknown) {
       const err = e as Error;
