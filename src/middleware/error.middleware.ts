@@ -1,6 +1,5 @@
 import type { ErrorRequestHandler } from "express";
-import { Prisma } from "@prisma/client";
-import { AppError } from "../utils/errors";
+import { AppError, fromPrisma } from "../utils/errors";
 
 /** An Error that carries an HTTP status for the global handler to honour. */
 interface HttpError extends Error {
@@ -15,26 +14,8 @@ function toHttpError(err: unknown): HttpError {
   );
 }
 
-/**
- * Prisma errors the client can act on, mapped once here instead of in every
- * service. The messages are fixed: Prisma's own text names tables and columns.
- */
-function fromPrisma(err: unknown): AppError | null {
-  if (!(err instanceof Prisma.PrismaClientKnownRequestError)) return null;
-  switch (err.code) {
-    case "P2025": // record required for the operation does not exist
-      return new AppError("Record not found", 404);
-    case "P2002": // unique constraint
-      return new AppError("This record already exists", 409);
-    case "P2003": // foreign key constraint
-      return new AppError(
-        "This record is linked to, or refers to, another that does not allow it",
-        409,
-      );
-    default:
-      return null;
-  }
-}
+// Prisma errors the client can act on are mapped by `fromPrisma`
+// (utils/errors.ts), shared with controllers that answer their own errors.
 
 export function createErrorHandler(isDev: boolean): ErrorRequestHandler {
   return (err, _req, res, _next) => {
