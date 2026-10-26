@@ -270,6 +270,45 @@ export default class EventTemplateRepo {
     });
   }
 
+  /**
+   * Names for a package's History: who acted, and which item an entry is
+   * about. One query per kind; an id that no longer resolves (a deleted item
+   * or account) is simply absent.
+   */
+  static async historyNames(ids: {
+    userIds: string[];
+    assetIds: string[];
+    serviceIds: string[];
+    venueIds: string[];
+  }) {
+    const unique = (list: string[]) => [...new Set(list)];
+    const byId = { select: { id: true, name: true } } as const;
+    const [users, assets, services, venues] = await Promise.all([
+      prisma.user.findMany({
+        where: { id: { in: unique(ids.userIds) } },
+        ...byId,
+      }),
+      prisma.asset.findMany({
+        where: { id: { in: unique(ids.assetIds) } },
+        ...byId,
+      }),
+      prisma.service.findMany({
+        where: { id: { in: unique(ids.serviceIds) } },
+        ...byId,
+      }),
+      prisma.venue.findMany({
+        where: { id: { in: unique(ids.venueIds) } },
+        ...byId,
+      }),
+    ]);
+    const toMap = (rows: { id: string; name: string | null }[]) =>
+      new Map(rows.map((r) => [r.id, r.name ?? ""]));
+    return {
+      users: toMap(users),
+      items: toMap([...assets, ...services, ...venues]),
+    };
+  }
+
   static async findTemplateById(id: string) {
     return prisma.eventTemplate.findUnique({
       where: { id },

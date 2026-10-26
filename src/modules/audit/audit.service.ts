@@ -76,6 +76,35 @@ export async function recordChange(
   });
 }
 
+/**
+ * `recordChange` for a caller that holds only the actor's id: a service a
+ * booking or check-in flow calls, with no `req.user` in reach. The email is
+ * looked up here, because the record must keep it after the account is gone.
+ * An unknown id records nothing. Never throws, like `recordAudit`.
+ */
+export async function recordChangeBy(
+  actorId: string,
+  action: string,
+  targetId: string,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const actor = await prisma.user.findUnique({
+      where: { id: actorId },
+      select: { email: true },
+    });
+    if (!actor) return;
+    await recordChange(
+      { userId: actorId, email: actor.email },
+      action,
+      targetId,
+      metadata,
+    );
+  } catch (e) {
+    console.error("AUDIT WRITE FAILED", action, targetId, e);
+  }
+}
+
 /** Newest first: the change history of one record. */
 export function listAuditForTarget(targetId: string, limit = 100) {
   return prisma.auditLog.findMany({

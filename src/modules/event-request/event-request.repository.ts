@@ -101,10 +101,27 @@ export default class EventRequestRepo {
     });
   }
 
-  static async updateStatus(id: string, status: EventStatus) {
-    return prisma.event.update({
-      where: { id },
+  /**
+   * Moves the Event to `status` only while it is still in one of `from`, in a
+   * single write. The count says whether this call made the change, which is
+   * what keeps completion XP to one payout.
+   */
+  static async advanceStatus(
+    id: string,
+    from: EventStatus[],
+    status: EventStatus,
+  ) {
+    const { count } = await prisma.event.updateMany({
+      where: { id, eventStatus: { in: from } },
       data: { eventStatus: status },
+    });
+    return count === 1;
+  }
+
+  static async bookingStatuses(eventId: string) {
+    return prisma.booking.findMany({
+      where: { eventId },
+      select: { status: true, checkedIn: true },
     });
   }
 

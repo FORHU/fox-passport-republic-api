@@ -48,6 +48,15 @@ export default class EventRepo {
   }
 
   /**
+   * Removes an Event a template booking created and then could not book (its
+   * dates were taken). Nothing refers to it yet: the booking is created only
+   * after the availability check passes.
+   */
+  static async deleteUnbooked(id: string) {
+    return prisma.event.delete({ where: { id } });
+  }
+
+  /**
    * Per-partner escrow rows for a template booking - one per included asset,
    * service and venue.
    *

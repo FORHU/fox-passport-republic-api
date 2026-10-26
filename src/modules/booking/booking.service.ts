@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import BookingRepo from "./booking.repository";
 import EventRepo from "../event/event.repository";
 import EventRequestRepo from "../event-request/event-request.repository";
+import EventRequestSvc from "../event-request/event-request.service";
 import AppointmentAccess from "../appointment/appointment.access";
 import OrganizerXpService from "../appointment/organizer-xp.service";
 import EventTemplateSvc from "../event-template/event-template.service";
@@ -20,8 +21,12 @@ import { sendBookingCancelledEmail } from "../../utils/emails/cancellation";
 import { sendBookingConfirmationEmail } from "../../utils/emails/confirmation";
 import { prisma } from "../../utils/prisma";
 import AvailabilitySvc from "../availability/availability.service";
-import { AvailabilityConflictError } from "../availability/availability.types";
+import {
+  AvailabilityConflictError,
+  type AvailabilityCheckItem,
+} from "../availability/availability.types";
 import IdempotencySvc from "../idempotency/idempotency.service";
+import { recordChangeBy } from "../audit/audit.service";
 import crypto from "crypto";
 import {
   BookingStatus,
@@ -96,6 +101,41 @@ export class BookingError extends AppError {
   constructor(message: string, status: number, code?: string) {
     super(message, status, code);
   }
+}
+
+/** A date as the booking page's calendar keys it: its UTC day, "2027-06-01". */
+const dayKey = (d: Date) => d.toISOString().split("T")[0];
+
+/**
+ * Every calendar day a booking from `start` to `end` touches. `end` itself is
+ * exclusive, so an event ending at midnight does not close the next day.
+ */
+function daysCovered(start: Date, end: Date): string[] {
+  const days: string[] = [];
+  const day = new Date(dayKey(start));
+  while (day < end) {
+    days.push(dayKey(day));
+    day.setUTCDate(day.getUTCDate() + 1);
+  }
+  return days.length > 0 ? days : [dayKey(start)];
+}
+
+/**
+ * A package's availability clash, as a sentence for the guest. The checks
+ * name the item by id ("Venue 3f2a… is not available"), which means nothing
+ * to them; the Foxer travel message is already written for people.
+ */
+function toPackageConflict(err: unknown): unknown {
+  if (!(err instanceof AvailabilityConflictError)) return err;
+  const message =
+    err.kind === "venue"
+      ? "This venue is already booked on those dates. Please choose other dates."
+      : err.kind === "asset"
+        ? "Some of this package's gear is already booked on those dates. Please choose other dates."
+        : err.message.startsWith("Service ")
+          ? "One of this package's Foxers is already booked on those dates. Please choose other dates."
+          : err.message;
+  return new BookingError(message, 409, "AVAILABILITY_CONFLICT");
 }
 
 /**
@@ -186,6 +226,20 @@ export default class BookingSvc {
    */
   static async invalidateCaches(): Promise<void> {
     await bookingCache.invalidateAll();
+  }
+
+  /**
+   * A booking event on its package's History (EventTemplateSvc.history). A
+   * booking with no package (a direct venue booking) has no History to join.
+   */
+  private static async recordForPackage(
+    actorId: string,
+    action: string,
+    templateId: string | null | undefined,
+    metadata: Record<string, unknown>,
+  ) {
+    if (!templateId) return;
+    await recordChangeBy(actorId, action, templateId, metadata);
   }
 
   /**
@@ -838,15 +892,27 @@ export default class BookingSvc {
       `availability:${templateId}`,
       AVAILABILITY_TTL,
       async () => {
-        const bookings =
-          await BookingRepo.findBookedStartsByTemplate(templateId);
+        const [bookings, venueTaken] = await Promise.all([
+          BookingRepo.findBookedStartsByTemplate(templateId),
+          BookingRepo.findVenueTakenByTemplate(templateId),
+        ]);
+        // Every day this package's venue is taken elsewhere or blocked, so
+        // the date picker closes it up front instead of the booking failing
+        // with AVAILABILITY_CONFLICT. Past days are dropped here; the
+        // package's own bookings are already future-only from the query.
+        const today = dayKey(new Date());
+        const venueDays = [
+          ...venueTaken.ranges.flatMap((r) => daysCovered(r.startAt, r.endAt)),
+          ...venueTaken.blockedDates.map(dayKey),
+        ].filter((d) => d >= today);
 
         return {
           bookedDates: [
-            ...new Set(
-              bookings.map((b) => b.startAt.toISOString().split("T")[0]),
-            ),
-          ],
+            ...new Set([
+              ...bookings.map((b) => dayKey(b.startAt)),
+              ...venueDays,
+            ]),
+          ].sort(),
         };
       },
     );
@@ -1083,6 +1149,9 @@ export default class BookingSvc {
       id,
       status as ItemBookingStatus,
     );
+    // Check-in settles a booking through here, so this is where its Event
+    // reaches `completed`.
+    await EventRequestSvc.syncStatusFromBookings(booking.eventId);
 
     if (status === ItemBookingStatus.completed) {
       // Payout failures must never fail the status-update response — log and move on.
@@ -1177,6 +1246,12 @@ export default class BookingSvc {
 
     await BookingRepo.update(id, { checkedIn: true });
     await this.updateStatus(id, ItemBookingStatus.completed, hostId);
+    await this.recordForPackage(
+      hostId,
+      "booking.checkedIn",
+      booking.event?.templateId,
+      { bookingId: id },
+    );
     // An Organizer earns on their path for guests they check in (ADR 0005).
     // The guard above means a guest can only ever count once.
     if (booking.event) {
@@ -1277,6 +1352,68 @@ export default class BookingSvc {
       targetCountry: template.targetCountry ?? undefined,
     });
 
+    // What this booking takes off the calendar: every included asset, service
+    // and venue, for the booked dates. Venues are on it: they used to be left
+    // off, so two package bookings (or a package and a direct venue booking)
+    // could take the same venue on the same night. Excluded items
+    // (included: false) consume nothing.
+    const dateRange = { start: input.startAt, end: input.endAt };
+    const reservations: AvailabilityCheckItem[] = [
+      ...template.templateAssets
+        .filter(
+          (ta) =>
+            ta.assetId &&
+            ta.asset?.ownerId &&
+            !excludedAssetIds.includes(ta.id),
+        )
+        .map((ta) => ({
+          kind: "asset" as const,
+          itemId: ta.assetId!,
+          dateRange,
+          quantity: ta.quantity ?? 1,
+        })),
+      ...template.templateServices
+        .filter(
+          (ts) =>
+            ts.serviceId &&
+            ts.service?.ownerId &&
+            !excludedServiceIds.includes(ts.id),
+        )
+        .map((ts) => ({
+          kind: "service" as const,
+          itemId: ts.serviceId!,
+          dateRange,
+          eventId: event.id,
+        })),
+      ...template.templateVenues
+        .filter(
+          (tv) =>
+            tv.venueId &&
+            tv.venue?.mayorId &&
+            !excludedVenueIds.includes(tv.id),
+        )
+        .map((tv) => ({
+          kind: "venue" as const,
+          itemId: tv.venueId!,
+          dateRange,
+        })),
+    ];
+
+    // Checked before the booking (and its payment) exist, so the usual clash
+    // leaves nothing behind but this Event, which is removed. The inputs are
+    // the ones the locked reserve below sees, so the two cannot disagree; that
+    // one still decides, for two bookings racing for the same date.
+    try {
+      await prisma.$transaction((tx) =>
+        AvailabilitySvc.reserve(tx, reservations),
+      );
+    } catch (err) {
+      await EventRepo.deleteUnbooked(event.id).catch((e) =>
+        console.error(`Failed to remove unbooked event ${event.id}`, e),
+      );
+      throw toPackageConflict(err);
+    }
+
     const booking = await this.createBooking({
       userId: input.userId,
       eventId: event.id,
@@ -1321,41 +1458,36 @@ export default class BookingSvc {
           status: tv.matched ? ("approved" as const) : ("pending" as const),
         })),
     };
-    const escrowDateRange = { start: input.startAt, end: input.endAt };
-
-    // AvailabilitySvc.reserve runs under its own row lock, in the same
-    // transaction as the inserts below — venues are excluded (Phase A
-    // affiliation approval already gates venue access, not this date/
-    // quantity mechanism), and excluded items (included: false) never
-    // consume inventory since the customer chose not to include them.
-    await prisma.$transaction(async (tx) => {
-      await AvailabilitySvc.reserve(tx, [
-        ...escrowRows.assets
-          .filter((a) => a.included)
-          .map((a) => ({
-            kind: "asset" as const,
-            itemId: a.assetId,
-            dateRange: escrowDateRange,
-            quantity: a.quantity ?? 1,
-          })),
-        ...escrowRows.services
-          .filter((s) => s.included)
-          .map((s) => ({
-            kind: "service" as const,
-            itemId: s.serviceId,
-            dateRange: escrowDateRange,
-            eventId: event.id,
-          })),
-      ]);
-
-      return EventRepo.createEscrowTransactions(tx, escrowRows);
-    });
+    // The reserve that decides: under its row locks, in the same transaction
+    // as the inserts, so nothing can book the same dates in between.
+    try {
+      await prisma.$transaction(async (tx) => {
+        await AvailabilitySvc.reserve(tx, reservations);
+        return EventRepo.createEscrowTransactions(tx, escrowRows);
+      });
+    } catch (err) {
+      // Lost a race for the dates after the check above passed. The booking
+      // and its pending payment already exist; cancel the booking rather than
+      // leave it open with no items (the payment expires with it).
+      if (err instanceof AvailabilityConflictError) {
+        await BookingRepo.cancel(booking.id).catch((e) =>
+          console.error(`Failed to cancel unreserved booking ${booking.id}`, e),
+        );
+      }
+      throw toPackageConflict(err);
+    }
 
     // The one bump left in this service. `BookingRepo` retired the cache when
     // the booking was created - before these rows existed - and they were
     // written through `EventRepo`, which owns no booking cache.
     await this.invalidateCaches();
     announceToUser(input.userId, "bookings");
+
+    await this.recordForPackage(input.userId, "booking.created", template.id, {
+      bookingId: booking.id,
+      guestCount: input.guestCount,
+      startAt: input.startAt,
+    });
 
     return { booking, eventId: event.id };
   }
@@ -1591,6 +1723,13 @@ export default class BookingSvc {
 
     if (completedPayments.length === 0) {
       const updated = await BookingRepo.cancel(id);
+      await EventRequestSvc.syncStatusFromBookings(booking.eventId);
+      await this.recordForPackage(
+        requesterId,
+        "booking.cancelled",
+        booking.event?.templateId,
+        { bookingId: id },
+      );
       PromotionSvc.releaseRedemption({ eventId: booking.eventId }).catch((e) =>
         console.error(
           `Failed to release voucher redemption for event ${booking.eventId}`,
@@ -1695,6 +1834,13 @@ export default class BookingSvc {
     }
 
     const updated = await BookingRepo.cancel(id);
+    await EventRequestSvc.syncStatusFromBookings(booking.eventId);
+    await this.recordForPackage(
+      requesterId,
+      "booking.cancelled",
+      booking.event?.templateId,
+      { bookingId: id, refunded: refunds.length > 0 },
+    );
     PromotionSvc.releaseRedemption({ eventId: booking.eventId }).catch((e) =>
       console.error(
         `Failed to release voucher redemption for event ${booking.eventId}`,
