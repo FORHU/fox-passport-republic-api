@@ -176,6 +176,77 @@ describe("Partnership Integration Tests", () => {
     });
   });
 
+  describe("Benefits and visibility", () => {
+    it("Saves proposed benefits as text", async () => {
+      const proposal = await PartnershipSvc.createProposal(partnerUser.id, {
+        targetVenueId: targetVenue.id,
+        partnershipType: PartnershipType.resource_contribution,
+        title: "Lighting rig",
+        description: "Lend our rig for the season",
+        proposedBenefits: "Logo on the stage backdrop",
+      });
+
+      expect(proposal.proposedBenefits).toBe("Logo on the stage backdrop");
+    });
+
+    it("Lists only the proposals a viewer sent or that target what they own", async () => {
+      const toVenue = await PartnershipSvc.createProposal(partnerUser.id, {
+        targetVenueId: targetVenue.id,
+        partnershipType: PartnershipType.business_partnership,
+        title: "Venue partnership",
+        description: "Run events together",
+      });
+      const toEvent = await PartnershipSvc.createProposal(partnerUser.id, {
+        targetEventId: targetEvent.id,
+        partnershipType: PartnershipType.sponsorship,
+        title: "Event sponsorship",
+        description: "Sponsor the night",
+      });
+
+      const ids = async (viewerId: string) =>
+        (await PartnershipSvc.listProposals({}, viewerId)).map((p) => p.id);
+
+      const partnerSees = await ids(partnerUser.id);
+      expect(partnerSees).toEqual(
+        expect.arrayContaining([toVenue.id, toEvent.id]),
+      );
+
+      const venueOwnerSees = await ids(venueOwner.id);
+      expect(venueOwnerSees).toContain(toVenue.id);
+      expect(venueOwnerSees).not.toContain(toEvent.id);
+
+      const eventOwnerSees = await ids(eventOwner.id);
+      expect(eventOwnerSees).toContain(toEvent.id);
+      expect(eventOwnerSees).not.toContain(toVenue.id);
+
+      expect(await ids(regularUser.id)).toEqual([]);
+
+      // A filter narrows the viewer's own set; it can't reach someone else's.
+      const filtered = await PartnershipSvc.listProposals(
+        { partnerId: partnerUser.id },
+        regularUser.id,
+      );
+      expect(filtered).toEqual([]);
+    });
+
+    it("A stranger can't open a proposal they aren't party to", async () => {
+      const proposal = await PartnershipSvc.createProposal(partnerUser.id, {
+        targetVenueId: targetVenue.id,
+        partnershipType: PartnershipType.investment,
+        title: "Private terms",
+        description: "Not for everyone",
+        proposedAmount: 250000,
+      });
+
+      await expect(
+        PartnershipSvc.getProposal(proposal.id, regularUser.id),
+      ).rejects.toThrow("Proposal not found");
+      await expect(
+        PartnershipSvc.getProposal(proposal.id, venueOwner.id),
+      ).resolves.toMatchObject({ id: proposal.id, canAccept: true });
+    });
+  });
+
   describe("Lifecycle", () => {
     it("Pending proposal can be accepted", async () => {
       const proposal = await PartnershipSvc.createProposal(partnerUser.id, {

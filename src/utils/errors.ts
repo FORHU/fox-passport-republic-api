@@ -1,4 +1,5 @@
 import type { Response } from "express";
+import { Prisma } from "@prisma/client";
 import { isDev } from "../config";
 
 const DEFAULT_CODES: Record<number, string> = {
@@ -44,6 +45,37 @@ export const conflict = (message: string, code?: string) =>
   new AppError(message, 409, code);
 
 /**
+ * Prisma errors a client can act on, as AppErrors with fixed messages: Prisma's
+ * own text quotes the call, the model and its columns. Shared by the global
+ * error handler and `sendServerError`, so a controller that answers its own
+ * errors maps them the same way.
+ */
+export function fromPrisma(err: unknown): AppError | null {
+  // A query Prisma refused to build (a wrong type, a missing field).
+  if (err instanceof Prisma.PrismaClientValidationError) {
+    return new AppError("The request was not valid.", 400);
+  }
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError)) return null;
+  switch (err.code) {
+    case "P2000": // value too long for the column
+      return new AppError("A value is too long.", 400);
+    case "P2020": // value out of range for the column's type
+      return new AppError("A value is too large or out of range.", 400);
+    case "P2025": // record required for the operation does not exist
+      return new AppError("Record not found", 404);
+    case "P2002": // unique constraint
+      return new AppError("This record already exists", 409);
+    case "P2003": // foreign key constraint
+      return new AppError(
+        "This record is linked to, or refers to, another that does not allow it",
+        409,
+      );
+    default:
+      return null;
+  }
+}
+
+/**
  * Answers with an AppError's status, message and code. Controllers call this
  * first in a catch block, then fall back to their own handling for plain
  * Errors. `success` is for controllers whose responses carry that field.
@@ -62,8 +94,9 @@ export function sendAppError(
 
 /**
  * The tail of a controller catch block. An AppError answers with its own status
- * and message; anything else is unexpected, so it is logged and answered with a
- * generic 500 instead of echoing an internal message to the client.
+ * and message, and so does a Prisma error `fromPrisma` recognises; anything
+ * else is unexpected, so it is logged and answered with a generic 500 instead
+ * of echoing an internal message to the client.
  */
 export function sendServerError(
   res: Response,
@@ -71,6 +104,8 @@ export function sendServerError(
   opts: { success?: boolean } = {},
 ) {
   if (err instanceof AppError) return sendAppError(res, err, opts);
+  const mapped = fromPrisma(err);
+  if (mapped) return sendAppError(res, mapped, opts);
   console.error("Unhandled controller error:", err);
   return res.status(500).json({
     ...(opts.success ? { success: false } : {}),
