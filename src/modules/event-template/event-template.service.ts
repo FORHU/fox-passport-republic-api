@@ -7,6 +7,20 @@ import {
 } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import EventTemplateRepo from "./event-template.repository";
+import { listAuditForTarget, recordChangeBy } from "../audit/audit.service";
+
+/** The package details its History tracks, as the template stores them. */
+const HISTORY_FIELDS = [
+  "name",
+  "description",
+  "category",
+  "isPublic",
+  "targetCity",
+  "targetState",
+  "targetCountry",
+  "hostMarkupPct",
+  "maxAttendees",
+] as const;
 import { PLATFORM_FEE_PERCENT } from "../../config";
 import { eventTemplateCache } from "../../utils/cache-namespaces";
 import { fingerprint } from "../../utils/cache.util";
@@ -128,12 +142,94 @@ export default class EventTemplateSvc {
     }>;
   }) {
     const { id, ownerId, data } = params;
-    await this.verifyOwnership(id, ownerId);
+    const existing = await this.verifyOwnership(id, ownerId);
     const template = await EventTemplateRepo.updateTemplate(id, data);
+
+    // The package's History: each detail that actually changed, before and
+    // after. Only the owner can edit, so they are the actor.
+    const changes: Record<string, { from: unknown; to: unknown }> = {};
+    for (const field of HISTORY_FIELDS) {
+      if (!(field in data)) continue;
+      const from = existing[field] ?? null;
+      const to = data[field] ?? null;
+      if (from !== to) changes[field] = { from, to };
+    }
+    if (data.imgIds) {
+      const before = existing.images
+        .map((i) => i.id)
+        .sort()
+        .join();
+      if ([...data.imgIds].sort().join() !== before) {
+        changes.photos = {
+          from: existing.images.length,
+          to: data.imgIds.length,
+        };
+      }
+    }
+    if (Object.keys(changes).length > 0) {
+      await recordChangeBy(ownerId, "package.edit", id, { changes });
+    }
+
     return {
       ...template,
       ...this.calculateTotalsBreakdown(template),
     };
+  }
+
+  /**
+   * An item added to or removed from a package, for its History. Called by
+   * the controller once the change succeeded. An item without an id is a
+   * placeholder still to be matched, known by its description.
+   */
+  static async recordItemChange(
+    ownerId: string,
+    templateId: string,
+    change: "add" | "remove",
+    kind: "asset" | "service" | "venue",
+    itemId?: string,
+    description?: string,
+  ) {
+    await recordChangeBy(ownerId, `package.item.${change}`, templateId, {
+      kind,
+      ...(itemId ? { itemId } : {}),
+      ...(description ? { description } : {}),
+    });
+  }
+
+  /**
+   * A package's History for its owner, newest first: edits to it, items added
+   * and removed, and its bookings (booked, checked in, cancelled). Who did it
+   * is a name, never the email the audit row keeps: the owner sees their
+   * guests here, and a guest's email is not theirs to see.
+   */
+  static async history(templateId: string, ownerId: string) {
+    await this.verifyOwnership(templateId, ownerId);
+    const entries = await listAuditForTarget(templateId);
+
+    const itemIds = (kind: string) =>
+      entries.flatMap((e) => {
+        const m = e.metadata as { kind?: string; itemId?: string } | null;
+        return m?.kind === kind && m.itemId ? [m.itemId] : [];
+      });
+    const names = await EventTemplateRepo.historyNames({
+      userIds: entries.map((e) => e.actorId),
+      assetIds: itemIds("asset"),
+      serviceIds: itemIds("service"),
+      venueIds: itemIds("venue"),
+    });
+
+    return entries.map((e) => {
+      const metadata = (e.metadata ?? {}) as Record<string, unknown>;
+      const itemId = metadata.itemId as string | undefined;
+      return {
+        id: e.id,
+        at: e.createdAt,
+        action: e.action,
+        actor: { id: e.actorId, name: names.users.get(e.actorId) ?? null },
+        ...metadata,
+        ...(itemId ? { itemName: names.items.get(itemId) ?? null } : {}),
+      };
+    });
   }
 
   static async submitTemplate(id: string, ownerId: string) {
@@ -569,6 +665,14 @@ export default class EventTemplateSvc {
 
     const template = await EventTemplateRepo.findTemplateById(templateId);
     if (!template) throw notFound("Template");
+
+    // Event Studio re-sends the package's venue on every Publish. Attaching it
+    // again used to add a second row for the same venue, which every total
+    // then counted twice. Already there: nothing to do.
+    const already = template.templateVenues.find(
+      (tv) => tv.venueId === venueId,
+    );
+    if (already) return { ...already, alreadyAttached: true as const };
 
     const venue = await prisma.venue.findUnique({ where: { id: venueId } });
     if (!venue) throw notFound("Venue");

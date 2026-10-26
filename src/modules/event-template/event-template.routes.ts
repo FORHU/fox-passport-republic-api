@@ -44,6 +44,14 @@ router.delete(
   requirePermission("template:manage"),
   EventTemplateCtrl.deleteTemplate,
 );
+// The package's History: edits, items and bookings. Owner only (the service
+// checks ownership; `template:manage` alone is every Event Foxer).
+router.get(
+  "/:id/history",
+  authenticate,
+  requirePermission("template:manage"),
+  EventTemplateCtrl.history,
+);
 
 // Asset associations
 router.post(

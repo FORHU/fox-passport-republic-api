@@ -26,6 +26,7 @@ import {
   type AvailabilityCheckItem,
 } from "../availability/availability.types";
 import IdempotencySvc from "../idempotency/idempotency.service";
+import { recordChangeBy } from "../audit/audit.service";
 import crypto from "crypto";
 import {
   BookingStatus,
@@ -208,6 +209,20 @@ export default class BookingSvc {
    */
   static async invalidateCaches(): Promise<void> {
     await bookingCache.invalidateAll();
+  }
+
+  /**
+   * A booking event on its package's History (EventTemplateSvc.history). A
+   * booking with no package (a direct venue booking) has no History to join.
+   */
+  private static async recordForPackage(
+    actorId: string,
+    action: string,
+    templateId: string | null | undefined,
+    metadata: Record<string, unknown>,
+  ) {
+    if (!templateId) return;
+    await recordChangeBy(actorId, action, templateId, metadata);
   }
 
   /**
@@ -1202,6 +1217,12 @@ export default class BookingSvc {
 
     await BookingRepo.update(id, { checkedIn: true });
     await this.updateStatus(id, ItemBookingStatus.completed, hostId);
+    await this.recordForPackage(
+      hostId,
+      "booking.checkedIn",
+      booking.event?.templateId,
+      { bookingId: id },
+    );
     // An Organizer earns on their path for guests they check in (ADR 0005).
     // The guard above means a guest can only ever count once.
     if (booking.event) {
@@ -1432,6 +1453,12 @@ export default class BookingSvc {
     // written through `EventRepo`, which owns no booking cache.
     await this.invalidateCaches();
     announceToUser(input.userId, "bookings");
+
+    await this.recordForPackage(input.userId, "booking.created", template.id, {
+      bookingId: booking.id,
+      guestCount: input.guestCount,
+      startAt: input.startAt,
+    });
 
     return { booking, eventId: event.id };
   }
@@ -1668,6 +1695,12 @@ export default class BookingSvc {
     if (completedPayments.length === 0) {
       const updated = await BookingRepo.cancel(id);
       await EventRequestSvc.syncStatusFromBookings(booking.eventId);
+      await this.recordForPackage(
+        requesterId,
+        "booking.cancelled",
+        booking.event?.templateId,
+        { bookingId: id },
+      );
       PromotionSvc.releaseRedemption({ eventId: booking.eventId }).catch((e) =>
         console.error(
           `Failed to release voucher redemption for event ${booking.eventId}`,
@@ -1773,6 +1806,12 @@ export default class BookingSvc {
 
     const updated = await BookingRepo.cancel(id);
     await EventRequestSvc.syncStatusFromBookings(booking.eventId);
+    await this.recordForPackage(
+      requesterId,
+      "booking.cancelled",
+      booking.event?.templateId,
+      { bookingId: id, refunded: refunds.length > 0 },
+    );
     PromotionSvc.releaseRedemption({ eventId: booking.eventId }).catch((e) =>
       console.error(
         `Failed to release voucher redemption for event ${booking.eventId}`,
