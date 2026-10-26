@@ -3,8 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 /**
  * A citizen's public profile is readable by anyone and can be indexed, so its
  * venue stamps show the venue and city only. The event's name, date, photo and
- * free-text location would make them a dated record of where the person was;
- * the person themselves still sees them.
+ * free-text location, and the stamp's own createdAt, would make them a dated
+ * record of where the person was; the person themselves still sees them.
  */
 
 const repo = vi.hoisted(() => ({ findPublicCitizenProfile: vi.fn() }));
@@ -25,6 +25,7 @@ const STAMP = {
   location: "12 Mabini St",
   imageUrl: "https://example.com/wedding.jpg",
   xpEarned: 50,
+  createdAt: new Date("2027-06-12T22:00:00Z"),
   venueId: "v1",
   venue: { id: "v1", name: "Sky Hall", city: "Cebu" },
 };
