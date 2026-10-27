@@ -2,6 +2,7 @@ import { AppError, notFound } from "../../utils/errors";
 import PaymentRepo, { PENDING_PAYMENT_TTL_MS } from "./payment.repository";
 import BookingRepo from "../booking/booking.repository";
 import EventRequestSvc from "../event-request/event-request.service";
+import { recordChangeBy } from "../audit/audit.service";
 import AppointmentAccess from "../appointment/appointment.access";
 import { can } from "../../types/permissions";
 import crypto from "crypto";
@@ -299,7 +300,34 @@ export default class PaymentSvc {
       console.error("Failed to write stripePaymentId to booking:", err);
     }
 
+    if (paymentStatus === PaymentStatus.paid) {
+      await this.recordPaidForPackage(data.bookingId, data.amount);
+    }
+
     return payment;
+  }
+
+  /**
+   * A payment that cleared, on its booking's package History
+   * (EventTemplateSvc.history). The guest who paid is the actor: Stripe's
+   * webhook brings no user, but the payment is theirs. A booking with no
+   * package has no History to join. Never throws.
+   */
+  private static async recordPaidForPackage(bookingId: string, amount: number) {
+    try {
+      const booking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        select: { userId: true, event: { select: { templateId: true } } },
+      });
+      const templateId = booking?.event?.templateId;
+      if (!booking || !templateId) return;
+      await recordChangeBy(booking.userId, "booking.paid", templateId, {
+        bookingId,
+        amount,
+      });
+    } catch (e) {
+      console.error("AUDIT WRITE FAILED", "booking.paid", bookingId, e);
+    }
   }
 
   // UPDATE PAYMENT
@@ -354,6 +382,12 @@ export default class PaymentSvc {
       // Without this, venue/asset/service transactions stay "pending" forever and
       // providers won't receive payouts (payout fan-out iterates included txns).
       await this.approveBookingTransactions(bookingId);
+
+      // Only when this call is what made it paid: both the webhook and the
+      // client's confirmation reach here for the same payment.
+      if (payment.status !== PaymentStatus.paid) {
+        await this.recordPaidForPackage(bookingId, Number(updated.amount));
+      }
     }
 
     return updated;
