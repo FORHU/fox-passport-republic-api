@@ -42,7 +42,7 @@ const paymentRepo = vi.hoisted(() => ({
   getPaymentById: vi.fn(async () => ({ id: "p1" })),
   getPaymentByTransactionId: vi.fn(async () => ({ id: "p1" })),
   getBookingPayments: vi.fn(),
-  cancelExpiredPayments: vi.fn(async () => 0),
+  cancelExpiredPayments: vi.fn(async () => ({ cancelled: 0, eventIds: [] })),
 }));
 
 vi.mock("../src/modules/payment/payment.repository", () => ({

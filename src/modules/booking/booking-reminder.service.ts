@@ -1,5 +1,6 @@
 import BookingRepo from "./booking.repository";
 import NotificationService from "../notifications/user-notification.service";
+import EventRequestSvc from "../event-request/event-request.service";
 import { BookingStatus } from "@prisma/client";
 
 const REMINDER_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -90,6 +91,7 @@ export default class BookingReminderService {
       // Reaches the repository without passing through `BookingSvc`, which is
       // exactly the case the repository-level invalidation exists for.
       await BookingRepo.updateStatus(booking.id, BookingStatus.cancelled);
+      await EventRequestSvc.syncStatusFromBookings(booking.eventId);
 
       await NotificationService.create({
         userId: booking.userId,

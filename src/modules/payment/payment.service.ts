@@ -1,6 +1,7 @@
 import { AppError, notFound } from "../../utils/errors";
 import PaymentRepo, { PENDING_PAYMENT_TTL_MS } from "./payment.repository";
 import BookingRepo from "../booking/booking.repository";
+import EventRequestSvc from "../event-request/event-request.service";
 import AppointmentAccess from "../appointment/appointment.access";
 import { can } from "../../types/permissions";
 import crypto from "crypto";
@@ -66,13 +67,17 @@ export default class PaymentSvc {
    * invalidates are not the ones the caller is about to fill.
    *
    * The repository method returns how many it cancelled, so the common case -
-   * nothing expired - costs no invalidation at all. Call this rather than
+   * nothing expired - costs no invalidation at all, and the Events those
+   * bookings belong to, whose status then follows them. Call this rather than
    * `PaymentRepo.cancelExpiredPayments` directly; that is the whole point of it
    * being here.
    */
   static async sweepExpiredPayments(): Promise<number> {
-    const cancelled = await PaymentRepo.cancelExpiredPayments();
+    const { cancelled, eventIds } = await PaymentRepo.cancelExpiredPayments();
     if (cancelled > 0) await bookingCache.invalidateAll();
+    for (const eventId of eventIds) {
+      await EventRequestSvc.syncStatusFromBookings(eventId);
+    }
     return cancelled;
   }
 

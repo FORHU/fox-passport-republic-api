@@ -309,7 +309,7 @@ export default class PaymentRepo {
       },
     });
 
-    if (expiredPayments.length === 0) return 0;
+    if (expiredPayments.length === 0) return { cancelled: 0, eventIds: [] };
 
     const paymentIds = expiredPayments.map((p) => p.id);
     const bookingIds = [
@@ -319,6 +319,14 @@ export default class PaymentRepo {
         ),
       ),
     ];
+
+    // The Events of the bookings about to be cancelled, so the caller can
+    // re-derive their status; a bulk write never passes through BookingSvc.
+    const events = await prisma.booking.findMany({
+      where: { id: { in: bookingIds }, status: "pending" },
+      select: { eventId: true },
+      distinct: ["eventId"],
+    });
 
     // 2. Batch cancel payments and their related bookings
     await this.retiring(
@@ -337,6 +345,9 @@ export default class PaymentRepo {
       ]),
     );
 
-    return expiredPayments.length;
+    return {
+      cancelled: expiredPayments.length,
+      eventIds: events.map((e) => e.eventId),
+    };
   }
 }
