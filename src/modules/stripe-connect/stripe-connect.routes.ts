@@ -18,6 +18,13 @@ router.post(
   requirePermission("payouts:onboard"),
   StripeConnectCtrl.createOnboardingLink,
 );
+// The embedded dashboard and onboarding pages. Always the caller's own account.
+router.post(
+  "/account-session",
+  authenticate,
+  requirePermission("payouts:onboard"),
+  StripeConnectCtrl.createAccountSession,
+);
 router.get("/status", authenticate, StripeConnectCtrl.getStatus);
 
 export default router;
