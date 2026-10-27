@@ -2,6 +2,8 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
+  DeleteObjectCommand,
   HeadBucketCommand,
   CreateBucketCommand,
 } from "@aws-sdk/client-s3";
@@ -67,28 +69,60 @@ s3Client.middlewareStack.add(
 
 /**
  * Generates a presigned URL for direct S3 upload.
+ *
+ * The declared type and size are part of the signature, so S3 refuses a PUT
+ * of anything else (a browser sends both headers for a File body on its own).
+ * What the bytes actually are is checked after the upload — verifyUpload.
  */
 export async function getPutObjectPresignedUrl(params: {
   key: string;
-  contentType?: string;
+  contentType: string;
+  contentLength: number;
 }) {
-  const { key, contentType } = params;
+  const { key, contentType, contentLength } = params;
 
   const command = new PutObjectCommand({
     Bucket: AWS_S3_BUCKET,
     Key: key,
     ContentType: contentType,
+    ContentLength: contentLength,
     // Explicitly set to undefined to prevent SDK injection
     ChecksumAlgorithm: undefined,
   });
 
-  // Sign only the host to keep it as simple as possible for the browser
   const url = await getSignedUrl(s3Client, command, {
     expiresIn: 3600,
-    signableHeaders: new Set(["host"]),
+    signableHeaders: new Set(["host", "content-type", "content-length"]),
   });
 
   return url;
+}
+
+/** Size and stored Content-Type of an uploaded object in the media bucket. */
+export async function headObject(key: string) {
+  const res = await s3Client.send(
+    new HeadObjectCommand({ Bucket: AWS_S3_BUCKET, Key: key }),
+  );
+  return { size: res.ContentLength ?? 0, contentType: res.ContentType ?? "" };
+}
+
+/** The first `bytes` of an object — enough to read its file signature. */
+export async function readObjectHead(key: string, bytes = 4096) {
+  const res = await s3Client.send(
+    new GetObjectCommand({
+      Bucket: AWS_S3_BUCKET,
+      Key: key,
+      Range: `bytes=0-${bytes - 1}`,
+    }),
+  );
+  const body = res.Body as { transformToByteArray?: () => Promise<Uint8Array> };
+  return Buffer.from((await body?.transformToByteArray?.()) ?? []);
+}
+
+export async function deleteObject(key: string) {
+  await s3Client.send(
+    new DeleteObjectCommand({ Bucket: AWS_S3_BUCKET, Key: key }),
+  );
 }
 
 export async function uploadToS3(params: {

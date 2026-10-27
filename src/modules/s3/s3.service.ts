@@ -5,31 +5,23 @@ import {
   getGetObjectPresignedUrl,
   uploadToS3,
   uploadPrivateToS3,
+  headObject,
+  readObjectHead,
+  deleteObject,
 } from "../../utils/s3";
+import {
+  checkUpload,
+  formatForMime,
+  acceptedMimeTypes,
+  fileTooLarge,
+  FILE_EMPTY,
+  FILE_UNSUPPORTED,
+  IMAGE_UNREADABLE,
+  MAX_UPLOAD_SIZE,
+  type DetectedFile,
+} from "../../utils/file-signature";
+import { badRequest, notFound } from "../../utils/errors";
 
-const IMAGE_EXTENSIONS = [
-  "jpg",
-  "jpeg",
-  "png",
-  "gif",
-  "bmp",
-  "tiff",
-  "ico",
-  "webp",
-];
-const VIDEO_EXTENSIONS = ["mp4", "mov", "webm", "m4v"];
-const ALLOWED_EXTENSIONS = [...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS, "pdf"];
-const MAX_IMAGE_SIZE = 15 * 1024 * 1024;
-const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
-
-// GIFs are excluded — re-encoding through sharp's pipeline would collapse
-// the animation to its first frame. Everything else (including already-webp)
-// is safe to re-run through this: sharp is a no-op-ish pass-through cost-wise
-// on an already-small image, and this keeps every upload well under what a
-// phone camera or a screenshot actually produces.
-const RESIZABLE_IMAGE_EXTENSIONS = IMAGE_EXTENSIONS.filter(
-  (ext) => ext !== "gif",
-);
 const MAX_IMAGE_DIMENSION = 1600;
 // Identity documents: big enough to read an ID number or a seal.
 const DOCUMENT_IMAGE_DIMENSION = 2400;
@@ -56,35 +48,59 @@ async function optimizeImage(
     .toBuffer();
 }
 
+/**
+ * An image's bytes as they will be stored. Still images are re-encoded to
+ * WebP; GIFs are kept as they are (re-encoding would drop the animation) but
+ * still decoded, so a file that only starts like a GIF is turned away. One
+ * that can't be decoded is refused — storing it anyway is how a renamed
+ * executable or an empty file used to get through.
+ */
+async function prepareImage(
+  buffer: Buffer,
+  detected: DetectedFile,
+  maxDimension: number,
+): Promise<{ body: Buffer; contentType: string; ext: string }> {
+  try {
+    if (detected.ext === "gif") {
+      await sharp(buffer, { animated: true }).metadata();
+      return { body: buffer, contentType: detected.mime, ext: detected.ext };
+    }
+    return {
+      body: await optimizeImage(buffer, maxDimension),
+      contentType: "image/webp",
+      ext: "webp",
+    };
+  } catch {
+    throw badRequest(IMAGE_UNREADABLE);
+  }
+}
+
 export default class S3Svc {
+  /**
+   * A presigned PUT for one listing, venue or avatar image. The declared type
+   * and size are checked here and signed into the URL; the bytes themselves
+   * are checked once uploaded, by verifyUpload.
+   */
   static async generateUploadUrl(
     userId: string,
-    originalFilename: string,
-    contentType?: string,
-    sizeOfFile?: number,
+    contentType: string,
+    sizeOfFile: number,
   ) {
-    const ext = (
-      S3Svc.getFileExtension(originalFilename) || "bin"
-    ).toLowerCase();
-
-    if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      throw new Error("Only images, videos, and PDF files are allowed");
+    const format = formatForMime(contentType);
+    if (!format || !acceptedMimeTypes("image").includes(contentType)) {
+      throw badRequest(FILE_UNSUPPORTED.image);
+    }
+    if (!(sizeOfFile > 0)) throw badRequest(FILE_EMPTY);
+    if (sizeOfFile > MAX_UPLOAD_SIZE[format.kind]) {
+      throw badRequest(fileTooLarge(format.kind));
     }
 
-    const maxSize = VIDEO_EXTENSIONS.includes(ext)
-      ? MAX_VIDEO_SIZE
-      : MAX_IMAGE_SIZE;
-    if (!sizeOfFile || sizeOfFile > maxSize) {
-      throw new Error(
-        `File size must be ${maxSize / (1024 * 1024)}MB or below`,
-      );
-    }
-
-    const key = `users/${userId}/uploads/${crypto.randomUUID()}.${ext}`;
+    const key = `${S3Svc.uploadPrefix(userId)}${crypto.randomUUID()}.${format.ext}`;
 
     const url = await getPutObjectPresignedUrl({
       key,
       contentType,
+      contentLength: sizeOfFile,
     });
 
     return { url, key };
@@ -98,12 +114,40 @@ export default class S3Svc {
     return { url, key };
   }
 
-  private static getFileExtension(filename: string): string | undefined {
-    const parts = filename.split(".");
-    if (parts.length < 2) return undefined;
-    return parts.pop();
+  /** Where a user's presigned uploads land; nobody can register another's. */
+  static uploadPrefix(userId: string) {
+    return `users/${userId}/uploads/`;
   }
 
+  /**
+   * Checks a presigned upload's actual bytes before it is registered as a
+   * File. The browser PUT it straight to S3, so this is the first time the
+   * server sees it; anything that is not a supported image is deleted.
+   */
+  static async verifyUpload(userId: string, key: string) {
+    if (!key.startsWith(S3Svc.uploadPrefix(userId)) || key.includes("..")) {
+      throw notFound("Upload");
+    }
+    let size: number;
+    try {
+      ({ size } = await headObject(key));
+    } catch {
+      throw notFound("Upload");
+    }
+    try {
+      const head = size > 0 ? await readObjectHead(key) : Buffer.alloc(0);
+      const detected = checkUpload(head, size, "image");
+      const { url } = await S3Svc.generateDownloadUrl(key);
+      return { url, contentType: detected.mime };
+    } catch (err) {
+      await deleteObject(key).catch((e) =>
+        console.warn("[S3Svc] Could not delete a rejected upload:", e),
+      );
+      throw err;
+    }
+  }
+
+  /** A post or chat attachment (image or video), checked from its bytes. */
   static async uploadFile(
     userId: string,
     file: {
@@ -113,43 +157,20 @@ export default class S3Svc {
       size: number;
     },
   ) {
-    const ext = (
-      S3Svc.getFileExtension(file.originalname) || "bin"
-    ).toLowerCase();
-
-    if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      throw new Error("Only images, videos, and PDF files are allowed");
-    }
-
-    const maxSize = VIDEO_EXTENSIONS.includes(ext)
-      ? MAX_VIDEO_SIZE
-      : MAX_IMAGE_SIZE;
-    if (file.size > maxSize) {
-      throw new Error(
-        `File size must be ${maxSize / (1024 * 1024)}MB or below`,
-      );
-    }
+    const detected = checkUpload(file.buffer, file.size, "media");
 
     let body = file.buffer;
-    let contentType = file.mimetype;
-    let outExt = ext;
-
-    if (RESIZABLE_IMAGE_EXTENSIONS.includes(ext)) {
-      try {
-        body = await optimizeImage(file.buffer);
-        contentType = "image/webp";
-        outExt = "webp";
-      } catch (err) {
-        // A corrupt/unsupported image shouldn't block the upload outright —
-        // fall back to storing the original buffer as before.
-        console.warn(
-          "[S3Svc] Image optimization failed, storing original:",
-          err,
-        );
-      }
+    let contentType = detected.mime;
+    let outExt = detected.ext;
+    if (detected.kind === "image") {
+      ({
+        body,
+        contentType,
+        ext: outExt,
+      } = await prepareImage(file.buffer, detected, MAX_IMAGE_DIMENSION));
     }
 
-    const key = `users/${userId}/uploads/${crypto.randomUUID()}.${outExt}`;
+    const key = `${S3Svc.uploadPrefix(userId)}${crypto.randomUUID()}.${outExt}`;
 
     await uploadToS3({
       key,
@@ -162,8 +183,9 @@ export default class S3Svc {
 
   /**
    * An identity document (ID, clearance, proof of funds) into the private
-   * bucket. Images or PDFs only. Returns the storage key, never a URL:
-   * readers get a short-lived link from `getPrivateObjectUrl` instead.
+   * bucket. Images or PDFs only, checked from their bytes. Returns the
+   * storage key, never a URL: readers get a short-lived link from
+   * `getPrivateObjectUrl` instead.
    *
    * Images are still re-encoded — which also strips EXIF, GPS included — but
    * kept larger than feed photos so the small print on an ID stays legible.
@@ -177,32 +199,17 @@ export default class S3Svc {
       size: number;
     },
   ) {
-    const ext = (
-      S3Svc.getFileExtension(file.originalname) || "bin"
-    ).toLowerCase();
-    if (!IMAGE_EXTENSIONS.includes(ext) && ext !== "pdf") {
-      throw new Error("Upload an image or a PDF");
-    }
-    if (file.size > MAX_IMAGE_SIZE) {
-      throw new Error(
-        `File size must be ${MAX_IMAGE_SIZE / (1024 * 1024)}MB or below`,
-      );
-    }
+    const detected = checkUpload(file.buffer, file.size, "document");
 
     let body = file.buffer;
-    let contentType = ext === "pdf" ? "application/pdf" : file.mimetype;
-    let outExt = ext;
-    if (RESIZABLE_IMAGE_EXTENSIONS.includes(ext)) {
-      try {
-        body = await optimizeImage(file.buffer, DOCUMENT_IMAGE_DIMENSION);
-        contentType = "image/webp";
-        outExt = "webp";
-      } catch (err) {
-        console.warn(
-          "[S3Svc] Document image optimization failed, storing original:",
-          err,
-        );
-      }
+    let contentType = detected.mime;
+    let outExt = detected.ext;
+    if (detected.kind === "image") {
+      ({
+        body,
+        contentType,
+        ext: outExt,
+      } = await prepareImage(file.buffer, detected, DOCUMENT_IMAGE_DIMENSION));
     }
 
     const key = `users/${userId}/private/${crypto.randomUUID()}.${outExt}`;
