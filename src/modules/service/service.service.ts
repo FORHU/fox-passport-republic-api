@@ -3,6 +3,7 @@ import { serviceCache } from "../../utils/cache-namespaces";
 import { fingerprint } from "../../utils/cache.util";
 import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
+import { assertListingImages } from "../../utils/listing-images";
 
 /** Five minutes, matching the other two listing types. */
 const SERVICE_TTL = 300;
@@ -22,7 +23,7 @@ export default class ServiceSvc {
     price: number;
     currency?: string;
     billingRate?: BillingRate;
-    imgIds: string[];
+    imgIds?: string[];
     status?: ServiceStatus;
   }) {
     const normalized = {
@@ -35,16 +36,12 @@ export default class ServiceSvc {
       billingRate: data.billingRate ?? BillingRate.daily,
     };
 
-    if (!Array.isArray(data.imgIds) || data.imgIds.length === 0) {
-      throw new Error("At least one image is required");
-    }
-    if (data.imgIds.length > 5) {
-      throw new Error("A maximum of 5 images is allowed");
-    }
+    const imgIds = data.imgIds ?? [];
+    assertListingImages(normalized.status, imgIds.length);
 
     const serviceData = {
       ...normalized,
-      imgIds: data.imgIds,
+      imgIds,
     };
 
     return ServiceRepo.createService(serviceData);
@@ -133,6 +130,14 @@ export default class ServiceSvc {
     }
     if (existing.ownerId !== ownerId) {
       throw new Error("Unauthorized");
+    }
+    // Checked when the status changes, i.e. on publish, so an older listing
+    // that predates the image rule can still be edited in place.
+    if (data.status && data.status !== existing.status) {
+      assertListingImages(
+        data.status,
+        data.imgIds?.length ?? existing.images.length,
+      );
     }
 
     return ServiceRepo.updateService(id, data);

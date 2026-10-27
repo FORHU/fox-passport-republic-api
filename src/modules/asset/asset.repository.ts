@@ -238,9 +238,11 @@ export default class AssetRepo {
           billingRate: data.billingRate ?? undefined,
           condition: data.condition ?? undefined,
           status: data.status ?? undefined,
+          // `set`, not `connect`: a new image replaces the old one rather
+          // than piling up next to it.
           ...(data.imgIds &&
             data.imgIds.length > 0 && {
-              images: { connect: data.imgIds.map((id) => ({ id })) },
+              images: { set: data.imgIds.map((id) => ({ id })) },
             }),
         },
         include: {
