@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import FileSvc from "./file.service";
 import S3Svc from "../s3/s3.service";
+import { AppError } from "../../utils/errors";
 
 export default class FileCtrl {
   static async uploadDirect(req: Request, res: Response) {
@@ -69,17 +70,17 @@ export default class FileCtrl {
     }
   }
 
+  // POST /files/create — registers an image the browser uploaded through a
+  // presigned URL. Takes the upload's key, not a URL: the server checks the
+  // object's bytes and builds the URL itself, so nothing but a verified
+  // upload of the caller's own can become a File.
   static async createFile(req: Request, res: Response) {
     const schema = Joi.object({
-      url: Joi.string().uri().required(),
+      key: Joi.string().min(1).required(),
       name: Joi.string().min(1).required(),
-      type: Joi.string().min(1).required(),
-      venueId: Joi.string().uuid().optional(),
-      assetId: Joi.string().uuid().optional(),
-      serviceId: Joi.string().uuid().optional(),
     });
 
-    const { error, value } = schema.validate(req.body);
+    const { error, value } = schema.validate(req.body, { stripUnknown: true });
     if (error) {
       return res.status(400).json({ message: error.message });
     }
@@ -89,17 +90,18 @@ export default class FileCtrl {
       if (!uploadedBy) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      const file = await FileSvc.createFile({
-        ...value,
-        uploadedBy: String(uploadedBy),
-      });
+      const file = await FileSvc.registerUpload(
+        String(uploadedBy),
+        value.key,
+        value.name,
+      );
       return res
         .status(201)
         .json({ message: "File created successfully", file });
     } catch (e: unknown) {
       const err = e as Error;
       return res
-        .status(400)
+        .status(e instanceof AppError ? e.status : 400)
         .json({ message: err?.message || "Failed to create file" });
     }
   }
