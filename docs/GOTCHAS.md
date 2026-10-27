@@ -187,6 +187,35 @@ one developer machine.
 
 ---
 
+## 13. An upload's name and Content-Type are whatever the client says
+
+Upload validation used to read the file extension. An executable renamed
+`qa.jpg` passed, and when sharp then failed to re-encode it, the code stored
+the original bytes anyway "so a corrupt image doesn't block the upload". A
+zero-byte file took the same path. Presigned uploads went straight from the
+browser to S3 and `/files/create` registered whatever URL it was sent.
+
+Now every route decides the type from the bytes (`src/utils/file-signature.ts`,
+the one list of formats and size caps):
+
+| Kind | Formats | Max | Routes |
+|---|---|---|---|
+| image | JPEG, PNG, WebP, GIF | 15MB | presigned (listings, venues, avatars), upload-direct, private |
+| video | MP4/M4V/MOV, WebM | 100MB | upload-direct (posts, chat) |
+| pdf | PDF | 15MB | private (identity documents) |
+
+- An image sharp can't decode is **refused**, never stored as-is.
+- A presigned URL signs the declared `Content-Type` and `Content-Length`, and
+  `/files/create` takes the upload's `key`, reads its first bytes and deletes
+  anything that isn't a supported image under `users/<caller>/uploads/`.
+- **HEIC is unsupported on purpose**: sharp's prebuilt binaries can't decode
+  it. The mobile app is unaffected (its picker hands over JPEG); the web
+  pickers only offer the formats above.
+
+The web app mirrors the list in `src/shared/lib/uploadRules.ts`. Change both.
+
+---
+
 ## Owed elsewhere
 
 - **`add_audit_log` was applied locally and nowhere else.** Whenever staging or

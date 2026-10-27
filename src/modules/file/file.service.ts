@@ -23,6 +23,20 @@ export default class FileSvc {
   }
 
   /**
+   * Registers an image uploaded through a presigned URL, once S3Svc has
+   * checked that its bytes are a supported image under the user's prefix.
+   */
+  static async registerUpload(userId: string, key: string, name: string) {
+    const { url, contentType } = await S3Svc.verifyUpload(userId, key);
+    return FileSvc.createFile({
+      url,
+      name,
+      type: contentType,
+      uploadedBy: userId,
+    });
+  }
+
+  /**
    * Stores an identity document in the private bucket and registers it.
    * The record has no URL — see utils/private-files.ts for how it is read.
    */

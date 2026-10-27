@@ -9,6 +9,7 @@ import {
 } from "@prisma/client";
 import { toEnum } from "../../utils/enums";
 import EventRequestSvc from "../event-request/event-request.service";
+import BookingSvc from "../booking/booking.service";
 import VenueSvc from "../venue/venue.service";
 import AssetSvc from "../asset/asset.service";
 import ServiceSvc from "../service/service.service";
@@ -658,6 +659,43 @@ export default class AdminCtrl {
       });
       return res.status(200).json({ success: true, data: events });
     } catch (e: unknown) {
+      const error = e as Error;
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  static async getEventsNeedingReview(req: Request, res: Response) {
+    try {
+      const events = await EventRequestSvc.findNeedingReview();
+      return res.status(200).json({ success: true, data: events });
+    } catch (e: unknown) {
+      const error = e as Error;
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  /** Settle one booking of an Event flagged for review: attended or no-show. */
+  static async settleBookingForReview(req: Request, res: Response) {
+    try {
+      const outcome = req.body?.outcome;
+      if (outcome !== "attended" && outcome !== "noShow") {
+        return res.status(400).json({
+          success: false,
+          message: 'outcome must be "attended" or "noShow"',
+        });
+      }
+      const booking = await BookingSvc.settleForReview(
+        req.params.id,
+        outcome,
+        req.user!.userId,
+      );
+      return res.status(200).json({ success: true, data: booking });
+    } catch (e: unknown) {
+      if (e instanceof AppError) {
+        return res
+          .status(e.status)
+          .json({ success: false, message: e.message, code: e.code });
+      }
       const error = e as Error;
       return res.status(500).json({ success: false, message: error.message });
     }
