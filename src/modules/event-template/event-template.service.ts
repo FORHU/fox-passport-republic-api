@@ -198,9 +198,9 @@ export default class EventTemplateSvc {
 
   /**
    * A package's History for its owner, newest first: edits to it, items added
-   * and removed, and its bookings (booked, checked in, cancelled). Who did it
-   * is a name, never the email the audit row keeps: the owner sees their
-   * guests here, and a guest's email is not theirs to see.
+   * and removed, and its bookings (booked, paid, checked in, cancelled). Who
+   * did it is a name, never the email the audit row keeps: the owner sees
+   * their guests here, and a guest's email is not theirs to see.
    */
   static async history(templateId: string, ownerId: string) {
     await this.verifyOwnership(templateId, ownerId);
