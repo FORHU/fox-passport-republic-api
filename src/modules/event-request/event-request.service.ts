@@ -9,6 +9,8 @@ import { sendApprovedEmail } from "../../utils/emails/approved";
 import { sendRejectedEmail } from "../../utils/emails/rejected";
 import OrganizerXpService from "../appointment/organizer-xp.service";
 import AppointmentAccess from "../appointment/appointment.access";
+import NotificationService from "../notifications/user-notification.service";
+import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
 
 export default class EventRequestSvc {
   static async createDirectEvent(data: {
@@ -202,6 +204,38 @@ export default class EventRequestSvc {
     } catch (e) {
       console.error(`Event status sync failed for ${eventId}`, e);
     }
+  }
+
+  /**
+   * Runs daily (jobs/unattended-events.job.ts). An Event that ended with
+   * bookings and nobody checked in is flagged for review, once, and its Event
+   * Foxer told. Its status is left alone: no completion XP, payouts or
+   * refunds follow from it. A person settles it. Several API instances run
+   * the job at once, so the flag is claimed before anyone is told.
+   */
+  static async flagUnattendedPast(now = new Date()) {
+    const events = await EventRequestRepo.findUnattendedPast(now);
+    let flagged = 0;
+    for (const event of events) {
+      if (!(await EventRequestRepo.claimReviewFlag(event.id, now))) continue;
+      flagged++;
+      await NotificationService.create({
+        userId: event.organizerId,
+        type: "EVENT_NEEDS_REVIEW",
+        title: "Event needs review",
+        message: `${event.name} has ended and nobody was checked in. It stays open until it's reviewed.`,
+        metadata: { link: "/creator-dashboard/events", eventId: event.id },
+      }).catch((e) =>
+        console.error(`Failed to notify review flag for event ${event.id}`, e),
+      );
+    }
+    if (flagged > 0) announceAdminQueueChanged();
+    return flagged;
+  }
+
+  /** Flagged Events not yet settled, for the admin review list. */
+  static async findNeedingReview() {
+    return EventRequestRepo.findNeedingReview();
   }
 
   private static async onCompleted(eventId: string) {

@@ -1149,6 +1149,21 @@ export default class BookingSvc {
       id,
       status as ItemBookingStatus,
     );
+    await this.afterStatusChange(booking, status);
+    return updated;
+  }
+
+  /**
+   * What follows a booking's status change, once it is written: its Event's
+   * status, and on `completed` the payouts, the guest's stamp and the XP.
+   * Shared by `updateStatus` and `settleForReview`, so a booking settled by
+   * an admin's review goes through exactly what check-in does.
+   */
+  private static async afterStatusChange(
+    booking: NonNullable<Awaited<ReturnType<typeof BookingRepo.findById>>>,
+    status: string,
+  ) {
+    const id = booking.id;
     // Check-in settles a booking through here, so this is where its Event
     // reaches `completed`.
     await EventRequestSvc.syncStatusFromBookings(booking.eventId);
@@ -1207,7 +1222,71 @@ export default class BookingSvc {
     }
 
     announceBookingChanged(booking.userId, booking.event?.organizerId);
-    return updated;
+  }
+
+  /**
+   * An admin settles one booking of an Event flagged for review: it ended
+   * and nobody was checked in (EventRequestSvc.flagUnattendedPast).
+   *
+   * `attended` settles it as check-in does - payouts, stamp, XP - except the
+   * Organizer XP check-in earns, since no Organizer checked anyone in.
+   * `noShow` cancels it with no refund: the event has started, so the
+   * cancellation policy refunds nothing, and what was paid stays put until
+   * an admin moves it by hand.
+   *
+   * Each runs once. The write is a claim on a booking still open, so a
+   * second click or a second admin changes nothing and is told so.
+   */
+  static async settleForReview(
+    id: string,
+    outcome: "attended" | "noShow",
+    adminId: string,
+  ) {
+    const booking = await BookingRepo.findById(id);
+    if (!booking) throw notFound("Booking");
+    if (!booking.event?.reviewFlaggedAt) {
+      throw new AppError("This booking's event is not flagged for review", 409);
+    }
+
+    const attended = outcome === "attended";
+    if (!(await BookingRepo.settleForReview(id, attended))) {
+      throw new AppError(
+        attended
+          ? "This booking is already settled, or was never paid"
+          : "This booking is already settled",
+        409,
+      );
+    }
+
+    if (attended) {
+      await this.afterStatusChange(booking, ItemBookingStatus.completed);
+      await this.recordForPackage(
+        adminId,
+        "booking.checkedIn",
+        booking.event.templateId,
+        { bookingId: id, byReview: true },
+      );
+    } else {
+      await this.afterStatusChange(booking, ItemBookingStatus.cancelled);
+      await this.recordForPackage(
+        adminId,
+        "booking.cancelled",
+        booking.event.templateId,
+        { bookingId: id, noShow: true },
+      );
+      await NotificationService.create({
+        userId: booking.userId,
+        type: "BOOKING_NO_SHOW",
+        title: "Marked as a no-show",
+        message: `Your booking for ${booking.event.name} was marked as a no-show after the event, so it has been closed.`,
+        metadata: { link: `/booking/${id}` },
+      }).catch((e) =>
+        console.error(`Failed to notify no-show for booking ${id}`, e),
+      );
+    }
+
+    announceAdminQueueChanged();
+    return BookingRepo.findById(id);
   }
 
   // Host scans the booking QR at the door: mark checked-in AND immediately

@@ -262,6 +262,20 @@ router.get(
   requirePermission("queue:read"),
   AdminCtrl.getPendingEvents,
 );
+// Ended with bookings and nobody checked in (EventRequestSvc.flagUnattendedPast).
+router.get(
+  "/events/needs-review",
+  authenticate,
+  requirePermission("queue:read"),
+  AdminCtrl.getEventsNeedingReview,
+);
+// Settle one booking of an Event in that list: { outcome: "attended" | "noShow" }.
+router.patch(
+  "/bookings/:id/review-outcome",
+  authenticate,
+  requirePermission("queue:decide"),
+  AdminCtrl.settleBookingForReview,
+);
 router.patch(
   "/events/:id/approve",
   authenticate,

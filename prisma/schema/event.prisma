@@ -145,6 +145,10 @@ model Event {
   // Whether approved Organizers may ask to join this Event's team. Off until
   // the Event Owner turns it on.
   acceptsOrganizerRequests Boolean @default(false)
+  // When the daily sweep flagged this Event for review: it ended with bookings
+  // and nobody checked in (EventRequestSvc.flagUnattendedPast). The flag never
+  // changes its status; a person settles it. Null = never flagged.
+  reviewFlaggedAt      DateTime?
   organizerXp          OrganizerEventXp[]
   inboxConversations   Conversation[]
   eventServiceBids     EventServiceBid[]
