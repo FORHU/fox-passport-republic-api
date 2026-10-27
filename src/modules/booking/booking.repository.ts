@@ -308,6 +308,38 @@ export default class BookingRepo {
    * above: that one returns the event and the user for an announcement these
    * paths make themselves, from a booking they have already loaded.
    */
+  /**
+   * Settles a booking of an Event flagged for review (BookingSvc.
+   * settleForReview), once: the status in the `where` is the claim, so a
+   * second attempt matches nothing and gets `false`. Attended needs a paid
+   * booking, as check-in does; a no-show may close an unpaid one too.
+   */
+  static async settleForReview(id: string, attended: boolean) {
+    const { count } = await this.retiring(
+      prisma.booking.updateMany({
+        where: attended
+          ? {
+              id,
+              status: { in: [BookingStatus.confirmed, BookingStatus.active] },
+            }
+          : {
+              id,
+              status: {
+                in: [
+                  BookingStatus.pending,
+                  BookingStatus.confirmed,
+                  BookingStatus.active,
+                ],
+              },
+            },
+        data: attended
+          ? { checkedIn: true, status: BookingStatus.completed }
+          : { status: BookingStatus.cancelled },
+      }),
+    );
+    return count === 1;
+  }
+
   static async cancel(id: string) {
     return this.retiring(
       prisma.booking.update({

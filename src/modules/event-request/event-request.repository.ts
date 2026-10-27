@@ -118,6 +118,64 @@ export default class EventRequestRepo {
     return count === 1;
   }
 
+  /**
+   * Events that ended before `before` with live bookings and no check-in,
+   * still unsettled and not yet flagged (EventRequestSvc.flagUnattendedPast).
+   */
+  static async findUnattendedPast(before: Date) {
+    return prisma.event.findMany({
+      where: {
+        endAt: { lt: before },
+        reviewFlaggedAt: null,
+        eventStatus: { notIn: [EventStatus.completed, EventStatus.cancelled] },
+        bookings: {
+          some: { status: { not: "cancelled" } },
+          none: { checkedIn: true },
+        },
+      },
+      select: { id: true, name: true, organizerId: true },
+    });
+  }
+
+  /**
+   * Flags an Event for review once. The null in the `where` makes the write
+   * the claim: of sweeps running at once, exactly one gets `true`.
+   */
+  static async claimReviewFlag(id: string, at: Date) {
+    const { count } = await prisma.event.updateMany({
+      where: { id, reviewFlaggedAt: null },
+      data: { reviewFlaggedAt: at },
+    });
+    return count === 1;
+  }
+
+  /** Flagged Events still waiting for a person to settle them, oldest first. */
+  static async findNeedingReview() {
+    return prisma.event.findMany({
+      where: {
+        reviewFlaggedAt: { not: null },
+        eventStatus: { notIn: [EventStatus.completed, EventStatus.cancelled] },
+      },
+      include: {
+        template: EventRequestRepo.templateInclude,
+        client: { select: { name: true, email: true } },
+        host: { select: { name: true, email: true } },
+        // What the admin settles, one by one.
+        bookings: {
+          select: {
+            id: true,
+            status: true,
+            checkedIn: true,
+            guestCount: true,
+            user: { select: { id: true, name: true, email: true } },
+          },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+      orderBy: { reviewFlaggedAt: "asc" },
+    });
+  }
+
   static async bookingStatuses(eventId: string) {
     return prisma.booking.findMany({
       where: { eventId },
