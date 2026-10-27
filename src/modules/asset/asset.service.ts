@@ -8,6 +8,7 @@ import AssetRepo from "./asset.repository";
 import { assetCache } from "../../utils/cache-namespaces";
 import { fingerprint } from "../../utils/cache.util";
 import { v4 as uuidv4 } from "uuid";
+import { assertListingImages } from "../../utils/listing-images";
 
 /** Five minutes, matching venues: listings are browsed far more than edited. */
 const ASSET_TTL = 300;
@@ -25,7 +26,7 @@ export default class AssetSvc {
     currency?: string;
     billingRate?: BillingRate;
     status?: AssetStatus;
-    imgIds: string[];
+    imgIds?: string[];
   }) {
     const normalized = {
       ...data,
@@ -37,16 +38,12 @@ export default class AssetSvc {
       billingRate: data.billingRate ?? BillingRate.daily,
     };
 
-    if (!Array.isArray(data.imgIds) || data.imgIds.length === 0) {
-      throw new Error("At least one image is required");
-    }
-    if (data.imgIds.length > 5) {
-      throw new Error("A maximum of 5 images is allowed");
-    }
+    const imgIds = data.imgIds ?? [];
+    assertListingImages(normalized.status, imgIds.length);
 
     const assetData = {
       ...normalized,
-      imgIds: data.imgIds,
+      imgIds,
     };
 
     const asset = await AssetRepo.createAsset(assetData);
@@ -122,6 +119,7 @@ export default class AssetSvc {
       currency?: string;
       billingRate?: BillingRate;
       status?: AssetStatus;
+      imgIds?: string[];
     }>,
   ) {
     const existing = await AssetRepo.findAssetById(id);
@@ -130,6 +128,14 @@ export default class AssetSvc {
     }
     if (existing.ownerId !== ownerId) {
       throw new Error("Unauthorized");
+    }
+    // Checked when the status changes, i.e. on publish, so an older listing
+    // that predates the image rule can still be edited in place.
+    if (data.status && data.status !== existing.status) {
+      assertListingImages(
+        data.status,
+        data.imgIds?.length ?? existing.images.length,
+      );
     }
 
     return AssetRepo.updateAsset(id, data);

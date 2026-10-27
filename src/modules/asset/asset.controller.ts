@@ -10,6 +10,7 @@ import {
 } from "@prisma/client";
 import { toEnum } from "../../utils/enums";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
+import { MAX_LISTING_IMAGES } from "../../utils/listing-images";
 
 interface CreateAssetPayload {
   category: AssetCategory;
@@ -25,7 +26,7 @@ interface CreateAssetPayload {
   country?: string;
   lat?: number;
   lng?: number;
-  imgIds: string[];
+  imgIds?: string[];
   status?: AssetStatus;
   cancellationPolicyId?: string;
   venueId?: string;
@@ -56,7 +57,11 @@ export default class AssetCtrl {
       country: Joi.string().optional(),
       lat: Joi.number().optional(),
       lng: Joi.number().optional(),
-      imgIds: Joi.array().items(Joi.string()).min(1).max(5).required(),
+      // Empty is fine for a draft; AssetSvc requires an image past draft.
+      imgIds: Joi.array()
+        .items(Joi.string())
+        .max(MAX_LISTING_IMAGES)
+        .default([]),
       status: Joi.string()
         .valid(...Object.values(AssetStatus))
         .optional(),
@@ -189,6 +194,12 @@ export default class AssetCtrl {
       lng: Joi.number().optional(),
       status: Joi.string()
         .valid(...Object.values(AssetStatus))
+        .optional(),
+      // Replaces the listing's images; omit it to leave them as they are.
+      imgIds: Joi.array()
+        .items(Joi.string())
+        .min(1)
+        .max(MAX_LISTING_IMAGES)
         .optional(),
       cancellationPolicyId: Joi.string().uuid().optional(),
     }).min(1);

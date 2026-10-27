@@ -6,6 +6,7 @@ import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 import { toEnum } from "../../utils/enums";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
 import { can, isPerformerServiceCategory } from "../../types/permissions";
+import { MAX_LISTING_IMAGES } from "../../utils/listing-images";
 
 /**
  * The route-level gate (`requirePermissionAny(["service:manage",
@@ -43,7 +44,7 @@ interface CreateServicePayload {
   price: number;
   currency?: string;
   billingRate?: BillingRate;
-  imgIds: string[];
+  imgIds?: string[];
   status?: ServiceStatus;
   cancellationPolicyId?: string;
 }
@@ -70,7 +71,11 @@ export default class ServiceCtrl {
       billingRate: Joi.string()
         .valid(...Object.values(BillingRate))
         .optional(),
-      imgIds: Joi.array().items(Joi.string()).min(1).max(5).required(),
+      // Empty is fine for a draft; ServiceSvc requires an image past draft.
+      imgIds: Joi.array()
+        .items(Joi.string())
+        .max(MAX_LISTING_IMAGES)
+        .default([]),
       status: Joi.string()
         .valid(...Object.values(ServiceStatus))
         .optional(),
@@ -198,6 +203,12 @@ export default class ServiceCtrl {
         .optional(),
       status: Joi.string()
         .valid(...Object.values(ServiceStatus))
+        .optional(),
+      // Replaces the listing's images; omit it to leave them as they are.
+      imgIds: Joi.array()
+        .items(Joi.string())
+        .min(1)
+        .max(MAX_LISTING_IMAGES)
         .optional(),
       cancellationPolicyId: Joi.string().uuid().optional(),
     }).min(1);
