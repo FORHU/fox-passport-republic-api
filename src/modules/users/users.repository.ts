@@ -723,7 +723,8 @@ export default class UsersRepo {
           },
         },
         roleType: true,
-        systemRole: true,
+        // Not `systemRole`: a public page has no use for it, and it would
+        // tell anyone which accounts are the admins.
         identityVerifiedAt: true,
         createdAt: true,
         foxerSpecializations: {

@@ -90,14 +90,39 @@ export default class UsersSvc {
   }
 
   // GET PUBLIC PROFILE (Citizen profile with passport, badges, stamps, listings, and posts)
-  static async getPublicProfile(idOrUsername: string) {
+  /**
+   * A citizen's public profile. Anyone may read it, signed in or not, and it
+   * can be indexed, so venue stamps (the events they attended) show the venue
+   * and city only: with the event's name, date, photo and free-text location
+   * they read as a dated record of where the person was. Those stay visible to
+   * the person themselves.
+   */
+  static async getPublicProfile(idOrUsername: string, viewerId?: string) {
     const profile = await userCache.cached(
       `publicProfile:${idOrUsername}`,
       USER_TTL,
       () => UsersRepo.findPublicCitizenProfile(idOrUsername),
     );
     if (!profile) throw new Error("Citizen profile not found");
-    return profile;
+    if (viewerId === profile.id || !profile.passport) return profile;
+
+    return {
+      ...profile,
+      passport: {
+        ...profile.passport,
+        // Built from what others may see, not by removing what they may
+        // not: `createdAt` dates the stamp as surely as `eventDate`, and a
+        // field added to the query later stays private by default.
+        stamps: profile.passport.stamps.map(
+          ({ id, xpEarned, venueId, venue }) => ({
+            id,
+            xpEarned,
+            venueId,
+            venue,
+          }),
+        ),
+      },
+    };
   }
 
   /**
