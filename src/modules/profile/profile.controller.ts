@@ -53,6 +53,15 @@ export default class ProfileCtrl {
         district: Joi.string().allow("").optional(),
         isPrivate: Joi.boolean().optional(),
         bio: Joi.string().trim().max(300).allow("").optional(),
+        // Each is checked and turned into a clean address by the service.
+        socialLinks: Joi.object({
+          instagram: Joi.string().trim().max(300).allow(""),
+          facebook: Joi.string().trim().max(300).allow(""),
+          tiktok: Joi.string().trim().max(300).allow(""),
+          x: Joi.string().trim().max(300).allow(""),
+          youtube: Joi.string().trim().max(300).allow(""),
+          website: Joi.string().trim().max(300).allow(""),
+        }).optional(),
         preferredCurrency: Joi.string()
           .valid(...SUPPORTED_CURRENCIES)
           .optional(),

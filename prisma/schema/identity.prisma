@@ -33,6 +33,9 @@ model User {
   lastActiveAt             DateTime?
   // A few lines about themselves, shown on their public profile. Optional.
   bio                      String?
+  // Links to their other social accounts, shown on the public profile:
+  // `{ instagram, facebook, tiktok, x, youtube, website }`, each an address.
+  socialLinks              Json?
 
   // 1:1 Domain extensions
   profile                  UserProfile?
