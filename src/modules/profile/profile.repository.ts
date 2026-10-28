@@ -30,6 +30,7 @@ export default class ProfileRepo {
         // the same flag the booking services enforce.
         isEmailVerified: true,
         isPrivate: true,
+        bio: true,
         preferredCurrency: true,
         // The "Verified" badge — display only.
         identityVerifiedAt: true,
@@ -67,6 +68,7 @@ export default class ProfileRepo {
       systemRole: user.systemRole,
       roleType: user.roleType,
       isPrivate: user.profile?.isPrivate ?? user.isPrivate,
+      bio: user.bio,
       preferredCurrency:
         user.settings?.preferredCurrency ?? user.preferredCurrency,
       createdAt: user.createdAt,
@@ -121,6 +123,7 @@ export default class ProfileRepo {
       city?: string;
       district?: string;
       isPrivate?: boolean;
+      bio?: string | null;
       preferredCurrency?: string;
     },
   ) {
@@ -139,6 +142,7 @@ export default class ProfileRepo {
             ...(data.city !== undefined && { city: data.city }),
             ...(data.district !== undefined && { district: data.district }),
             ...(data.isPrivate !== undefined && { isPrivate: data.isPrivate }),
+            ...(data.bio !== undefined && { bio: data.bio }),
             ...(data.preferredCurrency !== undefined && {
               preferredCurrency: data.preferredCurrency,
             }),
@@ -151,6 +155,7 @@ export default class ProfileRepo {
             systemRole: true,
             roleType: true,
             district: true,
+            bio: true,
             updatedAt: true,
           },
         });

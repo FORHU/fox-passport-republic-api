@@ -78,6 +78,7 @@ export default class ProfileCtrl {
         city: Joi.string().allow("").optional(),
         district: Joi.string().allow("").optional(),
         isPrivate: Joi.boolean().optional(),
+        bio: Joi.string().trim().max(300).allow("").optional(),
         preferredCurrency: Joi.string()
           .valid(...SUPPORTED_CURRENCIES)
           .optional(),
