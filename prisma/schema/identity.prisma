@@ -31,6 +31,8 @@ model User {
   stripeOnboardingComplete Boolean                      @default(false)
   isPrivate                Boolean                      @default(false)
   lastActiveAt             DateTime?
+  // A few lines about themselves, shown on their public profile. Optional.
+  bio                      String?
 
   // 1:1 Domain extensions
   profile                  UserProfile?

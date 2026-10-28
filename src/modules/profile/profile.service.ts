@@ -32,6 +32,7 @@ export default class ProfileSvc {
       city?: string;
       district?: string;
       isPrivate?: boolean;
+      bio?: string;
       preferredCurrency?: string;
     },
   ) {
@@ -47,10 +48,14 @@ export default class ProfileSvc {
       }
     }
 
-    const { profileImage, ...rest } = data;
+    const { profileImage, bio, ...rest } = data;
     return ProfileRepo.updateProfile(userId, {
       ...rest,
       ...(profileImage !== undefined ? { imgId: profileImage } : {}),
+      // An empty bio clears it.
+      ...(bio !== undefined
+        ? { bio: bio.trim() === "" ? null : bio.trim() }
+        : {}),
     } as Parameters<typeof ProfileRepo.updateProfile>[1]);
   }
 
