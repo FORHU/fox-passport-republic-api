@@ -1,7 +1,8 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import Joi from "joi";
 import { InvestmentType, InventoryCategory } from "@prisma/client";
 import InvestmentSvc from "./investment.service";
+import { unauthorized } from "../../utils/errors";
 
 export default class InvestmentCtrl {
   // POST /v1/investments
@@ -81,7 +82,11 @@ export default class InvestmentCtrl {
       const type = req.query.type as InvestmentType | undefined;
       const category = req.query.category as InventoryCategory | undefined;
       const partnerId = req.query.partnerId as string | undefined;
-      const status = req.query.status as string | undefined;
+      // Soft-deleted rows are never listable.
+      const status =
+        req.query.status === "deleted"
+          ? undefined
+          : (req.query.status as string | undefined);
       const country = req.query.country as string | undefined;
       const city = req.query.city as string | undefined;
       const limit = Number(req.query.limit) || 20;
@@ -176,24 +181,117 @@ export default class InvestmentCtrl {
     }
   }
 
-  // PATCH /v1/investments/:id/cancel
-  static async cancelInvestment(req: Request, res: Response) {
+  // PATCH /v1/investments/:id
+  static async updateInvestment(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) {
+    const schema = Joi.object({
+      title: Joi.string().min(3).max(120),
+      description: Joi.string().min(10).max(2000),
+      inventoryCategory: Joi.string().valid(
+        "furniture_seating",
+        "tables_staging",
+        "audio_visual",
+        "lighting_rigging",
+        "power_climate",
+        "decor_props",
+        "other",
+      ),
+      quantityTotal: Joi.number().integer().min(1),
+      itemCondition: Joi.string(),
+      usageTerms: Joi.string(),
+      address: Joi.string(),
+      city: Joi.string(),
+      state: Joi.string(),
+      country: Joi.string(),
+      lat: Joi.number().min(-90).max(90),
+      lng: Joi.number().min(-180).max(180),
+      deliveryRadiusKm: Joi.number().positive(),
+      transportPolicy: Joi.string().valid(
+        "self_pickup",
+        "partner_delivers_free",
+        "partner_delivers_fee",
+      ),
+      mediaUrls: Joi.array().items(Joi.string().uri()),
+    }).min(1);
+
+    const { error, value } = schema.validate(req.body);
+    if (error) {
+      return res
+        .status(400)
+        .json({ success: false, message: error.details[0].message });
+    }
+
     try {
       const requesterId = req.user?.userId;
-      if (!requesterId) {
-        return res
-          .status(401)
-          .json({ success: false, message: "Unauthorized" });
-      }
+      if (!requesterId) throw unauthorized();
+      const investment = await InvestmentSvc.updateInvestment(
+        req.params.id,
+        requesterId,
+        value,
+      );
+      return res.status(200).json({ success: true, data: investment });
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  // PATCH /v1/investments/:id/cancel
+  static async cancelInvestment(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) {
+    try {
+      const requesterId = req.user?.userId;
+      if (!requesterId) throw unauthorized();
       const investment = await InvestmentSvc.cancelInvestment(
         req.params.id,
         requesterId,
       );
       return res.status(200).json({ success: true, data: investment });
-    } catch (e: unknown) {
-      const err = e as Error;
-      const status = err.message.includes("Only the investor") ? 403 : 400;
-      return res.status(status).json({ success: false, message: err.message });
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  // PATCH /v1/investments/:id/archive
+  static async archiveInvestment(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) {
+    try {
+      const requesterId = req.user?.userId;
+      if (!requesterId) throw unauthorized();
+      const investment = await InvestmentSvc.archiveInvestment(
+        req.params.id,
+        requesterId,
+      );
+      return res.status(200).json({ success: true, data: investment });
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  // DELETE /v1/investments/:id (soft delete)
+  static async deleteInvestment(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) {
+    try {
+      const requesterId = req.user?.userId;
+      if (!requesterId) throw unauthorized();
+      const investment = await InvestmentSvc.deleteInvestment(
+        req.params.id,
+        requesterId,
+      );
+      return res.status(200).json({ success: true, data: investment });
+    } catch (e) {
+      next(e);
     }
   }
 }
