@@ -1,6 +1,7 @@
 import { prisma } from "../../utils/prisma";
 import { cached } from "../../utils/cache.util";
 import { City, Country, State, type ICity } from "country-state-city";
+import { phoneCallingCode } from "../../utils/phone";
 import { phCities, phProvinceOfCity, phStates } from "./ph-geo";
 import { CITY_EXTRAS } from "./city-extras";
 import { VenueStatus } from "@prisma/client";
@@ -186,7 +187,10 @@ export class GeoDirectory {
           code: c.isoCode,
           name: c.name,
           flag: c.flag,
-          phoneCode: c.phonecode,
+          // libphonenumber's calling code, not the dataset's: that one reads
+          // "+1-809 and 1-829" for some countries. "" where a territory has
+          // no phone numbering (Antarctica, Bouvet Island, ...).
+          phoneCode: phoneCallingCode(c.isoCode),
           currency: c.currency,
         }))
         .sort((a, b) => a.name.localeCompare(b.name));

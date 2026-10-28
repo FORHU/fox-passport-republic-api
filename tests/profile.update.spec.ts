@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Request, Response } from "express";
 
 /**
- * PUT /profile: a username is letters, numbers, `_` and `.` only, a phone is
- * 8–15 digits with an optional `+`, and an empty phone clears the number.
+ * PUT /profile: a username is letters, numbers, `_` and `.` only, a phone must
+ * be valid for one of the project's countries and is stored as E.164 (no
+ * +code reads as Philippine), and an empty phone clears the number.
  * A rejected field is named in the response so the form can show the message
  * under that input.
  */
@@ -72,20 +73,35 @@ describe("PUT /profile validation", () => {
     expect(updateProfile).toHaveBeenCalledWith("u1", { phone: "" });
   });
 
-  it("strips formatting from a valid phone", async () => {
-    const res = await call({ phone: "+63 917-123 4567" });
+  it.each([
+    ["+63 917-123 4567", "+639171234567"],
+    ["0917 123 4567", "+639171234567"],
+    ["917 123 4567", "+639171234567"],
+    ["(02) 8123 4567", "+63281234567"],
+    ["+1 415 555 0132", "+14155550132"],
+    ["+44 20 7946 0958", "+442079460958"],
+    ["+1 809 555 0123", "+18095550123"],
+  ])("stores %j as %j", async (phone, stored) => {
+    const res = await call({ phone });
     expect(res.statusCode).toBe(200);
-    expect(updateProfile).toHaveBeenCalledWith("u1", {
-      phone: "+639171234567",
-    });
+    expect(updateProfile).toHaveBeenCalledWith("u1", { phone: stored });
   });
 
-  it("rejects a phone that is too short or has letters", async () => {
-    for (const phone of ["12345", "0917abc4567"]) {
-      const res = await call({ phone });
-      expect(res.statusCode).toBe(400);
-      expect(res.body.field).toBe("phone");
-    }
+  it.each([
+    "12345",
+    "12345678",
+    "0917abc4567",
+    "<b>09171234567</b>",
+    "+00000000",
+    "+63 000 000 0000",
+    "1234567890123456",
+    // Valid in Ascension Island, which isn't one of the project's countries.
+    "+247 40123",
+  ])("rejects %j and names the field", async (phone) => {
+    const res = await call({ phone });
+    expect(res.statusCode).toBe(400);
+    expect(res.body.field).toBe("phone");
+    expect(updateProfile).not.toHaveBeenCalled();
   });
 
   it("names the username field when it is already taken", async () => {
