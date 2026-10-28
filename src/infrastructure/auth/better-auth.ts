@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { bearer, emailOTP } from "better-auth/plugins";
+import { createAuthMiddleware } from "better-auth/api";
 import { prisma } from "../../utils/prisma";
 import { sendTemplatedEmail } from "../../utils/helpers";
 import {
@@ -39,15 +40,21 @@ export const auth = betterAuth({
         type: "string",
         required: false,
       },
+      // Never from the request: sign-up and /update-user pass extra body
+      // fields through, so without `input: false` anyone could send
+      // `systemRole: "admin"` and become one. Roles are granted by the admin
+      // routes, through Prisma.
       systemRole: {
         type: "string",
         required: false,
         defaultValue: "user",
+        input: false,
       },
       roleType: {
         type: "string[]",
         required: false,
         defaultValue: [],
+        input: false,
       },
     },
   },
@@ -102,6 +109,29 @@ export const auth = betterAuth({
         return bcrypt.hash(password, 12);
       },
     },
+  },
+  hooks: {
+    // A sign-in replaces the session the request arrived with, as logging out
+    // would. Signing in as someone else without logging out first used to
+    // leave the first account's session valid for its full seven days, for
+    // whoever still held its token. Runs only once a new session exists, so a
+    // wrong password signs nobody out; and the `bearer` plugin has already
+    // copied an `Authorization: Bearer` token (mobile, the web proxy) into the
+    // cookie it reads. A refresh that keeps the same token is left alone.
+    after: createAuthMiddleware(async (ctx) => {
+      const created = ctx.context.newSession?.session.token;
+      if (!created) return;
+      const previous = await ctx.getSignedCookie(
+        ctx.context.authCookies.sessionToken.name,
+        ctx.context.secret,
+      );
+      if (!previous || previous === created) return;
+      try {
+        await ctx.context.internalAdapter.deleteSession(previous);
+      } catch (e) {
+        ctx.context.logger.error("Failed to revoke the replaced session", e);
+      }
+    }),
   },
   plugins: [
     bearer(),

@@ -5,6 +5,7 @@ import BookingSvc from "./booking.service";
 import { AppError } from "../../utils/errors";
 import RefundSvc from "../refund/refund.service";
 import { totalPages } from "../../utils/pagination";
+import { can } from "../../types/permissions";
 
 export default class BookingCtrl {
   // BOOK FROM TEMPLATE — creates an Event + Booking in one shot for a logged-in client
@@ -327,6 +328,19 @@ export default class BookingCtrl {
   // GET USER BOOKINGS
   static async getUserBookings(req: Request, res: Response) {
     try {
+      // The id in the path is the client's word for whose bookings these are;
+      // the session decides whose it may be. Anyone could read anyone's list
+      // by changing it, and the web asked with a stale stored id after an
+      // account switch. Same rule as GET /asset/bookings and /service/bookings.
+      if (
+        req.params.userId !== req.user!.userId &&
+        !can(req.user!, "bookings:read:all")
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only list your own bookings",
+        });
+      }
       const limit = Math.min(Number(req.query.limit) || 4, 20);
       const page = Math.max(Number(req.query.page) || 1, 1);
       const { bookings, total } = await BookingSvc.getUserBookings(
