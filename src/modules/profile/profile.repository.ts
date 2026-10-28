@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { userCache } from "../../utils/cache-namespaces";
 
@@ -31,6 +32,7 @@ export default class ProfileRepo {
         isEmailVerified: true,
         isPrivate: true,
         bio: true,
+        socialLinks: true,
         preferredCurrency: true,
         // The "Verified" badge — display only.
         identityVerifiedAt: true,
@@ -69,6 +71,7 @@ export default class ProfileRepo {
       roleType: user.roleType,
       isPrivate: user.profile?.isPrivate ?? user.isPrivate,
       bio: user.bio,
+      socialLinks: user.socialLinks,
       preferredCurrency:
         user.settings?.preferredCurrency ?? user.preferredCurrency,
       createdAt: user.createdAt,
@@ -124,6 +127,7 @@ export default class ProfileRepo {
       district?: string;
       isPrivate?: boolean;
       bio?: string | null;
+      socialLinks?: Record<string, string> | null;
       preferredCurrency?: string;
     },
   ) {
@@ -143,6 +147,9 @@ export default class ProfileRepo {
             ...(data.district !== undefined && { district: data.district }),
             ...(data.isPrivate !== undefined && { isPrivate: data.isPrivate }),
             ...(data.bio !== undefined && { bio: data.bio }),
+            ...(data.socialLinks !== undefined && {
+              socialLinks: data.socialLinks ?? Prisma.DbNull,
+            }),
             ...(data.preferredCurrency !== undefined && {
               preferredCurrency: data.preferredCurrency,
             }),
@@ -156,6 +163,7 @@ export default class ProfileRepo {
             roleType: true,
             district: true,
             bio: true,
+            socialLinks: true,
             updatedAt: true,
           },
         });

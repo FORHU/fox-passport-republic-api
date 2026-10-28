@@ -1,4 +1,5 @@
 import ProfileRepo from "./profile.repository";
+import { normalizeSocialLinks } from "../../utils/social-links";
 import { permissionsForUser } from "../../types/permissions";
 import { revokeAllSessions } from "../auth/sessions.service";
 import { hashPassword, verifyPassword } from "../../utils/password";
@@ -35,6 +36,7 @@ export default class ProfileSvc {
       district?: string;
       isPrivate?: boolean;
       bio?: string;
+      socialLinks?: Record<string, string>;
       preferredCurrency?: string;
     },
   ) {
@@ -50,12 +52,18 @@ export default class ProfileSvc {
       }
     }
 
-    const { profileImage, phone, bio, ...rest } = data;
+    const { profileImage, phone, bio, socialLinks, ...rest } = data;
+    // The links sent replace the ones stored; none left clears them.
+    const links =
+      socialLinks === undefined ? undefined : normalizeSocialLinks(socialLinks);
     return ProfileRepo.updateProfile(userId, {
       ...rest,
       // An empty phone clears it: stored as null, not "".
       ...(phone !== undefined ? { phone: phone || null } : {}),
       ...(profileImage !== undefined ? { imgId: profileImage } : {}),
+      ...(links !== undefined
+        ? { socialLinks: Object.keys(links).length === 0 ? null : links }
+        : {}),
       // An empty bio clears it.
       ...(bio !== undefined
         ? { bio: bio.trim() === "" ? null : bio.trim() }
