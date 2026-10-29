@@ -75,6 +75,24 @@ export const S3_ENDPOINT = process.env.S3_ENDPOINT as string | undefined;
 export const S3_FORCE_PATH_STYLE = process.env.S3_FORCE_PATH_STYLE === "true";
 export const CLOUD_FRONT_DOMAIN = process.env.CLOUD_FRONT_DOMAIN as
   string | undefined;
+// Videos live in real AWS S3, never in the local MinIO the photos may use.
+// Set AWS_S3_VIDEO_BUCKET to give them a bucket of their own. Where
+// S3_ENDPOINT is unset (a deployed AWS host) they default to AWS_S3_BUCKET;
+// where it is set (local MinIO) they are refused until this is configured.
+export const AWS_S3_VIDEO_BUCKET = process.env.AWS_S3_VIDEO_BUCKET as
+  string | undefined;
+export const AWS_VIDEO_REGION = process.env.AWS_VIDEO_REGION as
+  string | undefined;
+// Static keys for the video bucket, for a laptop without an AWS profile. Both
+// or neither: on an AWS host the instance role is used.
+export const AWS_VIDEO_ACCESS_KEY = process.env.AWS_VIDEO_ACCESS_KEY as
+  string | undefined;
+export const AWS_VIDEO_SECRET_ACCESS_KEY = process.env
+  .AWS_VIDEO_SECRET_ACCESS_KEY as string | undefined;
+// Public CDN in front of the video bucket. Without it a video's link is the
+// bucket's own address, which needs the bucket's videos to be publicly
+// readable.
+export const VIDEO_CDN_URL = process.env.VIDEO_CDN_URL as string | undefined;
 // A bucket with no public access and no CDN in front of it, for identity
 // documents (government IDs, clearances, proof of funds). Read only through
 // short-lived presigned links. Falls back to AWS_S3_BUCKET when unset, which

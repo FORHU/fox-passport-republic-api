@@ -4,6 +4,9 @@ import {
   getPutObjectPresignedUrl,
   getGetObjectPresignedUrl,
   uploadToS3,
+  uploadVideoToS3,
+  getVideoUrl,
+  isVideoStorageConfigured,
   uploadPrivateToS3,
   headObject,
   readObjectHead,
@@ -20,7 +23,7 @@ import {
   MAX_UPLOAD_SIZE,
   type DetectedFile,
 } from "../../utils/file-signature";
-import { badRequest, notFound } from "../../utils/errors";
+import { AppError, badRequest, notFound } from "../../utils/errors";
 
 const MAX_IMAGE_DIMENSION = 1600;
 // Identity documents: big enough to read an ID number or a seal.
@@ -74,6 +77,9 @@ async function prepareImage(
     throw badRequest(IMAGE_UNREADABLE);
   }
 }
+
+export const VIDEO_STORAGE_NOT_CONFIGURED =
+  "Video uploads are not set up on this server yet.";
 
 export default class S3Svc {
   /**
@@ -171,6 +177,20 @@ export default class S3Svc {
     }
 
     const key = `${S3Svc.uploadPrefix(userId)}${crypto.randomUUID()}.${outExt}`;
+
+    // Videos are kept in real S3, never in the local MinIO the photos may use,
+    // so they are refused until a video bucket is set up.
+    if (detected.kind === "video") {
+      if (!isVideoStorageConfigured()) {
+        throw new AppError(
+          VIDEO_STORAGE_NOT_CONFIGURED,
+          503,
+          "VIDEO_STORAGE_NOT_CONFIGURED",
+        );
+      }
+      await uploadVideoToS3({ key, body, contentType });
+      return { key, contentType, url: getVideoUrl(key) };
+    }
 
     await uploadToS3({
       key,

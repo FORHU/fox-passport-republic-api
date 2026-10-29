@@ -19,10 +19,11 @@ export default class FileCtrl {
       }
 
       // 1. Upload to S3 from backend (images are resized/re-encoded to WebP)
-      const { key, contentType } = await S3Svc.uploadFile(userId, file);
+      const stored = await S3Svc.uploadFile(userId, file);
+      const { key, contentType } = stored;
 
-      // 2. Generate Public URL
-      const { url } = await S3Svc.generateDownloadUrl(key);
+      // 2. Public URL: a video has its own address, in its own bucket
+      const url = stored.url ?? (await S3Svc.generateDownloadUrl(key)).url;
 
       // 3. Register in DB — contentType reflects what's actually stored,
       // not the original upload's mimetype, since images get transcoded.
@@ -44,7 +45,13 @@ export default class FileCtrl {
     } catch (e: unknown) {
       const error = e as Error;
       console.error("[FileCtrl] Upload error:", error);
-      return res.status(400).json({ success: false, message: error.message });
+      // A video the server has nowhere to keep says so (503), not 400.
+      const status = error instanceof AppError ? error.status : 400;
+      return res.status(status).json({
+        success: false,
+        message: error.message,
+        code: (error as AppError).code,
+      });
     }
   }
 

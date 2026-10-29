@@ -18,6 +18,11 @@ import {
   S3_CDN_URL,
   S3_ENDPOINT,
   S3_FORCE_PATH_STYLE,
+  AWS_S3_VIDEO_BUCKET,
+  AWS_VIDEO_REGION,
+  AWS_VIDEO_ACCESS_KEY,
+  AWS_VIDEO_SECRET_ACCESS_KEY,
+  VIDEO_CDN_URL,
 } from "../config";
 
 // Static keys only when both are set (local MinIO, or running off AWS). On an
@@ -167,6 +172,66 @@ export async function getGetObjectPresignedUrl(params: { key: string }) {
   });
   const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
   return url;
+}
+
+// --- Videos ------------------------------------------------------------------
+//
+// Videos go to real AWS S3 and nowhere else. The media client above may point
+// at local MinIO (S3_ENDPOINT), so videos get a client of their own that never
+// reads S3_ENDPOINT or S3_FORCE_PATH_STYLE: a video can not end up in MinIO.
+
+/** The bucket videos are stored in, or undefined when none is configured. */
+export const VIDEO_BUCKET =
+  AWS_S3_VIDEO_BUCKET || (S3_ENDPOINT ? undefined : AWS_S3_BUCKET) || undefined;
+
+export const isVideoStorageConfigured = () => Boolean(VIDEO_BUCKET);
+
+const videoRegion = AWS_VIDEO_REGION || AWS_REGION;
+
+// Dedicated keys when both are set. Otherwise the media keys, but only when
+// they are for AWS: against MinIO they are MinIO's, so the SDK's default
+// credential chain (an AWS profile, or the host's role) is used instead.
+const videoCredentials =
+  AWS_VIDEO_ACCESS_KEY && AWS_VIDEO_SECRET_ACCESS_KEY
+    ? {
+        accessKeyId: AWS_VIDEO_ACCESS_KEY,
+        secretAccessKey: AWS_VIDEO_SECRET_ACCESS_KEY,
+      }
+    : S3_ENDPOINT
+      ? undefined
+      : staticCredentials;
+
+export const videoClientConfig = {
+  region: videoRegion,
+  ...(videoCredentials && { credentials: videoCredentials }),
+};
+
+const videoClient = new S3Client(videoClientConfig);
+
+/** The public address of a stored video: the CDN's, else the bucket's own. */
+export function getVideoUrl(key: string): string {
+  const normalizedKey = key.replace(/^\/+/, "");
+  if (VIDEO_CDN_URL) {
+    return `${VIDEO_CDN_URL.replace(/\/+$/, "")}/${normalizedKey}`;
+  }
+  return `https://${VIDEO_BUCKET}.s3.${videoRegion}.amazonaws.com/${normalizedKey}`;
+}
+
+export async function uploadVideoToS3(params: {
+  key: string;
+  body: Buffer;
+  contentType: string;
+}) {
+  if (!VIDEO_BUCKET) throw new Error("No video bucket is configured");
+  await videoClient.send(
+    new PutObjectCommand({
+      Bucket: VIDEO_BUCKET,
+      Key: params.key,
+      Body: params.body,
+      ContentType: params.contentType,
+    }),
+  );
+  return params.key;
 }
 
 // --- Private documents -------------------------------------------------------
