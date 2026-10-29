@@ -711,6 +711,8 @@ export default class UsersRepo {
         name: true,
         username: true,
         imgId: true,
+        bio: true,
+        socialLinks: true,
         city: true,
         state: true,
         country: true,
