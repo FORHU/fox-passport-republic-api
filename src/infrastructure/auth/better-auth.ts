@@ -1,7 +1,8 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { bearer, emailOTP } from "better-auth/plugins";
-import { createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
+import { normalizeUsername, USERNAME_MESSAGE } from "../../utils/username";
 import { prisma } from "../../utils/prisma";
 import { sendTemplatedEmail } from "../../utils/helpers";
 import {
@@ -14,6 +15,15 @@ import {
   FACEBOOK_APP_SECRET,
 } from "../../config";
 import bcrypt from "bcryptjs";
+
+function checkUsername<T extends Record<string, unknown>>(user: T): T {
+  if (user.username === undefined || user.username === null) return user;
+  const username = normalizeUsername(user.username);
+  if (!username) {
+    throw new APIError("BAD_REQUEST", { message: USERNAME_MESSAGE });
+  }
+  return { ...user, username };
+}
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -108,6 +118,14 @@ export const auth = betterAuth({
       hash: async (password) => {
         return bcrypt.hash(password, 12);
       },
+    },
+  },
+  databaseHooks: {
+    // Sign-up takes `username` straight from the request body, so the rule is
+    // enforced here too, not only in the web form.
+    user: {
+      create: { before: async (user) => ({ data: checkUsername(user) }) },
+      update: { before: async (user) => ({ data: checkUsername(user) }) },
     },
   },
   hooks: {
