@@ -2,11 +2,11 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import ProfileSvc, { USERNAME_TAKEN } from "./profile.service";
 import { SUPPORTED_CURRENCIES } from "../fx/fx.service";
+import { usernameJoi } from "../../utils/username";
 import { normalizePhone } from "../../utils/phone";
 
 // Kept in step with the web's usernameSchema (shared/lib/schema.ts) and
 // normalizePhone (shared/lib/phone.ts).
-const USERNAME_PATTERN = /^[a-z0-9._]{3,30}$/;
 
 export default class ProfileCtrl {
   // Get current user profile
@@ -49,15 +49,7 @@ export default class ProfileCtrl {
 
       const schema = Joi.object({
         name: Joi.string().optional(),
-        username: Joi.string()
-          .trim()
-          .lowercase()
-          .pattern(USERNAME_PATTERN)
-          .optional()
-          .messages({
-            "string.pattern.base":
-              "Usernames need 3–30 characters and can only use letters, numbers, dots and underscores.",
-          }),
+        username: usernameJoi().optional(),
         // "" (or null) clears the number. Anything else must be valid for
         // its country and is stored as E.164 (+639171234567); a number with
         // no +code is read as Philippine.
