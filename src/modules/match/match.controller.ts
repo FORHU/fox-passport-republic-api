@@ -1,6 +1,7 @@
 import { AppError, sendAppError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
+import { VALIDATE_ALL, sendValidationError } from "../../utils/validation";
 import MatchSvc from "./match.service";
 import PaymentSvc from "../payment/payment.service";
 
@@ -11,15 +12,21 @@ export default class MatchController {
         style: Joi.string().allow("", null).default("Own idea"),
         foxerId: Joi.string().required(),
         date: Joi.date().iso().required(),
-        endDate: Joi.date().iso().min(Joi.ref("date")).optional(),
+        endDate: Joi.date()
+          .iso()
+          .min(Joi.ref("date"))
+          .messages({
+            "date.min": "The end date can't be before the start date.",
+          })
+          .optional(),
         guestCount: Joi.number().integer().min(1).required(),
         requestContent: Joi.string().allow("", null).optional(),
         totalAmount: Joi.number().min(0).optional(),
         venueId: Joi.string().uuid().optional(),
       });
 
-      const { error, value } = schema.validate(req.body);
-      if (error) return res.status(400).json({ message: error.message });
+      const { error, value } = schema.validate(req.body, VALIDATE_ALL);
+      if (error) return sendValidationError(res, error);
 
       const {
         style,

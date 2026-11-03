@@ -1,5 +1,7 @@
 import multer from "multer";
 import type { Request } from "express";
+import { badRequest } from "../utils/errors";
+import { FILE_UNSUPPORTED } from "../utils/file-signature";
 
 // Keep the file in memory so the buffer can be handed straight to S3.
 const storage = multer.memoryStorage();
@@ -13,7 +15,7 @@ const fileFilter = (
   if (file.mimetype.startsWith("image/")) {
     cb(null, true);
   } else {
-    cb(new Error("Only images are allowed"));
+    cb(badRequest(FILE_UNSUPPORTED.image));
   }
 };
 

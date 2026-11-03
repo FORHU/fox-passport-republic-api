@@ -2,6 +2,8 @@ import { sendServerError } from "../../utils/errors";
 import { AppError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
+import { postJoi } from "../../utils/limits";
+import { VALIDATE_ALL, sendValidationError } from "../../utils/validation";
 import FeedService from "./feed.service";
 import {
   PostType,
@@ -71,7 +73,7 @@ export default class FeedController {
       type: Joi.string()
         .valid(...Object.values(PostType))
         .required(),
-      content: Joi.string().trim().allow("").max(5000).required(),
+      content: postJoi().allow("").required(),
       mediaUrls: Joi.array().items(Joi.string().uri()).max(10).optional(),
       visibility: Joi.string()
         .valid(...Object.values(PostVisibility))
@@ -100,10 +102,8 @@ export default class FeedController {
         .optional(),
     });
 
-    const { error, value } = schema.validate(req.body);
-    if (error) {
-      return res.status(400).json({ success: false, message: error.message });
-    }
+    const { error, value } = schema.validate(req.body, VALIDATE_ALL);
+    if (error) return sendValidationError(res, error, { success: true });
 
     try {
       const post = await FeedService.createPost(req.user!, value);
@@ -131,16 +131,14 @@ export default class FeedController {
 
   static async editPost(req: Request, res: Response) {
     const schema = Joi.object({
-      content: Joi.string().trim().min(1).max(5000).optional(),
+      content: postJoi().min(1).optional(),
       mediaUrls: Joi.array().items(Joi.string().uri()).max(10).optional(),
       visibility: Joi.string()
         .valid(...Object.values(PostVisibility))
         .optional(),
     });
-    const { error, value } = schema.validate(req.body);
-    if (error) {
-      return res.status(400).json({ success: false, message: error.message });
-    }
+    const { error, value } = schema.validate(req.body, VALIDATE_ALL);
+    if (error) return sendValidationError(res, error, { success: true });
     try {
       const { id } = req.params;
       const post = await FeedService.editPost(id, req.user!, value);
@@ -155,12 +153,10 @@ export default class FeedController {
 
   static async repost(req: Request, res: Response) {
     const schema = Joi.object({
-      caption: Joi.string().trim().max(5000).allow("").optional(),
+      caption: postJoi().allow("").optional(),
     });
-    const { error, value } = schema.validate(req.body);
-    if (error) {
-      return res.status(400).json({ success: false, message: error.message });
-    }
+    const { error, value } = schema.validate(req.body, VALIDATE_ALL);
+    if (error) return sendValidationError(res, error, { success: true });
     try {
       const { id } = req.params;
       const post = await FeedService.repost(id, req.user!, value.caption ?? "");
