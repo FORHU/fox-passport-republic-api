@@ -12,6 +12,7 @@ import { can } from "../../types/permissions";
 import FeedRepo from "../feed/feed.repository";
 import PassportSvc from "../passport/passport.service";
 import VenueRepo from "../venue/venue.repository";
+import { badRequest, forbidden, notFound } from "../../utils/errors";
 
 export interface CreateInvestmentDTO {
   type: InvestmentType;
@@ -37,6 +38,28 @@ export interface CreateInvestmentDTO {
   mediaUrls?: string[];
   broadcastToFeed?: boolean;
 }
+
+/** Hub-descriptive fields only — money and ownership fields stay fixed. */
+export type UpdateInvestmentDTO = Partial<
+  Pick<
+    CreateInvestmentDTO,
+    | "title"
+    | "description"
+    | "inventoryCategory"
+    | "quantityTotal"
+    | "itemCondition"
+    | "usageTerms"
+    | "address"
+    | "city"
+    | "state"
+    | "country"
+    | "lat"
+    | "lng"
+    | "deliveryRadiusKm"
+    | "transportPolicy"
+    | "mediaUrls"
+  >
+>;
 
 export default class InvestmentSvc {
   // CREATE INVESTMENT
@@ -167,34 +190,79 @@ export default class InvestmentSvc {
       INVESTMENT_TTL,
       () => InvestmentRepo.findById(id),
     );
-    if (!investment) throw new Error("Investment not found");
+    if (!investment || investment.status === "deleted") {
+      throw notFound("Investment");
+    }
     return investment;
   }
 
   /**
-   * An investor's exit from a revenue-share/inventory pledge. Previously
-   * there was no way to end one at all — `resolveInvestorSplit` only ever
-   * matches `status: "active"` investments, so flipping this to
-   * "cancelled" is the whole mechanism: the next payout on that venue/event
-   * simply stops seeing it, no other code needs to change.
+   * The investment, if the requester owns it or holds `investments:manage`.
+   * Soft-deleted rows are treated as gone.
    */
-  static async cancelInvestment(id: string, requesterId: string) {
+  private static async findManageable(id: string, requesterId: string) {
     const investment = await InvestmentRepo.findById(id);
-    if (!investment) throw new Error("Investment not found");
-
-    const requester = await UsersRepo.findUserById(requesterId);
-    const isOwner = investment.partnerId === requesterId;
-    const isAdmin = !!requester && can(requester, "investments:manage");
-    if (!isOwner && !isAdmin) {
-      throw new Error("Only the investor who made this pledge can cancel it");
+    if (!investment || investment.status === "deleted") {
+      throw notFound("Investment");
     }
 
+    if (investment.partnerId !== requesterId) {
+      const requester = await UsersRepo.findUserById(requesterId);
+      if (!requester || !can(requester, "investments:manage")) {
+        throw forbidden("You can only manage your own investments");
+      }
+    }
+    return investment;
+  }
+
+  /**
+   * Takes an active investment out of circulation. `resolveInvestorSplit`
+   * only ever matches `status: "active"` investments, and every list/map
+   * query defaults to active, so flipping the status is the whole mechanism:
+   * the next payout on that venue/event simply stops seeing it.
+   */
+  private static async retire(
+    id: string,
+    requesterId: string,
+    status: "cancelled" | "archived",
+  ) {
+    const investment = await this.findManageable(id, requesterId);
     if (investment.status !== "active") {
-      throw new Error(
-        `Cannot cancel an investment that is ${investment.status}`,
+      throw badRequest(
+        `Cannot ${status === "cancelled" ? "cancel" : "archive"} an investment that is ${investment.status}`,
       );
     }
+    return InvestmentRepo.updateInvestment(id, { status });
+  }
 
-    return InvestmentRepo.updateInvestment(id, { status: "cancelled" });
+  /** An investor's exit from a revenue-share/inventory pledge. */
+  static async cancelInvestment(id: string, requesterId: string) {
+    return this.retire(id, requesterId, "cancelled");
+  }
+
+  static async archiveInvestment(id: string, requesterId: string) {
+    return this.retire(id, requesterId, "archived");
+  }
+
+  static async updateInvestment(
+    id: string,
+    requesterId: string,
+    data: UpdateInvestmentDTO,
+  ) {
+    await this.findManageable(id, requesterId);
+    return InvestmentRepo.updateInvestment(id, {
+      ...data,
+      // ponytail: nothing allocates units yet, so available always equals
+      // total; shift by the delta instead once allocations decrement it.
+      ...(data.quantityTotal != null
+        ? { quantityAvailable: data.quantityTotal }
+        : {}),
+    });
+  }
+
+  /** Soft delete: the row is kept so payout history still resolves. */
+  static async deleteInvestment(id: string, requesterId: string) {
+    await this.findManageable(id, requesterId);
+    return InvestmentRepo.updateInvestment(id, { status: "deleted" });
   }
 }
