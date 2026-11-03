@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import FileSvc from "./file.service";
 import S3Svc from "../s3/s3.service";
-import { AppError } from "../../utils/errors";
+import { AppError, sendServerError } from "../../utils/errors";
 
 export default class FileCtrl {
   static async uploadDirect(req: Request, res: Response) {
@@ -71,9 +71,7 @@ export default class FileCtrl {
         file: dbFile,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("[FileCtrl] Private upload error:", error);
-      return res.status(400).json({ success: false, message: error.message });
+      return sendServerError(res, e, { success: true });
     }
   }
 

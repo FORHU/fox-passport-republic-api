@@ -6,11 +6,23 @@ export const DESCRIPTION_MAX = 500;
 export const LONG_DESCRIPTION_MAX = 2000;
 // Event descriptions run 100-500 words in the web builder.
 export const EVENT_DESCRIPTION_MAX = 5000;
+// Posts and reposts (feed).
+export const POST_MAX = 5000;
 export const QUANTITY_MAX = 100_000;
 export const PRICE_MAX = 9_999_999.99;
 
 const maxMessage = (label: string, max: number) =>
   `${label} can be up to ${max.toLocaleString("en-US")} characters.`;
+
+/** Joi rule for a post's text or a repost caption, up to 5,000 characters. */
+export const postJoi = () =>
+  Joi.string()
+    .trim()
+    .max(POST_MAX)
+    .messages({
+      "string.empty": "Write something to post.",
+      "string.max": `${maxMessage("Posts", POST_MAX)} Shorten it and try again.`,
+    });
 
 /** Joi rule for a name: trimmed, 1-100 characters. */
 export const nameJoi = () =>

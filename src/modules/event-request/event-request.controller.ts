@@ -2,6 +2,11 @@ import { Request, Response } from "express";
 import EventRequestSvc from "./event-request.service";
 import Joi from "joi";
 import {
+  VALIDATE_ALL,
+  endAfter,
+  sendValidationError,
+} from "../../utils/validation";
+import {
   EVENT_DESCRIPTION_MAX,
   descriptionJoi,
   nameJoi,
@@ -19,8 +24,8 @@ export default class EventRequestCtrl {
       eventType: Joi.string().optional(),
       startDatetime: Joi.date().optional(),
       startAt: Joi.date().optional(),
-      endDatetime: Joi.date().optional(),
-      endAt: Joi.date().optional(),
+      endDatetime: endAfter(["startDatetime", "startAt"]).optional(),
+      endAt: endAfter(["startDatetime", "startAt"]).optional(),
       maxAttendees: quantityJoi().optional(),
       guestCount: quantityJoi().optional(),
       totalPrice: priceJoi().optional(),
@@ -28,9 +33,8 @@ export default class EventRequestCtrl {
       currency: Joi.string().optional(),
     }).or("templateId", "venueId");
 
-    const { error, value } = schema.validate(req.body);
-    if (error)
-      return res.status(400).json({ success: false, message: error.message });
+    const { error, value } = schema.validate(req.body, VALIDATE_ALL);
+    if (error) return sendValidationError(res, error, { success: true });
 
     try {
       const clientId = req.user?.userId;

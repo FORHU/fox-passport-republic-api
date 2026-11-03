@@ -59,7 +59,7 @@ describe("PlatformFeeConfigSvc", () => {
     it("rejects a rule with neither percentage nor fixedAmount", async () => {
       await expect(
         PlatformFeeConfigSvc.create({ name: "Empty Rule" }),
-      ).rejects.toThrow("At least one of percentage or fixedAmount");
+      ).rejects.toThrow("Add a percentage, a fixed amount, or both.");
       expect(prisma.platformFeeConfig.create).not.toHaveBeenCalled();
     });
 
@@ -71,13 +71,13 @@ describe("PlatformFeeConfigSvc", () => {
           effectiveFrom: new Date("2026-06-01"),
           effectiveUntil: new Date("2026-05-01"),
         }),
-      ).rejects.toThrow("effectiveUntil must be after effectiveFrom");
+      ).rejects.toThrow("The end date must be after the start date.");
     });
 
     it("rejects a blank name", async () => {
       await expect(
         PlatformFeeConfigSvc.create({ name: "   ", percentage: 5 }),
-      ).rejects.toThrow("Fee rule name is required");
+      ).rejects.toThrow("Enter a name for the fee rule.");
     });
 
     it("creates with a trimmed name when valid", async () => {
@@ -118,7 +118,7 @@ describe("PlatformFeeConfigSvc", () => {
           percentage: null,
           fixedAmount: null,
         }),
-      ).rejects.toThrow("At least one of percentage or fixedAmount");
+      ).rejects.toThrow("Add a percentage, a fixed amount, or both.");
       expect(prisma.platformFeeConfig.update).not.toHaveBeenCalled();
     });
 
@@ -131,7 +131,7 @@ describe("PlatformFeeConfigSvc", () => {
         PlatformFeeConfigSvc.update("rule-1", {
           effectiveUntil: new Date("2026-01-01"),
         }),
-      ).rejects.toThrow("effectiveUntil must be after effectiveFrom");
+      ).rejects.toThrow("The end date must be after the start date.");
     });
 
     it("applies a valid partial update", async () => {

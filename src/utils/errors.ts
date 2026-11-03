@@ -106,7 +106,11 @@ export function sendServerError(
   if (err instanceof AppError) return sendAppError(res, err, opts);
   const mapped = fromPrisma(err);
   if (mapped) return sendAppError(res, mapped, opts);
-  console.error("Unhandled controller error:", err);
+  console.error("Unhandled controller error:", {
+    message: (err as Error)?.message,
+    stack: (err as Error)?.stack,
+    err,
+  });
   return res.status(500).json({
     ...(opts.success ? { success: false } : {}),
     message: isDev
