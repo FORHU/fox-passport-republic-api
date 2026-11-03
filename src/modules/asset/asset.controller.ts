@@ -11,6 +11,12 @@ import {
 import { toEnum } from "../../utils/enums";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
 import { MAX_LISTING_IMAGES } from "../../utils/listing-images";
+import {
+  descriptionJoi,
+  nameJoi,
+  priceJoi,
+  quantityJoi,
+} from "../../utils/limits";
 
 interface CreateAssetPayload {
   category: AssetCategory;
@@ -41,13 +47,13 @@ export default class AssetCtrl {
       category: Joi.string()
         .valid(...Object.values(AssetCategory))
         .required(),
-      name: Joi.string().required(),
-      description: Joi.string().required(),
-      quantity: Joi.number().integer().min(1).optional(),
+      name: nameJoi().required(),
+      description: descriptionJoi().required(),
+      quantity: quantityJoi().optional(),
       condition: Joi.string()
         .valid(...Object.values(AssetCondition))
         .optional(),
-      price: Joi.number().required(),
+      price: priceJoi().required(),
       currency: Joi.string().trim().uppercase().length(3).optional(),
       billingRate: Joi.string()
         .valid(...Object.values(BillingRate))
@@ -176,10 +182,10 @@ export default class AssetCtrl {
       category: Joi.string()
         .valid(...Object.values(AssetCategory))
         .optional(),
-      name: Joi.string().optional(),
-      description: Joi.string().optional(),
-      quantity: Joi.number().integer().min(1).optional(),
-      price: Joi.number().min(0).optional(),
+      name: nameJoi().optional(),
+      description: descriptionJoi().optional(),
+      quantity: quantityJoi().optional(),
+      price: priceJoi().optional(),
       currency: Joi.string().trim().uppercase().length(3).optional(),
       billingRate: Joi.string()
         .valid(...Object.values(BillingRate))

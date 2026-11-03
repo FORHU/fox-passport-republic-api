@@ -4,6 +4,7 @@ import ProfileSvc, { USERNAME_TAKEN } from "./profile.service";
 import { SUPPORTED_CURRENCIES } from "../fx/fx.service";
 import { usernameJoi } from "../../utils/username";
 import { normalizePhone } from "../../utils/phone";
+import { nameJoi } from "../../utils/limits";
 
 // Kept in step with the web's usernameSchema (shared/lib/schema.ts) and
 // normalizePhone (shared/lib/phone.ts).
@@ -48,7 +49,7 @@ export default class ProfileCtrl {
       }
 
       const schema = Joi.object({
-        name: Joi.string().optional(),
+        name: nameJoi().optional(),
         username: usernameJoi().optional(),
         // "" (or null) clears the number. Anything else must be valid for
         // its country and is stored as E.164 (+639171234567); a number with

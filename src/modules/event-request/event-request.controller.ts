@@ -1,23 +1,30 @@
 import { Request, Response } from "express";
 import EventRequestSvc from "./event-request.service";
 import Joi from "joi";
+import {
+  EVENT_DESCRIPTION_MAX,
+  descriptionJoi,
+  nameJoi,
+  priceJoi,
+  quantityJoi,
+} from "../../utils/limits";
 
 export default class EventRequestCtrl {
   static async spawnRequest(req: Request, res: Response) {
     const schema = Joi.object({
       templateId: Joi.string().optional(),
       venueId: Joi.string().optional(),
-      name: Joi.string().required(),
-      description: Joi.string().required(),
+      name: nameJoi().required(),
+      description: descriptionJoi(EVENT_DESCRIPTION_MAX).required(),
       eventType: Joi.string().optional(),
       startDatetime: Joi.date().optional(),
       startAt: Joi.date().optional(),
       endDatetime: Joi.date().optional(),
       endAt: Joi.date().optional(),
-      maxAttendees: Joi.number().min(1).optional(),
-      guestCount: Joi.number().min(1).optional(),
-      totalPrice: Joi.number().min(0).optional(),
-      totalAmount: Joi.number().min(0).optional(),
+      maxAttendees: quantityJoi().optional(),
+      guestCount: quantityJoi().optional(),
+      totalPrice: priceJoi().optional(),
+      totalAmount: priceJoi().optional(),
       currency: Joi.string().optional(),
     }).or("templateId", "venueId");
 

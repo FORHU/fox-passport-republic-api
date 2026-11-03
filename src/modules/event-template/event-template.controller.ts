@@ -5,12 +5,19 @@ import { totalPages } from "../../utils/pagination";
 import EventTemplateSvc from "./event-template.service";
 import { EventCategory } from "@prisma/client";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
+import {
+  EVENT_DESCRIPTION_MAX,
+  descriptionJoi,
+  nameJoi,
+  priceJoi,
+  quantityJoi,
+} from "../../utils/limits";
 
 export default class EventTemplateCtrl {
   static async createTemplate(req: Request, res: Response) {
     const schema = Joi.object({
-      name: Joi.string().required(),
-      description: Joi.string().optional(),
+      name: nameJoi().required(),
+      description: descriptionJoi(EVENT_DESCRIPTION_MAX).optional(),
       category: Joi.string()
         .valid(...Object.values(EventCategory))
         .required(),
@@ -22,7 +29,7 @@ export default class EventTemplateCtrl {
       lat: Joi.number().optional(),
       lng: Joi.number().optional(),
       hostMarkupPct: Joi.number().min(0).max(100).optional(),
-      maxAttendees: Joi.number().integer().min(1).optional(),
+      maxAttendees: quantityJoi().optional(),
       cancellationPolicyId: Joi.string().uuid().optional(),
     });
 
@@ -49,8 +56,8 @@ export default class EventTemplateCtrl {
 
   static async updateTemplate(req: Request, res: Response) {
     const schema = Joi.object({
-      name: Joi.string().optional(),
-      description: Joi.string().optional(),
+      name: nameJoi().optional(),
+      description: descriptionJoi(EVENT_DESCRIPTION_MAX).optional(),
       category: Joi.string()
         .valid(...Object.values(EventCategory))
         .optional(),
@@ -62,7 +69,7 @@ export default class EventTemplateCtrl {
       lat: Joi.number().optional(),
       lng: Joi.number().optional(),
       hostMarkupPct: Joi.number().min(0).max(100).optional(),
-      maxAttendees: Joi.number().integer().min(1).allow(null).optional(),
+      maxAttendees: quantityJoi().allow(null).optional(),
       cancellationPolicyId: Joi.string().uuid().optional(),
     });
 
@@ -196,11 +203,11 @@ export default class EventTemplateCtrl {
   static async attachAsset(req: Request, res: Response) {
     const schema = Joi.object({
       assetId: Joi.string().optional(),
-      quantity: Joi.number().integer().min(1).optional(),
-      description: Joi.string().optional(),
+      quantity: quantityJoi().optional(),
+      description: descriptionJoi().optional(),
       matchedAt: Joi.date().optional(),
       date: Joi.date().optional(),
-      agreedPrice: Joi.number().min(0).optional(),
+      agreedPrice: priceJoi().optional(),
       isOptional: Joi.boolean().optional(),
     }).or("assetId", "description");
 
@@ -280,10 +287,10 @@ export default class EventTemplateCtrl {
   static async attachService(req: Request, res: Response) {
     const schema = Joi.object({
       serviceId: Joi.string().optional(),
-      description: Joi.string().optional(),
+      description: descriptionJoi().optional(),
       matchedAt: Joi.date().optional(),
       date: Joi.date().optional(),
-      agreedPrice: Joi.number().min(0).optional(),
+      agreedPrice: priceJoi().optional(),
       isOptional: Joi.boolean().optional(),
     }).or("serviceId", "description");
 
@@ -350,10 +357,10 @@ export default class EventTemplateCtrl {
   static async attachVenue(req: Request, res: Response) {
     const schema = Joi.object({
       venueId: Joi.string().optional(),
-      description: Joi.string().optional(),
+      description: descriptionJoi().optional(),
       matchedAt: Joi.date().optional(),
       date: Joi.date().optional(),
-      agreedPrice: Joi.number().min(0).optional(),
+      agreedPrice: priceJoi().optional(),
       isOptional: Joi.boolean().optional(),
     }).or("venueId", "description");
 
@@ -484,7 +491,7 @@ export default class EventTemplateCtrl {
       type: Joi.string().valid("asset", "service", "venue").required(),
       providerId: Joi.string().required(),
       forceMatch: Joi.boolean().optional(),
-      description: Joi.string().optional(),
+      description: descriptionJoi().optional(),
       matchedAt: Joi.date().optional(),
       date: Joi.date().optional(),
     });
