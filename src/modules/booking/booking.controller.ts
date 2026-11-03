@@ -6,6 +6,7 @@ import { AppError } from "../../utils/errors";
 import RefundSvc from "../refund/refund.service";
 import { totalPages } from "../../utils/pagination";
 import { can } from "../../types/permissions";
+import { priceJoi, quantityJoi } from "../../utils/limits";
 
 export default class BookingCtrl {
   // BOOK FROM TEMPLATE — creates an Event + Booking in one shot for a logged-in client
@@ -13,7 +14,7 @@ export default class BookingCtrl {
     try {
       const schema = Joi.object({
         templateId: Joi.string().required(),
-        guestCount: Joi.number().integer().min(1).required(),
+        guestCount: quantityJoi().required(),
         startAt: Joi.date().iso().required(),
         endAt: Joi.date().iso().required(),
         // IDs of optional template items the client chose to exclude
@@ -60,7 +61,7 @@ export default class BookingCtrl {
       const schema = Joi.object({
         kind: Joi.string().valid("asset", "service").required(),
         itemId: Joi.string().required(),
-        quantity: Joi.number().integer().min(1).optional(),
+        quantity: quantityJoi().optional(),
       });
       const { error, value } = schema.validate(req.body);
       if (error) return res.status(400).json({ message: error.message });
@@ -90,8 +91,8 @@ export default class BookingCtrl {
     try {
       const schema = Joi.object({
         eventId: Joi.string().uuid().required(),
-        guestCount: Joi.number().integer().min(1).required(),
-        totalAmount: Joi.number().min(0).required(),
+        guestCount: quantityJoi().required(),
+        totalAmount: priceJoi().required(),
         attendees: Joi.array()
           .items(
             Joi.object({
@@ -133,8 +134,8 @@ export default class BookingCtrl {
         endDate: Joi.date()
           .iso()
           .when("venueId", { is: Joi.exist(), then: Joi.required() }),
-        guestCount: Joi.number().min(1).optional(),
-        totalAmount: Joi.number().min(0).optional(),
+        guestCount: quantityJoi().optional(),
+        totalAmount: priceJoi().optional(),
         specialRequests: Joi.string().optional(),
         voucherCode: Joi.string().trim().uppercase().allow("").optional(),
       }).xor("venueId", "eventId");
@@ -163,7 +164,7 @@ export default class BookingCtrl {
         venueId: Joi.string().required(),
         startDate: Joi.date().iso().required(),
         endDate: Joi.date().iso().required(),
-        guestCount: Joi.number().integer().min(1).default(1),
+        guestCount: quantityJoi().default(1),
         voucherCode: Joi.string().trim().uppercase().allow("").optional(),
       });
       const { error, value } = schema.validate(req.query);
@@ -367,7 +368,7 @@ export default class BookingCtrl {
   static async confirmBooking(req: Request, res: Response) {
     try {
       const schema = Joi.object({
-        amount: Joi.number().min(0).required(),
+        amount: priceJoi().required(),
         method: Joi.string().required(),
         transactionId: Joi.string().required(),
       });

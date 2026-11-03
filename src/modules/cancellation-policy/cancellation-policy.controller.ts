@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import CancellationPolicySvc from "./cancellation-policy.service";
+import { descriptionJoi, nameJoi } from "../../utils/limits";
 
 export default class CancellationPolicyCtrl {
   static async getAll(req: Request, res: Response) {
@@ -30,8 +31,8 @@ export default class CancellationPolicyCtrl {
   static async create(req: Request, res: Response) {
     try {
       const schema = Joi.object({
-        name: Joi.string().trim().required(),
-        description: Joi.string().trim().optional().allow(""),
+        name: nameJoi().required(),
+        description: descriptionJoi().optional().allow(""),
         rules: Joi.array()
           .items(
             Joi.object({
@@ -65,8 +66,8 @@ export default class CancellationPolicyCtrl {
         return res.status(400).json({ message: paramsError.message });
 
       const bodySchema = Joi.object({
-        name: Joi.string().trim().optional(),
-        description: Joi.string().trim().optional().allow(""),
+        name: nameJoi().optional(),
+        description: descriptionJoi().optional().allow(""),
         rules: Joi.array()
           .items(
             Joi.object({
