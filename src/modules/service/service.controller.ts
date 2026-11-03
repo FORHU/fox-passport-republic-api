@@ -7,6 +7,7 @@ import { toEnum } from "../../utils/enums";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
 import { can, isPerformerServiceCategory } from "../../types/permissions";
 import { MAX_LISTING_IMAGES } from "../../utils/listing-images";
+import { descriptionJoi, nameJoi, priceJoi } from "../../utils/limits";
 
 /**
  * The route-level gate (`requirePermissionAny(["service:manage",
@@ -57,8 +58,8 @@ export default class ServiceCtrl {
       category: Joi.string()
         .valid(...Object.values(ServiceCategory))
         .required(),
-      name: Joi.string().required(),
-      description: Joi.string().required(),
+      name: nameJoi().required(),
+      description: descriptionJoi().required(),
       city: Joi.string().required(),
       state: Joi.string().optional(),
       country: Joi.string().required(),
@@ -66,7 +67,7 @@ export default class ServiceCtrl {
       lng: Joi.number().optional(),
       isWillingToTravel: Joi.boolean().optional(),
       tags: Joi.array().items(Joi.string().trim().min(1)).optional(),
-      price: Joi.number().required(),
+      price: priceJoi().required(),
       currency: Joi.string().trim().uppercase().length(3).optional(),
       billingRate: Joi.string()
         .valid(...Object.values(BillingRate))
@@ -187,8 +188,8 @@ export default class ServiceCtrl {
       category: Joi.string()
         .valid(...Object.values(ServiceCategory))
         .optional(),
-      name: Joi.string().optional(),
-      description: Joi.string().optional(),
+      name: nameJoi().optional(),
+      description: descriptionJoi().optional(),
       city: Joi.string().optional(),
       state: Joi.string().allow("").optional(),
       country: Joi.string().optional(),
@@ -196,7 +197,7 @@ export default class ServiceCtrl {
       lng: Joi.number().optional(),
       isWillingToTravel: Joi.boolean().optional(),
       tags: Joi.array().items(Joi.string().trim().min(1)).optional(),
-      price: Joi.number().min(0).optional(),
+      price: priceJoi().optional(),
       currency: Joi.string().trim().uppercase().length(3).optional(),
       billingRate: Joi.string()
         .valid(...Object.values(BillingRate))

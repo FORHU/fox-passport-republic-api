@@ -132,6 +132,13 @@ const ALLOW_LIST = new Set([
   "venue-affiliation.routes.ts GET /venue/:venueId",
   "venue-affiliation.routes.ts PATCH /:id/approve",
   "venue-affiliation.routes.ts PATCH /:id/reject",
+  // Investment hubs (BUG-08): edit, archive and soft-delete are checked per
+  // hub in InvestmentSvc.findManageable — the investor who owns it, or an
+  // admin holding `investments:manage`. No single global permission
+  // describes "owns this one hub".
+  "investment.routes.ts PATCH /:id",
+  "investment.routes.ts DELETE /:id",
+  "investment.routes.ts PATCH /:id/archive",
 ]);
 
 const BANNED_GUARDS = ["requireRole", "requireAdmin", "requireHost"];

@@ -216,6 +216,27 @@ The web app mirrors the list in `src/shared/lib/uploadRules.ts`. Change both.
 
 ---
 
+## 14. A user id in the request is a claim, and a sign-in used to leave the old session alive
+
+Signing in as B without logging out of A (BUG-07, #142) swapped the browser's
+cookie but left A's session valid for its full seven days, for whoever still
+held its token. And the web, still showing A, asked
+`GET /bookings/user/<A's id>` with B's session — which answered with A's
+bookings, because the route trusted the id in the path.
+
+- **A sign-in replaces the request's session.** The `hooks.after` in
+  `src/infrastructure/auth/better-auth.ts` revokes the session token the request
+  arrived with (cookie, or Bearer via the `bearer` plugin) once a new one
+  exists. A failed sign-in, or a refresh that keeps the same token, revokes
+  nothing.
+- **Identity comes from `req.user`, never the request.** A route that takes a
+  `:userId` (or `?userId=`) naming whose data to read must check it against
+  `req.user.userId`, and refuse anyone else without `bookings:read:all` or the
+  like — refuse, don't quietly narrow. `GET /bookings/user/:userId`,
+  `/asset/bookings` and `/service/bookings` all follow this.
+
+---
+
 ## Owed elsewhere
 
 - **`add_audit_log` was applied locally and nowhere else.** Whenever staging or

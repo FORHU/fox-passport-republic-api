@@ -17,6 +17,9 @@ router.post("/", authenticate, InvestmentCtrl.createInvestment);
 
 // Specific investment detail
 router.get("/:id", InvestmentCtrl.getInvestmentById);
+router.patch("/:id", authenticate, InvestmentCtrl.updateInvestment);
+router.delete("/:id", authenticate, InvestmentCtrl.deleteInvestment);
 router.patch("/:id/cancel", authenticate, InvestmentCtrl.cancelInvestment);
+router.patch("/:id/archive", authenticate, InvestmentCtrl.archiveInvestment);
 
 export default router;

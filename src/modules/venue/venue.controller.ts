@@ -14,6 +14,13 @@ import {
   LngLat,
 } from "../../utils/geo";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
+import {
+  LONG_DESCRIPTION_MAX,
+  descriptionJoi,
+  nameJoi,
+  priceJoi,
+  quantityJoi,
+} from "../../utils/limits";
 
 interface CreateVenuePayload {
   name: string;
@@ -60,12 +67,12 @@ export default class VenueCtrl {
   // Create Venue Controller
   static async createVenue(req: Request, res: Response) {
     const schema = Joi.object<CreateVenuePayload>({
-      name: Joi.string().required(),
-      description: Joi.string().required(),
+      name: nameJoi().required(),
+      description: descriptionJoi(LONG_DESCRIPTION_MAX).required(),
       category: Joi.string()
         .valid(...Object.values(VenueCategory))
         .required(),
-      capacity: Joi.number().integer().min(1).required(),
+      capacity: quantityJoi().required(),
       address: Joi.string().required(),
       city: Joi.string().required(),
       state: Joi.string().optional(),
@@ -99,21 +106,21 @@ export default class VenueCtrl {
       status: Joi.string()
         .valid(...Object.values(VenueStatus))
         .optional(),
-      price: Joi.number().min(0).optional(),
-      extraGuestRate: Joi.number().min(0).optional(),
+      price: priceJoi().optional(),
+      extraGuestRate: priceJoi().optional(),
       billingRate: Joi.string()
         .valid("hourly", "daily", "weekly", "monthly", "yearly", "one_time")
         .default("daily"),
       cancellationPolicyId: Joi.string().uuid().optional(),
 
       facilities: Joi.array().items(Joi.string()).optional(),
-      recommendedCapacity: Joi.number().integer().min(1).optional(),
+      recommendedCapacity: quantityJoi().optional(),
       seatingArrangements: Joi.array().items(Joi.string()).optional(),
       stageConfig: Joi.string().optional(),
       setupOptions: Joi.array().items(Joi.string()).optional(),
       operatingHours: Joi.any().optional(),
       blockedDates: Joi.array().items(Joi.date().iso()).optional(),
-      minBookingTime: Joi.number().integer().min(1).optional(),
+      minBookingTime: quantityJoi().optional(),
       depositRequirements: Joi.string().optional(),
       floorPlanUrls: Joi.array().items(Joi.string()).optional(),
       seatingLayoutUrls: Joi.array().items(Joi.string()).optional(),
@@ -221,14 +228,14 @@ export default class VenueCtrl {
 
   static async updateVenue(req: Request, res: Response) {
     const schema = Joi.object({
-      name: Joi.string().optional(),
-      description: Joi.string().optional(),
+      name: nameJoi().optional(),
+      description: descriptionJoi(LONG_DESCRIPTION_MAX).optional(),
       category: Joi.string()
         .valid(...Object.values(VenueCategory))
         .optional(),
-      capacity: Joi.number().integer().min(1).optional(),
-      price: Joi.number().min(0).optional(),
-      extraGuestRate: Joi.number().min(0).optional(),
+      capacity: quantityJoi().optional(),
+      price: priceJoi().optional(),
+      extraGuestRate: priceJoi().optional(),
 
       address: Joi.string().optional(),
       city: Joi.string().optional(),
@@ -262,13 +269,13 @@ export default class VenueCtrl {
       cancellationPolicyId: Joi.string().uuid().optional(),
 
       facilities: Joi.array().items(Joi.string()).optional(),
-      recommendedCapacity: Joi.number().integer().min(1).optional(),
+      recommendedCapacity: quantityJoi().optional(),
       seatingArrangements: Joi.array().items(Joi.string()).optional(),
       stageConfig: Joi.string().optional(),
       setupOptions: Joi.array().items(Joi.string()).optional(),
       operatingHours: Joi.any().optional(),
       blockedDates: Joi.array().items(Joi.date().iso()).optional(),
-      minBookingTime: Joi.number().integer().min(1).optional(),
+      minBookingTime: quantityJoi().optional(),
       depositRequirements: Joi.string().optional(),
       floorPlanUrls: Joi.array().items(Joi.string()).optional(),
       seatingLayoutUrls: Joi.array().items(Joi.string()).optional(),

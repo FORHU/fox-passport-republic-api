@@ -193,6 +193,18 @@ describe("Bidding Lifecycle Integration Tests", () => {
     await prisma.eventServiceBid.deleteMany({});
   });
 
+  it("open slots list the gear and the talent an event still needs", async () => {
+    const slots = await BiddingSvc.getOpenSlots();
+    const slot = slots.find((e) => e.id === eventId);
+
+    expect(slot?.template.templateAssets.map((a) => a.id)).toEqual([
+      eventTemplateAssetId,
+    ]);
+    expect(slot?.template.templateServices.map((x) => x.id)).toEqual([
+      eventTemplateServiceId,
+    ]);
+  });
+
   it("Gear/Talent capability validation: prevents unauthorized users from bidding", async () => {
     await expect(
       BiddingSvc.submitServiceBid({

@@ -39,6 +39,7 @@ export default class BiddingSvc {
         template: {
           include: {
             templateServices: true,
+            templateAssets: true,
           },
         },
         host: {

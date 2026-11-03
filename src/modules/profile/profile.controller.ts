@@ -2,10 +2,12 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import ProfileSvc, { USERNAME_TAKEN } from "./profile.service";
 import { SUPPORTED_CURRENCIES } from "../fx/fx.service";
+import { usernameJoi } from "../../utils/username";
+import { normalizePhone } from "../../utils/phone";
+import { nameJoi } from "../../utils/limits";
 
-// Kept in step with the web's usernameSchema / phoneSchema (shared/lib/schema.ts).
-const USERNAME_PATTERN = /^[a-z0-9._]{3,30}$/;
-const PHONE_PATTERN = /^\+?\d{8,15}$/;
+// Kept in step with the web's usernameSchema (shared/lib/schema.ts) and
+// normalizePhone (shared/lib/phone.ts).
 
 export default class ProfileCtrl {
   // Get current user profile
@@ -47,27 +49,21 @@ export default class ProfileCtrl {
       }
 
       const schema = Joi.object({
-        name: Joi.string().optional(),
-        username: Joi.string()
-          .trim()
-          .lowercase()
-          .pattern(USERNAME_PATTERN)
-          .optional()
-          .messages({
-            "string.pattern.base":
-              "Usernames need 3–30 characters and can only use letters, numbers, dots and underscores.",
-          }),
-        // "" (or null) clears the number. Spaces, dashes and brackets are
-        // formatting, so they are stripped before the digit check.
+        name: nameJoi().optional(),
+        username: usernameJoi().optional(),
+        // "" (or null) clears the number. Anything else must be valid for
+        // its country and is stored as E.164 (+639171234567); a number with
+        // no +code is read as Philippine.
         phone: Joi.string()
           .trim()
           .allow("", null)
-          .replace(/[\s()-]/g, "")
-          .pattern(PHONE_PATTERN)
+          .custom(
+            (v, helpers) => normalizePhone(v) ?? helpers.error("phone.invalid"),
+          )
           .optional()
           .messages({
-            "string.pattern.base":
-              "Enter a phone number like +63 917 123 4567 (8–15 digits).",
+            "phone.invalid":
+              "Enter a valid phone number with its country code, like +63 917 123 4567.",
           }),
         profileImage: Joi.string().uri().optional(),
         country: Joi.string().allow("").optional(),
@@ -75,6 +71,16 @@ export default class ProfileCtrl {
         city: Joi.string().allow("").optional(),
         district: Joi.string().allow("").optional(),
         isPrivate: Joi.boolean().optional(),
+        bio: Joi.string().trim().max(300).allow("").optional(),
+        // Each is checked and turned into a clean address by the service.
+        socialLinks: Joi.object({
+          instagram: Joi.string().trim().max(300).allow(""),
+          facebook: Joi.string().trim().max(300).allow(""),
+          tiktok: Joi.string().trim().max(300).allow(""),
+          x: Joi.string().trim().max(300).allow(""),
+          youtube: Joi.string().trim().max(300).allow(""),
+          website: Joi.string().trim().max(300).allow(""),
+        }).optional(),
         preferredCurrency: Joi.string()
           .valid(...SUPPORTED_CURRENCIES)
           .optional(),

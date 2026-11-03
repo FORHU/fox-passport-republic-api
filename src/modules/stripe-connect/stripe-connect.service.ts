@@ -135,6 +135,30 @@ export default class StripeConnectSvc {
     return { url: accountLink.url };
   }
 
+  /**
+   * A session for Stripe's embedded Connect components (onboarding, balances,
+   * payments, payouts) on the caller's own account, found or created from
+   * their user record. The web used to name the account itself, from
+   * localStorage, to an unauthenticated route: any visitor could open any
+   * account's payouts, and after an account switch the next user opened the
+   * previous one's.
+   */
+  static async createAccountSession(
+    userId: string,
+  ): Promise<{ clientSecret: string }> {
+    const account = await this.createExpressAccount(userId);
+    const session = await stripe.accountSessions.create({
+      account,
+      components: {
+        account_onboarding: { enabled: true },
+        payments: { enabled: true },
+        balances: { enabled: true },
+        payouts: { enabled: true },
+      },
+    });
+    return { clientSecret: session.client_secret };
+  }
+
   static async getOnboardingStatus(userId: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },

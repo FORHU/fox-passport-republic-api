@@ -2,15 +2,17 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import UsersSvc from "./users.service";
 import { totalPages } from "../../utils/pagination";
+import { usernameJoi } from "../../utils/username";
+import { nameJoi } from "../../utils/limits";
 
 export default class UsersCtrl {
   // CREATE
   static async createUser(req: Request, res: Response) {
     const schema = Joi.object({
       email: Joi.string().email().required(),
-      username: Joi.string().min(3).required(),
+      username: usernameJoi().required(),
       password: Joi.string().min(6).required(),
-      name: Joi.string().optional(),
+      name: nameJoi().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -145,9 +147,9 @@ export default class UsersCtrl {
   static async updateUserById(req: Request, res: Response) {
     const schema = Joi.object({
       email: Joi.string().email().optional(),
-      username: Joi.string().min(3).optional(),
+      username: usernameJoi().optional(),
       password: Joi.string().min(6).optional(),
-      name: Joi.string().optional(),
+      name: nameJoi().optional(),
       role: Joi.string().optional(),
     }).min(1); // must send at least one field
 

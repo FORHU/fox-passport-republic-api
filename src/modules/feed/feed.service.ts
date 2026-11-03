@@ -39,6 +39,15 @@ export interface CreatePostInput {
 // same character set usernames are created with elsewhere in the app.
 const MENTION_PATTERN = /@([a-zA-Z0-9_]{2,32})/g;
 
+/** What a notification calls the person who acted; never their email. */
+async function actorName(userId: string): Promise<string> {
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true, username: true },
+  });
+  return u?.name?.trim() || u?.username || "Someone";
+}
+
 async function notifyMentions(
   content: string,
   actorId: string,
@@ -48,6 +57,8 @@ async function notifyMentions(
   if (handles.length === 0) return;
 
   const uniqueHandles = [...new Set(handles.map((h) => h.toLowerCase()))];
+  const name = await actorName(actorId);
+  const where = metadata.commentId ? "a comment" : "a post";
   const mentioned = await prisma.user.findMany({
     where: {
       username: { in: uniqueHandles, mode: "insensitive" },
@@ -62,7 +73,7 @@ async function notifyMentions(
         userId: u.id,
         type: "feed:mention",
         title: "You were mentioned in the Republic",
-        message: "Someone mentioned you in a post.",
+        message: `${name} mentioned you in ${where}.`,
         metadata,
       }).catch((err) =>
         console.warn(
@@ -572,11 +583,12 @@ export default class FeedService {
     const result = await FeedRepo.setReaction(postId, user.userId, type);
 
     if (type && !post.isLikedByMe && post.authorId !== user.userId) {
+      const name = await actorName(user.userId);
       NotificationService.create({
         userId: post.authorId,
         type: "feed:like",
         title: "New Reaction on your Republic Post",
-        message: `${user.email} reacted to your post.`,
+        message: `${name} reacted to your post.`,
         metadata: { postId, reactorId: user.userId, reaction: type },
       }).catch((err) =>
         console.warn(
@@ -651,6 +663,7 @@ export default class FeedService {
       throw new AppError("Comment cannot be empty", 400);
     }
 
+    let parentAuthorId: string | undefined;
     if (parentId) {
       const parent = await FeedRepo.findCommentById(parentId);
       if (!parent || parent.postId !== postId) {
@@ -659,6 +672,7 @@ export default class FeedService {
       if (parent.parentId) {
         throw new AppError("Cannot reply to a reply", 400);
       }
+      parentAuthorId = parent.authorId;
     }
 
     const comment = await FeedRepo.createComment(
@@ -673,13 +687,37 @@ export default class FeedService {
       commentId: comment.id,
     }).catch(() => {});
 
+    const name = await actorName(user.userId);
+    const preview = `"${trimmed.slice(0, 60)}${trimmed.length > 60 ? "..." : ""}"`;
+
+    // Whoever was replied to hears about it, unless they are the post's
+    // author (who is told about the comment below) or the one replying.
+    if (
+      parentAuthorId &&
+      parentAuthorId !== user.userId &&
+      parentAuthorId !== post.authorId
+    ) {
+      NotificationService.create({
+        userId: parentAuthorId,
+        type: "feed:reply",
+        title: "New reply to your comment",
+        message: `${name} replied to your comment: ${preview}`,
+        metadata: { postId, commentId: comment.id, authorId: user.userId },
+      }).catch((err) =>
+        console.warn(
+          "[FeedService] Best-effort reply notification failed:",
+          err,
+        ),
+      );
+    }
+
     // Notify post author if not self
     if (post.authorId !== user.userId) {
       NotificationService.create({
         userId: post.authorId,
         type: "feed:comment",
         title: "New Comment on your Republic Post",
-        message: `Someone commented on your post: "${trimmed.slice(0, 60)}${trimmed.length > 60 ? "..." : ""}"`,
+        message: `${name} commented on your post: ${preview}`,
         metadata: {
           postId,
           commentId: comment.id,
