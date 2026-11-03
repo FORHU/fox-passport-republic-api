@@ -3,10 +3,57 @@ import Joi from "joi";
 import { InvestmentType, InventoryCategory } from "@prisma/client";
 import InvestmentSvc from "./investment.service";
 import { unauthorized } from "../../utils/errors";
+import { quantityJoi } from "../../utils/limits";
+import { sendValidationError, VALIDATE_ALL } from "../../utils/validation";
+
+const INVENTORY_CATEGORIES = [
+  "furniture_seating",
+  "tables_staging",
+  "audio_visual",
+  "lighting_rigging",
+  "power_climate",
+  "decor_props",
+  "other",
+];
+
+// Equipment Details rules, shared by create and edit. Kept in step with the web
+// wizard's features/investment/utils/wizardValidation.ts.
+const titleJoi = () =>
+  Joi.string().trim().min(3).max(120).messages({
+    "any.required": "Enter a title of at least 3 characters.",
+    "string.empty": "Enter a title of at least 3 characters.",
+    "string.min": "Enter a title of at least 3 characters.",
+    "string.max": "Titles can be up to 120 characters.",
+  });
+
+const descriptionJoi = () =>
+  Joi.string().trim().min(10).max(2000).messages({
+    "any.required": "Add a description of at least 10 characters.",
+    "string.empty": "Add a description of at least 10 characters.",
+    "string.min": "Add a description of at least 10 characters.",
+    "string.max": "Descriptions can be up to 2,000 characters.",
+  });
+
+const categoryJoi = () =>
+  Joi.string()
+    .valid(...INVENTORY_CATEGORIES)
+    .messages({
+      "any.required": "Choose a category.",
+      "any.only": "Choose one of the listed categories.",
+    });
+
+const quantityTotalJoi = () =>
+  quantityJoi().messages({
+    "any.required": "Enter how many units are available.",
+  });
+
+// Optional text: a blank value counts as not given.
+const optionalTextJoi = () => Joi.string().trim().empty("");
 
 export default class InvestmentCtrl {
   // POST /v1/investments
   static async createInvestment(req: Request, res: Response) {
+    const isPhysical = { is: "physical_inventory", then: Joi.required() };
     const schema = Joi.object({
       type: Joi.string()
         .valid(
@@ -17,24 +64,20 @@ export default class InvestmentCtrl {
         )
         .optional()
         .default("physical_inventory"),
-      title: Joi.string().min(3).max(120).required(),
-      description: Joi.string().min(10).max(2000).required(),
-      inventoryCategory: Joi.string()
-        .valid(
-          "furniture_seating",
-          "tables_staging",
-          "audio_visual",
-          "lighting_rigging",
-          "power_climate",
-          "decor_props",
-          "other",
-        )
-        .optional()
-        .default("furniture_seating"),
-      quantityTotal: Joi.number().integer().min(1).optional().default(1),
-      itemCondition: Joi.string().optional(),
+      title: titleJoi().required(),
+      description: descriptionJoi().required(),
+      // Physical inventory must say what and how many; other types keep the old defaults.
+      inventoryCategory: categoryJoi().when("type", {
+        ...isPhysical,
+        otherwise: Joi.optional().default("furniture_seating"),
+      }),
+      quantityTotal: quantityTotalJoi().when("type", {
+        ...isPhysical,
+        otherwise: Joi.optional().default(1),
+      }),
+      itemCondition: optionalTextJoi(),
       monetaryValue: Joi.number().min(0).optional().default(0),
-      usageTerms: Joi.string().optional(),
+      usageTerms: optionalTextJoi(),
       dailyRentalRate: Joi.number().min(0).optional(),
       revenueSharePercent: Joi.number().min(0).max(100).optional(),
       address: Joi.string().optional(),
@@ -53,12 +96,8 @@ export default class InvestmentCtrl {
       broadcastToFeed: Joi.boolean().optional().default(true),
     });
 
-    const { error, value } = schema.validate(req.body);
-    if (error) {
-      return res
-        .status(400)
-        .json({ success: false, message: error.details[0].message });
-    }
+    const { error, value } = schema.validate(req.body, VALIDATE_ALL);
+    if (error) return sendValidationError(res, error, { success: true });
 
     try {
       const partnerId = req.user?.userId;
@@ -188,20 +227,12 @@ export default class InvestmentCtrl {
     next: NextFunction,
   ) {
     const schema = Joi.object({
-      title: Joi.string().min(3).max(120),
-      description: Joi.string().min(10).max(2000),
-      inventoryCategory: Joi.string().valid(
-        "furniture_seating",
-        "tables_staging",
-        "audio_visual",
-        "lighting_rigging",
-        "power_climate",
-        "decor_props",
-        "other",
-      ),
-      quantityTotal: Joi.number().integer().min(1),
-      itemCondition: Joi.string(),
-      usageTerms: Joi.string(),
+      title: titleJoi(),
+      description: descriptionJoi(),
+      inventoryCategory: categoryJoi(),
+      quantityTotal: quantityTotalJoi(),
+      itemCondition: optionalTextJoi(),
+      usageTerms: optionalTextJoi(),
       address: Joi.string(),
       city: Joi.string(),
       state: Joi.string(),
@@ -217,12 +248,8 @@ export default class InvestmentCtrl {
       mediaUrls: Joi.array().items(Joi.string().uri()),
     }).min(1);
 
-    const { error, value } = schema.validate(req.body);
-    if (error) {
-      return res
-        .status(400)
-        .json({ success: false, message: error.details[0].message });
-    }
+    const { error, value } = schema.validate(req.body, VALIDATE_ALL);
+    if (error) return sendValidationError(res, error, { success: true });
 
     try {
       const requesterId = req.user?.userId;
