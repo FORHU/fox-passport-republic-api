@@ -273,6 +273,60 @@ async function upsertEvent(
   return event.id;
 }
 
+async function seedHugoSlots(hostId: string, eventId: string) {
+  const name = `Hugo's Reunion package ${TAG}`;
+  const fields = {
+    ownerId: hostId,
+    name,
+    description:
+      "A package with open slots, seeded by the multi-role scenario.",
+    category: "social" as const,
+    status: "published" as const,
+    isPublic: true,
+    targetCity: "Davao City",
+    targetCountry: "Philippines",
+  };
+  const existing = await prisma.eventTemplate.findFirst({
+    where: { ownerId: hostId, name },
+    select: { id: true },
+  });
+  const template = existing
+    ? await prisma.eventTemplate.update({
+        where: { id: existing.id },
+        data: fields,
+      })
+    : await prisma.eventTemplate.create({ data: fields });
+  // Start the slots over, so earlier bids do not linger.
+  await prisma.eventServiceBid.deleteMany({ where: { eventId } });
+  await prisma.eventAssetBid.deleteMany({ where: { eventId } });
+  await prisma.eventTemplateService.deleteMany({
+    where: { templateId: template.id },
+  });
+  await prisma.eventTemplateAsset.deleteMany({
+    where: { templateId: template.id },
+  });
+  await prisma.eventTemplateService.create({
+    data: {
+      templateId: template.id,
+      description: "A DJ for the night",
+      agreedPrice: 8000,
+    },
+  });
+  await prisma.eventTemplateAsset.create({
+    data: {
+      templateId: template.id,
+      description: "Sound system",
+      quantity: 1,
+      agreedPrice: 4000,
+    },
+  });
+  await prisma.event.update({
+    where: { id: eventId },
+    data: { templateId: template.id },
+  });
+  return template.id;
+}
+
 async function main() {
   await assertSchemaIsMigrated(pool);
   console.log("Seeding the multi-role scenario…");
@@ -338,11 +392,18 @@ async function main() {
   });
   const eventIds = [liveId, upcomingId, requestEventId, hugoEventId];
 
+  // Hugo's Reunion is looking for a DJ and some gear: open slots, with no
+  // listing in them yet, for a Talent, Performer or Gear Foxer to bid on.
+  await seedHugoSlots(u.host, hugoEventId);
+
   // Reset this scenario's own state, then lay it down again.
   await prisma.appointment.deleteMany({
     where: {
       OR: [{ eventId: { in: eventIds } }, { venueId: { in: [hall1, hall2] } }],
     },
+  });
+  await prisma.venueEventFoxerAffiliation.deleteMany({
+    where: { venueId: { in: [hall1, hall2] } },
   });
   await prisma.eventVenueTransaction.deleteMany({
     where: { eventId: { in: eventIds } },
@@ -524,6 +585,7 @@ async function main() {
     Performer  a DJ set and a live band; a request waiting
     Earnings   eight weeks of paid payouts and one pending
     Organizer  runs Harbour Hall 1; invited to Hugo's Reunion
+    Bids       Hugo's Reunion has an open DJ slot and an open gear slot
 
   multi.client@${DOMAIN}  Cora: the client who sent the requests
   multi.host@${DOMAIN}    Hugo: owns Hugo's Reunion and invited Mika
