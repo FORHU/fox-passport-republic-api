@@ -5,6 +5,8 @@ import {
   type AuditActor,
 } from "../audit/audit.service";
 import PricingSvc from "../pricing/pricing.service";
+import { badRequest, notFound } from "../../utils/errors";
+import { END_BEFORE_START_MESSAGE } from "../../utils/validation";
 
 /**
  * Not a Prisma enum — `PlatformFeeConfig.transactionType` is a free string,
@@ -44,16 +46,16 @@ interface FeeRuleInput {
 }
 
 function assertValidRule(data: FeeRuleInput) {
-  if (!data.name?.trim()) throw new Error("Fee rule name is required");
+  if (!data.name?.trim()) throw badRequest("Enter a name for the fee rule.");
   if (data.percentage == null && data.fixedAmount == null) {
-    throw new Error("At least one of percentage or fixedAmount is required");
+    throw badRequest("Add a percentage, a fixed amount, or both.");
   }
   if (
     data.effectiveFrom &&
     data.effectiveUntil &&
     data.effectiveUntil <= data.effectiveFrom
   ) {
-    throw new Error("effectiveUntil must be after effectiveFrom");
+    throw badRequest(END_BEFORE_START_MESSAGE);
   }
 }
 
@@ -83,7 +85,7 @@ export default class PlatformFeeConfigSvc {
 
   static async getById(id: string) {
     const rule = await PlatformFeeConfigRepo.findById(id);
-    if (!rule) throw new Error("Fee rule not found");
+    if (!rule) throw notFound("Fee rule");
     return toApi(rule);
   }
 
@@ -104,7 +106,7 @@ export default class PlatformFeeConfigSvc {
     actor?: AuditActor,
   ) {
     const existing = await PlatformFeeConfigRepo.findById(id);
-    if (!existing) throw new Error("Fee rule not found");
+    if (!existing) throw notFound("Fee rule");
 
     // Validate the merged shape, not just the patch — an update that only
     // sends `effectiveUntil` must still be checked against the existing
@@ -141,7 +143,7 @@ export default class PlatformFeeConfigSvc {
 
   static async remove(id: string, actor?: AuditActor) {
     const existing = await PlatformFeeConfigRepo.findById(id);
-    if (!existing) throw new Error("Fee rule not found");
+    if (!existing) throw notFound("Fee rule");
     const result = await PlatformFeeConfigRepo.softDelete(id);
     await recordChange(actor, "feeRule.deactivate", id, {
       previous: toApi(existing),
