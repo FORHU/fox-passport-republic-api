@@ -37,6 +37,16 @@ const PERK_THRESHOLDS: Record<string, { level: number; perk: string }[]> = {
     { level: 3, perk: "service_lower_fees" },
     { level: 8, perk: "service_featured" },
   ],
+  [UserPath.performerFoxer]: [
+    { level: 1, perk: "performer_verified" },
+    { level: 3, perk: "service_lower_fees" },
+    { level: 8, perk: "performer_featured" },
+  ],
+  [UserPath.providerFoxer]: [
+    { level: 1, perk: "provider_verified" },
+    { level: 3, perk: "lower_fees" },
+    { level: 8, perk: "provider_featured" },
+  ],
 };
 
 // XP earned per action (mirrors FE constants)

@@ -346,6 +346,17 @@ const ROLE_TYPE_GRANTS: Record<RoleType, readonly Permission[]> = {
   // that one Venue or Event. No `payouts:onboard` either: Organizers are paid
   // privately by the Mayor or Event Owner, not through the platform.
   organizer: [],
+  // Consolidated supply role: combines equipment/gear, services, and live
+  // performance talent capabilities into a unified provider persona.
+  providerFoxer: [
+    "asset:manage",
+    "service:manage",
+    "performer:manage",
+    "payouts:onboard",
+    "bid:submit-asset",
+    "bid:submit-service",
+    "promotions:manage-own",
+  ],
 };
 
 /**

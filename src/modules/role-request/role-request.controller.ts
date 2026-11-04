@@ -157,12 +157,43 @@ export default class RoleRequestController {
         }
       }
 
+      if (roleType === RoleType.providerFoxer) {
+        if (
+          data.experience !== undefined &&
+          data.experience !== null &&
+          data.experience !== ""
+        ) {
+          const experience = Number(data.experience);
+          if (
+            !Number.isInteger(experience) ||
+            experience < 0 ||
+            experience > 100
+          ) {
+            return res.status(400).json({
+              success: false,
+              message: "Years of experience must be between 0 and 100",
+            });
+          }
+        }
+        if (
+          typeof data.nbiClearanceIdNumber === "string" &&
+          data.nbiClearanceIdNumber.length > 0 &&
+          !/^\d{1,18}$/.test(data.nbiClearanceIdNumber)
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "NBI Clearance ID must be 1-18 digits",
+          });
+        }
+      }
+
       if (
         [
           RoleType.serviceFoxer,
           RoleType.gearFoxer,
           RoleType.venueFoxer,
           RoleType.performerFoxer,
+          RoleType.providerFoxer,
         ].includes(roleType) &&
         typeof data.tinNumber === "string" &&
         data.tinNumber.length > 0 &&

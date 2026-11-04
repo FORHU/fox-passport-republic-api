@@ -21,6 +21,7 @@ const APPLICATION_MODEL_BY_ROLE: Record<RoleType, string> = {
   [RoleType.performerFoxer]: "performerFoxerApplication",
   [RoleType.investor]: "investorApplication",
   [RoleType.organizer]: "organizerApplication",
+  [RoleType.providerFoxer]: "providerFoxerApplication",
 };
 
 // Maps the document field names admins flag (and applicants resubmit) to the
