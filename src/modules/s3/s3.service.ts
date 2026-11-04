@@ -23,6 +23,7 @@ import {
   MAX_UPLOAD_SIZE,
   type DetectedFile,
 } from "../../utils/file-signature";
+import { optimizeVideo } from "../../utils/video";
 import { AppError, badRequest, notFound } from "../../utils/errors";
 
 const MAX_IMAGE_DIMENSION = 1600;
@@ -165,6 +166,42 @@ export default class S3Svc {
   ) {
     const detected = checkUpload(file.buffer, file.size, "media");
 
+    // A video is checked and re-encoded to a small vertical file, and kept
+    // with a poster frame. Nothing about the original is stored.
+    if (detected.kind === "video") {
+      if (!isVideoStorageConfigured()) {
+        throw new AppError(
+          VIDEO_STORAGE_NOT_CONFIGURED,
+          503,
+          "VIDEO_STORAGE_NOT_CONFIGURED",
+        );
+      }
+      const optimized = await optimizeVideo(file.buffer);
+      const base = `${S3Svc.uploadPrefix(userId)}${crypto.randomUUID()}`;
+      const key = `${base}.mp4`;
+      const posterKey = `${base}.jpg`;
+      await uploadVideoToS3({
+        key,
+        body: optimized.video,
+        contentType: "video/mp4",
+      });
+      await uploadVideoToS3({
+        key: posterKey,
+        body: optimized.poster,
+        contentType: "image/jpeg",
+      });
+      return {
+        key,
+        contentType: "video/mp4",
+        url: getVideoUrl(key),
+        posterUrl: getVideoUrl(posterKey),
+        durationSec: optimized.durationSec,
+        sizeBytes: optimized.video.length,
+        width: optimized.width,
+        height: optimized.height,
+      };
+    }
+
     let body = file.buffer;
     let contentType = detected.mime;
     let outExt = detected.ext;
@@ -177,20 +214,6 @@ export default class S3Svc {
     }
 
     const key = `${S3Svc.uploadPrefix(userId)}${crypto.randomUUID()}.${outExt}`;
-
-    // Videos are kept in real S3, never in the local MinIO the photos may use,
-    // so they are refused until a video bucket is set up.
-    if (detected.kind === "video") {
-      if (!isVideoStorageConfigured()) {
-        throw new AppError(
-          VIDEO_STORAGE_NOT_CONFIGURED,
-          503,
-          "VIDEO_STORAGE_NOT_CONFIGURED",
-        );
-      }
-      await uploadVideoToS3({ key, body, contentType });
-      return { key, contentType, url: getVideoUrl(key) };
-    }
 
     await uploadToS3({
       key,
