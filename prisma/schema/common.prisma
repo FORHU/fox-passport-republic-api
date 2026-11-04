@@ -32,6 +32,7 @@ enum RoleType {
   performerFoxer
   investor
   organizer
+  providerFoxer
 }
 
 enum RequestStatus {

@@ -34,15 +34,15 @@ export default class SearchRepo {
       ...(eventCategory && { category: eventCategory }),
     };
     const gearFoxerWhere = {
-      roleType: { has: "gearFoxer" as RoleType },
+      roleType: { hasSome: ["gearFoxer", "providerFoxer"] as RoleType[] },
       ...(cityFilter && { city: cityFilter }),
     };
     const serviceFoxerWhere = {
-      roleType: { has: "serviceFoxer" as RoleType },
+      roleType: { hasSome: ["serviceFoxer", "providerFoxer"] as RoleType[] },
       ...(cityFilter && { city: cityFilter }),
     };
     const performerFoxerWhere = {
-      roleType: { has: "performerFoxer" as RoleType },
+      roleType: { hasSome: ["performerFoxer", "providerFoxer"] as RoleType[] },
       ...(cityFilter && { city: cityFilter }),
     };
     // A performer-category `category` param narrows the performer section to

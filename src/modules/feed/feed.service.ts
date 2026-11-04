@@ -257,6 +257,7 @@ export default class FeedService {
         const isAuthorized =
           can(user, "feed:post-for-anyone") ||
           user.roleType.includes("gearFoxer") ||
+          user.roleType.includes("providerFoxer") ||
           user.roleType.includes("investor");
         if (!isAuthorized) {
           throw new AppError(
@@ -288,6 +289,7 @@ export default class FeedService {
           can(user, "feed:post-for-anyone") ||
           user.roleType.includes("serviceFoxer") ||
           user.roleType.includes("performerFoxer") ||
+          user.roleType.includes("providerFoxer") ||
           user.roleType.includes("investor");
         if (!isAuthorized) {
           throw new AppError(
@@ -418,16 +420,24 @@ export default class FeedService {
         } else if (type === PostType.venue_spotlight) {
           await PassportSvc.awardXP(user.userId, UserPath.venueFoxer, 25);
         } else if (type === PostType.gear_offering) {
-          await PassportSvc.awardXP(user.userId, UserPath.gearFoxer, 25);
+          await PassportSvc.awardXP(
+            user.userId,
+            user.roleType.includes("providerFoxer")
+              ? UserPath.providerFoxer
+              : UserPath.gearFoxer,
+            25,
+          );
         } else if (type === PostType.service_offering) {
           // Poster already passed the case-block ownership check above, so
           // their own roleType (not the listing's category) is enough to
           // resolve which path earns the XP.
           await PassportSvc.awardXP(
             user.userId,
-            user.roleType.includes("performerFoxer")
-              ? UserPath.performerFoxer
-              : UserPath.serviceFoxer,
+            user.roleType.includes("providerFoxer")
+              ? UserPath.providerFoxer
+              : user.roleType.includes("performerFoxer")
+                ? UserPath.performerFoxer
+                : UserPath.serviceFoxer,
             25,
           );
         } else if (type === PostType.event_announcement) {
