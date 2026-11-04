@@ -125,6 +125,27 @@ async function seedCast() {
       },
       select: { id: true },
     });
+    // Login goes through Better Auth, which reads the password from the
+    // credential Account, not from the User row.
+    const account = await prisma.account.findFirst({
+      where: { userId: user.id, providerId: "credential" },
+      select: { id: true },
+    });
+    if (account) {
+      await prisma.account.update({
+        where: { id: account.id },
+        data: { password },
+      });
+    } else {
+      await prisma.account.create({
+        data: {
+          userId: user.id,
+          accountId: user.id,
+          providerId: "credential",
+          password,
+        },
+      });
+    }
     ids[key] = user.id;
   }
   return ids;
