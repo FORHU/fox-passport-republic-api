@@ -74,3 +74,40 @@ model UserOnboarding {
   @@map("user_onboardings")
 }
 
+model CoinReward {
+  id                 String           @id @default(uuid())
+  title              String
+  description        String?
+  targetAudience     String           @default("citizen") // "citizen", "foxer", "all"
+  coinCost           Int
+  rewardType         String           // "booking_voucher", "fee_discount", "listing_boost"
+  discountPhp        Decimal?         @db.Decimal(12, 2)
+  discountPercentage Decimal?         @db.Decimal(5, 2)
+  minLevel           Int              @default(1)
+  active             Boolean          @default(true)
+  metadata           Json?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  redemptions        CoinRedemption[]
+
+  @@map("coin_rewards")
+}
+
+model CoinRedemption {
+  id         String     @id @default(uuid())
+  userId     String
+  rewardId   String
+  coinsSpent Int
+  voucherId  String?    @unique
+  status     String     @default("completed") // "completed", "cancelled"
+  expiresAt  DateTime?
+  createdAt  DateTime   @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reward     CoinReward @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+  voucher    Voucher?   @relation(fields: [voucherId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@map("coin_redemptions")
+}
+

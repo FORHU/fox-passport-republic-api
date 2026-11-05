@@ -118,6 +118,8 @@ model User {
   rewardEvents             RewardEvent[]
   rewardLifecycles         RewardLifecycle[]
   onboardings              UserOnboarding[]
+  ownedVouchers            Voucher[]                    @relation("UserVouchers")
+  coinRedemptions          CoinRedemption[]
 
   @@map("users")
 }

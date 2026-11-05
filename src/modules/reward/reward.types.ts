@@ -43,3 +43,59 @@ export interface RewardRuleConfig {
   onceOnly: boolean;
   active: boolean;
 }
+
+export interface RewardCatalogItem {
+  id: string;
+  title: string;
+  description: string | null;
+  targetAudience: string;
+  coinCost: number;
+  rewardType: string;
+  discountPhp: number | null;
+  discountPercentage: number | null;
+  minLevel: number;
+  canAfford: boolean;
+  levelQualified: boolean;
+}
+
+export interface WalletHistoryItem {
+  id: string;
+  type: "grant" | "lifecycle";
+  action?: string;
+  lifecycleType?: string;
+  xp: number;
+  coinsDelta: number;
+  refType?: string;
+  refId?: string;
+  reason?: string | null;
+  createdAt: Date;
+}
+
+export interface WalletSummary {
+  coins: number;
+  pendingCoins: number;
+  totalEarnedCoins: number;
+  level: number;
+  rank: string;
+  history: WalletHistoryItem[];
+}
+
+export interface RedeemRewardParams {
+  userId: string;
+  rewardId: string;
+  path?: UserPath;
+}
+
+export interface RedeemRewardResult {
+  success: boolean;
+  redemptionId: string;
+  coinsSpent: number;
+  remainingCoins: number;
+  voucher: {
+    id: string;
+    code: string;
+    discountPhp: number | null;
+    discountPercentage: number | null;
+    expiresAt: Date;
+  };
+}

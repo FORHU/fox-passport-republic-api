@@ -139,6 +139,11 @@ const ALLOW_LIST = new Set([
   "investment.routes.ts PATCH /:id",
   "investment.routes.ts DELETE /:id",
   "investment.routes.ts PATCH /:id/archive",
+  // Rewards & Wallet (Phase 2): self-service wallet overview, catalog browsing,
+  // and coin redemption scoped to caller's own balance and passport
+  "reward.routes.ts GET /me",
+  "reward.routes.ts GET /catalog",
+  "reward.routes.ts POST /redeem",
 ]);
 
 const BANNED_GUARDS = ["requireRole", "requireAdmin", "requireHost"];

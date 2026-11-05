@@ -27,6 +27,7 @@ import cancellationPolicyRoutes from "../modules/cancellation-policy/cancellatio
 import waitlistRoutes from "../modules/waitlist/waitlist.routes";
 import locationsRoutes from "../modules/locations/locations.routes";
 import passportRoutes from "../modules/passport/passport.routes";
+import rewardRoutes from "../modules/reward/reward.routes";
 import analyticsRoutes from "../modules/analytics/analytics.routes";
 import searchRoutes from "../modules/search/search.routes";
 import conversationRoutes from "../modules/conversations/conversation.routes";
@@ -102,6 +103,8 @@ router.use("/v1/fx", fxRoutes);
 router.use("/v1/waitlist", waitlistRoutes);
 router.use("/v1/locations", locationsRoutes);
 router.use("/v1/passport", passportRoutes);
+router.use("/v1/rewards", rewardRoutes);
+router.use("/rewards", rewardRoutes);
 router.use("/v1/analytics", analyticsRoutes);
 router.use("/v1/search", searchRoutes);
 router.use("/v1/stripe-connect", stripeConnectRoutes);
