@@ -1,6 +1,7 @@
 import { AppError, notFound } from "../../utils/errors";
 import crypto from "crypto";
 import PromotionRepo from "./promotion.repository";
+import { AUTO_APPLY_CODE_PREFIX } from "./promotion.constants";
 import {
   recordChange,
   listAuditForTarget,
@@ -93,14 +94,61 @@ function toApi<
 }
 
 /**
- * Marks a system-generated voucher — never surfaced to a citizen, never
- * typed by anyone, just the redemption anchor an auto-apply promotion needs
- * so it can reuse the ordinary Voucher/VoucherRedemption limit-checking
- * machinery instead of a second one.
+ * Why codes can't be added to this promotion right now, or null when they
+ * can. The one place this is decided: generate and import refuse with it,
+ * and every promotion response carries it, so a client only displays it.
  */
-const AUTO_APPLY_CODE_PREFIX = "AUTO";
+export function codeGenerationBlock(
+  promo: { autoApply: boolean; active: boolean; endDate: Date | null },
+  now: Date = new Date(),
+): string | null {
+  if (promo.autoApply) {
+    return "This promotion applies automatically, so it has no codes.";
+  }
+  if (!promo.active) {
+    return "This promotion is deactivated. Reactivate it to add codes.";
+  }
+  if (promo.endDate && promo.endDate < now) {
+    const day = promo.endDate.toISOString().slice(0, 10);
+    return `This promotion ended on ${day}. Extend it to add codes.`;
+  }
+  return null;
+}
+
+/**
+ * A promotion as the API returns it: `toApi` plus what a client needs to show
+ * its codes without working anything out itself. Kept apart from `toApi`,
+ * which also builds the audit snapshots and must not change shape.
+ */
+function toResponse<
+  T extends Parameters<typeof toApi>[0] & {
+    autoApply: boolean;
+    active: boolean;
+    endDate: Date | null;
+    _count: { vouchers: number };
+  },
+>(promo: T) {
+  const { _count, ...rest } = promo;
+  const blocked = codeGenerationBlock(promo);
+  return {
+    ...toApi(rest),
+    voucherCount: _count.vouchers,
+    canGenerateCodes: blocked === null,
+    codeGenerationBlockedReason: blocked,
+  };
+}
+
+/** A code a person chose may not pass for the hidden auto-apply anchor. */
+const RESERVED_CODE_START = `${AUTO_APPLY_CODE_PREFIX}-`;
 
 export default class PromotionSvc {
+  /** One promotion, re-read with its visible codes, as a response. */
+  private static async responseFor(id: string) {
+    const promo = await PromotionRepo.findByIdWithVisibleCodes(id);
+    if (!promo) throw notFound("Promotion");
+    return toResponse(promo);
+  }
+
   /** Idempotent: a promotion already holding an auto-apply voucher keeps it. */
   private static async ensureAutoApplyVoucher(promotionId: string) {
     const existing = await PromotionRepo.findAutoApplyVoucher(promotionId);
@@ -117,13 +165,11 @@ export default class PromotionSvc {
 
   static async getAll(includeInactive: boolean) {
     const promos = await PromotionRepo.findAll(includeInactive);
-    return promos.map(toApi);
+    return promos.map((promo) => toResponse(promo));
   }
 
   static async getById(id: string) {
-    const promo = await PromotionRepo.findById(id);
-    if (!promo) throw notFound("Promotion");
-    return toApi(promo);
+    return this.responseFor(id);
   }
 
   static async create(data: PromotionInput, actor?: AuditActor) {
@@ -135,7 +181,7 @@ export default class PromotionSvc {
     if (data.autoApply) await this.ensureAutoApplyVoucher(promo.id);
     const current = toApi(promo);
     await recordChange(actor, "promotion.create", promo.id, { current });
-    return current;
+    return this.responseFor(promo.id);
   }
 
   static async update(
@@ -169,7 +215,7 @@ export default class PromotionSvc {
       previous: toApi(existing),
       current,
     });
-    return current;
+    return this.responseFor(id);
   }
 
   static async remove(id: string, actor?: AuditActor) {
@@ -196,6 +242,8 @@ export default class PromotionSvc {
   ) {
     const promo = await PromotionRepo.findById(promotionId);
     if (!promo) throw notFound("Promotion");
+    const blocked = codeGenerationBlock(promo);
+    if (blocked) throw new AppError(blocked, 400);
     if (count < 1 || count > 500) {
       throw new AppError("count must be between 1 and 500", 400);
     }
@@ -204,6 +252,12 @@ export default class PromotionSvc {
       ?.trim()
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, "");
+    if (cleanPrefix === AUTO_APPLY_CODE_PREFIX) {
+      throw new AppError(
+        `"${AUTO_APPLY_CODE_PREFIX}" is reserved. Choose another prefix.`,
+        400,
+      );
+    }
     const codes: string[] = [];
     while (codes.length < count) {
       const code = `${cleanPrefix ? cleanPrefix + "-" : ""}${randomCode(6)}`;
@@ -248,6 +302,8 @@ export default class PromotionSvc {
   ) {
     const promo = await PromotionRepo.findById(promotionId);
     if (!promo) throw notFound("Promotion");
+    const blocked = codeGenerationBlock(promo);
+    if (blocked) throw new AppError(blocked, 400);
 
     const seen = new Set<string>();
     const toCreate: string[] = [];
@@ -255,7 +311,11 @@ export default class PromotionSvc {
     for (const raw of rawCodes) {
       const code = raw.trim().toUpperCase();
       if (!code) continue;
-      if (seen.has(code) || (await PromotionRepo.codeExists(code))) {
+      if (
+        code.startsWith(RESERVED_CODE_START) ||
+        seen.has(code) ||
+        (await PromotionRepo.codeExists(code))
+      ) {
         skipped.push(code);
         continue;
       }
@@ -376,7 +436,7 @@ export default class PromotionSvc {
 
   static async getAllForProvider(providerId: string) {
     const promos = await PromotionRepo.findAllForProvider(providerId);
-    return promos.map(toApi);
+    return promos.map((promo) => toResponse(promo));
   }
 
   /** Ownership-guarded fetch — throws rather than returning another provider's promotion. */
@@ -423,7 +483,7 @@ export default class PromotionSvc {
     if (data.autoApply) await this.ensureAutoApplyVoucher(promo.id);
     const current = toApi(promo);
     await recordChange(actor, "promotion.create", promo.id, { current });
-    return current;
+    return this.responseFor(promo.id);
   }
 
   static async updateOwn(
@@ -479,7 +539,7 @@ export default class PromotionSvc {
       previous: toApi(existing),
       current,
     });
-    return current;
+    return this.responseFor(id);
   }
 
   static async removeOwn(providerId: string, id: string, actor?: AuditActor) {
