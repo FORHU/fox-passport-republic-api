@@ -1,0 +1,24 @@
+// The category catalog: display data for the category values listings carry.
+//
+// Two levels. The roots are the groups `event` and `listing`; every other row is
+// a subcategory of one of them. `slug` is the key that links a row to the
+// values stored on `Asset.category`, `Venue.category`, `Service.category` and
+// `EventTemplate.category`, so it never changes after creation. Listings still
+// validate their category against the enums in common.prisma, catalog.prisma
+// and event.prisma; this table does not replace those yet.
+model Category {
+  id               String     @id @default(uuid())
+  slug             String     @unique
+  name             String
+  description      String?
+  icon             String?
+  parentCategoryId String?
+  parent           Category?  @relation("CategoryTree", fields: [parentCategoryId], references: [id], onDelete: Restrict)
+  children         Category[] @relation("CategoryTree")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentCategoryId])
+  @@map("categories")
+}
