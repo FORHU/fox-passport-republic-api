@@ -114,6 +114,7 @@ export default class PassportRepo {
             startAt: true,
             targetCity: true,
             targetCountry: true,
+            platformFeeAmount: true,
           },
         },
         user: { select: { id: true } },

@@ -7,7 +7,7 @@ import {
   ReactionType,
 } from "@prisma/client";
 import FeedRepo, { QueryFeedOptions } from "./feed.repository";
-import PassportSvc, { XP_REWARDS } from "../passport/passport.service";
+import PassportSvc from "../passport/passport.service";
 import NotificationService from "../notifications/user-notification.service";
 import { prisma } from "../../utils/prisma";
 import { AuthenticatedUser } from "../../types/auth";
@@ -401,50 +401,53 @@ export default class FeedService {
       notifyMediaTags(mediaTags, user.userId, post.id).catch(() => {});
     }
 
-    // 3. Award XP via PassportSvc (with daily anti-spam cap)
+    // 3. Award XP & Coins via RewardService (with daily anti-spam cap and idempotency)
     try {
-      const postsCountToday = await FeedRepo.countUserPostsToday(user.userId);
-      if (postsCountToday <= 1) {
-        if (type === PostType.citizen_experience) {
-          await PassportSvc.awardXP(
-            user.userId,
-            UserPath.user,
-            XP_REWARDS.createCommunityPost,
-          );
-        } else if (type === PostType.review_share) {
-          await PassportSvc.awardXP(
-            user.userId,
-            UserPath.user,
-            XP_REWARDS.shareReviewPost,
-          );
-        } else if (type === PostType.venue_spotlight) {
-          await PassportSvc.awardXP(user.userId, UserPath.venueFoxer, 25);
-        } else if (type === PostType.gear_offering) {
-          await PassportSvc.awardXP(
-            user.userId,
-            user.roleType.includes("providerFoxer")
-              ? UserPath.providerFoxer
-              : UserPath.gearFoxer,
-            25,
-          );
+      const { default: RewardService } =
+        await import("../reward/reward.service");
+      if (type === PostType.citizen_experience) {
+        await RewardService.grant({
+          userId: user.userId,
+          path: UserPath.user,
+          action: "post_feed",
+          refType: "post",
+          refId: post.id,
+        });
+      } else if (type === PostType.review_share) {
+        await RewardService.grant({
+          userId: user.userId,
+          path: UserPath.user,
+          action: "share_review_post",
+          refType: "post",
+          refId: post.id,
+        });
+      } else {
+        let targetPath: UserPath = UserPath.user;
+        if (type === PostType.venue_spotlight) targetPath = UserPath.venueFoxer;
+        else if (type === PostType.gear_offering) {
+          targetPath = user.roleType.includes("providerFoxer")
+            ? UserPath.providerFoxer
+            : UserPath.gearFoxer;
         } else if (type === PostType.service_offering) {
-          // Poster already passed the case-block ownership check above, so
-          // their own roleType (not the listing's category) is enough to
-          // resolve which path earns the XP.
-          await PassportSvc.awardXP(
-            user.userId,
-            user.roleType.includes("providerFoxer")
-              ? UserPath.providerFoxer
-              : user.roleType.includes("performerFoxer")
-                ? UserPath.performerFoxer
-                : UserPath.serviceFoxer,
-            25,
-          );
-        } else if (type === PostType.event_announcement) {
-          await PassportSvc.awardXP(user.userId, UserPath.eventFoxer, 25);
-        } else if (type === PostType.partner_announcement) {
-          await PassportSvc.awardXP(user.userId, UserPath.investor, 25);
-        }
+          targetPath = user.roleType.includes("providerFoxer")
+            ? UserPath.providerFoxer
+            : user.roleType.includes("performerFoxer")
+              ? UserPath.performerFoxer
+              : UserPath.serviceFoxer;
+        } else if (type === PostType.event_announcement)
+          targetPath = UserPath.eventFoxer;
+        else if (type === PostType.partner_announcement)
+          targetPath = UserPath.investor;
+
+        await RewardService.grant({
+          userId: user.userId,
+          path: targetPath,
+          action: "post_feed",
+          refType: "post",
+          refId: post.id,
+          xpOverride: 25,
+          coinsOverride: 0,
+        });
       }
     } catch (xpError) {
       console.warn("[FeedService] Best-effort XP award failed:", xpError);
