@@ -3,6 +3,7 @@ import Joi from "joi";
 import ProfileSvc, { USERNAME_TAKEN } from "./profile.service";
 import { SUPPORTED_CURRENCIES } from "../fx/fx.service";
 import { usernameJoi } from "../../utils/username";
+import { passwordJoi } from "../../utils/password-policy";
 import { normalizePhone } from "../../utils/phone";
 import { nameJoi } from "../../utils/limits";
 
@@ -126,7 +127,7 @@ export default class ProfileCtrl {
 
       const schema = Joi.object({
         currentPassword: Joi.string().required(),
-        newPassword: Joi.string().min(6).required(),
+        newPassword: passwordJoi().required(),
         confirmPassword: Joi.string()
           .valid(Joi.ref("newPassword"))
           .required()
