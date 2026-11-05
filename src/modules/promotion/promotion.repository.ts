@@ -1,13 +1,43 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
+import { AUTO_APPLY_CODE_PREFIX } from "./promotion.constants";
+
+/**
+ * The codes a person can see and hand out: every voucher except an
+ * auto-apply promotion's hidden anchor. Decided here, once, so no client has
+ * to filter a list it was given.
+ */
+const VISIBLE_CODES = {
+  NOT: { code: { startsWith: `${AUTO_APPLY_CODE_PREFIX}-` } },
+} satisfies Prisma.VoucherWhereInput;
+
+/** A promotion as the API returns it: its visible codes and how many. */
+const WITH_VISIBLE_CODES = {
+  vouchers: {
+    where: VISIBLE_CODES,
+    include: { _count: { select: { redemptions: true } } },
+  },
+  _count: { select: { vouchers: { where: VISIBLE_CODES } } },
+} satisfies Prisma.PromotionInclude;
 
 export default class PromotionRepo {
   static async findAll(includeInactive = false) {
     return prisma.promotion.findMany({
       where: includeInactive ? {} : { active: true },
-      include: {
-        vouchers: { include: { _count: { select: { redemptions: true } } } },
-      },
+      include: WITH_VISIBLE_CODES,
       orderBy: { createdAt: "desc" },
+    });
+  }
+
+  /**
+   * One promotion for a response. `findById` stays unfiltered: the service
+   * also uses it for existence checks and for the audit `previous` snapshot,
+   * which keeps recording every voucher exactly as before.
+   */
+  static async findByIdWithVisibleCodes(id: string) {
+    return prisma.promotion.findUnique({
+      where: { id },
+      include: WITH_VISIBLE_CODES,
     });
   }
 
@@ -23,9 +53,7 @@ export default class PromotionRepo {
   static async findAllForProvider(providerId: string) {
     return prisma.promotion.findMany({
       where: { providerId },
-      include: {
-        vouchers: { include: { _count: { select: { redemptions: true } } } },
-      },
+      include: WITH_VISIBLE_CODES,
       orderBy: { createdAt: "desc" },
     });
   }
@@ -98,7 +126,15 @@ export default class PromotionRepo {
   }
 
   static async findAutoApplyVoucher(promotionId: string) {
-    return prisma.voucher.findFirst({ where: { promotionId } });
+    // The anchor only. Matching any voucher meant a promotion that already
+    // had printed codes, once switched to auto-apply, adopted one of them as
+    // its hidden anchor and never got a real one.
+    return prisma.voucher.findFirst({
+      where: {
+        promotionId,
+        code: { startsWith: `${AUTO_APPLY_CODE_PREFIX}-` },
+      },
+    });
   }
 
   static async findVoucherWithPromotion(voucherId: string) {

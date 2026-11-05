@@ -64,6 +64,14 @@ const PROMO = {
 vi.mock("../src/modules/promotion/promotion.repository", () => ({
   default: {
     findById: vi.fn(async () => PROMO),
+    // The re-read an update returns, with its visible codes and their count.
+    findByIdWithVisibleCodes: vi.fn(async () => ({
+      ...PROMO,
+      autoApply: false,
+      active: true,
+      vouchers: [],
+      _count: { vouchers: 0 },
+    })),
     update: vi.fn(async (_id: string, data: Record<string, unknown>) => ({
       ...PROMO,
       discountValue: dec(Number(data.discountValue)),
