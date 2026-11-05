@@ -3,6 +3,7 @@
 model Passport {
   id         String          @id @default(uuid())
   userId     String          @unique
+  coins      Int             @default(0)
   perks      String[]        @default([])
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt

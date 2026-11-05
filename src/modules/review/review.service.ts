@@ -129,14 +129,18 @@ export default class ReviewSvc {
       await BookingRepo.setHasReview(String(data.bookingId), true);
     }
 
-    // Award leaveReview XP + First Review badge (fire-and-forget)
-    import("../passport/passport.service")
-      .then(async ({ default: PassportSvc, XP_REWARDS, UserPath }) => {
-        await PassportSvc.awardXP(
-          String(data.userId),
-          UserPath.user,
-          XP_REWARDS.leaveReview,
-        );
+    // Award leaveReview XP and Coins via RewardService + First Review badge (fire-and-forget)
+    import("../reward/reward.service")
+      .then(async ({ default: RewardService }) => {
+        const { default: PassportSvc, UserPath } =
+          await import("../passport/passport.service");
+        await RewardService.grant({
+          userId: String(data.userId),
+          path: UserPath.user,
+          action: "leave_review",
+          refType: "review",
+          refId: review.id,
+        });
         const reviewCount = await prisma.review.count({
           where: { userId: String(data.userId) },
         });
@@ -147,7 +151,7 @@ export default class ReviewSvc {
           );
         }
 
-        // Award receive5StarReview XP to the provider when rating is 5
+        // Award five_star_review XP/Coins to the provider when rating is 5
         if (data.rating >= 5) {
           let providerId: string | null = null;
           let providerPath: (typeof UserPath)[keyof typeof UserPath] =
@@ -187,11 +191,13 @@ export default class ReviewSvc {
           }
 
           if (providerId && providerId !== String(data.userId)) {
-            await PassportSvc.awardXP(
-              providerId,
-              providerPath,
-              XP_REWARDS.receive5StarReview,
-            );
+            await RewardService.grant({
+              userId: providerId,
+              path: providerPath,
+              action: "five_star_review",
+              refType: "review",
+              refId: review.id,
+            });
           }
         }
       })
