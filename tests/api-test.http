@@ -31,15 +31,24 @@ Content-Type: application/json
 
 ### 2. Categories
 
+# @name TopLevelCategories
+# The roots (Event, Listing): a new category's parentCategoryId is one of their ids.
+GET {{baseUrl}}/categories/top-level
+
+###
+
 # @name CreateCategory
-POST {{baseUrl}}/categories
+# Needs categories:manage (the admin role). Slug is fixed once created.
+POST {{baseUrl}}/categories/create
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-    "name": "Wedding",
-    "slug": "wedding-{{$timestamp}}",
-    "iconUrl": "https://example.com/wedding.png"
+    "name": "Pool Party",
+    "slug": "pool_party_{{$timestamp}}",
+    "description": "Poolside celebrations",
+    "icon": "pool",
+    "parentCategoryId": "{{TopLevelCategories.response.body.data[0].id}}"
 }
 
 ### 3. Listings (Venues)
