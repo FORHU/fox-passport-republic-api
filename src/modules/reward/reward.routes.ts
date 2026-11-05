@@ -9,4 +9,3 @@ router.get("/catalog", authenticate, RewardCtrl.getCatalog);
 router.post("/redeem", authenticate, RewardCtrl.redeemReward);
 
 export default router;
-
