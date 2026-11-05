@@ -193,6 +193,36 @@ describe("Bidding Lifecycle Integration Tests", () => {
     await prisma.eventServiceBid.deleteMany({});
   });
 
+  const freshService = async () =>
+    (
+      await prisma.service.create({
+        data: {
+          ownerId: talentFoxerId,
+          category: "entertainment",
+          name: "DJ Talent",
+          description: "desc",
+          price: 100,
+          billingRate: "hourly",
+          status: "available",
+        },
+      })
+    ).id;
+  const freshAsset = async () =>
+    (
+      await prisma.asset.create({
+        data: {
+          ownerId: gearFoxerId,
+          category: "sound_system",
+          name: "Speakers",
+          description: "desc",
+          quantity: 4,
+          price: 100,
+          billingRate: "daily",
+          status: "available",
+        },
+      })
+    ).id;
+
   it("open slots list the gear and the talent an event still needs", async () => {
     const slots = await BiddingSvc.getOpenSlots();
     const slot = slots.find((e) => e.id === eventId);
@@ -203,6 +233,114 @@ describe("Bidding Lifecycle Integration Tests", () => {
     expect(slot?.template.templateServices.map((x) => x.id)).toEqual([
       eventTemplateServiceId,
     ]);
+  });
+
+  it("open slots leave out a slot that has a listing in it or is matched", async () => {
+    const taken = await prisma.eventTemplateService.create({
+      data: { templateId, serviceId, description: "Already filled" },
+    });
+    const matched = await prisma.eventTemplateAsset.create({
+      data: { templateId, description: "Matched", matched: true },
+    });
+
+    const slots = await BiddingSvc.getOpenSlots();
+    const slot = slots.find((e) => e.id === eventId);
+    expect(slot?.template.templateServices.map((x) => x.id)).not.toContain(
+      taken.id,
+    );
+    expect(slot?.template.templateAssets.map((x) => x.id)).not.toContain(
+      matched.id,
+    );
+
+    await prisma.eventTemplateService.delete({ where: { id: taken.id } });
+    await prisma.eventTemplateAsset.delete({ where: { id: matched.id } });
+  });
+
+  it("open slots leave out an event with no open slot", async () => {
+    const template = await prisma.eventTemplate.create({
+      data: {
+        ownerId: eventFoxerId,
+        name: "Full Template",
+        description: "d",
+        category: "corporate",
+        templateServices: { create: [{ serviceId, matched: true }] },
+      },
+    });
+    const full = await prisma.event.create({
+      data: {
+        clientId: eventFoxerId,
+        organizerId: eventFoxerId,
+        templateId: template.id,
+        name: "Full Event",
+        description: "d",
+        eventCategory: "corporate",
+        startAt: new Date(),
+        endAt: new Date(Date.now() + 86400000),
+        guestCount: 1,
+        totalAmount: 1,
+        eventStatus: "pending",
+      },
+    });
+
+    const slots = await BiddingSvc.getOpenSlots();
+    expect(slots.map((e) => e.id)).not.toContain(full.id);
+    expect(slots.map((e) => e.id)).toContain(eventId);
+
+    await prisma.event.delete({ where: { id: full.id } });
+    await prisma.eventTemplate.delete({ where: { id: template.id } });
+  });
+
+  it("applying twice with the same listing is refused while the first waits", async () => {
+    const svc = await freshService();
+    const asset = await freshAsset();
+    const first = await BiddingSvc.submitServiceBid({
+      eventId,
+      eventTemplateServiceId,
+      providerId: talentFoxerId,
+      proposedServiceId: svc,
+      proposedPrice: 100,
+    });
+    await expect(
+      BiddingSvc.submitServiceBid({
+        eventId,
+        eventTemplateServiceId,
+        providerId: talentFoxerId,
+        proposedServiceId: svc,
+        proposedPrice: 90,
+      }),
+    ).rejects.toThrow("already applied");
+
+    const gear = await BiddingSvc.submitAssetBid({
+      eventId,
+      eventTemplateAssetId,
+      providerId: gearFoxerId,
+      proposedAssetId: asset,
+      proposedPrice: 100,
+      proposedQuantity: 4,
+    });
+    await expect(
+      BiddingSvc.submitAssetBid({
+        eventId,
+        eventTemplateAssetId,
+        providerId: gearFoxerId,
+        proposedAssetId: asset,
+        proposedPrice: 90,
+        proposedQuantity: 4,
+      }),
+    ).rejects.toThrow("already applied");
+
+    // Once it has been answered, the same listing may apply again.
+    await BiddingSvc.rejectServiceBid(first.id, eventFoxerId);
+    await expect(
+      BiddingSvc.submitServiceBid({
+        eventId,
+        eventTemplateServiceId,
+        providerId: talentFoxerId,
+        proposedServiceId: svc,
+        proposedPrice: 95,
+      }),
+    ).resolves.toBeTruthy();
+    expect(gear.id).toBeTruthy();
   });
 
   it("Gear/Talent capability validation: prevents unauthorized users from bidding", async () => {
@@ -285,14 +423,14 @@ describe("Bidding Lifecycle Integration Tests", () => {
       eventId,
       eventTemplateServiceId,
       providerId: talentFoxerId,
-      proposedServiceId: serviceId,
+      proposedServiceId: await freshService(),
       proposedPrice: 100,
     });
     const bid2 = await BiddingSvc.submitServiceBid({
       eventId,
       eventTemplateServiceId,
       providerId: talentFoxerId,
-      proposedServiceId: serviceId,
+      proposedServiceId: await freshService(),
       proposedPrice: 120,
     });
 
@@ -316,21 +454,21 @@ describe("Bidding Lifecycle Integration Tests", () => {
       eventId,
       eventTemplateServiceId,
       providerId: talentFoxerId,
-      proposedServiceId: serviceId,
+      proposedServiceId: await freshService(),
       proposedPrice: 100,
     });
     const bid2 = await BiddingSvc.submitServiceBid({
       eventId,
       eventTemplateServiceId,
       providerId: talentFoxerId,
-      proposedServiceId: serviceId,
+      proposedServiceId: await freshService(),
       proposedPrice: 110,
     });
     const bid3 = await BiddingSvc.submitServiceBid({
       eventId,
       eventTemplateServiceId,
       providerId: talentFoxerId,
-      proposedServiceId: serviceId,
+      proposedServiceId: await freshService(),
       proposedPrice: 120,
     });
 
@@ -356,7 +494,7 @@ describe("Bidding Lifecycle Integration Tests", () => {
       eventId,
       eventTemplateAssetId,
       providerId: gearFoxerId,
-      proposedAssetId: assetId,
+      proposedAssetId: await freshAsset(),
       proposedPrice: 500,
       proposedQuantity: 4,
     });
@@ -377,7 +515,7 @@ describe("Bidding Lifecycle Integration Tests", () => {
       eventId,
       eventTemplateServiceId,
       providerId: talentFoxerId,
-      proposedServiceId: serviceId,
+      proposedServiceId: await freshService(),
       proposedPrice: 100,
     });
 
@@ -397,7 +535,7 @@ describe("Bidding Lifecycle Integration Tests", () => {
       eventId,
       eventTemplateServiceId,
       providerId: talentFoxerId,
-      proposedServiceId: serviceId,
+      proposedServiceId: await freshService(),
       proposedPrice: 100,
     });
 
@@ -431,7 +569,7 @@ describe("Bidding Lifecycle Integration Tests", () => {
       eventId,
       eventTemplateAssetId,
       providerId: gearFoxerId,
-      proposedAssetId: assetId,
+      proposedAssetId: await freshAsset(),
       proposedPrice: 100,
       proposedQuantity: 2, // Requirement needs 4
     });
@@ -446,7 +584,7 @@ describe("Bidding Lifecycle Integration Tests", () => {
       eventId,
       eventTemplateServiceId,
       providerId: talentFoxerId,
-      proposedServiceId: serviceId,
+      proposedServiceId: await freshService(),
       proposedPrice: 100,
     });
 

@@ -21,6 +21,18 @@ export default class FileCtrl {
       // 1. Upload to S3 from backend (images are resized/re-encoded to WebP)
       const stored = await S3Svc.uploadFile(userId, file);
       const { key, contentType } = stored;
+      // Only a video has these: where its poster frame is, how long it runs,
+      // and how big the stored file is.
+      const video =
+        "posterUrl" in stored
+          ? {
+              posterUrl: stored.posterUrl,
+              durationSec: stored.durationSec,
+              sizeBytes: stored.sizeBytes,
+              width: stored.width,
+              height: stored.height,
+            }
+          : {};
 
       // 2. Public URL: a video has its own address, in its own bucket
       const url = stored.url ?? (await S3Svc.generateDownloadUrl(key)).url;
@@ -40,7 +52,8 @@ export default class FileCtrl {
         fileId: dbFile.id,
         key: key,
         url: url,
-        file: { url },
+        file: { url, ...video },
+        ...video,
       });
     } catch (e: unknown) {
       const error = e as Error;

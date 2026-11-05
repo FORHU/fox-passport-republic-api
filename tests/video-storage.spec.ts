@@ -21,6 +21,18 @@ const s3 = vi.hoisted(() => ({
   deleteObject: vi.fn(async () => undefined),
 }));
 
+// The encoder is tested on its own (video.optimize.spec.ts); here it is a stub.
+const optimizer = vi.hoisted(() => ({
+  optimizeVideo: vi.fn(async () => ({
+    video: Buffer.from("optimized-video"),
+    poster: Buffer.from("poster"),
+    durationSec: 12.5,
+    width: 720,
+    height: 1280,
+    maxrateKbps: 800,
+  })),
+}));
+
 async function loadS3(env: Record<string, string | undefined>) {
   vi.resetModules();
   vi.doMock("../src/config", async (importOriginal) => ({
@@ -130,6 +142,10 @@ describe("uploading a video (S3Svc.uploadFile)", () => {
   async function service() {
     vi.resetModules();
     vi.doMock("../src/utils/s3", () => s3);
+    vi.doMock("../src/utils/video", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("../src/utils/video")>()),
+      ...optimizer,
+    }));
     return (await import("../src/modules/s3/s3.service")).default;
   }
 
@@ -143,11 +159,46 @@ describe("uploading a video (S3Svc.uploadFile)", () => {
 
     const stored = await S3Svc.uploadFile("u1", file);
 
-    expect(s3.uploadVideoToS3).toHaveBeenCalledOnce();
+    // The video and its poster, both in the video bucket, never the media one.
+    expect(s3.uploadVideoToS3).toHaveBeenCalledTimes(2);
     expect(s3.uploadToS3).not.toHaveBeenCalled();
     expect(stored.contentType).toBe("video/mp4");
     expect(stored.key).toMatch(/^users\/u1\/uploads\/.+\.mp4$/);
     expect(stored).toMatchObject({ url: `https://video.example/${stored.key}` });
+  });
+
+  it("keeps the optimized file, not the original, and a poster beside it", async () => {
+    const S3Svc = await service();
+
+    const stored = await S3Svc.uploadFile("u1", file);
+    if (!("posterUrl" in stored)) throw new Error("no poster");
+
+    const [video, poster] = s3.uploadVideoToS3.mock.calls.map(
+      (c) =>
+        (c as unknown as [{ key: string; body: Buffer; contentType: string }])[0],
+    );
+    expect(video.body.toString()).toBe("optimized-video");
+    expect(video.contentType).toBe("video/mp4");
+    expect(poster.contentType).toBe("image/jpeg");
+    expect(poster.key).toBe(video.key.replace(/.mp4$/, ".jpg"));
+    expect(stored.posterUrl).toBe(`https://video.example/${poster.key}`);
+    expect(stored.durationSec).toBe(12.5);
+    expect(stored.sizeBytes).toBe("optimized-video".length);
+  });
+
+  it("stores nothing when the video is refused", async () => {
+    optimizer.optimizeVideo.mockRejectedValueOnce(
+      Object.assign(new Error("Videos can be at most 30 seconds."), {
+        status: 400,
+        code: "VIDEO_TOO_LONG",
+      }),
+    );
+    const S3Svc = await service();
+
+    await expect(S3Svc.uploadFile("u1", file)).rejects.toMatchObject({
+      code: "VIDEO_TOO_LONG",
+    });
+    expect(s3.uploadVideoToS3).not.toHaveBeenCalled();
   });
 
   it("is refused with a 503 where no video bucket is set up", async () => {

@@ -1,6 +1,9 @@
 FROM node:22-alpine
 
 # Enable pnpm (bundled with Node via corepack - no npm install needed)
+# ffmpeg re-encodes every uploaded video (src/utils/video.ts)
+RUN apk add --no-cache ffmpeg
+
 RUN corepack enable pnpm
 
 WORKDIR /app

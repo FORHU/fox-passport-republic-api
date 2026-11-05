@@ -217,6 +217,11 @@ export function getVideoUrl(key: string): string {
   return `https://${VIDEO_BUCKET}.s3.${videoRegion}.amazonaws.com/${normalizedKey}`;
 }
 
+// A video's key is a fresh random name and its bytes never change, so a CDN or
+// a phone may keep it for a year without asking again. That is most of the
+// bandwidth saved when the same clip is watched many times.
+const VIDEO_CACHE_CONTROL = "public, max-age=31536000, immutable";
+
 export async function uploadVideoToS3(params: {
   key: string;
   body: Buffer;
@@ -229,6 +234,7 @@ export async function uploadVideoToS3(params: {
       Key: params.key,
       Body: params.body,
       ContentType: params.contentType,
+      CacheControl: VIDEO_CACHE_CONTROL,
     }),
   );
   return params.key;
