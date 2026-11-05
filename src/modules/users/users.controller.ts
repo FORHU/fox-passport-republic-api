@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import Joi from "joi";
+import { RoleType } from "@prisma/client";
 import UsersSvc from "./users.service";
 import { totalPages } from "../../utils/pagination";
 import { usernameJoi } from "../../utils/username";
@@ -33,8 +34,21 @@ export default class UsersCtrl {
   static async getAllUsers(req: Request, res: Response) {
     const roleTypeParam = req.query.roleType as string | undefined;
     const roleTypes = roleTypeParam
-      ? roleTypeParam.split(",").map((r) => r.trim())
+      ? roleTypeParam
+          .split(",")
+          .map((r) => r.trim())
+          .filter(Boolean)
       : undefined;
+    // Unchecked, an unknown role reached Prisma as an invalid enum value and
+    // came back as a 500.
+    const unknownRoles = (roleTypes ?? []).filter(
+      (r) => !(Object.values(RoleType) as string[]).includes(r),
+    );
+    if (unknownRoles.length > 0) {
+      return res.status(400).json({
+        message: `Unknown roleType: ${unknownRoles.join(", ")}`,
+      });
+    }
     const limit = Math.min(Number(req.query.limit) || 20, 100);
     const page = Math.max(Number(req.query.page) || 1, 1);
     const search = (req.query.search as string | undefined)?.trim();

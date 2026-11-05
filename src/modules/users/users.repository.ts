@@ -3,7 +3,11 @@ import { prisma } from "../../utils/prisma";
 import { userCache } from "../../utils/cache-namespaces";
 import { SystemRole, RoleType } from "@prisma/client";
 import { totalPages } from "../../utils/pagination";
-import { cityNeedle, eventCategoriesMatching } from "../../utils/search-terms";
+import {
+  cityNeedle,
+  eventCategoriesMatching,
+  roleTypesMatching,
+} from "../../utils/search-terms";
 
 export default class UsersRepo {
   /**
@@ -17,14 +21,18 @@ export default class UsersRepo {
     return result;
   }
 
-  // READ ALL (optionally filtered by roleType)
-  static async getAllUsers(
+  /**
+   * The admin citizen directory's filter. A search matches name, email and
+   * username, and also any role it names - searching "investor" used to
+   * return only people with "investor" in their name or email, not the
+   * investors themselves.
+   */
+  static buildDirectoryWhere(
     roleTypes?: RoleType[],
-    page = 1,
-    limit = 20,
     search?: string,
-  ) {
-    const where: Prisma.UserWhereInput = {
+  ): Prisma.UserWhereInput {
+    const searchedRoles = search ? roleTypesMatching(search) : [];
+    return {
       ...(roleTypes && roleTypes.length > 0
         ? { roleType: { hasSome: roleTypes } }
         : {}),
@@ -34,10 +42,23 @@ export default class UsersRepo {
               { name: { contains: search, mode: "insensitive" } },
               { email: { contains: search, mode: "insensitive" } },
               { username: { contains: search, mode: "insensitive" } },
+              ...(searchedRoles.length > 0
+                ? [{ roleType: { hasSome: searchedRoles } }]
+                : []),
             ],
           }
         : {}),
     };
+  }
+
+  // READ ALL (optionally filtered by roleType)
+  static async getAllUsers(
+    roleTypes?: RoleType[],
+    page = 1,
+    limit = 20,
+    search?: string,
+  ) {
+    const where = UsersRepo.buildDirectoryWhere(roleTypes, search);
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
