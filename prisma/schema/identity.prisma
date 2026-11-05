@@ -198,6 +198,7 @@ model RoleRequest {
   gearFoxerApplication      GearFoxerApplication?
   serviceFoxerApplication   ServiceFoxerApplication?
   performerFoxerApplication PerformerFoxerApplication?
+  providerFoxerApplication   ProviderFoxerApplication?
   eventFoxerApplication     EventFoxerApplication?
   investorApplication       InvestorApplication?
   organizerApplication      OrganizerApplication?
@@ -323,6 +324,34 @@ model PerformerFoxerApplication {
   validId1             File?       @relation("PerformerFoxerValidId1", fields: [validId1FileId], references: [id])
 
   @@map("performer_foxer_applications")
+}
+
+model ProviderFoxerApplication {
+  id                   String      @id @default(uuid())
+  requestId            String      @unique
+  businessName         String?
+  assetTypes           String[]    @default([])
+  serviceTypes         String[]    @default([])
+  specializations      String[]    @default([])
+  portfolioUrls        String[]    @default([])
+  experience           Int?
+  nbiClearanceIdNumber String?
+  tinNumber            String?
+  validId1FileId       String?
+  nbiFileId            String?
+  tinIdFileId          String?
+  birPermitFileId      String?
+  selfieFileId         String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  birPermitFile        File?       @relation("ProviderFoxerBirPermit", fields: [birPermitFileId], references: [id])
+  nbiFile              File?       @relation("ProviderFoxerNBI", fields: [nbiFileId], references: [id])
+  request              RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  selfieFile           File?       @relation("ProviderFoxerSelfie", fields: [selfieFileId], references: [id])
+  tinIdFile            File?       @relation("ProviderFoxerTinId", fields: [tinIdFileId], references: [id])
+  validId1             File?       @relation("ProviderFoxerValidId1", fields: [validId1FileId], references: [id])
+
+  @@map("provider_foxer_applications")
 }
 
 model InvestorApplication {

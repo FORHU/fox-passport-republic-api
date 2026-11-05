@@ -123,6 +123,7 @@ export default class UsersRepo {
       "serviceFoxer",
       "performerFoxer",
       "gearFoxer",
+      "providerFoxer",
       "eventFoxer",
       "venueFoxer",
     ];
@@ -320,6 +321,7 @@ export default class UsersRepo {
             "serviceFoxer",
             "performerFoxer",
             "gearFoxer",
+            "providerFoxer",
             "eventFoxer",
             "venueFoxer",
           ] as RoleType[],

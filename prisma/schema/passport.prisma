@@ -130,6 +130,7 @@ enum UserPath {
   performerFoxer
   investor
   organizer
+  providerFoxer
 }
 
 enum BadgeRarity {

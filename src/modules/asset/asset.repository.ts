@@ -3,6 +3,7 @@ import {
   AssetStatus,
   BillingRate,
   AssetCategory,
+  RoleType,
 } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { toEnum } from "../../utils/enums";
@@ -87,7 +88,7 @@ export default class AssetRepo {
         price: { lte: filters.maxPrice },
       }),
       owner: {
-        roleType: { has: "gearFoxer" as const },
+        roleType: { hasSome: ["gearFoxer", "providerFoxer"] as RoleType[] },
         ...(ownerCity && {
           city: { contains: ownerCity, mode: "insensitive" as const },
         }),

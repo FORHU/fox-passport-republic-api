@@ -182,10 +182,24 @@ describe("the supply side", () => {
       "gearFoxer",
       "serviceFoxer",
       "performerFoxer",
+      "providerFoxer",
       "investor",
     ]) {
       expect(can({ roleType: [r] }, "payouts:onboard")).toBe(true);
     }
+  });
+
+  it("gives providerFoxer unified supply capability across gear, talent, and performer", () => {
+    const provider = { roleType: ["providerFoxer"] };
+    expect(can(provider, "asset:manage")).toBe(true);
+    expect(can(provider, "service:manage")).toBe(true);
+    expect(can(provider, "performer:manage")).toBe(true);
+    expect(can(provider, "payouts:onboard")).toBe(true);
+    expect(can(provider, "bid:submit-asset")).toBe(true);
+    expect(can(provider, "bid:submit-service")).toBe(true);
+    expect(can(provider, "promotions:manage-own")).toBe(true);
+    expect(can(provider, "venue:manage")).toBe(false);
+    expect(can(provider, "template:manage")).toBe(false);
   });
 
   it("gives investor partnership:propose and payouts:onboard, no other supply capability", () => {

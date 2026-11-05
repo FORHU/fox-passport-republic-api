@@ -90,7 +90,11 @@ export default class ServiceRepo {
         // performerFoxer owns performer-category rows of this same model —
         // see PERFORMER_SERVICE_CATEGORIES in src/types/permissions.ts.
         roleType: {
-          hasSome: ["serviceFoxer", "performerFoxer"] as RoleType[],
+          hasSome: [
+            "serviceFoxer",
+            "performerFoxer",
+            "providerFoxer",
+          ] as RoleType[],
         },
         ...(ownerCity && {
           city: { contains: ownerCity, mode: "insensitive" as const },
