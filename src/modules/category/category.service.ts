@@ -1,10 +1,24 @@
-import { AppError, notFound } from "../../utils/errors";
-import CategoryRepo from "./category.repository";
+import { AppError, badRequest, conflict, notFound } from "../../utils/errors";
+import { recordChange, type AuditActor } from "../audit/audit.service";
+import CategoryRepo, { type CategoryWrite } from "./category.repository";
+
+export type CategoryUpdate = Partial<{
+  name: string;
+  description: string | null;
+  icon: string | null;
+  parentCategoryId: string;
+}>;
 
 export default class CategorySvc {
-  // GET ALL CATEGORIES
-  static async getAllCategories() {
-    return CategoryRepo.getAllCategories();
+  /**
+   * The browse list. By default it keeps the shape the public pages have always
+   * had: every event category, and a listing category only once something
+   * carries it. `includeEmpty` is the admin's view of the whole catalog.
+   */
+  static async getAllCategories(includeEmpty = false) {
+    const all = await CategoryRepo.getAllCategories();
+    if (includeEmpty) return all;
+    return all.filter((c) => c.isEventCategory || c.count > 0);
   }
 
   // GET CATEGORY BY ID
@@ -25,70 +39,72 @@ export default class CategorySvc {
     return category;
   }
 
+  /**
+   * The catalog is two levels deep: a subcategory's parent must be a root.
+   * Holding that here means no chain of parents can ever loop.
+   */
+  private static async assertRootParent(parentCategoryId: string) {
+    const parent = await CategoryRepo.findById(parentCategoryId);
+    if (!parent) {
+      throw badRequest("Parent category not found");
+    }
+    if (parent.parentCategoryId) {
+      throw badRequest("The parent must be Event or Listing");
+    }
+  }
+
   // CREATE CATEGORY
-  static async createCategory(data: {
-    name: string;
-    slug: string;
-    description?: string;
-    parentCategoryId?: string;
-  }) {
-    // Check if slug already exists
-    const slugExists = await CategoryRepo.slugExists(data.slug);
-    if (slugExists) {
-      throw new AppError("Category slug already exists", 409);
+  static async createCategory(data: CategoryWrite, actor?: AuditActor) {
+    if (await CategoryRepo.slugExists(data.slug)) {
+      throw conflict("A category with this slug already exists");
     }
+    await this.assertRootParent(data.parentCategoryId);
 
-    // If parentCategoryId is provided, check if it exists
-    if (data.parentCategoryId) {
-      const parentExists = await CategoryRepo.categoryExists(
-        data.parentCategoryId,
-      );
-      if (!parentExists) {
-        throw new AppError("Parent category not found", 400);
-      }
-    }
-
-    return CategoryRepo.createCategory(data);
+    const category = await CategoryRepo.createCategory(data);
+    await CategoryRepo.invalidateAll();
+    await recordChange(actor, "category.create", category.id, {
+      current: category,
+    });
+    return category;
   }
 
   // UPDATE CATEGORY
   static async updateCategory(
     id: string,
-    data: Partial<{
-      name: string;
-      slug: string;
-      description: string;
-      parentCategoryId: string;
-    }>,
+    data: CategoryUpdate & { slug?: unknown },
+    actor?: AuditActor,
   ) {
-    // Check if category exists
-    const exists = await CategoryRepo.categoryExists(id);
-    if (!exists) {
+    const existing = await CategoryRepo.findById(id);
+    if (!existing) {
       throw notFound("Category");
     }
 
-    // If updating slug, check if new slug is available
-    if (data.slug) {
-      const slugExists = await CategoryRepo.slugExists(data.slug, id);
-      if (slugExists) {
-        throw new AppError("Category slug already exists", 409);
-      }
+    // The slug links the row to the values listings already carry.
+    if (data.slug !== undefined && data.slug !== existing.slug) {
+      throw badRequest("A category's slug cannot be changed");
     }
 
-    // If updating parent, check if parent exists and prevent circular reference
-    if (data.parentCategoryId) {
+    if (
+      data.parentCategoryId !== undefined &&
+      data.parentCategoryId !== existing.parentCategoryId
+    ) {
+      if (!existing.parentCategoryId) {
+        throw badRequest("Event and Listing cannot be moved");
+      }
       if (data.parentCategoryId === id) {
         throw new AppError("Category cannot be its own parent", 400);
       }
-      const parentExists = await CategoryRepo.categoryExists(
-        data.parentCategoryId,
-      );
-      if (!parentExists) {
-        throw new AppError("Parent category not found", 400);
-      }
+      await this.assertRootParent(data.parentCategoryId);
     }
 
-    return CategoryRepo.updateCategory(id, data);
+    const { slug: _slug, ...changes } = data;
+    const category = await CategoryRepo.updateCategory(id, changes);
+    await CategoryRepo.invalidateAll();
+    await recordChange(actor, "category.update", id, {
+      previous: existing,
+      current: category,
+    });
+    return category;
   }
 
   // DELETE CATEGORY

@@ -1,4 +1,4 @@
-import { RewardLifecycleType, UserPath } from "@prisma/client";
+import { Prisma, RewardLifecycleType, UserPath } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 
 export default class RewardRepo {
@@ -222,5 +222,157 @@ export default class RewardRepo {
       select: { coins: true },
     });
     return passport?.coins ?? 0;
+  }
+
+  /**
+   * Finds active coin rewards catalog items.
+   */
+  static async findRewardsCatalog(targetAudience?: string) {
+    return prisma.coinReward.findMany({
+      where: {
+        active: true,
+        ...(targetAudience && targetAudience !== "all"
+          ? { OR: [{ targetAudience }, { targetAudience: "all" }] }
+          : {}),
+      },
+      orderBy: [{ minLevel: "asc" }, { coinCost: "asc" }],
+    });
+  }
+
+  /**
+   * Finds a specific coin reward by ID.
+   */
+  static async findRewardById(id: string) {
+    return prisma.coinReward.findUnique({
+      where: { id },
+    });
+  }
+
+  /**
+   * Retrieves user reward events and lifecycle transactions for wallet history.
+   */
+  static async getUserRewardHistory(userId: string) {
+    const [events, lifecycles] = await Promise.all([
+      prisma.rewardEvent.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+      prisma.rewardLifecycle.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+    ]);
+    return { events, lifecycles };
+  }
+
+  /**
+   * Transactionally executes coin deduction, Promotion/Voucher creation,
+   * CoinRedemption tracking, and lifecycle logging.
+   */
+  static async executeRedemptionTransaction(data: {
+    userId: string;
+    reward: {
+      id: string;
+      title: string;
+      coinCost: number;
+      rewardType: string;
+      discountPhp: Prisma.Decimal | null;
+      discountPercentage: Prisma.Decimal | null;
+    };
+    expiresAt: Date;
+    voucherCode: string;
+    minSubtotal: number;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      // 1. Verify user's spendable coins balance
+      const passport = await tx.passport.findUnique({
+        where: { userId: data.userId },
+        select: { coins: true },
+      });
+
+      const currentCoins = passport?.coins ?? 0;
+      if (currentCoins < data.reward.coinCost) {
+        throw new Error("Insufficient coins balance.");
+      }
+
+      // 2. Decrement cached passport coins
+      const updatedPassport = await tx.passport.update({
+        where: { userId: data.userId },
+        data: {
+          coins: { decrement: data.reward.coinCost },
+        },
+      });
+
+      // 3. Create Promotion
+      const discountType = data.reward.discountPercentage
+        ? "percentage"
+        : "fixed";
+      const discountVal = data.reward.discountPercentage
+        ? data.reward.discountPercentage
+        : (data.reward.discountPhp ?? new Prisma.Decimal(0));
+
+      const promo = await tx.promotion.create({
+        data: {
+          name: `Reward: ${data.reward.title}`,
+          discountType,
+          discountValue: discountVal,
+          minSubtotal: new Prisma.Decimal(data.minSubtotal),
+          startDate: new Date(),
+          endDate: data.expiresAt,
+          usageLimit: 1,
+          perUserLimit: 1,
+          active: true,
+        },
+      });
+
+      // 4. Create Voucher scoped to ownerUserId
+      const voucher = await tx.voucher.create({
+        data: {
+          code: data.voucherCode,
+          promotionId: promo.id,
+          ownerUserId: data.userId,
+          active: true,
+        },
+      });
+
+      // 5. Create CoinRedemption record
+      const redemption = await tx.coinRedemption.create({
+        data: {
+          userId: data.userId,
+          rewardId: data.reward.id,
+          coinsSpent: data.reward.coinCost,
+          voucherId: voucher.id,
+          status: "completed",
+          expiresAt: data.expiresAt,
+        },
+      });
+
+      // 6. Record REDEMPTION in RewardLifecycle
+      const latestGrant = await tx.rewardEvent.findFirst({
+        where: { userId: data.userId },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+
+      if (latestGrant) {
+        await tx.rewardLifecycle.create({
+          data: {
+            grantEventId: latestGrant.id,
+            userId: data.userId,
+            type: RewardLifecycleType.REDEMPTION,
+            coinsDelta: -data.reward.coinCost,
+            reason: `Redeemed ${data.reward.title} (${data.voucherCode})`,
+          },
+        });
+      }
+
+      return {
+        redemption,
+        voucher,
+        remainingCoins: updatedPassport.coins,
+      };
+    });
   }
 }

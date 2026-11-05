@@ -115,6 +115,14 @@ export default class PricingSvc {
       return { ok: false, reason: "Invalid or inactive voucher code." };
     }
 
+    if (
+      "ownerUserId" in voucher &&
+      voucher.ownerUserId &&
+      voucher.ownerUserId !== context.userId
+    ) {
+      return { ok: false, reason: "Voucher belongs to another user." };
+    }
+
     const now = new Date();
     if (promo.startDate && promo.startDate > now) {
       return { ok: false, reason: "Voucher is not yet active." };

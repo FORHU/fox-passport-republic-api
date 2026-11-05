@@ -1,4 +1,6 @@
+import crypto from "node:crypto";
 import { UserPath } from "@prisma/client";
+import { AppError, notFound } from "../../utils/errors";
 import RewardRepo from "./reward.repository";
 import PassportSvc from "../passport/passport.service";
 import PassportRepo from "../passport/passport.repository";
@@ -7,6 +9,11 @@ import {
   GrantRewardResult,
   ReverseRewardParams,
   ReverseRewardResult,
+  RewardCatalogItem,
+  WalletSummary,
+  WalletHistoryItem,
+  RedeemRewardParams,
+  RedeemRewardResult,
 } from "./reward.types";
 
 export default class RewardService {
@@ -231,5 +238,183 @@ export default class RewardService {
    */
   static async getBalance(userId: string): Promise<number> {
     return RewardRepo.getCoinsBalance(userId);
+  }
+
+  /**
+   * Retrieves the rewards catalog filtered by target audience and user level.
+   */
+  static async getCatalog(
+    userId: string,
+    targetAudience?: string,
+    path: UserPath = UserPath.user,
+  ): Promise<RewardCatalogItem[]> {
+    const passport = await PassportRepo.findByUserId(userId);
+    const coinsBalance = passport?.coins ?? 0;
+    const currentPath = passport?.paths.find((p) => p.path === path);
+    const userLevel = currentPath?.level ?? 1;
+
+    const defaultAudience = path === UserPath.user ? "citizen" : "foxer";
+    const audienceToFetch = targetAudience || defaultAudience;
+
+    const rewards = await RewardRepo.findRewardsCatalog(audienceToFetch);
+
+    return rewards.map((r) => ({
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      targetAudience: r.targetAudience,
+      coinCost: r.coinCost,
+      rewardType: r.rewardType,
+      discountPhp: r.discountPhp ? Number(r.discountPhp) : null,
+      discountPercentage: r.discountPercentage
+        ? Number(r.discountPercentage)
+        : null,
+      minLevel: r.minLevel,
+      canAfford: coinsBalance >= r.coinCost,
+      levelQualified: userLevel >= r.minLevel,
+    }));
+  }
+
+  /**
+   * Retrieves user's wallet overview including spendable coins, level, rank, and ledger history.
+   */
+  static async getWallet(
+    userId: string,
+    path: UserPath = UserPath.user,
+  ): Promise<WalletSummary> {
+    const passport = await PassportRepo.findByUserId(userId);
+    const currentPath = passport?.paths.find((p) => p.path === path);
+    const level = currentPath?.level ?? 1;
+    const coins = passport?.coins ?? 0;
+
+    const { events, lifecycles } =
+      await RewardRepo.getUserRewardHistory(userId);
+
+    const history: WalletHistoryItem[] = [];
+
+    for (const ev of events) {
+      history.push({
+        id: ev.id,
+        type: "grant",
+        action: ev.action,
+        xp: ev.xp,
+        coinsDelta: ev.coins,
+        refType: ev.refType,
+        refId: ev.refId,
+        reason: `Earned from ${ev.action}`,
+        createdAt: ev.createdAt,
+      });
+    }
+
+    for (const lc of lifecycles) {
+      history.push({
+        id: lc.id,
+        type: "lifecycle",
+        lifecycleType: lc.type,
+        xp: 0,
+        coinsDelta: lc.coinsDelta,
+        reason: lc.reason,
+        createdAt: lc.createdAt,
+      });
+    }
+
+    history.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    const totalEarnedCoins = events.reduce((sum, e) => sum + e.coins, 0);
+
+    return {
+      coins,
+      pendingCoins: 0,
+      totalEarnedCoins,
+      level,
+      rank: this.calculateRank(level, path),
+      history,
+    };
+  }
+
+  /**
+   * Redeems a coin reward: verifies eligibility, deducts coins, records REDEMPTION lifecycle,
+   * and creates an owner-scoped voucher adhering to the 50% platform fee limit.
+   */
+  static async redeem(params: RedeemRewardParams): Promise<RedeemRewardResult> {
+    const path = params.path ?? UserPath.user;
+    const reward = await RewardRepo.findRewardById(params.rewardId);
+    if (!reward || !reward.active) {
+      throw notFound("Reward");
+    }
+
+    const passport = await PassportRepo.findByUserId(params.userId);
+    if (!passport) {
+      throw notFound("User passport");
+    }
+
+    const currentPath = passport.paths.find((p) => p.path === path);
+    const userLevel = currentPath?.level ?? 1;
+
+    if (userLevel < reward.minLevel) {
+      throw new AppError(
+        `Minimum level ${reward.minLevel} required to redeem this reward (your level is ${userLevel}).`,
+        400,
+      );
+    }
+
+    const currentBalance = passport.coins;
+    if (currentBalance < reward.coinCost) {
+      throw new AppError(
+        `Insufficient coins. Required: ${reward.coinCost}, Available: ${currentBalance}.`,
+        400,
+      );
+    }
+
+    // Calculate minimum subtotal to ensure max 50% platform fee liability
+    let minSubtotal = 0;
+    if (reward.discountPhp) {
+      // 5% default fee, max 50% discount -> minSubtotal = discount / 0.025
+      minSubtotal = Math.ceil(Number(reward.discountPhp) * 40);
+    }
+
+    const voucherCode = `RWD-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+    try {
+      const result = await RewardRepo.executeRedemptionTransaction({
+        userId: params.userId,
+        reward: {
+          id: reward.id,
+          title: reward.title,
+          coinCost: reward.coinCost,
+          rewardType: reward.rewardType,
+          discountPhp: reward.discountPhp,
+          discountPercentage: reward.discountPercentage,
+        },
+        expiresAt,
+        voucherCode,
+        minSubtotal,
+      });
+
+      return {
+        success: true,
+        redemptionId: result.redemption.id,
+        coinsSpent: reward.coinCost,
+        remainingCoins: result.remainingCoins,
+        voucher: {
+          id: result.voucher.id,
+          code: result.voucher.code,
+          discountPhp: reward.discountPhp ? Number(reward.discountPhp) : null,
+          discountPercentage: reward.discountPercentage
+            ? Number(reward.discountPercentage)
+            : null,
+          expiresAt,
+        },
+      };
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        err.message === "Insufficient coins balance."
+      ) {
+        throw new AppError("Insufficient coins balance.", 400);
+      }
+      throw err;
+    }
   }
 }

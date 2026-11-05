@@ -1,4 +1,4 @@
-import { EventCategory } from "@prisma/client";
+import { EventCategory, RoleType } from "@prisma/client";
 
 /**
  * The part of a city name worth matching on, for `contains` filters.
@@ -36,4 +36,23 @@ export function eventCategoriesMatching(q: unknown): EventCategory[] {
   return (Object.values(EventCategory) as EventCategory[]).filter(
     (c) => c !== EventCategory.other && (term.includes(c) || c.includes(term)),
   );
+}
+
+/**
+ * The role types a free-text search names, so an admin typing "investor",
+ * "Investors" or "venue foxer" into the citizen directory finds the people who
+ * hold that role, not just people whose name or email happens to contain the
+ * word. Matches the whole role name (ignoring case, spaces, hyphens and a
+ * plural "s"), or a Foxer role by its prefix ("venue" → venueFoxer). Terms
+ * under three characters match nothing.
+ */
+export function roleTypesMatching(q: unknown): RoleType[] {
+  if (typeof q !== "string") return [];
+  const term = q.toLowerCase().replace(/[\s_-]+/g, "");
+  if (term.length < 3) return [];
+  const terms = term.endsWith("s") ? [term, term.slice(0, -1)] : [term];
+  return (Object.values(RoleType) as RoleType[]).filter((role) => {
+    const name = role.toLowerCase();
+    return terms.some((t) => name === t || name === `${t}foxer`);
+  });
 }
