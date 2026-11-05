@@ -131,7 +131,7 @@ export default class PassportSvc {
 
     const existing = passport.paths.find((p) => p.path === path);
     const prevLevel = existing?.level ?? 1;
-    const newTotalXP = (existing?.totalXP ?? 0) + amount;
+    const newTotalXP = Math.max(0, (existing?.totalXP ?? 0) + amount);
     const { level, currentXP, requiredXP } = calculateLevel(newTotalXP);
 
     await PassportRepo.upsertPath({
@@ -229,11 +229,21 @@ export default class PassportSvc {
       xpEarned: XP_REWARDS.attendEvent,
     });
 
-    await PassportSvc.awardXP(
-      booking.userId,
-      UserPath.user,
-      XP_REWARDS.attendEvent,
-    );
+    // Award attend_event XP and Coins via RewardService (enforces booking fee budget)
+    try {
+      const { default: RewardService } =
+        await import("../reward/reward.service");
+      await RewardService.grant({
+        userId: booking.userId,
+        path: UserPath.user,
+        action: "attend_event",
+        refType: "booking",
+        refId: bookingId,
+        bookingFeeAmount: Number(booking.event?.platformFeeAmount || 0),
+      });
+    } catch (grantErr) {
+      console.warn("[PassportSvc] attend_event reward grant failed:", grantErr);
+    }
 
     // Milestone Badges: Track distinct venue stamps collected
     try {

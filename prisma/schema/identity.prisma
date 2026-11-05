@@ -115,6 +115,11 @@ model User {
   bookingEditRequests      BookingEditRequest[]
   venueAffiliations        VenueEventFoxerAffiliation[] @relation("VenueAffiliationEventFoxer")
   venueAffiliationReviews  VenueEventFoxerAffiliation[] @relation("VenueAffiliationReviewer")
+  rewardEvents             RewardEvent[]
+  rewardLifecycles         RewardLifecycle[]
+  onboardings              UserOnboarding[]
+  ownedVouchers            Voucher[]                    @relation("UserVouchers")
+  coinRedemptions          CoinRedemption[]
 
   @@map("users")
 }

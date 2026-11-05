@@ -1,0 +1,113 @@
+// Reward rules, immutable ledger, and lifecycle records for XP and Coins.
+
+enum RewardLifecycleType {
+  RELEASE
+  REDEMPTION
+  EXPIRY
+  REVERSAL
+}
+
+model RewardRule {
+  id        String   @id @default(uuid())
+  action    String   @unique
+  xp        Int      @default(0)
+  coins     Int      @default(0)
+  dailyCap  Int?
+  onceOnly  Boolean  @default(false)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("reward_rules")
+}
+
+model RewardEvent {
+  id             String            @id @default(uuid())
+  userId         String
+  path           UserPath
+  action         String
+  refType        String
+  refId          String
+  xp             Int               @default(0)
+  coins          Int               @default(0)
+  idempotencyKey String            @unique
+  createdAt      DateTime          @default(now())
+
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lifecycles     RewardLifecycle[]
+
+  @@index([userId, createdAt])
+  @@index([refType, refId])
+  @@index([userId, path])
+  @@index([action, createdAt])
+  @@map("reward_events")
+}
+
+model RewardLifecycle {
+  id           String              @id @default(uuid())
+  grantEventId String
+  userId       String
+  type         RewardLifecycleType
+  coinsDelta   Int
+  reversalOf   String?
+  reason       String?
+  createdAt    DateTime            @default(now())
+
+  grantEvent   RewardEvent         @relation(fields: [grantEventId], references: [id], onDelete: Cascade)
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([grantEventId])
+  @@index([userId, type])
+  @@index([reversalOf])
+  @@map("reward_lifecycles")
+}
+
+model UserOnboarding {
+  id          String   @id @default(uuid())
+  userId      String
+  step        String
+  completedAt DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, step])
+  @@map("user_onboardings")
+}
+
+model CoinReward {
+  id                 String           @id @default(uuid())
+  title              String
+  description        String?
+  targetAudience     String           @default("citizen") // "citizen", "foxer", "all"
+  coinCost           Int
+  rewardType         String           // "booking_voucher", "fee_discount", "listing_boost"
+  discountPhp        Decimal?         @db.Decimal(12, 2)
+  discountPercentage Decimal?         @db.Decimal(5, 2)
+  minLevel           Int              @default(1)
+  active             Boolean          @default(true)
+  metadata           Json?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  redemptions        CoinRedemption[]
+
+  @@map("coin_rewards")
+}
+
+model CoinRedemption {
+  id         String     @id @default(uuid())
+  userId     String
+  rewardId   String
+  coinsSpent Int
+  voucherId  String?    @unique
+  status     String     @default("completed") // "completed", "cancelled"
+  expiresAt  DateTime?
+  createdAt  DateTime   @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reward     CoinReward @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+  voucher    Voucher?   @relation(fields: [voucherId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@map("coin_redemptions")
+}
+

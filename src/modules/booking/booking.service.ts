@@ -661,14 +661,16 @@ export default class BookingSvc {
         expiresAt,
       });
 
-      // Award bookEvent XP to the citizen who made the booking
-      import("../passport/passport.service")
-        .then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
-          return PassportSvc.awardXP(
+      // Award bookEvent reward via RewardService (idempotent, budget-capped)
+      import("../reward/reward.service")
+        .then(({ default: RewardService }) => {
+          return RewardService.grant({
             userId,
-            UserPath.user,
-            XP_REWARDS.bookEvent,
-          );
+            action: "book_event",
+            refType: "booking",
+            refId: booking.id,
+            bookingFeeAmount: Number(platformFeeAmount || 0),
+          });
         })
         .catch(() => {});
 
@@ -747,10 +749,16 @@ export default class BookingSvc {
       expiresAt,
     });
 
-    // Award bookEvent XP to the citizen who made the booking
-    import("../passport/passport.service")
-      .then(({ default: P, XP_REWARDS, UserPath }) => {
-        return P.awardXP(userId, UserPath.user, XP_REWARDS.bookEvent);
+    // Award bookEvent reward via RewardService (idempotent, budget-capped)
+    import("../reward/reward.service")
+      .then(({ default: RewardService }) => {
+        return RewardService.grant({
+          userId,
+          action: "book_event",
+          refType: "booking",
+          refId: booking.id,
+          bookingFeeAmount: Number(event.platformFeeAmount || 0),
+        });
       })
       .catch(() => {});
 
@@ -1219,6 +1227,21 @@ export default class BookingSvc {
           }
         })
         .catch(() => {});
+    } else if (
+      status === ItemBookingStatus.cancelled ||
+      status === "cancelled"
+    ) {
+      import("../reward/reward.service")
+        .then(({ default: RewardService }) => {
+          return RewardService.reverse({
+            refType: "booking",
+            refId: id,
+            reason: "Booking cancelled",
+          });
+        })
+        .catch((err) =>
+          console.error(`Reward reversal failed for booking ${id}`, err),
+        );
     }
 
     announceBookingChanged(booking.userId, booking.event?.organizerId);
