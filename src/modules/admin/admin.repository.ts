@@ -211,6 +211,10 @@ export default class AdminRepo {
       assetBookings,
       categoryGroups,
     ] = await Promise.all([
+      // Every user and every venue in every status, unfiltered - the same rows
+      // the admin Citizens directory (`GET /users`) and Venues list
+      // (`GET /admin/venues`) show with no filter applied, so the dashboard
+      // totals and those lists agree.
       prisma.user.count(),
       prisma.venue.count(),
       prisma.eventTemplate.count(),
