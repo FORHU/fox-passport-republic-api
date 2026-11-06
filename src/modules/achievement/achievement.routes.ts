@@ -8,4 +8,3 @@ router.get("/me", authenticate, AchievementCtrl.getMyAchievements);
 router.get("/user/:userId", AchievementCtrl.getPublicAchievements);
 
 export default router;
-

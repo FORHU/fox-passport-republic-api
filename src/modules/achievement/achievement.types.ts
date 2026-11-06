@@ -47,4 +47,3 @@ export interface UserAchievementsResponse {
   totalUnlockedTiers: number;
   completedAchievements: number;
 }
-
