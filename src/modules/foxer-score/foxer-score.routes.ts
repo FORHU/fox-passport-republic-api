@@ -8,4 +8,3 @@ router.get("/me", authenticate, FoxerScoreCtrl.getMyScore);
 router.get("/:userId", FoxerScoreCtrl.getFoxerReputation);
 
 export default router;
-
