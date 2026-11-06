@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { BadgeRarity, UserPath } from "@prisma/client";
 import RankSvc from "../src/modules/passport/rank.service";
-import PassportSvc from "../src/modules/passport/passport.service";
+import PassportSvc, {
+  RANK_THRESHOLDS,
+} from "../src/modules/passport/passport.service";
 import RewardService from "../src/modules/reward/reward.service";
 
 // requirements/xp-and-coins.md, section 4.2.
@@ -94,6 +96,19 @@ describe("RankSvc", () => {
     expect(RankSvc.rankUpCoins(6)).toBe(500);
     expect(RankSvc.rankUpCoins(9)).toBe(2000);
     expect(RankSvc.rankUpCoins(99)).toBe(0);
+  });
+
+  it("agrees with the table PassportSvc pays rank-up Coins from", () => {
+    // RANK_THRESHOLDS starts at rank 2, since rank 1 pays nothing.
+    RANK_THRESHOLDS.forEach((t, i) => {
+      const citizen = RankSvc.forLevel(t.level, UserPath.user);
+      const foxer = RankSvc.forLevel(t.level, UserPath.venueFoxer);
+      expect(citizen.name, `level ${t.level}`).toBe(t.citizenRank);
+      expect(foxer.name, `level ${t.level}`).toBe(t.foxerRank);
+      expect(citizen.minLevel).toBe(t.level);
+      expect(RankSvc.rankUpCoins(i + 2), `rank ${i + 2}`).toBe(t.coins);
+    });
+    expect(RANK_THRESHOLDS).toHaveLength(8);
   });
 
   it("is the ladder RewardService.calculateRank answers from", () => {
