@@ -63,6 +63,8 @@ const MAX_UNGUARDED_ROUTES = 178;
 const ALLOW_LIST = new Set([
   // "users.routes.ts GET /:id/profile — self-service, no separate permission needed",
 
+  // Foxer Score management console: self-service operational metrics for authenticated Foxer.
+  "foxer-score.routes.ts GET /me",
   // Appointments (docs/adr/0005). Audited 24 Sep 2026 when written. Who may
   // act is "owns this one Venue or Event" or "is the person this Appointment
   // names" — both checked in AppointmentService, and neither expressible as a
