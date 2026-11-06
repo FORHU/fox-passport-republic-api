@@ -149,6 +149,7 @@ const ALLOW_LIST = new Set([
   "onboarding.routes.ts POST /:step",
   // Leaderboard: any signed-in user reads the public board and their own place.
   "leaderboard.routes.ts GET /foxers",
+  "leaderboard.routes.ts GET /citizens",
 ]);
 
 const BANNED_GUARDS = ["requireRole", "requireAdmin", "requireHost"];

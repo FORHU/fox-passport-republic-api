@@ -3,6 +3,7 @@ import { AppError } from "../../utils/errors";
 import { cached } from "../../utils/cache.util";
 import RankSvc from "../passport/rank.service";
 import LeaderboardRepo, {
+  CitizenRow,
   LEADERBOARD_ROLES,
   LeaderboardRole,
   LeaderboardRow,
@@ -22,6 +23,10 @@ const MAX_CITY_LENGTH = 80;
 /** The tabs that exist so far. Top rated and Rising need the Foxer Score. */
 const TABS = ["most_booked"] as const;
 type Tab = (typeof TABS)[number];
+
+/** The citizen board's tabs: this month, all time, this month in my city. */
+const CITIZEN_TABS = ["month", "all", "city"] as const;
+type CitizenTab = (typeof CITIZEN_TABS)[number];
 
 /**
  * The calendar month `now` falls in, in Manila time, as the instants it
@@ -59,6 +64,29 @@ export interface FoxerBoard {
   rows: FoxerBoardEntry[];
   /** The caller's own place, even when it is below the rows; null if absent. */
   me: FoxerBoardEntry | null;
+}
+
+export interface CitizenBoardEntry {
+  position: number;
+  userId: string;
+  name: string;
+  username: string | null;
+  image: string | null;
+  city: string | null;
+  level: number;
+  rank: { number: number; name: string; rarity: string };
+  isMe: boolean;
+}
+
+export interface CitizenBoard {
+  tab: CitizenTab;
+  /** The caller's own city on the city tab; null elsewhere or with none set. */
+  city: string | null;
+  /** The Manila month counted, as `YYYY-MM`; null for all time. */
+  month: string | null;
+  rows: CitizenBoardEntry[];
+  /** The caller's own place, even when it is below the rows; null if absent. */
+  me: CitizenBoardEntry | null;
 }
 
 export default class LeaderboardSvc {
@@ -139,6 +167,83 @@ export default class LeaderboardSvc {
         .slice(0, limit)
         .map((r) => LeaderboardSvc.toEntry(r, role, params.viewerId)),
       me: mine ? LeaderboardSvc.toEntry(mine, role, params.viewerId) : null,
+    };
+  }
+
+  private static toCitizenEntry(
+    row: CitizenRow,
+    viewerId: string,
+  ): CitizenBoardEntry {
+    const rank = RankSvc.forLevel(row.level, UserPath.user);
+    return {
+      position: row.position,
+      userId: row.userId,
+      name: row.name,
+      username: row.username,
+      image: row.image,
+      city: row.city,
+      level: row.level,
+      rank: { number: rank.number, name: rank.name, rarity: rank.rarity },
+      isMe: row.userId === viewerId,
+    };
+  }
+
+  /**
+   * The citizen leaderboard (requirements section 8.1): this month's XP, all
+   * time (level, then XP), or this month's XP in the caller's own city. Rows
+   * carry a position, a rank and a level; XP never leaves the server.
+   */
+  static async citizens(params: {
+    viewerId: string;
+    tab?: string;
+    limit?: number;
+    now?: Date;
+  }): Promise<CitizenBoard> {
+    const tab = params.tab ?? "month";
+    if (!(CITIZEN_TABS as readonly string[]).includes(tab)) {
+      throw new AppError(`tab must be one of: ${CITIZEN_TABS.join(", ")}`, 400);
+    }
+    const kind = tab as CitizenTab;
+    const limit = Math.min(
+      Math.max(1, Math.trunc(params.limit ?? DEFAULT_LIMIT)),
+      MAX_LIMIT,
+    );
+    const window = manilaMonthWindow(params.now ?? new Date());
+
+    let city: string | null = null;
+    if (kind === "city") {
+      city = await LeaderboardRepo.cityOf(params.viewerId);
+      // Without a city of their own there is no city to rank within.
+      if (!city) {
+        return {
+          tab: kind,
+          city: null,
+          month: window.month,
+          rows: [],
+          me: null,
+        };
+      }
+    }
+
+    const all = await cached(
+      `leaderboard:citizens:${kind}:${(city ?? "").toLowerCase()}:${window.month}`,
+      BOARD_TTL_SECONDS,
+      () =>
+        kind === "all"
+          ? LeaderboardRepo.citizensAllTime()
+          : LeaderboardRepo.citizensByMonth(window, city),
+    );
+
+    const mine = all.find((r) => r.userId === params.viewerId);
+    return {
+      tab: kind,
+      city,
+      // "All time" does not belong to a month.
+      month: kind === "all" ? null : window.month,
+      rows: all
+        .slice(0, limit)
+        .map((r) => LeaderboardSvc.toCitizenEntry(r, params.viewerId)),
+      me: mine ? LeaderboardSvc.toCitizenEntry(mine, params.viewerId) : null,
     };
   }
 }

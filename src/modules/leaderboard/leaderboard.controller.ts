@@ -26,4 +26,22 @@ export default class LeaderboardCtrl {
       return sendServerError(res, e, { success: false });
     }
   }
+
+  /**
+   * GET /api/v1/leaderboard/citizens?tab=month|all|city&limit=
+   * The citizen leaderboard, with the caller's own place pinned.
+   */
+  static async citizens(req: Request, res: Response) {
+    try {
+      const limit = Number(one(req.query.limit));
+      const board = await LeaderboardSvc.citizens({
+        viewerId: req.user!.userId,
+        tab: one(req.query.tab),
+        limit: Number.isFinite(limit) ? limit : undefined,
+      });
+      return res.status(200).json({ success: true, data: board });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: false });
+    }
+  }
 }

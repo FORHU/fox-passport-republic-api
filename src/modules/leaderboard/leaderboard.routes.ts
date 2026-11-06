@@ -5,5 +5,6 @@ import { authenticate } from "../../middleware/auth.middleware";
 const router = express.Router();
 
 router.get("/foxers", authenticate, LeaderboardCtrl.foxers);
+router.get("/citizens", authenticate, LeaderboardCtrl.citizens);
 
 export default router;
