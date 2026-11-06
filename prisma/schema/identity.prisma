@@ -65,6 +65,7 @@ model User {
   passport                 Passport?
   reviews                  Review[]
   reviewReplies            ReviewReply[]
+  reviewHelpfulVotes       ReviewHelpfulVote[]
   assets                   Asset[]
   reviewsGiven             RoleRequest[]                @relation("Reviewer")
   roleRequests             RoleRequest[]                @relation("Applicant")

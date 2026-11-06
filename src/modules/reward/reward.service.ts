@@ -103,9 +103,11 @@ export default class RewardService {
     }
 
     // 4. Daily Cap Check
+    const effectiveDailyCap =
+      rule?.dailyCap ?? (params.action === "review_helpful" ? 5 : undefined);
     if (
-      rule?.dailyCap &&
-      rule.dailyCap > 0 &&
+      effectiveDailyCap &&
+      effectiveDailyCap > 0 &&
       (xpToAward > 0 || coinsToAward > 0)
     ) {
       const startOfDay = this.getStartOfDayManila();
@@ -114,7 +116,7 @@ export default class RewardService {
         params.action,
         startOfDay,
       );
-      if (countToday >= rule.dailyCap) {
+      if (countToday >= effectiveDailyCap) {
         xpToAward = 0;
         coinsToAward = 0;
       }
