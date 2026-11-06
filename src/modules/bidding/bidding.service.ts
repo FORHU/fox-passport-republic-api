@@ -28,18 +28,32 @@ export default class BiddingSvc {
   }
 
   static async getOpenSlots(_categoryId?: string) {
-    // Basic implementation: find events that are pending or ongoing.
+    // A slot is open while nobody has been matched to it and it has no
+    // listing in it yet. Only events with one are listed (otherwise the 50
+    // earliest events would crowd out the ones that really need someone), and
+    // each carries only its open slots.
+    const open = { matched: false };
+    const openService = { ...open, serviceId: null };
+    const openAsset = { ...open, assetId: null };
     const events = await prisma.event.findMany({
       where: {
         eventStatus: {
           in: ["pending", "ongoing"],
         },
+        template: {
+          is: {
+            OR: [
+              { templateServices: { some: openService } },
+              { templateAssets: { some: openAsset } },
+            ],
+          },
+        },
       },
       include: {
         template: {
           include: {
-            templateServices: true,
-            templateAssets: true,
+            templateServices: { where: openService },
+            templateAssets: { where: openAsset },
           },
         },
         host: {
@@ -107,7 +121,23 @@ export default class BiddingSvc {
       throw new Error("Requirement does not belong to this event's template");
     }
 
-    // 3. Create Bid
+    // 3. One waiting application per listing and slot.
+    const duplicate = await prisma.eventServiceBid.findFirst({
+      where: {
+        eventTemplateServiceId: data.eventTemplateServiceId,
+        providerId: data.providerId,
+        proposedServiceId: data.proposedServiceId,
+        status: "pending",
+      },
+      select: { id: true },
+    });
+    if (duplicate) {
+      throw new Error(
+        "You have already applied for this slot with this service",
+      );
+    }
+
+    // 4. Create Bid
     return BiddingRepo.createServiceBid(data);
   }
 
@@ -266,7 +296,21 @@ export default class BiddingSvc {
       throw new Error("Requirement does not belong to this event's template");
     }
 
-    // 3. Create Bid
+    // 3. One waiting application per listing and slot.
+    const duplicate = await prisma.eventAssetBid.findFirst({
+      where: {
+        eventTemplateAssetId: data.eventTemplateAssetId,
+        providerId: data.providerId,
+        proposedAssetId: data.proposedAssetId,
+        status: "pending",
+      },
+      select: { id: true },
+    });
+    if (duplicate) {
+      throw new Error("You have already applied for this slot with this gear");
+    }
+
+    // 4. Create Bid
     return BiddingRepo.createAssetBid(data);
   }
 

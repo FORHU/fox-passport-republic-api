@@ -3,6 +3,11 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { bearer, emailOTP } from "better-auth/plugins";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { normalizeUsername, USERNAME_MESSAGE } from "../../utils/username";
+import {
+  PASSWORD_MAX,
+  PASSWORD_MIN,
+  passwordPolicyError,
+} from "../../utils/password-policy";
 import { prisma } from "../../utils/prisma";
 import { sendTemplatedEmail } from "../../utils/helpers";
 import {
@@ -15,6 +20,16 @@ import {
   FACEBOOK_APP_SECRET,
 } from "../../config";
 import bcrypt from "bcryptjs";
+
+// Better Auth routes that set a password, and the body field holding it.
+// Its own config only checks length; the hook below adds the character rules.
+const PASSWORD_FIELD_BY_PATH: Record<string, string> = {
+  "/sign-up/email": "password",
+  "/reset-password": "newPassword",
+  "/email-otp/reset-password": "password",
+  "/change-password": "newPassword",
+  "/set-password": "newPassword",
+};
 
 function checkUsername<T extends Record<string, unknown>>(user: T): T {
   if (user.username === undefined || user.username === null) return user;
@@ -111,6 +126,9 @@ export const auth = betterAuth({
     // A reset is what someone does when they think the account is exposed:
     // sign every device out, as the custom /auth/reset-password did.
     revokeSessionsOnPasswordReset: true,
+    // utils/password-policy.ts; the defaults were 8–128 (BUG-27).
+    minPasswordLength: PASSWORD_MIN,
+    maxPasswordLength: PASSWORD_MAX,
     password: {
       verify: async ({ password, hash }) => {
         return bcrypt.compare(password, hash);
@@ -129,6 +147,19 @@ export const auth = betterAuth({
     },
   },
   hooks: {
+    // The full password policy on every route that sets one, so a password
+    // the web would refuse can't be set by calling the API directly. Runs
+    // before the handler: nothing is created or changed when it fails.
+    before: createAuthMiddleware(async (ctx) => {
+      const field = ctx.path ? PASSWORD_FIELD_BY_PATH[ctx.path] : undefined;
+      if (!field) return;
+      const password = (ctx.body as Record<string, unknown> | undefined)?.[
+        field
+      ];
+      if (typeof password !== "string") return;
+      const error = passwordPolicyError(password);
+      if (error) throw new APIError("BAD_REQUEST", { message: error });
+    }),
     // A sign-in replaces the session the request arrived with, as logging out
     // would. Signing in as someone else without logging out first used to
     // leave the first account's session valid for its full seven days, for

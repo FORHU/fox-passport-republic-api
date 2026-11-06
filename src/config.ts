@@ -93,6 +93,19 @@ export const AWS_VIDEO_SECRET_ACCESS_KEY = process.env
 // bucket's own address, which needs the bucket's videos to be publicly
 // readable.
 export const VIDEO_CDN_URL = process.env.VIDEO_CDN_URL as string | undefined;
+// Every uploaded video is checked and re-encoded on the server (src/utils/video.ts).
+export const VIDEO_MAX_SECONDS = Number(process.env.VIDEO_MAX_SECONDS) || 30;
+// A stored video should come out near 3MB; past this it is encoded again smaller.
+export const VIDEO_MAX_OUTPUT_BYTES =
+  Number(process.env.VIDEO_MAX_OUTPUT_BYTES) || 4 * 1024 * 1024;
+// How many encodes run at once on one server; the rest wait their turn.
+export const VIDEO_TRANSCODE_CONCURRENCY =
+  Number(process.env.VIDEO_TRANSCODE_CONCURRENCY) || 2;
+export const VIDEO_TRANSCODE_TIMEOUT_MS =
+  Number(process.env.VIDEO_TRANSCODE_TIMEOUT_MS) || 120_000;
+// The ffmpeg tools; found on the PATH unless these say where they are.
+export const FFMPEG_PATH = process.env.FFMPEG_PATH || "ffmpeg";
+export const FFPROBE_PATH = process.env.FFPROBE_PATH || "ffprobe";
 // A bucket with no public access and no CDN in front of it, for identity
 // documents (government IDs, clearances, proof of funds). Read only through
 // short-lived presigned links. Falls back to AWS_S3_BUCKET when unset, which
