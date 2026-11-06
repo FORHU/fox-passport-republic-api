@@ -6,7 +6,9 @@ export default class PassportCtrl {
   static async getMyPassport(req: Request, res: Response) {
     try {
       const passport = await PassportSvc.getOrCreate(req.user!.userId);
-      return res.status(200).json({ success: true, data: passport });
+      return res
+        .status(200)
+        .json({ success: true, data: PassportSvc.withRanks(passport) });
     } catch (e: unknown) {
       return sendServerError(res, e, { success: true });
     }
@@ -19,7 +21,9 @@ export default class PassportCtrl {
         return res
           .status(404)
           .json({ success: false, message: "Passport not found" });
-      return res.status(200).json({ success: true, data: passport });
+      return res
+        .status(200)
+        .json({ success: true, data: PassportSvc.withRanks(passport) });
     } catch (e: unknown) {
       return sendServerError(res, e, { success: true });
     }
