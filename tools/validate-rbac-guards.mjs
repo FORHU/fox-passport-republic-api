@@ -147,6 +147,8 @@ const ALLOW_LIST = new Set([
   // Onboarding: the signed-in user records and reads their own tour steps.
   "onboarding.routes.ts GET /",
   "onboarding.routes.ts POST /:step",
+  // Leaderboard: any signed-in user reads the public board and their own place.
+  "leaderboard.routes.ts GET /foxers",
 ]);
 
 const BANNED_GUARDS = ["requireRole", "requireAdmin", "requireHost"];
