@@ -2,6 +2,7 @@ import { UserPath } from "@prisma/client";
 import { cached } from "../../utils/cache.util";
 import { passportCache, PASSPORT_TTL } from "../../utils/cache-namespaces";
 import PassportRepo from "./passport.repository";
+import RankSvc from "./rank.service";
 
 // Level curve (requirements/xp-and-coins.md, section 4.1): the XP that takes a
 // player from level `i` to `i + 1` is `XP_PER_LEVEL * XP_MULTIPLIER^(i - 1)`,
@@ -122,6 +123,23 @@ export default class PassportSvc {
 
   static async getOrCreate(userId: string) {
     return PassportRepo.upsertPassport(userId);
+  }
+
+  /**
+   * The passport with each path's rank (number, name, rarity, and the next
+   * rank) alongside its level, so the app never works a rank out itself. Only
+   * adds a field; everything the passport already carried is unchanged.
+   */
+  static withRanks<T extends { paths: { path: UserPath; level: number }[] }>(
+    passport: T,
+  ) {
+    return {
+      ...passport,
+      paths: passport.paths.map((p) => ({
+        ...p,
+        rank: RankSvc.forLevel(p.level, p.path),
+      })),
+    };
   }
 
   static async getByUserId(userId: string) {

@@ -4,6 +4,7 @@ import { AppError, notFound } from "../../utils/errors";
 import RewardRepo from "./reward.repository";
 import PassportSvc from "../passport/passport.service";
 import PassportRepo from "../passport/passport.repository";
+import RankSvc from "../passport/rank.service";
 import {
   GrantRewardParams,
   GrantRewardResult,
@@ -21,17 +22,7 @@ export default class RewardService {
    * Resolves rank title for a given level and path based on the 9-rank ladder.
    */
   static calculateRank(level: number, path: UserPath = UserPath.user): string {
-    const isCitizen = path === UserPath.user;
-
-    if (level >= 50) return "Legend";
-    if (level >= 40) return isCitizen ? "Vanguard" : "Luminary";
-    if (level >= 30) return isCitizen ? "Pioneer" : "Icon";
-    if (level >= 20) return isCitizen ? "Adventurer" : "Maestro";
-    if (level >= 15) return isCitizen ? "Voyager" : "Headliner";
-    if (level >= 10) return isCitizen ? "Trailblazer" : "Veteran";
-    if (level >= 5) return isCitizen ? "Explorer" : "Pro";
-    if (level >= 3) return isCitizen ? "Wanderer" : "Regular";
-    return isCitizen ? "Newcomer" : "Rookie";
+    return RankSvc.nameForLevel(level, path);
   }
 
   /**
