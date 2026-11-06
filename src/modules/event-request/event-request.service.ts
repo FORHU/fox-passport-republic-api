@@ -250,12 +250,18 @@ export default class EventRequestSvc {
     const organizerId = event?.organizerId;
     if (organizerId) {
       import("../passport/passport.service")
-        .then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
-          return PassportSvc.awardXP(
+        .then(async ({ default: PassportSvc, XP_REWARDS, UserPath }) => {
+          await PassportSvc.awardXP(
             organizerId,
             UserPath.eventFoxer,
             XP_REWARDS.completeEvent,
           );
+          // Milestone badge: Host Master (50+ hosted events)
+          const completedCount =
+            await EventRequestRepo.countCompletedEventsByOrganizer(organizerId);
+          if (completedCount >= 50) {
+            await PassportSvc.awardBadgeByName(organizerId, "Host Master");
+          }
         })
         .catch(() => {});
     }
