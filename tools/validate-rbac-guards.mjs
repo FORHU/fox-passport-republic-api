@@ -144,6 +144,9 @@ const ALLOW_LIST = new Set([
   "reward.routes.ts GET /me",
   "reward.routes.ts GET /catalog",
   "reward.routes.ts POST /redeem",
+  // Onboarding: the signed-in user records and reads their own tour steps.
+  "onboarding.routes.ts GET /",
+  "onboarding.routes.ts POST /:step",
 ]);
 
 const BANNED_GUARDS = ["requireRole", "requireAdmin", "requireHost"];
