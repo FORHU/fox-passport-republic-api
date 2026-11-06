@@ -3,12 +3,22 @@ import { cached } from "../../utils/cache.util";
 import { passportCache, PASSPORT_TTL } from "../../utils/cache-namespaces";
 import PassportRepo from "./passport.repository";
 
-const XP_PER_LEVEL = 1000;
-const XP_MULTIPLIER = 1.15;
+// Level curve (requirements/xp-and-coins.md, section 4.1): the XP that takes a
+// player from level `i` to `i + 1` is `XP_PER_LEVEL * XP_MULTIPLIER^(i - 1)`,
+// and stops growing at level `XP_COST_CAP_LEVEL`, so every level from there on
+// costs the same. Adventurer (level 20) needs 15,860 XP and Legend (50)
+// 124,414. The earlier 1000 * 1.15^(i - 1) with no cap needed 88,211 and
+// 6,275,408, which left every rank past level 10 out of reach.
+const XP_PER_LEVEL = 250;
+const XP_MULTIPLIER = 1.12;
+const XP_COST_CAP_LEVEL = 25;
 
 // Perk keys granted per path at specific level thresholds.
 // Order matters — lower levels first.
-const PERK_THRESHOLDS: Record<string, { level: number; perk: string }[]> = {
+export const PERK_THRESHOLDS: Record<
+  string,
+  { level: number; perk: string }[]
+> = {
   [UserPath.user]: [
     { level: 1, perk: "early_bird" },
     { level: 5, perk: "priority_access" },
@@ -65,16 +75,18 @@ const XP_REWARDS = {
   shareReviewPost: 20,
 };
 
-function xpRequiredForLevel(level: number): number {
+/** Total XP at which `level` starts. */
+export function xpRequiredForLevel(level: number): number {
   if (level <= 1) return 0;
   let total = 0;
   for (let i = 1; i < level; i++) {
-    total += Math.round(XP_PER_LEVEL * Math.pow(XP_MULTIPLIER, i - 1));
+    const step = Math.min(i, XP_COST_CAP_LEVEL);
+    total += Math.round(XP_PER_LEVEL * Math.pow(XP_MULTIPLIER, step - 1));
   }
   return total;
 }
 
-function calculateLevel(totalXP: number): {
+export function calculateLevel(totalXP: number): {
   level: number;
   currentXP: number;
   requiredXP: number;
