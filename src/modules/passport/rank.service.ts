@@ -15,8 +15,9 @@ interface LadderStep {
   foxer: string;
   rarity: BadgeRarity;
   /**
-   * Coins the spec pays on reaching the rank. Nothing pays them yet: that
-   * needs the monthly Coin pool (section 7.4), which is not built.
+   * Coins the spec pays on reaching the rank. `PassportSvc` pays them from its
+   * own `RANK_THRESHOLDS` table, which repeats this ladder; `tests/rank.spec.ts`
+   * fails if the two ever disagree.
    */
   rankUpCoins: number;
 }
