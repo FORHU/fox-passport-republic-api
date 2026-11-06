@@ -2,6 +2,26 @@ import { UserPath } from "@prisma/client";
 import { cached } from "../../utils/cache.util";
 import { passportCache, PASSPORT_TTL } from "../../utils/cache-namespaces";
 import PassportRepo from "./passport.repository";
+import RewardRepo from "../reward/reward.repository";
+
+// 9-Rank Ladder thresholds with rank-up Coins bonuses (requirements/xp-and-coins.md, section 4.2)
+export interface RankThreshold {
+  level: number;
+  citizenRank: string;
+  foxerRank: string;
+  coins: number;
+}
+
+export const RANK_THRESHOLDS: readonly RankThreshold[] = [
+  { level: 3, citizenRank: "Wanderer", foxerRank: "Regular", coins: 50 },
+  { level: 5, citizenRank: "Explorer", foxerRank: "Pro", coins: 100 },
+  { level: 10, citizenRank: "Trailblazer", foxerRank: "Veteran", coins: 200 },
+  { level: 15, citizenRank: "Voyager", foxerRank: "Headliner", coins: 300 },
+  { level: 20, citizenRank: "Adventurer", foxerRank: "Maestro", coins: 500 },
+  { level: 30, citizenRank: "Pioneer", foxerRank: "Icon", coins: 800 },
+  { level: 40, citizenRank: "Vanguard", foxerRank: "Luminary", coins: 1200 },
+  { level: 50, citizenRank: "Legend", foxerRank: "Legend", coins: 2000 },
+] as const;
 
 // Level curve (requirements/xp-and-coins.md, section 4.1): the XP that takes a
 // player from level `i` to `i + 1` is `XP_PER_LEVEL * XP_MULTIPLIER^(i - 1)`,
@@ -181,6 +201,9 @@ export default class PassportSvc {
           await PassportRepo.pushPerks(passport.id, [lvl1Perk]);
         }
       }
+      // Award starter rank badge
+      const starterBadge = path === UserPath.user ? "Newcomer" : "Rookie";
+      PassportSvc.awardBadgeByName(userId, starterBadge).catch(() => {});
     }
 
     // Award level-based badges when crossing thresholds
@@ -191,6 +214,42 @@ export default class PassportSvc {
         );
       if (prevLevel < 18 && level >= 18)
         PassportSvc.awardBadgeByName(userId, "Grand Mayor").catch(() => {});
+    }
+
+    // Award 9-Rank ladder bonuses (Coins & Badges) when level crosses thresholds
+    if (level !== prevLevel) {
+      const isCitizen = path === UserPath.user;
+      for (const t of RANK_THRESHOLDS) {
+        if (t.level > prevLevel && t.level <= level) {
+          const rankBadgeName = isCitizen ? t.citizenRank : t.foxerRank;
+          PassportSvc.awardBadgeByName(userId, rankBadgeName).catch(() => {});
+
+          if (t.coins > 0) {
+            const rankIdempotencyKey = `grant:${userId}:rank_up:${path}:${t.level}`;
+            RewardRepo.findEventByIdempotencyKey(rankIdempotencyKey)
+              .then(async (existingGrant) => {
+                if (!existingGrant) {
+                  await RewardRepo.recordGrant({
+                    userId,
+                    path,
+                    action: "rank_up",
+                    refType: "rank_level",
+                    refId: `${path}:${t.level}`,
+                    xp: 0,
+                    coins: t.coins,
+                    idempotencyKey: rankIdempotencyKey,
+                  });
+                }
+              })
+              .catch((err) => {
+                console.warn(
+                  "[PassportSvc] rank_up bonus coins grant failed:",
+                  err,
+                );
+              });
+          }
+        }
+      }
     }
 
     return { level, currentXP, requiredXP, totalXP: newTotalXP };
