@@ -48,6 +48,17 @@ export default class FoxerScoreRepo {
     };
   }
 
+  /** The city and roles a Foxer is placed by on the leaderboards. */
+  static async getUserPlace(
+    userId: string,
+  ): Promise<{ city: string | null; roleType: string[] } | null> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { city: true, roleType: true },
+    });
+    return user ? { city: user.city, roleType: user.roleType } : null;
+  }
+
   /**
    * Computes the platform-wide average rating across all reviews.
    */
