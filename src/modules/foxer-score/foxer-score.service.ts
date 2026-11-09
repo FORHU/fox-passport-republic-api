@@ -26,6 +26,13 @@ export interface FoxerScoreResult {
   operationalMetrics: FoxerOperationalMetrics;
 }
 
+/** Where a Foxer stands on their own leaderboard, for "#3 Venues in Manila". */
+export interface FoxerLeaderboardPlace {
+  position: number;
+  role: string;
+  city: string | null;
+}
+
 export interface PublicFoxerProfileReputation {
   starRating: number | null;
   reviewCount: number;
@@ -35,6 +42,27 @@ export interface PublicFoxerProfileReputation {
   cancellationRatePercent: number;
   isIdentityVerified: boolean;
   labels: string[];
+  /** Null when they are not on a board: outside the top 50, or too new. */
+  leaderboard: FoxerLeaderboardPlace | null;
+}
+
+/**
+ * The role whose board a Foxer is placed on, when they hold several: the first
+ * of these they have. Null for someone who holds none of them.
+ */
+const BOARD_ROLES = [
+  "venueFoxer",
+  "eventFoxer",
+  "gearFoxer",
+  "serviceFoxer",
+  "performerFoxer",
+  "providerFoxer",
+] as const;
+
+export function pickLeaderboardRole(
+  roleTypes: readonly string[],
+): string | null {
+  return BOARD_ROLES.find((r) => roleTypes.includes(r)) ?? null;
 }
 
 /**
@@ -202,6 +230,8 @@ export default class FoxerScoreService {
     if (operationalMetrics.isNew && operationalMetrics.completedBookings >= 3)
       labels.push("Rising");
 
+    const leaderboard = await this.findLeaderboardPlace(userId);
+
     return {
       starRating: operationalMetrics.isNew
         ? null
@@ -217,6 +247,38 @@ export default class FoxerScoreService {
       ),
       isIdentityVerified: operationalMetrics.isIdentityVerified,
       labels,
+      leaderboard,
     };
+  }
+
+  /**
+   * Their place on the Top rated board for their role in their city, from the
+   * cached board, so it costs no scoring of its own. Null when they are not
+   * among the 50 on it. Never fails the reputation: a board that cannot be
+   * read leaves the place out.
+   */
+  private static async findLeaderboardPlace(
+    userId: string,
+  ): Promise<FoxerLeaderboardPlace | null> {
+    try {
+      const place = await FoxerScoreRepo.getUserPlace(userId);
+      const role = place ? pickLeaderboardRole(place.roleType) : null;
+      if (!place || !role) return null;
+
+      // Loaded when needed: the leaderboard module itself uses this one.
+      const { default: LeaderboardService } =
+        await import("../leaderboard/leaderboard.service");
+      const city = place.city?.trim() || null;
+      const board = await LeaderboardService.getFoxerLeaderboard(
+        null,
+        "top_rated",
+        role,
+        city ?? undefined,
+      );
+      const mine = board.entries.find((e) => e.userId === userId);
+      return mine ? { position: mine.position, role, city } : null;
+    } catch {
+      return null;
+    }
   }
 }
