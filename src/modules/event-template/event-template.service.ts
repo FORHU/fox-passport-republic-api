@@ -22,6 +22,10 @@ const HISTORY_FIELDS = [
   "maxAttendees",
 ] as const;
 import { PLATFORM_FEE_PERCENT } from "../../config";
+import {
+  isExcludedRow,
+  type EventBreakdownExclusions,
+} from "../pricing/event-breakdown";
 import { eventTemplateCache } from "../../utils/cache-namespaces";
 import { fingerprint } from "../../utils/cache.util";
 
@@ -392,21 +396,18 @@ export default class EventTemplateSvc {
    */
   static calculateItemsTotal(
     template: TemplateForPricing,
-    exclusions?: {
-      excludedAssetIds?: string[];
-      excludedServiceIds?: string[];
-      excludedVenueIds?: string[];
-    },
+    exclusions?: EventBreakdownExclusions,
   ): number {
-    const excludedAssetIds = exclusions?.excludedAssetIds ?? [];
-    const excludedServiceIds = exclusions?.excludedServiceIds ?? [];
-    const excludedVenueIds = exclusions?.excludedVenueIds ?? [];
     let total = 0;
+
+    // Exclusions use the same rule as the new breakdown (`isExcludedRow`): a
+    // row loaded without its id, when exclusions were asked for, throws
+    // instead of charging for an item the client removed.
 
     // Sum Assets
     if (template.templateAssets) {
       template.templateAssets.forEach((ta) => {
-        if (ta.id && excludedAssetIds.includes(ta.id)) return;
+        if (isExcludedRow(exclusions?.excludedAssetIds, ta.id, "asset")) return;
         const price = itemPrice(ta.agreedPrice, ta.asset?.price);
         const qty = ta.quantity || 1;
         total += price * qty;
@@ -416,7 +417,8 @@ export default class EventTemplateSvc {
     // Sum Services
     if (template.templateServices) {
       template.templateServices.forEach((ts) => {
-        if (ts.id && excludedServiceIds.includes(ts.id)) return;
+        if (isExcludedRow(exclusions?.excludedServiceIds, ts.id, "service"))
+          return;
         total += itemPrice(ts.agreedPrice, ts.service?.price);
       });
     }
@@ -424,7 +426,7 @@ export default class EventTemplateSvc {
     // Sum Venues
     if (template.templateVenues) {
       template.templateVenues.forEach((tv) => {
-        if (tv.id && excludedVenueIds.includes(tv.id)) return;
+        if (isExcludedRow(exclusions?.excludedVenueIds, tv.id, "venue")) return;
         total += itemPrice(tv.agreedPrice, tv.venue?.price);
       });
     }
@@ -447,11 +449,7 @@ export default class EventTemplateSvc {
    */
   static calculateTotalsBreakdown(
     template: TemplateForPricing,
-    exclusions?: {
-      excludedAssetIds?: string[];
-      excludedServiceIds?: string[];
-      excludedVenueIds?: string[];
-    },
+    exclusions?: EventBreakdownExclusions,
     platformFeePercent?: number,
   ): {
     itemsTotal: number;

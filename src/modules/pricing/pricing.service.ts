@@ -1,6 +1,13 @@
 import { prisma } from "../../utils/prisma";
 import { PlatformFeeConfig, Prisma } from "@prisma/client";
-import { PLATFORM_FEE_PERCENT } from "../../config";
+import { PLATFORM_FEE_PERCENT, PROCESSING_FEE_PERCENT } from "../../config";
+import {
+  buildEventBreakdown,
+  eventTemplateLines,
+  type EventBreakdown,
+  type EventBreakdownExclusions,
+  type EventTemplateForBreakdown,
+} from "./event-breakdown";
 import { AppError } from "../../utils/errors";
 import {
   EVENT_ITEM_TRANSACTION_TYPE,
@@ -203,6 +210,41 @@ export default class PricingSvc {
         ruleId: rule.id,
         ruleName: rule.name,
       };
+    });
+  }
+
+  /**
+   * The full price breakdown for an Event built from `template` (#264 T4):
+   * every Foxer line with its commission, FoxPassport fee and processing fee,
+   * plus the totals. See `event-breakdown.ts` for the formula and rounding.
+   *
+   * - `commissionPct` is the EventFoxer's rate: the Event's snapshot once it
+   *   has a booking, otherwise the EventFoxer's current rate. The caller picks.
+   * - The FoxPassport fee per line comes only from `event_item` fee rules
+   *   (`resolveEventItemFeeRates`), never from `PLATFORM_FEE_PERCENT` or the
+   *   template's `platformFeePct`.
+   * - The processing fee is `PROCESSING_FEE_PERCENT` unless `processingFeePct`
+   *   is given.
+   *
+   * Nothing calls this yet; event pricing switches to it in T6 and T12.
+   */
+  static async calculateEventBreakdown(
+    template: EventTemplateForBreakdown,
+    commissionPct: number,
+    exclusions?: EventBreakdownExclusions,
+    options?: { processingFeePct?: number },
+  ): Promise<EventBreakdown> {
+    const lines = eventTemplateLines(template, exclusions);
+    const platformFees = await this.resolveEventItemFeeRates(
+      lines.map((line) => ({
+        itemType: line.kind,
+        listingCategory: line.category,
+      })),
+    );
+    return buildEventBreakdown(lines, {
+      commissionPct,
+      platformFees,
+      processingFeePct: options?.processingFeePct ?? PROCESSING_FEE_PERCENT,
     });
   }
 
