@@ -70,7 +70,7 @@ export function pickStartingRate(templates: TemplateRate[]): number | null {
   return best ? best.rate : null;
 }
 
-interface Report {
+export interface Report {
   eventFoxers: number;
   set: { userId: string; rate: number; templates: number; distinct: number }[];
   skippedAlreadySet: number;
@@ -79,7 +79,16 @@ interface Report {
   failed: { userId: string; error: string }[];
 }
 
-async function main() {
+/**
+ * The backfill itself. `dryRun` writes nothing. `onlyUserIds` limits it to
+ * those users: the integration spec uses it to touch only the rows it created
+ * in the shared test database. The CLI never passes it.
+ */
+export async function backfillEventFoxerCommission(options: {
+  dryRun: boolean;
+  onlyUserIds?: string[];
+}): Promise<Report> {
+  const { dryRun, onlyUserIds } = options;
   const report: Report = {
     eventFoxers: 0,
     set: [],
@@ -90,7 +99,10 @@ async function main() {
   };
 
   const users = await prisma.user.findMany({
-    where: { roleType: { has: "eventFoxer" } },
+    where: {
+      roleType: { has: "eventFoxer" },
+      ...(onlyUserIds ? { id: { in: onlyUserIds } } : {}),
+    },
     select: {
       id: true,
       commissionPct: true,
@@ -121,7 +133,7 @@ async function main() {
       distinct: new Set(user.eventTemplates.map((t) => t.hostMarkupPct)).size,
     };
 
-    if (DRY_RUN) {
+    if (dryRun) {
       report.set.push(entry);
       continue;
     }
@@ -140,7 +152,11 @@ async function main() {
     }
   }
 
-  printReport(report);
+  return report;
+}
+
+async function main() {
+  printReport(await backfillEventFoxerCommission({ dryRun: DRY_RUN }));
 }
 
 function printReport(report: Report) {
