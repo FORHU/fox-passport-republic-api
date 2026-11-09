@@ -10,6 +10,11 @@ model User {
   systemRole               SystemRole                   @default(user)
   roleType                 RoleType[]
   isEmailVerified          Boolean                      @default(false)
+  // The EventFoxer's one commission rate, in percent (10.00 = 10%), applied to
+  // every Event they created. Copied onto Event.commissionPct at an Event's
+  // first booking, so a later change never reprices a booked Event. 0 for
+  // everyone who isn't an EventFoxer.
+  commissionPct            Decimal                      @default(0) @db.Decimal(5, 2)
   createdAt                DateTime                     @default(now())
   updatedAt                DateTime                     @updatedAt
 
