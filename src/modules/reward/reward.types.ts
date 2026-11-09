@@ -68,6 +68,8 @@ export interface WalletHistoryItem {
   refType?: string;
   refId?: string;
   reason?: string | null;
+  /** A grant whose Coins are still held, not yet spendable. */
+  isPending?: boolean;
   createdAt: Date;
 }
 

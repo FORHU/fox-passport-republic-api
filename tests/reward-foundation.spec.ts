@@ -13,6 +13,19 @@ const mockDb = vi.hoisted(() => ({
   passports: new Map<string, any>(),
 }));
 
+/** The grants whose Coins are held: the query RewardRepo makes for them. */
+function heldEvents(where: any) {
+  const blocked: string[] = where.lifecycles.none.type.in;
+  return [...mockDb.events.values()].filter(
+    (ev) =>
+      ev.userId === where.userId &&
+      ev.coins > 0 &&
+      !mockDb.lifecycles.some(
+        (l) => l.grantEventId === ev.id && blocked.includes(l.type),
+      ),
+  );
+}
+
 vi.mock("../src/utils/prisma", () => ({
   prisma: {
     rewardRule: {
@@ -41,6 +54,7 @@ vi.mock("../src/utils/prisma", () => ({
         return null;
       }),
       findMany: vi.fn(async ({ where }: { where: any }) => {
+        if (where.lifecycles) return heldEvents(where);
         const matches: any[] = [];
         for (const ev of mockDb.events.values()) {
           if (where.refType && ev.refType !== where.refType) continue;
@@ -106,8 +120,21 @@ vi.mock("../src/utils/prisma", () => ({
             mockDb.events.set(ev.id, ev);
             return ev;
           }),
+          findMany: vi.fn(async ({ where }: { where: any }) =>
+            heldEvents(where),
+          ),
         },
         rewardLifecycle: {
+          findFirst: vi.fn(async ({ where }: { where: any }) => {
+            return (
+              mockDb.lifecycles.find(
+                (l) =>
+                  (!where.grantEventId ||
+                    l.grantEventId === where.grantEventId) &&
+                  (!where.type || l.type === where.type),
+              ) || null
+            );
+          }),
           create: vi.fn(async ({ data }: any) => {
             const lc = { id: `lc-${Date.now()}-${Math.random()}`, ...data };
             mockDb.lifecycles.push(lc);
@@ -147,24 +174,22 @@ vi.mock("../src/utils/prisma", () => ({
 
 vi.mock("../src/modules/passport/passport.service", () => ({
   default: {
-    awardXP: vi.fn(
-      async (userId: string, path: UserPath, amount: number) => {
-        const passport = mockDb.passports.get(userId) || {
-          userId,
-          coins: 0,
-          paths: [],
-        };
-        let p = passport.paths?.find((it: any) => it.path === path);
-        if (!p) {
-          p = { path, totalXP: 0, level: 1 };
-          passport.paths = passport.paths || [];
-          passport.paths.push(p);
-        }
-        p.totalXP = Math.max(0, p.totalXP + amount);
-        p.level = Math.max(1, Math.floor(p.totalXP / 1000) + 1);
-        mockDb.passports.set(userId, passport);
-      },
-    ),
+    awardXP: vi.fn(async (userId: string, path: UserPath, amount: number) => {
+      const passport = mockDb.passports.get(userId) || {
+        userId,
+        coins: 0,
+        paths: [],
+      };
+      let p = passport.paths?.find((it: any) => it.path === path);
+      if (!p) {
+        p = { path, totalXP: 0, level: 1 };
+        passport.paths = passport.paths || [];
+        passport.paths.push(p);
+      }
+      p.totalXP = Math.max(0, p.totalXP + amount);
+      p.level = Math.max(1, Math.floor(p.totalXP / 1000) + 1);
+      mockDb.passports.set(userId, passport);
+    }),
   },
 }));
 
@@ -227,7 +252,9 @@ describe("RewardService & Immutable Ledger Foundation", () => {
       expect(RewardService.calculateRank(1, UserPath.user)).toBe("Newcomer");
       expect(RewardService.calculateRank(3, UserPath.user)).toBe("Wanderer");
       expect(RewardService.calculateRank(5, UserPath.user)).toBe("Explorer");
-      expect(RewardService.calculateRank(10, UserPath.user)).toBe("Trailblazer");
+      expect(RewardService.calculateRank(10, UserPath.user)).toBe(
+        "Trailblazer",
+      );
       expect(RewardService.calculateRank(15, UserPath.user)).toBe("Voyager");
       expect(RewardService.calculateRank(20, UserPath.user)).toBe("Adventurer");
       expect(RewardService.calculateRank(30, UserPath.user)).toBe("Pioneer");
@@ -239,7 +266,9 @@ describe("RewardService & Immutable Ledger Foundation", () => {
       expect(RewardService.calculateRank(1, UserPath.providerFoxer)).toBe(
         "Rookie",
       );
-      expect(RewardService.calculateRank(5, UserPath.providerFoxer)).toBe("Pro");
+      expect(RewardService.calculateRank(5, UserPath.providerFoxer)).toBe(
+        "Pro",
+      );
       expect(RewardService.calculateRank(20, UserPath.providerFoxer)).toBe(
         "Maestro",
       );
