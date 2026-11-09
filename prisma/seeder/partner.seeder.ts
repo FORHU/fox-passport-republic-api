@@ -11,6 +11,8 @@ import { getVenueCoords } from "./city-coords";
 import { hashPassword } from "../../src/utils/password";
 
 const SEED_PASSWORD = "Password123!";
+const PARTNER_BIO =
+  "Fox Partner hosts curated venues across Luzon, from Tagaytay hillside villas to Makati rooftops.";
 
 export async function seedPartners(prisma: PrismaClient) {
   try {
@@ -36,6 +38,7 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Makati",
         state: "Metro Manila",
         country: "Philippines",
+        bio: PARTNER_BIO,
       },
       create: {
         email: "partner@example.com",
@@ -53,6 +56,7 @@ export async function seedPartners(prisma: PrismaClient) {
         city: "Makati",
         state: "Metro Manila",
         country: "Philippines",
+        bio: PARTNER_BIO,
       },
     });
     console.log(
