@@ -1,5 +1,6 @@
 import * as dotenv from "dotenv";
 import { requireSecret } from "./utils/require-secret";
+import { readPercentEnv } from "./utils/percent-env";
 dotenv.config();
 
 export const DATABASE_URL = process.env.DATABASE_URL as string;
@@ -125,8 +126,22 @@ export const STRIPE_WEBHOOK_SECRET = process.env
   .STRIPE_WEBHOOK_SECRET as string;
 // Platform's own cut, applied on top of itemsTotal (+ hostMarkup for Event bookings),
 // never carved out of provider/host shares. See docs/adr/0002-stripe-connect-payouts.md.
-export const PLATFORM_FEE_PERCENT = Number(
-  process.env.PLATFORM_FEE_PERCENT || 5,
+// Checked at startup like PROCESSING_FEE_PERCENT: unset or empty still means 5,
+// but "5%" or 300 now stops the API instead of charging NaN or 300%.
+export const PLATFORM_FEE_PERCENT = readPercentEnv(
+  "PLATFORM_FEE_PERCENT",
+  process.env.PLATFORM_FEE_PERCENT,
+  5,
+);
+// The processing fee added on top of each Foxer's price on an Event, in
+// percent (3 = 3%). It pays Stripe's charge on the client's payment, so it is
+// never paid out to anyone. One rate for every category. Event pricing only;
+// direct asset/service/venue bookings don't charge it. See #264 and the
+// library plan event-payment-breakdown-plan.md (D7).
+export const PROCESSING_FEE_PERCENT = readPercentEnv(
+  "PROCESSING_FEE_PERCENT",
+  process.env.PROCESSING_FEE_PERCENT,
+  3,
 );
 // Where Stripe-hosted Express onboarding sends the provider back to:
 // `return` once they finish, `refresh` when the single-use link has expired and

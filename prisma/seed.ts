@@ -18,6 +18,7 @@ import {
   seedPassports,
   seedSpecializations,
   seedCancellationPolicies,
+  seedPlatformFees,
   seedPartners,
   seedFeed,
   seedPromotions,
@@ -140,6 +141,9 @@ async function main() {
 
   // 9. Seed Cancellation Policies
   await seedCancellationPolicies(prisma);
+
+  // 9b. Seed the default Event line fee rule (5%, no category)
+  await seedPlatformFees(prisma);
 
   // 10. Seed Badges (platform-wide badge definitions)
   await seedBadges(prisma);

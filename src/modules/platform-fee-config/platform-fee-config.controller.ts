@@ -4,7 +4,7 @@ import { sendServerError } from "../../utils/errors";
 import { VALIDATE_ALL, sendValidationError } from "../../utils/validation";
 import PlatformFeeConfigSvc, {
   KNOWN_TRANSACTION_TYPES,
-  KNOWN_CATEGORIES,
+  ALL_RULE_CATEGORIES,
 } from "./platform-fee-config.service";
 
 const actorOf = (req: Request) => ({
@@ -19,7 +19,7 @@ const CREATE_BODY_SCHEMA = Joi.object({
     .allow(null)
     .optional(),
   category: Joi.string()
-    .valid(...KNOWN_CATEGORIES)
+    .valid(...ALL_RULE_CATEGORIES)
     .allow(null)
     .optional(),
   subcategory: Joi.string().trim().allow(null, "").optional(),
@@ -42,7 +42,7 @@ const UPDATE_BODY_SCHEMA = Joi.object({
     .allow(null)
     .optional(),
   category: Joi.string()
-    .valid(...KNOWN_CATEGORIES)
+    .valid(...ALL_RULE_CATEGORIES)
     .allow(null)
     .optional(),
   subcategory: Joi.string().trim().allow(null, "").optional(),

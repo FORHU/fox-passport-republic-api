@@ -1,6 +1,12 @@
 import { prisma } from "../../utils/prisma";
 import { PlatformFeeConfig, Prisma } from "@prisma/client";
 import { PLATFORM_FEE_PERCENT } from "../../config";
+import { AppError } from "../../utils/errors";
+import {
+  EVENT_ITEM_TRANSACTION_TYPE,
+  type EventItemFeeInput,
+  type EventItemFeeRate,
+} from "./event-item-fee";
 type Decimal = Prisma.Decimal;
 
 export interface PricingContext {
@@ -40,52 +46,164 @@ export interface PricingBreakdown {
   finalAmount: number;
 }
 
+/**
+ * The most specific rule in `rules` for `context`, or null. A rule that names a
+ * transaction type, category or subcategory only matches that value; among the
+ * matches, subcategory outweighs category, which outweighs transaction type,
+ * and `priority` breaks ties. Pure, so one fetched rule list can price many
+ * lines (see `resolveEventItemFeeRates`).
+ */
+export function pickPricingRule<
+  R extends Pick<
+    PlatformFeeConfig,
+    "transactionType" | "category" | "subcategory" | "priority"
+  >,
+>(
+  rules: readonly R[],
+  context: Pick<PricingContext, "transactionType" | "category" | "subcategory">,
+): R | null {
+  let bestMatch: R | null = null;
+  let matchScore = -1;
+
+  for (const rule of rules) {
+    let score = 0;
+
+    // Strict exclusions (if rule defines a context property, it must match)
+    if (
+      rule.transactionType &&
+      rule.transactionType !== context.transactionType
+    )
+      continue;
+    if (rule.category && rule.category !== context.category) continue;
+    if (rule.subcategory && rule.subcategory !== context.subcategory) continue;
+
+    // Scoring
+    if (rule.transactionType === context.transactionType) score += 10;
+    if (rule.category === context.category) score += 100;
+    if (rule.subcategory === context.subcategory) score += 1000;
+
+    score += rule.priority; // Allow manual override
+
+    if (score > matchScore) {
+      matchScore = score;
+      bestMatch = rule;
+    }
+  }
+
+  return bestMatch;
+}
+
+/** Rules in force right now: active, started, not yet ended. */
+function activeRuleWhere(now: Date): Prisma.PlatformFeeConfigWhereInput {
+  return {
+    active: true,
+    effectiveFrom: { lte: now },
+    OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: now } }],
+  };
+}
+
 export default class PricingSvc {
   /**
    * Resolves the most specific pricing rule based on context.
    */
   static async resolvePricingRule(context: PricingContext) {
     const rules = await prisma.platformFeeConfig.findMany({
-      where: {
-        active: true,
-        effectiveFrom: { lte: new Date() },
-        OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: new Date() } }],
-      },
+      where: activeRuleWhere(new Date()),
       orderBy: {
         priority: "desc",
       },
     });
 
-    let bestMatch: PlatformFeeConfig | null = null;
-    let matchScore = -1;
+    return pickPricingRule(rules, context);
+  }
 
-    for (const rule of rules) {
-      let score = 0;
+  /**
+   * The rules that can price an Event line: `event_item` rules in force that
+   * have a percentage. Catch-all rules (no transaction type) are left out on
+   * purpose: they were written for `event`/`sponsorship` pricing, and letting
+   * their `priority` or `subcategory` compete would let them override the
+   * `event_item` default, or block checkout with a fixed-amount-only rule.
+   */
+  private static fetchEventItemRules() {
+    return prisma.platformFeeConfig.findMany({
+      where: {
+        AND: [
+          activeRuleWhere(new Date()),
+          {
+            transactionType: EVENT_ITEM_TRANSACTION_TYPE,
+            percentage: { not: null },
+          },
+        ],
+      },
+      orderBy: { priority: "desc" },
+    });
+  }
 
-      // Strict exclusions (if rule defines a context property, it must match)
-      if (
-        rule.transactionType &&
-        rule.transactionType !== context.transactionType
-      )
-        continue;
-      if (rule.category && rule.category !== context.category) continue;
-      if (rule.subcategory && rule.subcategory !== context.subcategory)
-        continue;
+  private static pickEventItemRule(
+    rules: PlatformFeeConfig[],
+    item: { itemType?: string | null; listingCategory?: string | null },
+  ) {
+    return pickPricingRule(rules, {
+      transactionType: EVENT_ITEM_TRANSACTION_TYPE,
+      category: item.itemType ?? undefined,
+      subcategory: item.listingCategory ?? undefined,
+    });
+  }
 
-      // Scoring
-      if (rule.transactionType === context.transactionType) score += 10;
-      if (rule.category === context.category) score += 100;
-      if (rule.subcategory === context.subcategory) score += 1000;
+  /**
+   * The rule that would price one Event line, or null when none would and
+   * checkout would refuse it. The admin preview uses this, so it shows exactly
+   * what `resolveEventItemFeeRates` charges.
+   */
+  static async resolveEventItemFeeRule(item: {
+    itemType?: string | null;
+    listingCategory?: string | null;
+  }) {
+    const rules = await this.fetchEventItemRules();
+    return this.pickEventItemRule(rules, item);
+  }
 
-      score += rule.priority; // Allow manual override
+  /**
+   * The FoxPassport fee rate for every Foxer line on an Event, from one query
+   * (#264 T3.4). Only `event_item` rules with a percentage take part
+   * (`fetchEventItemRules`); among them `category` = item type and
+   * `subcategory` = the listing's category, so the admin's most specific rule
+   * wins and the default rule (no category) covers the rest.
+   *
+   * The result is index-aligned with `items`. Percentages are in percent and
+   * are never rescaled: a rule of 1 is 1%.
+   *
+   * Throws rather than pricing a line at 0% when no rule covers it. The
+   * default rule from migration
+   * `20261109130000_add_default_event_item_fee_rule` prevents that unless an
+   * admin deactivates or ends it.
+   */
+  static async resolveEventItemFeeRates(
+    items: readonly EventItemFeeInput[],
+  ): Promise<EventItemFeeRate[]> {
+    if (items.length === 0) return [];
 
-      if (score > matchScore) {
-        matchScore = score;
-        bestMatch = rule;
+    const rules = await this.fetchEventItemRules();
+
+    return items.map((item) => {
+      const rule = this.pickEventItemRule(rules, item);
+      if (!rule || rule.percentage == null) {
+        const what = item.listingCategory
+          ? `${item.itemType} (${item.listingCategory})`
+          : item.itemType;
+        throw new AppError(
+          `No FoxPassport fee rule covers ${what} on an Event. ` +
+            `Add, reactivate or extend an "${EVENT_ITEM_TRANSACTION_TYPE}" fee rule with a percentage and no category.`,
+          500,
+          "EVENT_ITEM_FEE_RULE_MISSING",
+        );
       }
-    }
-
-    return bestMatch;
+      return {
+        percentage: rule.percentage.toNumber(),
+        ruleId: rule.id,
+        ruleName: rule.name,
+      };
+    });
   }
 
   /**
