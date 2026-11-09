@@ -31,6 +31,18 @@ const PASSWORD_FIELD_BY_PATH: Record<string, string> = {
   "/set-password": "newPassword",
 };
 
+// Better Auth's emailOTP answers 200 for an unknown email and sends nothing, so
+// a client can't tell "code sent" from "no such account". These routes check
+// first and say so. That does reveal whether an email is registered; the
+// per-IP and per-account otpSendRateLimit in app.ts caps how fast anyone can ask.
+const PASSWORD_RESET_REQUEST_PATHS = new Set([
+  "/email-otp/request-password-reset",
+  "/forget-password/email-otp",
+]);
+
+export const NO_ACCOUNT_MESSAGE =
+  "No account found with this email. Please double-check your email and try again.";
+
 function checkUsername<T extends Record<string, unknown>>(user: T): T {
   if (user.username === undefined || user.username === null) return user;
   const username = normalizeUsername(user.username);
@@ -151,6 +163,19 @@ export const auth = betterAuth({
     // the web would refuse can't be set by calling the API directly. Runs
     // before the handler: nothing is created or changed when it fails.
     before: createAuthMiddleware(async (ctx) => {
+      // A reset code is only sent to an account that exists. Lowercased the
+      // way the handler itself does before it looks the user up.
+      if (ctx.path && PASSWORD_RESET_REQUEST_PATHS.has(ctx.path)) {
+        const email = (ctx.body as Record<string, unknown> | undefined)?.email;
+        if (typeof email !== "string") return;
+        const user = await ctx.context.internalAdapter.findUserByEmail(
+          email.toLowerCase(),
+        );
+        if (!user) {
+          throw new APIError("NOT_FOUND", { message: NO_ACCOUNT_MESSAGE });
+        }
+        return;
+      }
       const field = ctx.path ? PASSWORD_FIELD_BY_PATH[ctx.path] : undefined;
       if (!field) return;
       const password = (ctx.body as Record<string, unknown> | undefined)?.[

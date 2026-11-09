@@ -31,7 +31,7 @@ Two systems run side by side today, and the seam has already caused an outage:
 | `POST /auth/refresh-token`, `refresh_tokens` table, `fox_token` / `fox_refresh_token` / `fox_user` cookies | API `refresh-token.service.ts`, `auth.cookies.ts`; web `/api/proxy` refresh-and-replay; mobile `ApiEndpoints.refresh` | Not needed — sessions renew themselves (`session.updateAge`, 1 day; `expiresIn` 7 days) |
 | `POST /auth/logout` | API; web | `sign-out` (mobile already uses it) |
 | `POST /auth/verify-email`, `/auth/resend-verification-otp` — OTP in `User.otpCode` / `otpExpiry` | API `auth.service.ts`; web; mobile | `emailOTP` plugin, type `email-verification` — OTP kept in `verifications` |
-| `POST /auth/forgot-password`, `/auth/reset-password` — OTP | API; web; mobile | `emailOTP` plugin, type `forget-password` |
+| `POST /auth/forgot-password`, `/auth/reset-password` — OTP | API; web; mobile | `emailOTP` plugin, type `forget-password`. An unknown email is a 404 with "No account found…" (a `hooks.before` check in `better-auth.ts`, app#257); the plugin alone answered 200 and sent nothing |
 | `GET /auth/google`, `/google/callback`, `POST /google/exchange` (+ Facebook) — links in `oauth_accounts` | API `google-auth.service.ts`, `facebook-auth.service.ts`; web; mobile | `socialProviders.google` / `.facebook`; mobile native via `signIn.social({ idToken })` — links in `accounts` |
 | One session per account (`revokeAllForUser` on sign-in) | API, custom paths only | Dropped — one session per device. Password change/reset uses `revokeOtherSessions` |
 | JWT fallback in `authenticate` / `optionalAuth` | API `auth.middleware.ts` | `auth.api.getSession` only (already runs first) |
