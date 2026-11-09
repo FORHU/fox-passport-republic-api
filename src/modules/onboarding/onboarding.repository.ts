@@ -26,6 +26,13 @@ export default class OnboardingRepo {
     });
   }
 
+  /** Bookings the account holds that were not cancelled. */
+  static async countActiveBookings(userId: string): Promise<number> {
+    return prisma.booking.count({
+      where: { userId, status: { not: "cancelled" } },
+    });
+  }
+
   /**
    * What the server-detected steps are judged on: the four profile fields
    * (the photo may live on the account or on its profile row) and whether an

@@ -18,9 +18,12 @@ const STEPS: Record<string, { action?: string; path?: UserPath }> = {
  * in `STEPS`, so the app cannot report them: a client call to
  * `POST /onboarding/profile_complete` is refused as an unknown step.
  */
-const DETECTED_STEPS: Record<string, { action: string; path: UserPath }> = {
+const DETECTED_STEPS: Record<string, { action?: string; path?: UserPath }> = {
   profile_complete: { action: "complete_profile", path: UserPath.user },
   id_verified: { action: "verify_identity", path: UserPath.user },
+  // The checklist's "first booking": recorded, and pays nothing of its own
+  // (booking and attending already pay).
+  first_booking: {},
 };
 
 const filled = (value: string | null | undefined): boolean =>
@@ -118,6 +121,13 @@ export default class OnboardingSvc {
       earned.push("profile_complete");
     }
     if (facts.identityVerifiedAt) earned.push("id_verified");
+    // Asked only while it is still open, so a finished checklist costs no query.
+    if (
+      !(await OnboardingRepo.isCompleted(userId, "first_booking")) &&
+      (await OnboardingRepo.countActiveBookings(userId)) > 0
+    ) {
+      earned.push("first_booking");
+    }
 
     for (const step of earned) {
       if (await OnboardingRepo.isCompleted(userId, step)) continue;

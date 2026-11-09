@@ -4,6 +4,7 @@ import { UserPath } from "@prisma/client";
 const state = vi.hoisted(() => ({
   done: new Set<string>(),
   facts: null as null | Record<string, unknown>,
+  bookings: 0,
 }));
 
 const completeFacts = {
@@ -25,6 +26,7 @@ vi.mock("../src/modules/onboarding/onboarding.repository", () => ({
       state.done.add(`${u}:${s}`);
     }),
     findDetectionFacts: vi.fn(async () => state.facts),
+    countActiveBookings: vi.fn(async () => state.bookings),
     findCompletedSteps: vi.fn(async (u: string) =>
       [...state.done]
         .filter((k) => k.startsWith(`${u}:`))
@@ -55,6 +57,7 @@ describe("OnboardingSvc", () => {
   beforeEach(() => {
     state.done.clear();
     state.facts = null;
+    state.bookings = 0;
     vi.clearAllMocks();
   });
 
@@ -202,6 +205,36 @@ describe("OnboardingSvc", () => {
       vi.clearAllMocks();
       await OnboardingSvc.syncDetectedSteps("u1");
       expect(RewardService.grant).not.toHaveBeenCalled();
+    });
+
+    it("records the first booking once there is one, and pays nothing for it", async () => {
+      state.facts = { ...completeFacts, imgId: null };
+      state.bookings = 0;
+      await OnboardingSvc.syncDetectedSteps("u1");
+      expect(state.done.has("u1:first_booking")).toBe(false);
+
+      state.bookings = 1;
+      await OnboardingSvc.syncDetectedSteps("u1");
+
+      expect(state.done.has("u1:first_booking")).toBe(true);
+      expect(RewardService.grant).not.toHaveBeenCalled();
+    });
+
+    it("does not look for bookings again once the step is recorded", async () => {
+      state.facts = { ...completeFacts, imgId: null };
+      state.bookings = 1;
+      await OnboardingSvc.syncDetectedSteps("u1");
+      vi.mocked(OnboardingRepo.countActiveBookings).mockClear();
+
+      await OnboardingSvc.syncDetectedSteps("u1");
+
+      expect(OnboardingRepo.countActiveBookings).not.toHaveBeenCalled();
+    });
+
+    it("cannot be reported by the app either", async () => {
+      await expect(
+        OnboardingSvc.complete("u1", "first_booking"),
+      ).rejects.toMatchObject({ status: 400 });
     });
 
     it("does nothing for an account that is gone", async () => {
