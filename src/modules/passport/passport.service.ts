@@ -58,21 +58,6 @@ export const PERK_THRESHOLDS: Record<
     { level: 8, perk: "venue_spotlight" },
     { level: 15, perk: "mayor_verified" },
   ],
-  [UserPath.gearFoxer]: [
-    { level: 1, perk: "gear_verified" },
-    { level: 3, perk: "lower_fees" },
-    { level: 8, perk: "gear_featured" },
-  ],
-  [UserPath.serviceFoxer]: [
-    { level: 1, perk: "service_verified" },
-    { level: 3, perk: "service_lower_fees" },
-    { level: 8, perk: "service_featured" },
-  ],
-  [UserPath.performerFoxer]: [
-    { level: 1, perk: "performer_verified" },
-    { level: 3, perk: "service_lower_fees" },
-    { level: 8, perk: "performer_featured" },
-  ],
   [UserPath.providerFoxer]: [
     { level: 1, perk: "provider_verified" },
     { level: 3, perk: "lower_fees" },

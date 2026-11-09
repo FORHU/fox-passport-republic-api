@@ -56,7 +56,7 @@ describe("Event checkout — concurrency, duplicate-checkout, availability reval
         email: `checkout_provider_${runId}@test.com`,
         password: "pw",
         name: "Provider",
-        roleType: ["gearFoxer"],
+        roleType: ["providerFoxer"],
       },
     });
     payerId = payer.id;

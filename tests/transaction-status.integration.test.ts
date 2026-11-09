@@ -30,7 +30,7 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
         email: `ts_provider_${runId}@test.com`,
         password: "pw",
         name: "Provider",
-        roleType: ["gearFoxer"],
+        roleType: ["providerFoxer"],
       },
     });
     const otherProvider = await prisma.user.create({
@@ -38,7 +38,7 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
         email: `ts_other_provider_${runId}@test.com`,
         password: "pw",
         name: "OtherProvider",
-        roleType: ["gearFoxer"],
+        roleType: ["providerFoxer"],
       },
     });
     const customer = await prisma.user.create({

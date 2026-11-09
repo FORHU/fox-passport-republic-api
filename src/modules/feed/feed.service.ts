@@ -256,12 +256,11 @@ export default class FeedService {
         }
         const isAuthorized =
           can(user, "feed:post-for-anyone") ||
-          user.roleType.includes("gearFoxer") ||
           user.roleType.includes("providerFoxer") ||
           user.roleType.includes("investor");
         if (!isAuthorized) {
           throw new AppError(
-            "Unauthorized: Equipment Foxer or Partner role required",
+            "Unauthorized: Provider or Partner role required",
             403,
           );
         }
@@ -287,13 +286,11 @@ export default class FeedService {
         }
         const isAuthorized =
           can(user, "feed:post-for-anyone") ||
-          user.roleType.includes("serviceFoxer") ||
-          user.roleType.includes("performerFoxer") ||
           user.roleType.includes("providerFoxer") ||
           user.roleType.includes("investor");
         if (!isAuthorized) {
           throw new AppError(
-            "Unauthorized: Talent Foxer, Performer Foxer, or Partner role required",
+            "Unauthorized: Provider or Partner role required",
             403,
           );
         }
@@ -424,16 +421,17 @@ export default class FeedService {
       } else {
         let targetPath: UserPath = UserPath.user;
         if (type === PostType.venue_spotlight) targetPath = UserPath.venueFoxer;
-        else if (type === PostType.gear_offering) {
+        else if (
+          type === PostType.gear_offering ||
+          type === PostType.service_offering
+        ) {
+          // A Provider earns on their own path; a Partner spotlighting supply
+          // earns on theirs.
           targetPath = user.roleType.includes("providerFoxer")
             ? UserPath.providerFoxer
-            : UserPath.gearFoxer;
-        } else if (type === PostType.service_offering) {
-          targetPath = user.roleType.includes("providerFoxer")
-            ? UserPath.providerFoxer
-            : user.roleType.includes("performerFoxer")
-              ? UserPath.performerFoxer
-              : UserPath.serviceFoxer;
+            : user.roleType.includes("investor")
+              ? UserPath.investor
+              : UserPath.user;
         } else if (type === PostType.event_announcement)
           targetPath = UserPath.eventFoxer;
         else if (type === PostType.partner_announcement)

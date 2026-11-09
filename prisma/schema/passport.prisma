@@ -145,11 +145,8 @@ model ReviewReply {
 
 enum UserPath {
   user
-  gearFoxer
-  serviceFoxer
   eventFoxer
   venueFoxer
-  performerFoxer
   investor
   organizer
   providerFoxer

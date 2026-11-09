@@ -68,9 +68,7 @@ vi.mock("../src/modules/passport/passport.service", () => ({
     user: "user",
     venueFoxer: "venue_foxer",
     eventFoxer: "event_foxer",
-    serviceFoxer: "service_foxer",
-    performerFoxer: "performer_foxer",
-    gearFoxer: "gear_foxer",
+    providerFoxer: "provider_foxer",
   },
 }));
 

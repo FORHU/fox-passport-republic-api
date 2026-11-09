@@ -49,7 +49,7 @@ describe("Bidding Lifecycle Integration Tests", () => {
         email: talentEmail,
         username: `talent_${runId}`,
         password: "pw",
-        roleType: ["serviceFoxer"],
+        roleType: ["providerFoxer"],
         name: "Talent Foxer",
       },
     });
@@ -60,7 +60,7 @@ describe("Bidding Lifecycle Integration Tests", () => {
         email: gearEmail,
         username: `gear_${runId}`,
         password: "pw",
-        roleType: ["gearFoxer"],
+        roleType: ["providerFoxer"],
         name: "Gear Foxer",
       },
     });
@@ -352,9 +352,7 @@ describe("Bidding Lifecycle Integration Tests", () => {
         proposedServiceId: serviceId,
         proposedPrice: 100,
       }),
-    ).rejects.toThrow(
-      "Unauthorized: you must have the Talent Foxer capability",
-    );
+    ).rejects.toThrow("Unauthorized: you must be a Provider");
 
     await expect(
       BiddingSvc.submitAssetBid({
@@ -364,7 +362,7 @@ describe("Bidding Lifecycle Integration Tests", () => {
         proposedAssetId: assetId,
         proposedPrice: 100,
       }),
-    ).rejects.toThrow("Unauthorized: you must have the Gear Foxer capability");
+    ).rejects.toThrow("Unauthorized: you must be a Provider");
   });
 
   it("Asset/Service ownership validation: prevents bidding with others items", async () => {

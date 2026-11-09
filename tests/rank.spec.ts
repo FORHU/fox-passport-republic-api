@@ -56,9 +56,6 @@ describe("RankSvc", () => {
   it("uses the Foxer names for every Foxer path, not just one", () => {
     for (const path of [
       UserPath.eventFoxer,
-      UserPath.gearFoxer,
-      UserPath.serviceFoxer,
-      UserPath.performerFoxer,
       UserPath.providerFoxer,
       UserPath.organizer,
     ]) {

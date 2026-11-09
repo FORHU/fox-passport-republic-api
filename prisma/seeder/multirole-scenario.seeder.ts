@@ -79,14 +79,7 @@ const CAST = {
   // The account to sign in with.
   multi: {
     name: "Mika Multirole",
-    roleType: [
-      "venueFoxer",
-      "eventFoxer",
-      "gearFoxer",
-      "serviceFoxer",
-      "performerFoxer",
-      "organizer",
-    ],
+    roleType: ["venueFoxer", "eventFoxer", "providerFoxer", "organizer"],
   },
   // A client who asks Mika for things.
   client: { name: "Cora Client", roleType: [] },

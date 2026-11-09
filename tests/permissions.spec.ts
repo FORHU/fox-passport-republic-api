@@ -159,32 +159,18 @@ describe("the supply side", () => {
   it("grants each foxer type its own capability", () => {
     expect(can(host, "template:manage")).toBe(true);
     expect(can(mayor, "venue:manage")).toBe(true);
-    expect(can({ roleType: ["gearFoxer"] }, "asset:manage")).toBe(true);
-    expect(can({ roleType: ["serviceFoxer"] }, "service:manage")).toBe(true);
-    expect(can({ roleType: ["performerFoxer"] }, "performer:manage")).toBe(
-      true,
-    );
+    expect(can({ roleType: ["providerFoxer"] }, "asset:manage")).toBe(true);
   });
 
   it("does not leak one foxer's capability to another", () => {
     expect(can(mayor, "template:manage")).toBe(false);
     expect(can(host, "venue:manage")).toBe(false);
-    // performerFoxer and serviceFoxer own different subsets of the same
-    // Service model, so this pair is the one most likely to leak.
-    expect(can({ roleType: ["serviceFoxer"] }, "performer:manage")).toBe(false);
-    expect(can({ roleType: ["performerFoxer"] }, "service:manage")).toBe(false);
+    expect(can(host, "asset:manage")).toBe(false);
+    expect(can(mayor, "service:manage")).toBe(false);
   });
 
   it("gives every foxer type payouts:onboard, and investor too since revenue-share payouts", () => {
-    for (const r of [
-      "venueFoxer",
-      "eventFoxer",
-      "gearFoxer",
-      "serviceFoxer",
-      "performerFoxer",
-      "providerFoxer",
-      "investor",
-    ]) {
+    for (const r of ["venueFoxer", "eventFoxer", "providerFoxer", "investor"]) {
       expect(can({ roleType: [r] }, "payouts:onboard")).toBe(true);
     }
   });
@@ -209,21 +195,12 @@ describe("the supply side", () => {
     );
   });
 
-  it("gives service/gear foxers their own bid-submission permission only", () => {
-    expect(can({ roleType: ["serviceFoxer"] }, "bid:submit-service")).toBe(
-      true,
-    );
-    expect(can({ roleType: ["serviceFoxer"] }, "bid:submit-asset")).toBe(false);
-    expect(can({ roleType: ["gearFoxer"] }, "bid:submit-asset")).toBe(true);
-    expect(can({ roleType: ["gearFoxer"] }, "bid:submit-service")).toBe(false);
-    // performerFoxer items ride the same EventTemplateService/EventServiceBid
-    // path as serviceFoxer items, so it shares bid:submit-service.
-    expect(can({ roleType: ["performerFoxer"] }, "bid:submit-service")).toBe(
-      true,
-    );
-    expect(can({ roleType: ["performerFoxer"] }, "bid:submit-asset")).toBe(
-      false,
-    );
+  it("grants the retired supply roles nothing", () => {
+    // gearFoxer, serviceFoxer and performerFoxer were folded into
+    // providerFoxer (#273); a stale value on a session must not grant.
+    for (const r of ["gearFoxer", "serviceFoxer", "performerFoxer"]) {
+      expect(permissionsForUser({ roleType: [r] })).toEqual([]);
+    }
   });
 
   it("gives eventFoxer bid:manage for both bid types", () => {

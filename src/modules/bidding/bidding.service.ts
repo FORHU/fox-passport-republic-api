@@ -86,13 +86,9 @@ export default class BiddingSvc {
       where: { id: data.providerId },
     });
     if (!provider) throw new Error("Provider not found");
-    if (
-      !provider.roleType.includes("serviceFoxer") &&
-      !provider.roleType.includes("performerFoxer") &&
-      !provider.roleType.includes("providerFoxer")
-    ) {
+    if (!provider.roleType.includes("providerFoxer")) {
       throw new Error(
-        "Unauthorized: you must have the Talent Foxer capability to submit a service bid",
+        "Unauthorized: you must be a Provider to submit a service bid",
       );
     }
 
@@ -262,12 +258,9 @@ export default class BiddingSvc {
       where: { id: data.providerId },
     });
     if (!provider) throw new Error("Provider not found");
-    if (
-      !provider.roleType.includes("gearFoxer") &&
-      !provider.roleType.includes("providerFoxer")
-    ) {
+    if (!provider.roleType.includes("providerFoxer")) {
       throw new Error(
-        "Unauthorized: you must have the Gear Foxer capability to submit an asset bid",
+        "Unauthorized: you must be a Provider to submit an asset bid",
       );
     }
 

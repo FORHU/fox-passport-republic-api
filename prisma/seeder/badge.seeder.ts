@@ -52,7 +52,7 @@ const badges = [
     icon: "trending_up",
     color: "#f59e0b",
     rarity: BadgeRarity.Legendary,
-    path: UserPath.gearFoxer,
+    path: UserPath.providerFoxer,
     criteria: null,
   },
   {
@@ -79,7 +79,7 @@ const badges = [
     icon: "diversity_3",
     color: "#3b82f6",
     rarity: BadgeRarity.Rare,
-    path: UserPath.gearFoxer,
+    path: UserPath.providerFoxer,
     criteria: "connections:100",
   },
   {
@@ -97,7 +97,7 @@ const badges = [
     icon: "hotel_class",
     color: "#f59e0b",
     rarity: BadgeRarity.Legendary,
-    path: UserPath.gearFoxer,
+    path: UserPath.providerFoxer,
     criteria: null,
   },
   {
@@ -124,7 +124,7 @@ const badges = [
     icon: "campaign",
     color: "#f97316",
     rarity: BadgeRarity.Legendary,
-    path: UserPath.gearFoxer,
+    path: UserPath.providerFoxer,
     criteria: "platform_attendees:500",
   },
   {

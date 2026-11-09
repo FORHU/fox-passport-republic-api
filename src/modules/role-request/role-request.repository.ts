@@ -71,33 +71,6 @@ export default class RoleRequestRepo {
             portfolioFile: true,
           },
         },
-        gearFoxerApplication: {
-          include: {
-            validId1: true,
-            nbiFile: true,
-            tinIdFile: true,
-            birPermitFile: true,
-            selfieFile: true,
-          },
-        },
-        serviceFoxerApplication: {
-          include: {
-            validId1: true,
-            nbiFile: true,
-            tinIdFile: true,
-            birPermitFile: true,
-            selfieFile: true,
-          },
-        },
-        performerFoxerApplication: {
-          include: {
-            validId1: true,
-            nbiFile: true,
-            tinIdFile: true,
-            birPermitFile: true,
-            selfieFile: true,
-          },
-        },
         providerFoxerApplication: {
           include: {
             validId1: true,
@@ -128,9 +101,6 @@ export default class RoleRequestRepo {
       include: {
         venueFoxerApplication: true,
         eventFoxerApplication: true,
-        gearFoxerApplication: true,
-        serviceFoxerApplication: true,
-        performerFoxerApplication: true,
         providerFoxerApplication: true,
         investorApplication: { include: { proofOfFunds: true } },
         organizerApplication: true,
@@ -164,33 +134,6 @@ export default class RoleRequestRepo {
             birPermitFile: true,
             selfieFile: true,
             portfolioFile: true,
-          },
-        },
-        gearFoxerApplication: {
-          include: {
-            validId1: true,
-            nbiFile: true,
-            tinIdFile: true,
-            birPermitFile: true,
-            selfieFile: true,
-          },
-        },
-        serviceFoxerApplication: {
-          include: {
-            validId1: true,
-            nbiFile: true,
-            tinIdFile: true,
-            birPermitFile: true,
-            selfieFile: true,
-          },
-        },
-        performerFoxerApplication: {
-          include: {
-            validId1: true,
-            nbiFile: true,
-            tinIdFile: true,
-            birPermitFile: true,
-            selfieFile: true,
           },
         },
         providerFoxerApplication: {

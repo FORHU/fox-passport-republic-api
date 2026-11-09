@@ -27,9 +27,6 @@ enum ComponentType {
 enum RoleType {
   venueFoxer
   eventFoxer
-  gearFoxer
-  serviceFoxer
-  performerFoxer
   investor
   organizer
   providerFoxer

@@ -24,7 +24,7 @@ describe("AvailabilitySvc — locking and cross-flow conflict detection", () => 
         email: `avail_owner_${runId}@test.com`,
         password: "pw",
         name: "Owner",
-        roleType: ["gearFoxer"],
+        roleType: ["providerFoxer"],
       },
     });
     const customer = await prisma.user.create({

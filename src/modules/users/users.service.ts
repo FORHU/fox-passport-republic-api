@@ -1,5 +1,6 @@
 import UsersRepo from "./users.repository";
 import { RoleType, SystemRole } from "@prisma/client";
+import { toRoleTypes } from "../../utils/enums";
 import { hashPassword } from "../../utils/password";
 import { userCache } from "../../utils/cache-namespaces";
 import { fingerprint } from "../../utils/cache.util";
@@ -46,7 +47,8 @@ export default class UsersSvc {
   }
 
   // GET FOXERS (public listing, optionally filtered by roleType, specialization, city)
-  // roleType may be a single value or a comma-separated list (e.g. "serviceFoxer,gearFoxer")
+  // roleType may be a single value or a comma-separated list (e.g. "providerFoxer,venueFoxer");
+  // retired supply roles map to providerFoxer and unknown values are dropped.
   static async getFoxers(
     limit = 9,
     page = 1,
@@ -57,10 +59,7 @@ export default class UsersSvc {
     search?: string,
   ) {
     const roleTypes = roleType
-      ? (roleType
-          .split(",")
-          .map((r) => r.trim())
-          .filter(Boolean) as RoleType[])
+      ? toRoleTypes(roleType.split(",").map((r) => r.trim()))
       : undefined;
     return userCache.cached(
       `foxers:${fingerprint({ limit, page, roleTypes, specialization, city, maxPrice, search })}`,

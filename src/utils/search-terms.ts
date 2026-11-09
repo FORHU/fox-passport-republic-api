@@ -51,8 +51,19 @@ export function roleTypesMatching(q: unknown): RoleType[] {
   const term = q.toLowerCase().replace(/[\s_-]+/g, "");
   if (term.length < 3) return [];
   const terms = term.endsWith("s") ? [term, term.slice(0, -1)] : [term];
-  return (Object.values(RoleType) as RoleType[]).filter((role) => {
+  const matched = (Object.values(RoleType) as RoleType[]).filter((role) => {
     const name = role.toLowerCase();
     return terms.some((t) => name === t || name === `${t}foxer`);
   });
+  // Gear, Service (Talent) and Performer Foxer were folded into Provider;
+  // their old names still find Providers.
+  if (
+    !matched.includes(RoleType.providerFoxer) &&
+    terms.some((t) => PROVIDER_ALIASES.includes(t.replace(/foxer$/, "")))
+  ) {
+    matched.push(RoleType.providerFoxer);
+  }
+  return matched;
 }
+
+const PROVIDER_ALIASES = ["gear", "service", "talent", "performer"];

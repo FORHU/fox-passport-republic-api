@@ -109,15 +109,15 @@ export const PERMISSIONS = [
 export type Permission = (typeof PERMISSIONS)[number];
 
 /**
- * Which `ServiceCategory` values are owned by `performerFoxer` rather than
- * `serviceFoxer`. This list — not a schema flag — is what answers "is this
- * category performer-owned," at every ownership/XP/review call site that
- * used to hardcode `serviceFoxer` for every `Service` row.
+ * Which `ServiceCategory` values are performer categories, managed under
+ * `performer:manage` rather than `service:manage`. This list — not a schema
+ * flag — is what answers "is this category performer-owned" at every
+ * ownership call site. (Both permissions belong to `providerFoxer`; the
+ * separate performerFoxer and serviceFoxer roles were retired.)
  *
- * `entertainment` is included for the sake of existing rows (paused by the
- * `20260914120000_add_performer_foxer_role` migration until their owner is
- * approved as `performerFoxer`) but is not offered as a category for new
- * listings — new performer supply uses the granular values below.
+ * `entertainment` is included for the sake of existing rows but is not
+ * offered as a category for new listings — new performer supply uses the
+ * granular values below.
  */
 export const PERFORMER_SERVICE_CATEGORIES: readonly ServiceCategory[] = [
   "entertainment",
@@ -132,16 +132,6 @@ export const isPerformerServiceCategory = (
   category: ServiceCategory,
 ): boolean =>
   (PERFORMER_SERVICE_CATEGORIES as readonly string[]).includes(category);
-
-/** The `RoleType`/`UserPath` a `Service` row's provider should resolve to,
- * given its category — `performerFoxer` for performer categories,
- * `serviceFoxer` otherwise. Centralizes the branch used by ownership checks,
- * XP awards on approval/booking-completion, and review-bonus resolution, so
- * it isn't reimplemented at each call site. */
-export const resolveServiceProviderRole = (
-  category: ServiceCategory,
-): Extract<RoleType, "serviceFoxer" | "performerFoxer"> =>
-  isPerformerServiceCategory(category) ? "performerFoxer" : "serviceFoxer";
 
 /**
  * What an Appointment lets someone do on one Event or Venue — see
@@ -305,28 +295,6 @@ const GRANTS: Record<SystemRole, readonly Permission[]> = {
  */
 const ROLE_TYPE_GRANTS: Record<RoleType, readonly Permission[]> = {
   venueFoxer: ["venue:manage", "payouts:onboard", "promotions:manage-own"],
-  gearFoxer: [
-    "asset:manage",
-    "payouts:onboard",
-    "bid:submit-asset",
-    "promotions:manage-own",
-  ],
-  serviceFoxer: [
-    "service:manage",
-    "payouts:onboard",
-    "bid:submit-service",
-    "promotions:manage-own",
-  ],
-  // Owns performer-category Service rows (see PERFORMER_SERVICE_CATEGORIES
-  // below) — a subset of the same `Service` model serviceFoxer owns, not a
-  // separate catalog entity. Shares `bid:submit-service` since performer
-  // items ride the same EventTemplateService/EventServiceBid path.
-  performerFoxer: [
-    "performer:manage",
-    "payouts:onboard",
-    "bid:submit-service",
-    "promotions:manage-own",
-  ],
   eventFoxer: [
     "template:manage",
     "booking:check-in",
