@@ -7,22 +7,31 @@ import {
 import PricingSvc from "../pricing/pricing.service";
 import { badRequest, notFound } from "../../utils/errors";
 import { END_BEFORE_START_MESSAGE } from "../../utils/validation";
+import {
+  EVENT_ITEM_TRANSACTION_TYPE,
+  EVENT_ITEM_TYPES,
+  eventItemRuleProblem,
+} from "../pricing/event-item-fee";
 
 /**
- * Not a Prisma enum — `PlatformFeeConfig.transactionType` is a free string,
- * matching every real caller of `PricingSvc.resolvePricingRule`
- * (`event-checkout.service.ts`, `partnership-checkout.service.ts`), which
- * only ever pass one of these two literals today. Extend this list
+ * Not a Prisma enum — `PlatformFeeConfig.transactionType` is a free string.
+ * `event` and `sponsorship` are what the `PricingSvc.resolvePricingRule`
+ * callers pass (`event-checkout.service.ts`, `partnership-checkout.service.ts`).
+ * `event_item` is read only by `PricingSvc.resolveEventItemFeeRates`, which
+ * ignores every other type, including rules with none. Extend this list
  * alongside any new caller that introduces a new transaction source.
  */
-export const KNOWN_TRANSACTION_TYPES = ["event", "sponsorship"] as const;
+export const KNOWN_TRANSACTION_TYPES = [
+  "event",
+  "sponsorship",
+  // FoxPassport fee on each Foxer line of an Event (#264). Its category is the
+  // item type and its subcategory the listing's category; see event-item-fee.ts.
+  EVENT_ITEM_TRANSACTION_TYPE,
+] as const;
 
 /**
- * The only category domain that actually flows into `PricingContext` today
- * — confirmed by grep of every `resolvePricingRule` caller, all of which
- * pass `EventCategory` values. `AssetCategory`/`VenueCategory` exist in the
- * schema but are unused as field types anywhere, so they're deliberately
- * not offered here.
+ * The categories an `event`/`sponsorship` rule can name: `EventCategory`
+ * values, which is what their `resolvePricingRule` callers pass.
  */
 export const KNOWN_CATEGORIES = [
   "corporate",
@@ -30,6 +39,12 @@ export const KNOWN_CATEGORIES = [
   "wedding",
   "social",
   "other",
+] as const;
+
+/** Every category a rule can name: Event categories, or Event line item types. */
+export const ALL_RULE_CATEGORIES = [
+  ...KNOWN_CATEGORIES,
+  ...EVENT_ITEM_TYPES,
 ] as const;
 
 interface FeeRuleInput {
@@ -56,6 +71,19 @@ function assertValidRule(data: FeeRuleInput) {
     data.effectiveUntil <= data.effectiveFrom
   ) {
     throw badRequest(END_BEFORE_START_MESSAGE);
+  }
+  const eventItemProblem = eventItemRuleProblem(data);
+  if (eventItemProblem) throw badRequest(eventItemProblem);
+  // An Event line item type only means something on an `event_item` rule; on
+  // any other rule it would never match a real caller.
+  if (
+    data.transactionType !== EVENT_ITEM_TRANSACTION_TYPE &&
+    data.category != null &&
+    (EVENT_ITEM_TYPES as readonly string[]).includes(data.category)
+  ) {
+    throw badRequest(
+      `The category "${data.category}" is an Event line item type. Set the transaction type to "${EVENT_ITEM_TRANSACTION_TYPE}".`,
+    );
   }
 }
 
@@ -113,6 +141,15 @@ export default class PlatformFeeConfigSvc {
     // `effectiveFrom`, and clearing both fee fields must still be caught.
     const merged: FeeRuleInput = {
       name: data.name ?? existing.name,
+      transactionType:
+        data.transactionType !== undefined
+          ? data.transactionType
+          : existing.transactionType,
+      category: data.category !== undefined ? data.category : existing.category,
+      subcategory:
+        data.subcategory !== undefined
+          ? data.subcategory
+          : existing.subcategory,
       percentage:
         data.percentage !== undefined
           ? data.percentage
@@ -156,13 +193,23 @@ export default class PlatformFeeConfigSvc {
     return listAuditForTarget(id);
   }
 
-  /** Which rule would currently win for this context — same resolver Central Payment checkout uses. */
+  /**
+   * Which rule would currently win for this context, from the same resolver
+   * checkout uses: `resolveEventItemFeeRule` for Event lines (null means
+   * checkout would refuse the line), `resolvePricingRule` otherwise.
+   */
   static async preview(context: {
     transactionType: string;
     category?: string;
     subcategory?: string;
   }) {
-    const rule = await PricingSvc.resolvePricingRule(context);
+    const rule =
+      context.transactionType === EVENT_ITEM_TRANSACTION_TYPE
+        ? await PricingSvc.resolveEventItemFeeRule({
+            itemType: context.category,
+            listingCategory: context.subcategory,
+          })
+        : await PricingSvc.resolvePricingRule(context);
     return rule ? toApi(rule) : null;
   }
 }

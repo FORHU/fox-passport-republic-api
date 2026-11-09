@@ -1,5 +1,6 @@
 export * from "./user.seeder";
 export * from "./cancellation-policy.seeder";
+export * from "./platform-fee.seeder";
 export * from "./venue.seeder";
 export * from "./international-venue.seeder";
 export * from "./asset.seeder";
