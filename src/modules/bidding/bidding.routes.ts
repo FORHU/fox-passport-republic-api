@@ -22,7 +22,7 @@ router.get(
   BiddingCtrl.getServiceBidsForEvent,
 );
 
-// POST /v1/bids/service (Talent Foxer submits a bid)
+// POST /v1/bids/service (a Provider submits a service bid)
 router.post(
   "/service",
   authenticate,
@@ -49,7 +49,7 @@ router.get(
   BiddingCtrl.getAssetBidsForEvent,
 );
 
-// POST /v1/bids/asset (Gear Foxer submits a bid)
+// POST /v1/bids/asset (a Provider submits an asset bid)
 router.post(
   "/asset",
   authenticate,

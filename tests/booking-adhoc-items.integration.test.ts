@@ -30,7 +30,7 @@ describe("BookingSvc.addAdHocItem — ad-hoc marketplace item add, authorization
         email: `adhoc_provider_${runId}@test.com`,
         password: "pw",
         name: "Provider",
-        roleType: ["gearFoxer"],
+        roleType: ["providerFoxer"],
       },
     });
     const stranger = await prisma.user.create({

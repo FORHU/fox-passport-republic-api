@@ -5,7 +5,7 @@ import { totalPages } from "../../utils/pagination";
 
 export default class SearchCtrl {
   // GET /v1/search?location=<city>&category=<cat>
-  // Returns event templates, Equipment Foxers, and Talent Foxers relevant to the
+  // Returns event templates and Providers (gear, services, performers) relevant to the
   // location (+ optional category) entered by the user.
   static async search(req: Request, res: Response) {
     try {

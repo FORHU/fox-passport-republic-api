@@ -10,7 +10,10 @@ import { PERFORMER_SERVICE_CATEGORIES } from "../../types/permissions";
 
 export default class SearchRepo {
   // Aggregate discovery search: given a location (city) and optional category,
-  // return event templates + Equipment Foxers + Talent Foxers (with their top items).
+  // return event templates + Providers in three sections, gear, services and
+  // performers, each with their top items of that kind. (The section keys
+  // keep their legacy gearFoxers/serviceFoxers/performerFoxers names, which
+  // web and mobile read.)
   static async searchByLocation(
     location?: string,
     category?: string,
@@ -34,15 +37,15 @@ export default class SearchRepo {
       ...(eventCategory && { category: eventCategory }),
     };
     const gearFoxerWhere = {
-      roleType: { hasSome: ["gearFoxer", "providerFoxer"] as RoleType[] },
+      roleType: { has: RoleType.providerFoxer },
       ...(cityFilter && { city: cityFilter }),
     };
     const serviceFoxerWhere = {
-      roleType: { hasSome: ["serviceFoxer", "providerFoxer"] as RoleType[] },
+      roleType: { has: RoleType.providerFoxer },
       ...(cityFilter && { city: cityFilter }),
     };
     const performerFoxerWhere = {
-      roleType: { hasSome: ["performerFoxer", "providerFoxer"] as RoleType[] },
+      roleType: { has: RoleType.providerFoxer },
       ...(cityFilter && { city: cityFilter }),
     };
     // A performer-category `category` param narrows the performer section to

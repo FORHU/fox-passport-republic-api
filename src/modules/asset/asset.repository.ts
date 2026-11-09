@@ -88,7 +88,7 @@ export default class AssetRepo {
         price: { lte: filters.maxPrice },
       }),
       owner: {
-        roleType: { hasSome: ["gearFoxer", "providerFoxer"] as RoleType[] },
+        roleType: { has: RoleType.providerFoxer },
         ...(ownerCity && {
           city: { contains: ownerCity, mode: "insensitive" as const },
         }),

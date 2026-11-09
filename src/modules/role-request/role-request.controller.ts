@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import RoleRequestService from "./role-request.service";
+import RoleRequestService, { retiredRoleError } from "./role-request.service";
 import FileSvc from "../file/file.service";
 import { signPrivateFiles } from "../../utils/private-files";
 import {
@@ -94,6 +94,12 @@ export default class RoleRequestController {
         return res
           .status(401)
           .json({ success: false, message: "Unauthorized" });
+      // A retired role gets a pointer to Provider, not "Invalid role type".
+      // Checked before any document is stored.
+      const retired = retiredRoleError(roleType);
+      if (retired) {
+        return res.status(400).json({ success: false, message: retired });
+      }
       if (!roleType || !Object.values(RoleType).includes(roleType)) {
         return res
           .status(400)
@@ -131,32 +137,6 @@ export default class RoleRequestController {
         });
       }
 
-      if (
-        roleType === RoleType.serviceFoxer ||
-        roleType === RoleType.performerFoxer
-      ) {
-        const experience = Number(data.experience);
-        if (
-          !Number.isInteger(experience) ||
-          experience < 0 ||
-          experience > 100
-        ) {
-          return res.status(400).json({
-            success: false,
-            message: "Years of experience must be between 0 and 100",
-          });
-        }
-        if (
-          typeof data.nbiClearanceIdNumber !== "string" ||
-          !/^\d{1,18}$/.test(data.nbiClearanceIdNumber)
-        ) {
-          return res.status(400).json({
-            success: false,
-            message: "NBI Clearance ID must be 1-18 digits",
-          });
-        }
-      }
-
       if (roleType === RoleType.providerFoxer) {
         if (
           data.experience !== undefined &&
@@ -188,13 +168,7 @@ export default class RoleRequestController {
       }
 
       if (
-        [
-          RoleType.serviceFoxer,
-          RoleType.gearFoxer,
-          RoleType.venueFoxer,
-          RoleType.performerFoxer,
-          RoleType.providerFoxer,
-        ].includes(roleType) &&
+        [RoleType.venueFoxer, RoleType.providerFoxer].includes(roleType) &&
         typeof data.tinNumber === "string" &&
         data.tinNumber.length > 0 &&
         !/^\d{1,9}$/.test(data.tinNumber)

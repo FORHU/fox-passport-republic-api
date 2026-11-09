@@ -53,10 +53,10 @@ describe("a Foxer's place on the leaderboard", () => {
 
   describe("pickLeaderboardRole", () => {
     it("takes the first board role they hold, in a fixed order", () => {
-      expect(pickLeaderboardRole(["gearFoxer", "venueFoxer"])).toBe(
+      expect(pickLeaderboardRole(["providerFoxer", "venueFoxer"])).toBe(
         "venueFoxer",
       );
-      expect(pickLeaderboardRole(["performerFoxer", "eventFoxer"])).toBe(
+      expect(pickLeaderboardRole(["providerFoxer", "eventFoxer"])).toBe(
         "eventFoxer",
       );
       expect(pickLeaderboardRole(["providerFoxer"])).toBe("providerFoxer");
@@ -85,19 +85,19 @@ describe("a Foxer's place on the leaderboard", () => {
   });
 
   it("asks for no city when they have none, and says so", async () => {
-    state.place = { city: "  ", roleType: ["gearFoxer"] };
+    state.place = { city: "  ", roleType: ["providerFoxer"] };
 
     const rep = await FoxerScoreService.getPublicReputation("f1");
 
     expect(getFoxerLeaderboard).toHaveBeenCalledWith(
       null,
       "top_rated",
-      "gearFoxer",
+      "providerFoxer",
       undefined,
     );
     expect(rep.leaderboard).toEqual({
       position: 2,
-      role: "gearFoxer",
+      role: "providerFoxer",
       city: null,
     });
   });

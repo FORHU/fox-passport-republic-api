@@ -394,7 +394,7 @@ export default class AssetBookingSvc {
           if (ownerId)
             return PassportSvc.awardXP(
               ownerId,
-              UserPath.gearFoxer,
+              UserPath.providerFoxer,
               XP_REWARDS.listingBooked,
             );
         })
@@ -404,7 +404,7 @@ export default class AssetBookingSvc {
           const assetId = booking.asset?.id ?? booking.assetId;
           const ownerId = booking.asset?.ownerId ?? booking.asset?.owner?.id;
           if (assetId && ownerId)
-            return SpecializationSvc.checkGearFoxer(assetId, ownerId);
+            return SpecializationSvc.checkProviderAsset(assetId, ownerId);
         })
         .catch(() => {});
     }

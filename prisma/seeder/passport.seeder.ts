@@ -23,15 +23,10 @@ const PERK_THRESHOLDS: Record<string, { level: number; perk: string }[]> = {
     { level: 8, perk: "venue_spotlight" },
     { level: 15, perk: "mayor_verified" },
   ],
-  [UserPath.gearFoxer]: [
-    { level: 1, perk: "gear_verified" },
+  [UserPath.providerFoxer]: [
+    { level: 1, perk: "provider_verified" },
     { level: 3, perk: "lower_fees" },
-    { level: 8, perk: "gear_featured" },
-  ],
-  [UserPath.serviceFoxer]: [
-    { level: 1, perk: "service_verified" },
-    { level: 3, perk: "service_lower_fees" },
-    { level: 8, perk: "service_featured" },
+    { level: 8, perk: "provider_featured" },
   ],
 };
 
@@ -70,30 +65,30 @@ const USER_PASSPORT_DATA: Record<string, PathXP[]> = {
   ],
   "servicefoxer@example.com": [
     { path: UserPath.user, totalXP: 1800 },
-    { path: UserPath.serviceFoxer, totalXP: 5200 },
+    { path: UserPath.providerFoxer, totalXP: 5200 },
   ],
   "gearfoxer@example.com": [
     { path: UserPath.user, totalXP: 2100 },
-    { path: UserPath.gearFoxer, totalXP: 7300 },
+    { path: UserPath.providerFoxer, totalXP: 7300 },
   ],
   "multirole@example.com": [
     { path: UserPath.user, totalXP: 4500 },
     { path: UserPath.eventFoxer, totalXP: 3200 },
     { path: UserPath.venueFoxer, totalXP: 2800 },
-    { path: UserPath.serviceFoxer, totalXP: 1900 },
+    { path: UserPath.providerFoxer, totalXP: 1900 },
   ],
   "user@example.com": [{ path: UserPath.user, totalXP: 1200 }],
   "jasmine.reyes@foxers.ph": [
     { path: UserPath.user, totalXP: 900 },
-    { path: UserPath.serviceFoxer, totalXP: 4100 },
+    { path: UserPath.providerFoxer, totalXP: 4100 },
   ],
   "marco.santos@foxers.ph": [
     { path: UserPath.user, totalXP: 700 },
-    { path: UserPath.serviceFoxer, totalXP: 2600 },
+    { path: UserPath.providerFoxer, totalXP: 2600 },
   ],
   "sarah.lim@foxers.ph": [
     { path: UserPath.user, totalXP: 1500 },
-    { path: UserPath.serviceFoxer, totalXP: 3800 },
+    { path: UserPath.providerFoxer, totalXP: 3800 },
   ],
 };
 

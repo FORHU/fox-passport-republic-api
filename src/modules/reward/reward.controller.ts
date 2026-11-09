@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { UserPath } from "@prisma/client";
 import { sendServerError, AppError } from "../../utils/errors";
+import { toUserPath } from "../../utils/enums";
 import RewardService from "./reward.service";
 
 export default class RewardCtrl {
@@ -12,10 +13,7 @@ export default class RewardCtrl {
     try {
       const userId = req.user!.userId;
       const pathParam = req.query.path as string | undefined;
-      const path =
-        pathParam && pathParam in UserPath
-          ? (pathParam as UserPath)
-          : UserPath.user;
+      const path = toUserPath(pathParam, UserPath.user);
 
       const wallet = await RewardService.getWallet(userId, path);
       return res.status(200).json({ success: true, data: wallet });
@@ -33,10 +31,7 @@ export default class RewardCtrl {
       const userId = req.user!.userId;
       const targetAudience = req.query.targetAudience as string | undefined;
       const pathParam = req.query.path as string | undefined;
-      const path =
-        pathParam && pathParam in UserPath
-          ? (pathParam as UserPath)
-          : UserPath.user;
+      const path = toUserPath(pathParam, UserPath.user);
 
       const catalog = await RewardService.getCatalog(
         userId,
@@ -62,10 +57,7 @@ export default class RewardCtrl {
         throw new AppError("rewardId is required", 400);
       }
 
-      const path =
-        pathParam && pathParam in UserPath
-          ? (pathParam as UserPath)
-          : UserPath.user;
+      const path = toUserPath(pathParam, UserPath.user);
 
       const result = await RewardService.redeem({
         userId,

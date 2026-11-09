@@ -35,13 +35,13 @@ describe("Progression Ranks & Rank-up Bonuses (Specification section 4.2)", () =
       expect(RewardService.calculateRank(5, UserPath.providerFoxer)).toBe(
         "Pro",
       );
-      expect(RewardService.calculateRank(10, UserPath.gearFoxer)).toBe(
+      expect(RewardService.calculateRank(10, UserPath.providerFoxer)).toBe(
         "Veteran",
       );
-      expect(RewardService.calculateRank(15, UserPath.serviceFoxer)).toBe(
+      expect(RewardService.calculateRank(15, UserPath.providerFoxer)).toBe(
         "Headliner",
       );
-      expect(RewardService.calculateRank(20, UserPath.performerFoxer)).toBe(
+      expect(RewardService.calculateRank(20, UserPath.providerFoxer)).toBe(
         "Maestro",
       );
       expect(RewardService.calculateRank(30, UserPath.organizer)).toBe("Icon");

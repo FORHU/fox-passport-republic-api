@@ -16,13 +16,30 @@ export type RoleApplicationData = Record<string, unknown> & {
 const APPLICATION_MODEL_BY_ROLE: Record<RoleType, string> = {
   [RoleType.venueFoxer]: "venueFoxerApplication",
   [RoleType.eventFoxer]: "eventFoxerApplication",
-  [RoleType.gearFoxer]: "gearFoxerApplication",
-  [RoleType.serviceFoxer]: "serviceFoxerApplication",
-  [RoleType.performerFoxer]: "performerFoxerApplication",
   [RoleType.investor]: "investorApplication",
   [RoleType.organizer]: "organizerApplication",
   [RoleType.providerFoxer]: "providerFoxerApplication",
 };
+
+/**
+ * Supply roles folded into `providerFoxer` (#228, #273) and removed from
+ * `RoleType`; every holder and application was moved to providerFoxer by the
+ * 20261109140000 migration. Older clients may still send one, so it gets a
+ * pointer to Provider instead of a bare "Invalid role type".
+ */
+export const RETIRED_APPLICATION_ROLES: readonly string[] = [
+  "gearFoxer",
+  "serviceFoxer",
+  "performerFoxer",
+];
+
+/** The reason an application for `roleType` is refused as retired, or null. */
+export function retiredRoleError(roleType: unknown): string | null {
+  return typeof roleType === "string" &&
+    RETIRED_APPLICATION_ROLES.includes(roleType)
+    ? `New ${roleType} applications are closed. Apply for providerFoxer (Provider) instead.`
+    : null;
+}
 
 // Maps the document field names admins flag (and applicants resubmit) to the
 // application row's file FK column. Mirrors RoleRequestController's
@@ -72,6 +89,9 @@ export default class RoleRequestService {
     roleType: RoleType,
     applicationData: RoleApplicationData,
   ) {
+    const retired = retiredRoleError(roleType);
+    if (retired) throw new Error(retired);
+
     // 1. Check if user already has this role
     const user = await UsersRepo.findUserById(userId);
     if (!user) throw new Error("User not found");
@@ -150,10 +170,15 @@ export default class RoleRequestService {
 
       // 3. If approved, grant the role and copy declared specializations
       if (status === RequestStatus.approved) {
-        await tx.user.update({
-          where: { id: request.userId },
-          data: { roleType: { push: request.roleType } },
-        });
+        // Grant the role once. Two open applications can end up for the same
+        // role (two legacy supply applications both became providerFoxer), and
+        // approving the second must not list the role twice.
+        if (!request.user.roleType.includes(request.roleType)) {
+          await tx.user.update({
+            where: { id: request.userId },
+            data: { roleType: { push: request.roleType } },
+          });
+        }
 
         const appKey = `${request.roleType}Application` as keyof typeof request;
         const app = request[appKey] as { specializations?: string[] } | null;

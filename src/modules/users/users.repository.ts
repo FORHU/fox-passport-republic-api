@@ -141,9 +141,6 @@ export default class UsersRepo {
     search?: string,
   ) {
     const allFoxerRoles: RoleType[] = [
-      "serviceFoxer",
-      "performerFoxer",
-      "gearFoxer",
       "providerFoxer",
       "eventFoxer",
       "venueFoxer",
@@ -338,14 +335,7 @@ export default class UsersRepo {
       where: {
         id,
         roleType: {
-          hasSome: [
-            "serviceFoxer",
-            "performerFoxer",
-            "gearFoxer",
-            "providerFoxer",
-            "eventFoxer",
-            "venueFoxer",
-          ] as RoleType[],
+          hasSome: ["providerFoxer", "eventFoxer", "venueFoxer"] as RoleType[],
         },
       },
       select: {

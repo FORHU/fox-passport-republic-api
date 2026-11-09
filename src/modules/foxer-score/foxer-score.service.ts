@@ -50,14 +50,7 @@ export interface PublicFoxerProfileReputation {
  * The role whose board a Foxer is placed on, when they hold several: the first
  * of these they have. Null for someone who holds none of them.
  */
-const BOARD_ROLES = [
-  "venueFoxer",
-  "eventFoxer",
-  "gearFoxer",
-  "serviceFoxer",
-  "performerFoxer",
-  "providerFoxer",
-] as const;
+const BOARD_ROLES = ["venueFoxer", "eventFoxer", "providerFoxer"] as const;
 
 export function pickLeaderboardRole(
   roleTypes: readonly string[],
