@@ -35,6 +35,26 @@ const reviewCache = versionedCache("review");
  */
 const REVIEW_TTL = 120;
 
+const SUB_RATING_FIELDS = [
+  "quality",
+  "communication",
+  "value",
+  "punctuality",
+] as const;
+
+function validateSubRating(
+  field: string,
+  val: unknown,
+): number | null | undefined {
+  if (val === undefined) return undefined;
+  if (val === null) return null;
+  const num = Number(val);
+  if (!Number.isInteger(num) || num < 1 || num > 5) {
+    throw new Error(`${field} rating must be an integer between 1 and 5`);
+  }
+  return num;
+}
+
 export default class ReviewSvc {
   /**
    * A review requires the booking it is about.
@@ -62,6 +82,10 @@ export default class ReviewSvc {
     entityType: string;
     rating: number;
     comment?: string;
+    quality?: number | null;
+    communication?: number | null;
+    value?: number | null;
+    punctuality?: number | null;
   }) {
     const bookingId = data.bookingId;
 
@@ -71,6 +95,16 @@ export default class ReviewSvc {
       throw new Error(
         "A review must name the booking it is about (bookingId is required).",
       );
+    }
+
+    const validatedSubRatings: Partial<
+      Record<(typeof SUB_RATING_FIELDS)[number], number | null>
+    > = {};
+    for (const field of SUB_RATING_FIELDS) {
+      const checked = validateSubRating(field, data[field]);
+      if (checked !== undefined) {
+        validatedSubRatings[field] = checked;
+      }
     }
 
     {
@@ -117,7 +151,11 @@ export default class ReviewSvc {
       );
     }
 
-    const review = await ReviewRepo.createReview({ ...data, bookingId });
+    const review = await ReviewRepo.createReview({
+      ...data,
+      ...validatedSubRatings,
+      bookingId,
+    });
     // Before the XP and notification side effects below, which are
     // fire-and-forget: a caller that reads straight back must not be told the
     // review it just wrote does not exist.
@@ -206,9 +244,11 @@ export default class ReviewSvc {
     return review;
   }
 
-  static async getAllReviews(includeReplies = false) {
-    return reviewCache.cached(`all:${includeReplies}`, REVIEW_TTL, () =>
-      ReviewRepo.getAllReviews(includeReplies),
+  static async getAllReviews(includeReplies = false, sort?: string) {
+    return reviewCache.cached(
+      `all:${includeReplies}:${sort || "recent"}`,
+      REVIEW_TTL,
+      () => ReviewRepo.getAllReviews(includeReplies, undefined, sort),
     );
   }
 
@@ -218,19 +258,29 @@ export default class ReviewSvc {
     );
   }
 
-  static async getVenueReviews(venueId: string, includeReplies = false) {
+  static async getVenueReviews(
+    venueId: string,
+    includeReplies = false,
+    sort?: string,
+  ) {
     return reviewCache.cached(
-      `venue:${venueId}:${includeReplies}`,
+      `venue:${venueId}:${includeReplies}:${sort || "recent"}`,
       REVIEW_TTL,
-      () => ReviewRepo.getVenueReviews(venueId, includeReplies),
+      () =>
+        ReviewRepo.getVenueReviews(venueId, includeReplies, undefined, sort),
     );
   }
 
-  static async getEventReviews(eventId: string, includeReplies = false) {
+  static async getEventReviews(
+    eventId: string,
+    includeReplies = false,
+    sort?: string,
+  ) {
     return reviewCache.cached(
-      `event:${eventId}:${includeReplies}`,
+      `event:${eventId}:${includeReplies}:${sort || "recent"}`,
       REVIEW_TTL,
-      () => ReviewRepo.getEventReviews(eventId, includeReplies),
+      () =>
+        ReviewRepo.getEventReviews(eventId, includeReplies, undefined, sort),
     );
   }
 
@@ -238,23 +288,40 @@ export default class ReviewSvc {
     targetId: string,
     targetType: string,
     includeReplies = false,
+    sort?: string,
   ) {
     return reviewCache.cached(
-      `target:${targetType}:${targetId}:${includeReplies}`,
+      `target:${targetType}:${targetId}:${includeReplies}:${sort || "recent"}`,
       REVIEW_TTL,
-      () => ReviewRepo.findByTarget(targetId, targetType, includeReplies),
+      () =>
+        ReviewRepo.findByTarget(
+          targetId,
+          targetType,
+          includeReplies,
+          undefined,
+          sort,
+        ),
     );
   }
 
-  static async getListingReviews(listingId: string, includeReplies = false) {
+  static async getListingReviews(
+    listingId: string,
+    includeReplies = false,
+    sort?: string,
+  ) {
     // The distribution is an aggregate over every review on the listing, which
     // makes this the most expensive read in the module and the one most worth
     // caching.
     return reviewCache.cached(
-      `listing:${listingId}:${includeReplies}`,
+      `listing:${listingId}:${includeReplies}:${sort || "recent"}`,
       REVIEW_TTL,
       () =>
-        ReviewRepo.getListingReviewsWithDistribution(listingId, includeReplies),
+        ReviewRepo.getListingReviewsWithDistribution(
+          listingId,
+          includeReplies,
+          undefined,
+          sort,
+        ),
     );
   }
 
@@ -345,18 +412,36 @@ export default class ReviewSvc {
     id: string;
     requesterId: string;
     requesterRole?: string;
-    data: Partial<{ rating: number; comment: string }>;
+    data: Partial<{
+      rating: number;
+      comment: string;
+      quality: number | null;
+      communication: number | null;
+      value: number | null;
+      punctuality: number | null;
+    }>;
   }) {
     const { id, requesterId, requesterRole, data } = params;
     await this.assertCanMutate(id, requesterId, requesterRole);
 
-    // Only these two fields are writable. The controller validates as well, but
-    // the repository spreads whatever it is handed straight into
-    // `prisma.review.update`, so narrowing here too means a future caller
-    // cannot reintroduce mass assignment by skipping the schema.
-    const patch: Partial<{ rating: number; comment: string }> = {};
+    // Narrow writable fields explicitly so a future caller cannot reintroduce
+    // mass assignment by skipping the schema.
+    const patch: Partial<{
+      rating: number;
+      comment: string;
+      quality: number | null;
+      communication: number | null;
+      value: number | null;
+      punctuality: number | null;
+    }> = {};
     if (data.rating !== undefined) patch.rating = data.rating;
     if (data.comment !== undefined) patch.comment = data.comment;
+    for (const field of SUB_RATING_FIELDS) {
+      const checked = validateSubRating(field, data[field]);
+      if (checked !== undefined) {
+        patch[field] = checked;
+      }
+    }
 
     const updated = await ReviewRepo.updateReview(id, patch);
     // `rating` feeds the listing distribution and the Earned Specialization
@@ -375,5 +460,70 @@ export default class ReviewSvc {
     const deleted = await ReviewRepo.deleteReview(id);
     await reviewCache.invalidateAll();
     return deleted;
+  }
+
+  /**
+   * Toggle a "Helpful" vote on a review.
+   *
+   * - Self-voting is rejected.
+   * - Adding a vote increments `helpfulCount` and awards the review author +2 XP
+   *   (0 Coins) via `RewardService.grant` (`action: "review_helpful"`), capped at
+   *   5 helpful votes (10 XP) per day.
+   * - Idempotency is keyed by `${reviewId}:${voterId}` so toggling a vote off and
+   *   on again does not grant duplicate XP.
+   */
+  static async toggleHelpfulVote(reviewId: string, voterId: string) {
+    const review = await prisma.review.findUnique({
+      where: { id: String(reviewId) },
+      select: { id: true, userId: true, helpfulCount: true },
+    });
+    if (!review) {
+      throw new Error("Review not found");
+    }
+    if (review.userId === String(voterId)) {
+      throw new Error("You cannot mark your own review as helpful");
+    }
+
+    const existingVote = await ReviewRepo.findHelpfulVote(reviewId, voterId);
+    if (existingVote) {
+      const updated = await ReviewRepo.removeHelpfulVote(reviewId, voterId);
+      await reviewCache.invalidateAll();
+      return {
+        helpful: false,
+        helpfulCount: Math.max(0, updated.helpfulCount),
+        xpAwarded: 0,
+      };
+    }
+
+    const updated = await ReviewRepo.addHelpfulVote(reviewId, voterId);
+    await reviewCache.invalidateAll();
+
+    let xpAwarded = 0;
+    try {
+      const { default: RewardService } =
+        await import("../reward/reward.service");
+      const { UserPath } = await import("../passport/passport.service");
+      const grantResult = await RewardService.grant({
+        userId: review.userId,
+        path: UserPath.user,
+        action: "review_helpful",
+        refType: "review_helpful",
+        refId: `${reviewId}:${voterId}`,
+        idempotencyKey: `grant:${review.userId}:review_helpful:${reviewId}:${voterId}`,
+        xpOverride: 2,
+        coinsOverride: 0,
+      });
+      if (!grantResult.isIdempotentReplay) {
+        xpAwarded = grantResult.xpAwarded;
+      }
+    } catch {
+      // Non-blocking if reward grant fails
+    }
+
+    return {
+      helpful: true,
+      helpfulCount: updated.helpfulCount,
+      xpAwarded,
+    };
   }
 }

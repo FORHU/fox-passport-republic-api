@@ -41,6 +41,743 @@ const VENUE_IDS = {
   loft: "seed-venue-the-loft-bgc",
 };
 
+// ── Bulk event templates for pagination testing ──────────────────────────
+// Each entry has its own cover photo so search results never show the same
+// picture on two packages. Keep in sync with the
+// 20261107120000_unique_bulk_template_covers migration (tests/bulk-template-covers.spec.ts).
+export const BULK_TEMPLATE_DEFS: {
+  suffix: string;
+  name: string;
+  desc: string;
+  category: EventCategory;
+  city: string;
+  state: string;
+  cover: string;
+}[] = [
+  {
+    suffix: "beach-wedding",
+    name: "Beach Wedding Bliss",
+    desc: "A stunning beachfront wedding experience with full coordination and decor.",
+    category: EventCategory.wedding,
+    city: "Boracay",
+    state: "Aklan",
+    cover:
+      "https://images.unsplash.com/photo-1537633552985-df8429e8048b?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "garden-birthday",
+    name: "Garden Birthday Fiesta",
+    desc: "Outdoor birthday party in a lush garden venue with catering and entertainment.",
+    category: EventCategory.birthday,
+    city: "Tagaytay",
+    state: "Cavite",
+    cover:
+      "https://images.unsplash.com/photo-1602631985686-1bb0e6a8696e?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "rooftop-social",
+    name: "Rooftop Social Night",
+    desc: "An elevated social gathering on a city rooftop with live music and cocktails.",
+    category: EventCategory.social,
+    city: "Makati",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "corp-summit",
+    name: "Leadership Summit Package",
+    desc: "Professional conference setup with AV, staging, and catering for 100+ attendees.",
+    category: EventCategory.corporate,
+    city: "Taguig",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1587825140708-dfaf72ae4b04?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "debut-party",
+    name: "Grand Debut Celebration",
+    desc: "A fairytale 18th birthday debut with full production, sound, and styling.",
+    category: EventCategory.birthday,
+    city: "Quezon City",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1535254973040-607b474cb50d?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "cebu-fiesta",
+    name: "Cebu Island Fiesta",
+    desc: "Traditional Filipino fiesta celebration with local cuisine, music, and dance.",
+    category: EventCategory.social,
+    city: "Cebu City",
+    state: "Cebu",
+    cover:
+      "https://images.unsplash.com/photo-1498931299472-f7a63a5a1cfa?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "davao-corp",
+    name: "Davao Business Convention",
+    desc: "Full-scale business convention with exhibit booths, keynote staging, and networking.",
+    category: EventCategory.corporate,
+    city: "Davao City",
+    state: "Davao del Sur",
+    cover:
+      "https://images.unsplash.com/photo-1544531586-fde5298cdd40?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "intimate-wedding",
+    name: "Intimate Wedding Package",
+    desc: "A cozy wedding celebration for 30 guests with curated decor and live acoustics.",
+    category: EventCategory.wedding,
+    city: "Antipolo",
+    state: "Rizal",
+    cover:
+      "https://images.unsplash.com/photo-1525772764200-be829a350797?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "pool-party",
+    name: "Pool Party Package",
+    desc: "Fun-filled pool party with DJ, inflatables, and poolside bar service.",
+    category: EventCategory.social,
+    city: "Manila",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1540541338287-41700207dee6?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "art-exhibit",
+    name: "Art & Culture Exhibit",
+    desc: "Gallery-style event with lighting, curation, and cocktail reception.",
+    category: EventCategory.other,
+    city: "Pasig",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1518998053901-5348d3961a04?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "holiday-gala",
+    name: "Holiday Gala Night",
+    desc: "Year-end gala dinner with formal setup, live band, and awards ceremony.",
+    category: EventCategory.corporate,
+    city: "Makati",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1531058020387-3be344556be6?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "outdoor-concert",
+    name: "Outdoor Concert Package",
+    desc: "Open-air concert setup with stage, sound system, lighting, and crowd management.",
+    category: EventCategory.other,
+    city: "Clark",
+    state: "Pampanga",
+    cover:
+      "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "kiddie-party",
+    name: "Kiddie Party Bundle",
+    desc: "Colorful kids' party with games, face painting, balloon twisting, and buffet.",
+    category: EventCategory.birthday,
+    city: "Manila",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "reunion-package",
+    name: "Family Reunion Package",
+    desc: "Large family gathering with activities, catering, and photo coverage.",
+    category: EventCategory.social,
+    city: "Laguna",
+    state: "Laguna",
+    cover:
+      "https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "product-launch",
+    name: "Product Launch Event",
+    desc: "Sleek product unveiling with media setup, stage design, and press kits.",
+    category: EventCategory.corporate,
+    city: "Taguig",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1560439513-74b037a25d84?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "sunset-dinner",
+    name: "Sunset Dinner Experience",
+    desc: "Seaside dinner event with live acoustic music and curated Filipino cuisine.",
+    category: EventCategory.other,
+    city: "La Union",
+    state: "La Union",
+    cover:
+      "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "music-festival",
+    name: "Mini Music Festival",
+    desc: "Multi-stage music event with food stalls, art installations, and VIP areas.",
+    category: EventCategory.other,
+    city: "Cebu City",
+    state: "Cebu",
+    cover:
+      "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop",
+  },
+
+  // ── Batch 2 (for pagination testing — page 2+) ─────────────────────
+  {
+    suffix: "corporate-manila-2",
+    name: "Board Meeting Manila",
+    desc: "Professional board meeting setup with projector and conference table.",
+    category: EventCategory.corporate,
+    city: "Manila",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1431540015161-0bf868a2d407?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "birthday-cebu-2",
+    name: "Fiesta Birthday Cebu",
+    desc: "Colorful birthday bash with local Cebuano flair and catering.",
+    category: EventCategory.birthday,
+    city: "Cebu City",
+    state: "Cebu",
+    cover:
+      "https://images.unsplash.com/photo-1496843916299-590492c751f4?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "wedding-davao-2",
+    name: "Sunset Wedding Davao",
+    desc: "Romantic sunset wedding at a Davao garden resort.",
+    category: EventCategory.wedding,
+    city: "Davao City",
+    state: "Davao del Sur",
+    cover:
+      "https://images.unsplash.com/photo-1607190074257-dd4b7af0309f?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "social-baguio-2",
+    name: "Bonfire Night Baguio",
+    desc: "Cozy outdoor bonfire gathering in the Baguio highlands.",
+    category: EventCategory.social,
+    city: "Baguio",
+    state: "Benguet",
+    cover:
+      "https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "other-clark-2",
+    name: "Team Building Clark",
+    desc: "Action-packed team building event at Clark Freeport.",
+    category: EventCategory.other,
+    city: "Clark",
+    state: "Pampanga",
+    cover:
+      "https://images.unsplash.com/photo-1470753323753-3f8091bb0232?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "corporate-davao-2",
+    name: "Sales Kickoff Davao",
+    desc: "High-energy sales kickoff with AV and stage setup.",
+    category: EventCategory.corporate,
+    city: "Davao City",
+    state: "Davao del Sur",
+    cover:
+      "https://images.unsplash.com/photo-1560523159-4a9692d222ef?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "birthday-manila-2",
+    name: "First Birthday Manila",
+    desc: "Adorable first birthday celebration with themed decor.",
+    category: EventCategory.birthday,
+    city: "Manila",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1558636508-e0db3814bd1d?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "wedding-cebu-2",
+    name: "Garden Wedding Cebu",
+    desc: "Lush garden wedding in a Cebu countryside estate.",
+    category: EventCategory.wedding,
+    city: "Cebu City",
+    state: "Cebu",
+    cover:
+      "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "social-makati-2",
+    name: "Rooftop Party Makati",
+    desc: "Vibrant rooftop party with skyline views and cocktails.",
+    category: EventCategory.social,
+    city: "Makati",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1516997121675-4c2d1684aa3e?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "other-cebu-2",
+    name: "Harvest Festival Cebu",
+    desc: "Community harvest festival with food stalls and entertainment.",
+    category: EventCategory.other,
+    city: "Cebu City",
+    state: "Cebu",
+    cover:
+      "https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "wedding-manila-2",
+    name: "Cathedral Wedding Manila",
+    desc: "Classic cathedral wedding in historic Intramuros.",
+    category: EventCategory.wedding,
+    city: "Manila",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1438032005730-c779502df39b?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "social-cebu-2",
+    name: "Beach Bonfire Cebu",
+    desc: "Relaxed beachside bonfire with acoustic music.",
+    category: EventCategory.social,
+    city: "Cebu City",
+    state: "Cebu",
+    cover:
+      "https://images.unsplash.com/photo-1475483768296-6163e08872a1?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "corporate-baguio-2",
+    name: "Strategy Retreat Baguio",
+    desc: "Executive strategy retreat with mountain lodge setup.",
+    category: EventCategory.corporate,
+    city: "Baguio",
+    state: "Benguet",
+    cover:
+      "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "birthday-makati-2",
+    name: "Quinceañera Makati",
+    desc: "Elegant 15th birthday celebration in a Makati ballroom.",
+    category: EventCategory.birthday,
+    city: "Makati",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1513278974582-3e1b4a4fa21e?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "other-manila-2",
+    name: "Film Screening Manila",
+    desc: "Private film screening event with red carpet setup.",
+    category: EventCategory.other,
+    city: "Manila",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "corporate-makati-2",
+    name: "Awards Night Makati",
+    desc: "Glamorous corporate awards night with dinner and show.",
+    category: EventCategory.corporate,
+    city: "Makati",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1578474846511-04ba529f0b88?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "birthday-cebu-3",
+    name: "Surprise Party Cebu",
+    desc: "Secret surprise party with full decoy setup and catering.",
+    category: EventCategory.birthday,
+    city: "Cebu City",
+    state: "Cebu",
+    cover:
+      "https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "wedding-baguio-2",
+    name: "Pine Forest Wedding Baguio",
+    desc: "Enchanting wedding among Benguet pine trees.",
+    category: EventCategory.wedding,
+    city: "Baguio",
+    state: "Benguet",
+    cover:
+      "https://images.unsplash.com/photo-1591604466107-ec97de577aff?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "social-clark-2",
+    name: "Music Festival Clark",
+    desc: "Multi-band outdoor music festival at Clark.",
+    category: EventCategory.social,
+    city: "Clark",
+    state: "Pampanga",
+    cover:
+      "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "other-davao-2",
+    name: "Food Fair Davao",
+    desc: "Gourmet food fair with tasting stations and demos.",
+    category: EventCategory.other,
+    city: "Davao City",
+    state: "Davao del Sur",
+    cover:
+      "https://images.unsplash.com/photo-1533900298318-6b8da08a523e?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "wedding-clark-2",
+    name: "Ranch Wedding Clark",
+    desc: "Rustic ranch-style wedding with open-air chapel.",
+    category: EventCategory.wedding,
+    city: "Clark",
+    state: "Pampanga",
+    cover:
+      "https://images.unsplash.com/photo-1546032996-6dfacbacbf3f?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "social-davao-2",
+    name: "Cultural Night Davao",
+    desc: "Celebration of Mindanao culture with performances and feasts.",
+    category: EventCategory.social,
+    city: "Davao City",
+    state: "Davao del Sur",
+    cover:
+      "https://images.unsplash.com/photo-1547153760-18fc86324498?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "corporate-cebu-2",
+    name: "Product Demo Cebu",
+    desc: "Product demonstration event with interactive booths.",
+    category: EventCategory.corporate,
+    city: "Cebu City",
+    state: "Cebu",
+    cover:
+      "https://images.unsplash.com/photo-1591115765373-5207764f72e7?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "birthday-baguio-2",
+    name: "Retirement Party Baguio",
+    desc: "Heartwarming retirement celebration in a Baguio café.",
+    category: EventCategory.birthday,
+    city: "Baguio",
+    state: "Benguet",
+    cover:
+      "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "other-makati-2",
+    name: "Art Auction Makati",
+    desc: "Charity art auction with gallery walkthrough and wine.",
+    category: EventCategory.other,
+    city: "Makati",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1531243269054-5ebf6f34081e?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "wedding-cebu-3",
+    name: "Cliffside Wedding Cebu",
+    desc: "Dramatic cliffside ceremony overlooking the Cebu sea.",
+    category: EventCategory.wedding,
+    city: "Cebu City",
+    state: "Cebu",
+    cover:
+      "https://images.unsplash.com/photo-1544078751-58fee2d8a03b?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "social-manila-2",
+    name: "Comedy Night Manila",
+    desc: "Stand-up comedy night with top Filipino comedians.",
+    category: EventCategory.social,
+    city: "Manila",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1527224857830-43a7acc85260?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "corporate-davao-3",
+    name: "Innovation Summit Davao",
+    desc: "Tech and innovation summit with demo pods and talks.",
+    category: EventCategory.corporate,
+    city: "Davao City",
+    state: "Davao del Sur",
+    cover:
+      "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "birthday-clark-2",
+    name: "Graduation Party Clark",
+    desc: "Graduation celebration with photo wall and buffet.",
+    category: EventCategory.birthday,
+    city: "Clark",
+    state: "Pampanga",
+    cover:
+      "https://images.unsplash.com/photo-1627556704290-2b1f5853ff78?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "other-clark-3",
+    name: "Holiday Market Clark",
+    desc: "Seasonal holiday market with artisan stalls and caroling.",
+    category: EventCategory.other,
+    city: "Clark",
+    state: "Pampanga",
+    cover:
+      "https://images.unsplash.com/photo-1543589077-47d81606c1bf?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "wedding-manila-3",
+    name: "Garden Wedding Manila",
+    desc: "Romantic garden wedding in Manila's botanical park.",
+    category: EventCategory.wedding,
+    city: "Manila",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1529636798458-92182e662485?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "social-cebu-3",
+    name: "Fiesta Night Cebu",
+    desc: "Traditional Cebuano fiesta with lechon and Sinulog dance.",
+    category: EventCategory.social,
+    city: "Cebu City",
+    state: "Cebu",
+    cover:
+      "https://images.unsplash.com/photo-1439539698758-ba2680ecadb9?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "corporate-davao-4",
+    name: "Tech Conference Davao",
+    desc: "Multi-track tech conference with breakout sessions.",
+    category: EventCategory.corporate,
+    city: "Davao City",
+    state: "Davao del Sur",
+    cover:
+      "https://images.unsplash.com/photo-1561489413-985b06da5bee?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "birthday-baguio-3",
+    name: "Kiddie Party Baguio",
+    desc: "Fun-filled kids' party at a Baguio playground venue.",
+    category: EventCategory.birthday,
+    city: "Baguio",
+    state: "Benguet",
+    cover:
+      "https://images.unsplash.com/photo-1471286174890-9c112ffca5b4?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "other-manila-3",
+    name: "Art Exhibit Manila",
+    desc: "Contemporary art exhibit with gallery openings.",
+    category: EventCategory.other,
+    city: "Manila",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1515187029135-18ee286d815b?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "corporate-makati-3",
+    name: "Product Launch Makati",
+    desc: "High-profile product launch with media coverage.",
+    category: EventCategory.corporate,
+    city: "Makati",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "social-makati-3",
+    name: "Rooftop Social Makati",
+    desc: "Chic rooftop social with cocktails and skyline views.",
+    category: EventCategory.social,
+    city: "Makati",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "wedding-davao-3",
+    name: "Rustic Wedding Davao",
+    desc: "Rustic barn wedding with farm-to-table catering.",
+    category: EventCategory.wedding,
+    city: "Davao City",
+    state: "Davao del Sur",
+    cover:
+      "https://images.unsplash.com/photo-1510076857177-7470076d4098?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "birthday-manila-3",
+    name: "Debut Manila",
+    desc: "Elegant 18th birthday debut with live band.",
+    category: EventCategory.birthday,
+    city: "Manila",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "other-baguio-2",
+    name: "Cultural Night Baguio",
+    desc: "Igorot cultural showcase with traditional dances.",
+    category: EventCategory.other,
+    city: "Baguio",
+    state: "Benguet",
+    cover:
+      "https://images.unsplash.com/photo-1504609813442-a8924e83f76e?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "corporate-clark-2",
+    name: "Business Summit Clark",
+    desc: "Regional business summit with keynote speakers.",
+    category: EventCategory.corporate,
+    city: "Clark",
+    state: "Pampanga",
+    cover:
+      "https://images.unsplash.com/photo-1561489396-888724a1543d?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "social-clark-3",
+    name: "Outdoor Concert Clark",
+    desc: "Open-air concert at Clark with multiple stages.",
+    category: EventCategory.social,
+    city: "Clark",
+    state: "Pampanga",
+    cover:
+      "https://images.unsplash.com/photo-1506157786151-b8491531f063?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "wedding-baguio-3",
+    name: "Mountain Wedding Baguio",
+    desc: "Scenic mountain wedding with panoramic Cordillera views.",
+    category: EventCategory.wedding,
+    city: "Baguio",
+    state: "Benguet",
+    cover:
+      "https://images.unsplash.com/photo-1532712938310-34cb3982ef74?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "birthday-davao-2",
+    name: "Debut Gala Davao",
+    desc: "Glamorous debut gala at a Davao waterfront hotel.",
+    category: EventCategory.birthday,
+    city: "Davao City",
+    state: "Davao del Sur",
+    cover:
+      "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "social-manila-3",
+    name: "Reunion Night Manila",
+    desc: "Nostalgic reunion night with OPM hits and karaoke.",
+    category: EventCategory.social,
+    city: "Manila",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "other-cebu-3",
+    name: "Food Festival Cebu",
+    desc: "Annual food festival with cooking demos and tastings.",
+    category: EventCategory.other,
+    city: "Cebu City",
+    state: "Cebu",
+    cover:
+      "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "corporate-baguio-3",
+    name: "Leadership Summit Baguio",
+    desc: "Executive leadership retreat in the Cordillera mountains.",
+    category: EventCategory.corporate,
+    city: "Baguio",
+    state: "Benguet",
+    cover:
+      "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "wedding-makati-2",
+    name: "Garden Wedding Makati",
+    desc: "Elegant garden wedding in a Makati courtyard.",
+    category: EventCategory.wedding,
+    city: "Makati",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1469371670807-013ccf25f16a?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "social-davao-3",
+    name: "Summer Social Davao",
+    desc: "Tropical summer poolside social with BBQ.",
+    category: EventCategory.social,
+    city: "Davao City",
+    state: "Davao del Sur",
+    cover:
+      "https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "birthday-clark-3",
+    name: "Sweet 16 Clark",
+    desc: "Sweet sixteen celebration with themed decor.",
+    category: EventCategory.birthday,
+    city: "Clark",
+    state: "Pampanga",
+    cover:
+      "https://images.unsplash.com/photo-1532117182044-031e7cd916ee?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "corporate-makati-4",
+    name: "Corporate Gala Makati",
+    desc: "Black-tie corporate gala with dinner and awards.",
+    category: EventCategory.corporate,
+    city: "Makati",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "other-baguio-3",
+    name: "Cultural Festival Baguio",
+    desc: "Panagbenga-inspired cultural festival event.",
+    category: EventCategory.other,
+    city: "Baguio",
+    state: "Benguet",
+    cover:
+      "https://images.unsplash.com/photo-1467307983825-619715426c70?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "wedding-cebu-4",
+    name: "Beach Wedding Cebu",
+    desc: "Tropical beach wedding with white sand and sunset.",
+    category: EventCategory.wedding,
+    city: "Cebu City",
+    state: "Cebu",
+    cover:
+      "https://images.unsplash.com/photo-1530023367847-a683933f4172?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "social-manila-4",
+    name: "Pool Party Manila",
+    desc: "Summer poolside bash with DJ and cocktails.",
+    category: EventCategory.social,
+    city: "Manila",
+    state: "Metro Manila",
+    cover:
+      "https://images.unsplash.com/photo-1596436889106-be35e843f974?w=800&auto=format&fit=crop",
+  },
+  {
+    suffix: "birthday-cebu-4",
+    name: "Fiesta Birthday Cebu 2",
+    desc: "Grand Cebuano birthday fiesta with lechon feast.",
+    category: EventCategory.birthday,
+    city: "Cebu City",
+    state: "Cebu",
+    cover:
+      "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&auto=format&fit=crop",
+  },
+];
+
 export async function seedEvents(prisma: PrismaClient, users: any[]) {
   try {
     console.log("Starting event seed...");
@@ -328,595 +1065,6 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
       }
     }
 
-    // ── Bulk event templates for pagination testing ──────────────────────────
-    const BULK_TEMPLATE_DEFS: {
-      suffix: string;
-      name: string;
-      desc: string;
-      category: EventCategory;
-      city: string;
-      state: string;
-    }[] = [
-      {
-        suffix: "beach-wedding",
-        name: "Beach Wedding Bliss",
-        desc: "A stunning beachfront wedding experience with full coordination and decor.",
-        category: EventCategory.wedding,
-        city: "Boracay",
-        state: "Aklan",
-      },
-      {
-        suffix: "garden-birthday",
-        name: "Garden Birthday Fiesta",
-        desc: "Outdoor birthday party in a lush garden venue with catering and entertainment.",
-        category: EventCategory.birthday,
-        city: "Tagaytay",
-        state: "Cavite",
-      },
-      {
-        suffix: "rooftop-social",
-        name: "Rooftop Social Night",
-        desc: "An elevated social gathering on a city rooftop with live music and cocktails.",
-        category: EventCategory.social,
-        city: "Makati",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "corp-summit",
-        name: "Leadership Summit Package",
-        desc: "Professional conference setup with AV, staging, and catering for 100+ attendees.",
-        category: EventCategory.corporate,
-        city: "Taguig",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "debut-party",
-        name: "Grand Debut Celebration",
-        desc: "A fairytale 18th birthday debut with full production, sound, and styling.",
-        category: EventCategory.birthday,
-        city: "Quezon City",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "cebu-fiesta",
-        name: "Cebu Island Fiesta",
-        desc: "Traditional Filipino fiesta celebration with local cuisine, music, and dance.",
-        category: EventCategory.social,
-        city: "Cebu City",
-        state: "Cebu",
-      },
-      {
-        suffix: "davao-corp",
-        name: "Davao Business Convention",
-        desc: "Full-scale business convention with exhibit booths, keynote staging, and networking.",
-        category: EventCategory.corporate,
-        city: "Davao City",
-        state: "Davao del Sur",
-      },
-      {
-        suffix: "intimate-wedding",
-        name: "Intimate Wedding Package",
-        desc: "A cozy wedding celebration for 30 guests with curated decor and live acoustics.",
-        category: EventCategory.wedding,
-        city: "Antipolo",
-        state: "Rizal",
-      },
-      {
-        suffix: "pool-party",
-        name: "Pool Party Package",
-        desc: "Fun-filled pool party with DJ, inflatables, and poolside bar service.",
-        category: EventCategory.social,
-        city: "Manila",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "art-exhibit",
-        name: "Art & Culture Exhibit",
-        desc: "Gallery-style event with lighting, curation, and cocktail reception.",
-        category: EventCategory.other,
-        city: "Pasig",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "holiday-gala",
-        name: "Holiday Gala Night",
-        desc: "Year-end gala dinner with formal setup, live band, and awards ceremony.",
-        category: EventCategory.corporate,
-        city: "Makati",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "outdoor-concert",
-        name: "Outdoor Concert Package",
-        desc: "Open-air concert setup with stage, sound system, lighting, and crowd management.",
-        category: EventCategory.other,
-        city: "Clark",
-        state: "Pampanga",
-      },
-      {
-        suffix: "kiddie-party",
-        name: "Kiddie Party Bundle",
-        desc: "Colorful kids' party with games, face painting, balloon twisting, and buffet.",
-        category: EventCategory.birthday,
-        city: "Manila",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "reunion-package",
-        name: "Family Reunion Package",
-        desc: "Large family gathering with activities, catering, and photo coverage.",
-        category: EventCategory.social,
-        city: "Laguna",
-        state: "Laguna",
-      },
-      {
-        suffix: "product-launch",
-        name: "Product Launch Event",
-        desc: "Sleek product unveiling with media setup, stage design, and press kits.",
-        category: EventCategory.corporate,
-        city: "Taguig",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "sunset-dinner",
-        name: "Sunset Dinner Experience",
-        desc: "Seaside dinner event with live acoustic music and curated Filipino cuisine.",
-        category: EventCategory.other,
-        city: "La Union",
-        state: "La Union",
-      },
-      {
-        suffix: "music-festival",
-        name: "Mini Music Festival",
-        desc: "Multi-stage music event with food stalls, art installations, and VIP areas.",
-        category: EventCategory.other,
-        city: "Cebu City",
-        state: "Cebu",
-      },
-
-      // ── Batch 2 (for pagination testing — page 2+) ─────────────────────
-      {
-        suffix: "corporate-manila-2",
-        name: "Board Meeting Manila",
-        desc: "Professional board meeting setup with projector and conference table.",
-        category: EventCategory.corporate,
-        city: "Manila",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "birthday-cebu-2",
-        name: "Fiesta Birthday Cebu",
-        desc: "Colorful birthday bash with local Cebuano flair and catering.",
-        category: EventCategory.birthday,
-        city: "Cebu City",
-        state: "Cebu",
-      },
-      {
-        suffix: "wedding-davao-2",
-        name: "Sunset Wedding Davao",
-        desc: "Romantic sunset wedding at a Davao garden resort.",
-        category: EventCategory.wedding,
-        city: "Davao City",
-        state: "Davao del Sur",
-      },
-      {
-        suffix: "social-baguio-2",
-        name: "Bonfire Night Baguio",
-        desc: "Cozy outdoor bonfire gathering in the Baguio highlands.",
-        category: EventCategory.social,
-        city: "Baguio",
-        state: "Benguet",
-      },
-      {
-        suffix: "other-clark-2",
-        name: "Team Building Clark",
-        desc: "Action-packed team building event at Clark Freeport.",
-        category: EventCategory.other,
-        city: "Clark",
-        state: "Pampanga",
-      },
-      {
-        suffix: "corporate-davao-2",
-        name: "Sales Kickoff Davao",
-        desc: "High-energy sales kickoff with AV and stage setup.",
-        category: EventCategory.corporate,
-        city: "Davao City",
-        state: "Davao del Sur",
-      },
-      {
-        suffix: "birthday-manila-2",
-        name: "First Birthday Manila",
-        desc: "Adorable first birthday celebration with themed decor.",
-        category: EventCategory.birthday,
-        city: "Manila",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "wedding-cebu-2",
-        name: "Garden Wedding Cebu",
-        desc: "Lush garden wedding in a Cebu countryside estate.",
-        category: EventCategory.wedding,
-        city: "Cebu City",
-        state: "Cebu",
-      },
-      {
-        suffix: "social-makati-2",
-        name: "Rooftop Party Makati",
-        desc: "Vibrant rooftop party with skyline views and cocktails.",
-        category: EventCategory.social,
-        city: "Makati",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "other-cebu-2",
-        name: "Harvest Festival Cebu",
-        desc: "Community harvest festival with food stalls and entertainment.",
-        category: EventCategory.other,
-        city: "Cebu City",
-        state: "Cebu",
-      },
-      {
-        suffix: "wedding-manila-2",
-        name: "Cathedral Wedding Manila",
-        desc: "Classic cathedral wedding in historic Intramuros.",
-        category: EventCategory.wedding,
-        city: "Manila",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "social-cebu-2",
-        name: "Beach Bonfire Cebu",
-        desc: "Relaxed beachside bonfire with acoustic music.",
-        category: EventCategory.social,
-        city: "Cebu City",
-        state: "Cebu",
-      },
-      {
-        suffix: "corporate-baguio-2",
-        name: "Strategy Retreat Baguio",
-        desc: "Executive strategy retreat with mountain lodge setup.",
-        category: EventCategory.corporate,
-        city: "Baguio",
-        state: "Benguet",
-      },
-      {
-        suffix: "birthday-makati-2",
-        name: "Quinceañera Makati",
-        desc: "Elegant 15th birthday celebration in a Makati ballroom.",
-        category: EventCategory.birthday,
-        city: "Makati",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "other-manila-2",
-        name: "Film Screening Manila",
-        desc: "Private film screening event with red carpet setup.",
-        category: EventCategory.other,
-        city: "Manila",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "corporate-makati-2",
-        name: "Awards Night Makati",
-        desc: "Glamorous corporate awards night with dinner and show.",
-        category: EventCategory.corporate,
-        city: "Makati",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "birthday-cebu-3",
-        name: "Surprise Party Cebu",
-        desc: "Secret surprise party with full decoy setup and catering.",
-        category: EventCategory.birthday,
-        city: "Cebu City",
-        state: "Cebu",
-      },
-      {
-        suffix: "wedding-baguio-2",
-        name: "Pine Forest Wedding Baguio",
-        desc: "Enchanting wedding among Benguet pine trees.",
-        category: EventCategory.wedding,
-        city: "Baguio",
-        state: "Benguet",
-      },
-      {
-        suffix: "social-clark-2",
-        name: "Music Festival Clark",
-        desc: "Multi-band outdoor music festival at Clark.",
-        category: EventCategory.social,
-        city: "Clark",
-        state: "Pampanga",
-      },
-      {
-        suffix: "other-davao-2",
-        name: "Food Fair Davao",
-        desc: "Gourmet food fair with tasting stations and demos.",
-        category: EventCategory.other,
-        city: "Davao City",
-        state: "Davao del Sur",
-      },
-      {
-        suffix: "wedding-clark-2",
-        name: "Ranch Wedding Clark",
-        desc: "Rustic ranch-style wedding with open-air chapel.",
-        category: EventCategory.wedding,
-        city: "Clark",
-        state: "Pampanga",
-      },
-      {
-        suffix: "social-davao-2",
-        name: "Cultural Night Davao",
-        desc: "Celebration of Mindanao culture with performances and feasts.",
-        category: EventCategory.social,
-        city: "Davao City",
-        state: "Davao del Sur",
-      },
-      {
-        suffix: "corporate-cebu-2",
-        name: "Product Demo Cebu",
-        desc: "Product demonstration event with interactive booths.",
-        category: EventCategory.corporate,
-        city: "Cebu City",
-        state: "Cebu",
-      },
-      {
-        suffix: "birthday-baguio-2",
-        name: "Retirement Party Baguio",
-        desc: "Heartwarming retirement celebration in a Baguio café.",
-        category: EventCategory.birthday,
-        city: "Baguio",
-        state: "Benguet",
-      },
-      {
-        suffix: "other-makati-2",
-        name: "Art Auction Makati",
-        desc: "Charity art auction with gallery walkthrough and wine.",
-        category: EventCategory.other,
-        city: "Makati",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "wedding-cebu-3",
-        name: "Cliffside Wedding Cebu",
-        desc: "Dramatic cliffside ceremony overlooking the Cebu sea.",
-        category: EventCategory.wedding,
-        city: "Cebu City",
-        state: "Cebu",
-      },
-      {
-        suffix: "social-manila-2",
-        name: "Comedy Night Manila",
-        desc: "Stand-up comedy night with top Filipino comedians.",
-        category: EventCategory.social,
-        city: "Manila",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "corporate-davao-3",
-        name: "Innovation Summit Davao",
-        desc: "Tech and innovation summit with demo pods and talks.",
-        category: EventCategory.corporate,
-        city: "Davao City",
-        state: "Davao del Sur",
-      },
-      {
-        suffix: "birthday-clark-2",
-        name: "Graduation Party Clark",
-        desc: "Graduation celebration with photo wall and buffet.",
-        category: EventCategory.birthday,
-        city: "Clark",
-        state: "Pampanga",
-      },
-      {
-        suffix: "other-clark-3",
-        name: "Holiday Market Clark",
-        desc: "Seasonal holiday market with artisan stalls and caroling.",
-        category: EventCategory.other,
-        city: "Clark",
-        state: "Pampanga",
-      },
-      {
-        suffix: "wedding-manila-3",
-        name: "Garden Wedding Manila",
-        desc: "Romantic garden wedding in Manila's botanical park.",
-        category: EventCategory.wedding,
-        city: "Manila",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "social-cebu-3",
-        name: "Fiesta Night Cebu",
-        desc: "Traditional Cebuano fiesta with lechon and Sinulog dance.",
-        category: EventCategory.social,
-        city: "Cebu City",
-        state: "Cebu",
-      },
-      {
-        suffix: "corporate-davao-4",
-        name: "Tech Conference Davao",
-        desc: "Multi-track tech conference with breakout sessions.",
-        category: EventCategory.corporate,
-        city: "Davao City",
-        state: "Davao del Sur",
-      },
-      {
-        suffix: "birthday-baguio-3",
-        name: "Kiddie Party Baguio",
-        desc: "Fun-filled kids' party at a Baguio playground venue.",
-        category: EventCategory.birthday,
-        city: "Baguio",
-        state: "Benguet",
-      },
-      {
-        suffix: "other-manila-3",
-        name: "Art Exhibit Manila",
-        desc: "Contemporary art exhibit with gallery openings.",
-        category: EventCategory.other,
-        city: "Manila",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "corporate-makati-3",
-        name: "Product Launch Makati",
-        desc: "High-profile product launch with media coverage.",
-        category: EventCategory.corporate,
-        city: "Makati",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "social-makati-3",
-        name: "Rooftop Social Makati",
-        desc: "Chic rooftop social with cocktails and skyline views.",
-        category: EventCategory.social,
-        city: "Makati",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "wedding-davao-3",
-        name: "Rustic Wedding Davao",
-        desc: "Rustic barn wedding with farm-to-table catering.",
-        category: EventCategory.wedding,
-        city: "Davao City",
-        state: "Davao del Sur",
-      },
-      {
-        suffix: "birthday-manila-3",
-        name: "Debut Manila",
-        desc: "Elegant 18th birthday debut with live band.",
-        category: EventCategory.birthday,
-        city: "Manila",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "other-baguio-2",
-        name: "Cultural Night Baguio",
-        desc: "Igorot cultural showcase with traditional dances.",
-        category: EventCategory.other,
-        city: "Baguio",
-        state: "Benguet",
-      },
-      {
-        suffix: "corporate-clark-2",
-        name: "Business Summit Clark",
-        desc: "Regional business summit with keynote speakers.",
-        category: EventCategory.corporate,
-        city: "Clark",
-        state: "Pampanga",
-      },
-      {
-        suffix: "social-clark-3",
-        name: "Outdoor Concert Clark",
-        desc: "Open-air concert at Clark with multiple stages.",
-        category: EventCategory.social,
-        city: "Clark",
-        state: "Pampanga",
-      },
-      {
-        suffix: "wedding-baguio-3",
-        name: "Mountain Wedding Baguio",
-        desc: "Scenic mountain wedding with panoramic Cordillera views.",
-        category: EventCategory.wedding,
-        city: "Baguio",
-        state: "Benguet",
-      },
-      {
-        suffix: "birthday-davao-2",
-        name: "Debut Gala Davao",
-        desc: "Glamorous debut gala at a Davao waterfront hotel.",
-        category: EventCategory.birthday,
-        city: "Davao City",
-        state: "Davao del Sur",
-      },
-      {
-        suffix: "social-manila-3",
-        name: "Reunion Night Manila",
-        desc: "Nostalgic reunion night with OPM hits and karaoke.",
-        category: EventCategory.social,
-        city: "Manila",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "other-cebu-3",
-        name: "Food Festival Cebu",
-        desc: "Annual food festival with cooking demos and tastings.",
-        category: EventCategory.other,
-        city: "Cebu City",
-        state: "Cebu",
-      },
-      {
-        suffix: "corporate-baguio-3",
-        name: "Leadership Summit Baguio",
-        desc: "Executive leadership retreat in the Cordillera mountains.",
-        category: EventCategory.corporate,
-        city: "Baguio",
-        state: "Benguet",
-      },
-      {
-        suffix: "wedding-makati-2",
-        name: "Garden Wedding Makati",
-        desc: "Elegant garden wedding in a Makati courtyard.",
-        category: EventCategory.wedding,
-        city: "Makati",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "social-davao-3",
-        name: "Summer Social Davao",
-        desc: "Tropical summer poolside social with BBQ.",
-        category: EventCategory.social,
-        city: "Davao City",
-        state: "Davao del Sur",
-      },
-      {
-        suffix: "birthday-clark-3",
-        name: "Sweet 16 Clark",
-        desc: "Sweet sixteen celebration with themed decor.",
-        category: EventCategory.birthday,
-        city: "Clark",
-        state: "Pampanga",
-      },
-      {
-        suffix: "corporate-makati-4",
-        name: "Corporate Gala Makati",
-        desc: "Black-tie corporate gala with dinner and awards.",
-        category: EventCategory.corporate,
-        city: "Makati",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "other-baguio-3",
-        name: "Cultural Festival Baguio",
-        desc: "Panagbenga-inspired cultural festival event.",
-        category: EventCategory.other,
-        city: "Baguio",
-        state: "Benguet",
-      },
-      {
-        suffix: "wedding-cebu-4",
-        name: "Beach Wedding Cebu",
-        desc: "Tropical beach wedding with white sand and sunset.",
-        category: EventCategory.wedding,
-        city: "Cebu City",
-        state: "Cebu",
-      },
-      {
-        suffix: "social-manila-4",
-        name: "Pool Party Manila",
-        desc: "Summer poolside bash with DJ and cocktails.",
-        category: EventCategory.social,
-        city: "Manila",
-        state: "Metro Manila",
-      },
-      {
-        suffix: "birthday-cebu-4",
-        name: "Fiesta Birthday Cebu 2",
-        desc: "Grand Cebuano birthday fiesta with lechon feast.",
-        category: EventCategory.birthday,
-        city: "Cebu City",
-        state: "Cebu",
-      },
-    ];
-
     // Assign ownership across bulk event foxers (round-robin)
     const bulkEventFoxers = users.filter((u: any) =>
       (u.email as string).startsWith("ef-"),
@@ -1166,25 +1314,9 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
     };
 
     // ── Bulk template images ────────────────────────────────────────────────
-    // Record<EventCategory, string> ensures every category has a cover image;
-    // TypeScript will error at compile time if a new EventCategory is added
-    // without a corresponding entry here.
-    const TEMPLATE_COVER_URLS: Record<EventCategory, string> = {
-      [EventCategory.wedding]:
-        "https://images.unsplash.com/photo-1519741497674-611481863552?w=800&auto=format&fit=crop",
-      [EventCategory.birthday]:
-        "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&auto=format&fit=crop",
-      [EventCategory.corporate]:
-        "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop",
-      [EventCategory.social]:
-        "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop",
-      [EventCategory.other]:
-        "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&auto=format&fit=crop",
-    };
-
     for (const t of BULK_TEMPLATE_DEFS) {
       const templateId = `seed-template-bulk-${t.suffix}`;
-      const coverUrl = TEMPLATE_COVER_URLS[t.category];
+      const coverUrl = t.cover;
       templateImages[templateId] = [
         {
           id: `seed-file-bulk-${t.suffix}-1`,
