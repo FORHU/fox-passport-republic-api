@@ -11,6 +11,11 @@ import PaymentSvc from "../payment/payment.service";
 import PaymentRepo from "../payment/payment.repository";
 import PayoutSvc from "../payout/payout.service";
 import PricingSvc from "../pricing/pricing.service";
+import {
+  breakdownTotals,
+  commissionPctOf,
+  lineSnapshot,
+} from "../pricing/event-breakdown";
 import PromotionSvc from "../promotion/promotion.service";
 import RefundSvc from "../refund/refund.service";
 import WaitlistSvc from "../waitlist/waitlist.service";
@@ -730,6 +735,11 @@ export default class BookingSvc {
       ...cleanRest,
       guestCount: data.guestCount ?? 1,
       totalAmount,
+      // The Event's own server-computed parts (#264 T8.1): the commission
+      // total, the FoxPassport fee and the processing fee.
+      hostMarkup: event.hostMarkupAmount,
+      platformFee: event.platformFeeAmount,
+      processingFee: event.processingFeeAmount,
       startAt: event.startAt,
       endAt: event.endAt,
       expiresAt,
@@ -1426,12 +1436,34 @@ export default class BookingSvc {
       }
     }
 
-    const { itemsTotal, hostMarkupAmount, platformFeeAmount, totalAmount } =
-      EventTemplateSvc.calculateTotalsBreakdown(template, {
-        excludedAssetIds,
-        excludedServiceIds,
-        excludedVenueIds,
-      });
+    // The new price breakdown (#264 T8.1): Foxer prices + the EventFoxer's
+    // commission + the FoxPassport fee per category + the processing fee.
+    // The rate used is stored on the Event (T8.2), so this Event's price
+    // never moves when the EventFoxer later changes their rate.
+    const commissionPct = EventTemplateSvc.ownerCommissionPct(template);
+    const breakdown = await PricingSvc.calculateEventBreakdown(
+      template,
+      commissionPct,
+      { excludedAssetIds, excludedServiceIds, excludedVenueIds },
+      { eventFoxerId: template.ownerId },
+    );
+    const {
+      itemsTotal,
+      hostMarkupAmount,
+      platformFeeAmount,
+      processingFeeAmount,
+      totalAmount,
+    } = breakdownTotals(breakdown);
+    // Each priced line, by its template row, for the escrow rows below.
+    const lineByRow = new Map(
+      breakdown.lines.map((line) => [line.itemId, line] as const),
+    );
+    const snapshotFor = (rowId: string, fallbackPrice: unknown) => {
+      const line = lineByRow.get(rowId);
+      return line
+        ? lineSnapshot(line)
+        : { agreedPrice: fallbackPrice as Prisma.Decimal };
+    };
 
     const event = await EventRepo.createFromTemplate({
       templateId: template.id,
@@ -1447,6 +1479,8 @@ export default class BookingSvc {
       itemsTotal,
       hostMarkupAmount,
       platformFeeAmount,
+      processingFeeAmount,
+      commissionPct,
       requestStatus: "approved",
       eventStatus: "pending",
       targetCity: template.targetCity ?? undefined,
@@ -1533,7 +1567,9 @@ export default class BookingSvc {
           assetId: ta.assetId!,
           providerId: ta.asset!.ownerId,
           quantity: ta.quantity,
-          agreedPrice: ta.agreedPrice,
+          // The line's price and how it was priced (#264 T7). An excluded
+          // row has no line and keeps its old price; it is never paid.
+          ...snapshotFor(ta.id, ta.agreedPrice),
           included: !excludedAssetIds.includes(ta.id),
           status: "pending" as const,
         })),
@@ -1544,7 +1580,7 @@ export default class BookingSvc {
           bookingId: booking.id,
           serviceId: ts.serviceId!,
           providerId: ts.service!.ownerId,
-          agreedPrice: ts.agreedPrice,
+          ...snapshotFor(ts.id, ts.agreedPrice),
           included: !excludedServiceIds.includes(ts.id),
           status: "pending" as const,
         })),
@@ -1555,7 +1591,7 @@ export default class BookingSvc {
           bookingId: booking.id,
           venueId: tv.venueId!,
           providerId: tv.venue!.mayorId,
-          agreedPrice: tv.agreedPrice,
+          ...snapshotFor(tv.id, tv.agreedPrice),
           included: !excludedVenueIds.includes(tv.id),
           status: tv.matched ? ("approved" as const) : ("pending" as const),
         })),
@@ -1659,6 +1695,27 @@ export default class BookingSvc {
     }
   }
 
+  /**
+   * How an item added after booking is priced (#264 T7): with the Event's own
+   * commission rate and today's fee rule, stored on the row like a template
+   * line, so checkout charges what was quoted. An Event booked before the new
+   * pricing (no stored rate) stores nothing, and checkout prices it the old
+   * way, as it always has.
+   */
+  private static async adHocSnapshot(
+    eventCommissionPct: Prisma.Decimal | null,
+    line: Parameters<
+      typeof PricingSvc.calculateEventBreakdownForLines
+    >[0][number],
+  ) {
+    if (eventCommissionPct == null) return {};
+    const breakdown = await PricingSvc.calculateEventBreakdownForLines(
+      [line],
+      commissionPctOf(eventCommissionPct),
+    );
+    return lineSnapshot(breakdown.lines[0]);
+  }
+
   private static async executeAddAdHocItem(input: {
     bookingId: string;
     userId: string;
@@ -1724,6 +1781,13 @@ export default class BookingSvc {
               providerId: asset.ownerId,
               quantity,
               agreedPrice: asset.price.toNumber() * quantity,
+              ...(await this.adHocSnapshot(booking.event.commissionPct, {
+                kind: "asset",
+                listingId: asset.id,
+                category: asset.category,
+                unitPrice: asset.price,
+                quantity,
+              })),
               currency: asset.currency,
               status: "pending_provider_confirmation",
               confirmationDeadline,
@@ -1745,6 +1809,12 @@ export default class BookingSvc {
             serviceId: service.id,
             providerId: service.ownerId,
             agreedPrice: service.price,
+            ...(await this.adHocSnapshot(booking.event.commissionPct, {
+              kind: "service",
+              listingId: service.id,
+              category: service.category,
+              unitPrice: service.price,
+            })),
             currency: service.currency,
             status: "pending_provider_confirmation",
             confirmationDeadline,

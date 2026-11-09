@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
-import { userCache } from "../../utils/cache-namespaces";
+import { userCache, eventTemplateCache } from "../../utils/cache-namespaces";
 
 export default class ProfileRepo {
   /** A profile edit changes what the public listings show. */
@@ -228,6 +228,60 @@ export default class ProfileRepo {
         data: { password: passwordHash },
       }),
     );
+  }
+
+  /** The EventFoxer's one commission rate (#264 D5), in percent. */
+  static async findCommissionPct(userId: string) {
+    return prisma.user.findUnique({
+      where: { id: String(userId) },
+      select: { id: true, commissionPct: true },
+    });
+  }
+
+  /**
+   * Sets the rate and returns the one it replaced, read in the same
+   * transaction so the audit entry's "previous" can't be another request's
+   * value. Only `users.commissionPct` changes: an Event stores the rate it
+   * was priced with (a booking or a request), so it keeps the price its
+   * client was quoted, and everything priced from now on takes the new rate.
+   *
+   * Templates are cached with their owner's rate, so the cache is cleared:
+   * otherwise previews and bookings could use the old rate for a while.
+   */
+  static async updateCommissionPct(userId: string, commissionPct: number) {
+    const result = await prisma.$transaction(async (tx) => {
+      const before = await tx.user.findUnique({
+        where: { id: String(userId) },
+        select: { commissionPct: true },
+      });
+      if (!before) return null;
+      const after = await tx.user.update({
+        where: { id: String(userId) },
+        data: { commissionPct },
+        select: { commissionPct: true },
+      });
+      return { previous: before.commissionPct, current: after.commissionPct };
+    });
+    if (result) await eventTemplateCache.invalidateAll();
+    return result;
+  }
+
+  /**
+   * The organizer's Events that have a booking which isn't cancelled and
+   * haven't ended: these keep the rate their clients saw (#264 D6, Q11).
+   * The soonest 100, so a busy EventFoxer's response stays small.
+   */
+  static async findBookedUpcomingEvents(organizerId: string, now: Date) {
+    return prisma.event.findMany({
+      where: {
+        organizerId: String(organizerId),
+        endAt: { gte: now },
+        bookings: { some: { status: { not: "cancelled" } } },
+      },
+      select: { id: true, name: true, startAt: true, commissionPct: true },
+      orderBy: { startAt: "asc" },
+      take: 100,
+    });
   }
 
   static async deleteUser(userId: string) {

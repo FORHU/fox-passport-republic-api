@@ -174,7 +174,9 @@ describe("Venue affiliation gating on EventTemplateSvc.attachVenue", () => {
     expect(result.agreedPrice.toNumber()).toBe(3000); // affiliation.agreedPrice, not venue.price (5000)
   });
 
-  it("still honors an explicit agreedPrice override even when affiliated", async () => {
+  // #264 C6: an EventFoxer can no longer set a Foxer's price. The Mayor's
+  // agreed price (or the listing price) is the only one that counts.
+  it("ignores an agreedPrice the EventFoxer sends and keeps the affiliation's agreed price", async () => {
     const templateId = await makeTemplate(affiliatedOrganizerId);
     const result: any = await EventTemplateSvc.attachVenue(
       templateId,
@@ -185,6 +187,6 @@ describe("Venue affiliation gating on EventTemplateSvc.attachVenue", () => {
       undefined,
       1234,
     );
-    expect(result.agreedPrice.toNumber()).toBe(1234);
+    expect(result.agreedPrice.toNumber()).toBe(3000);
   });
 });

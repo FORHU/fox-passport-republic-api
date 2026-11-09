@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../src/utils/prisma";
 import PricingSvc from "../../src/modules/pricing/pricing.service";
-import EventTemplateSvc from "../../src/modules/event-template/event-template.service";
 import { PROCESSING_FEE_PERCENT } from "../../src/config";
 import { AppError } from "../../src/utils/errors";
 import {
@@ -357,30 +356,6 @@ describe("eventTemplateLines", () => {
       expect((e as AppError).code).toBe(EVENT_BREAKDOWN_INVALID_INPUT);
       expect((e as AppError).status).toBe(500);
     }
-  });
-});
-
-describe("EventTemplateSvc.calculateItemsTotal shares the exclusion rule", () => {
-  it("still excludes by row id", () => {
-    const total = EventTemplateSvc.calculateItemsTotal(
-      {
-        templateServices: [
-          { id: "ts-1", service: { price: 5000 } },
-          { id: "ts-2", service: { price: 8000 } },
-        ],
-      },
-      { excludedServiceIds: ["ts-2"] },
-    );
-    expect(total).toBe(5000);
-  });
-
-  it("refuses exclusions it can't apply, instead of charging for removed items", () => {
-    expect(() =>
-      EventTemplateSvc.calculateItemsTotal(
-        { templateServices: [{ service: { price: 5000 } }] },
-        { excludedServiceIds: ["ts-2"] },
-      ),
-    ).toThrow(/loaded without their ids/);
   });
 });
 
