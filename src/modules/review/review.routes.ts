@@ -14,6 +14,7 @@ router.get("/", ReviewCtrl.getAllReviews);
 router.get("/:id", ReviewCtrl.getReviewById);
 router.post("/create", authenticate, ReviewCtrl.createReview);
 router.post("/:id/reply", authenticate, ReviewCtrl.replyToReview);
+router.post("/:id/helpful", authenticate, ReviewCtrl.toggleHelpfulVote);
 router.put("/:id", authenticate, ReviewCtrl.updateReview);
 router.delete("/:id", authenticate, ReviewCtrl.deleteReview);
 

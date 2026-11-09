@@ -89,24 +89,45 @@ model Favorite {
 }
 
 model Review {
-  id         String   @id @default(uuid())
-  userId     String
-  bookingId  String?
-  entityId   String
-  entityType String
-  rating     Int
-  comment    String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  booking    Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  posts      Post[]
+  id            String   @id @default(uuid())
+  userId        String
+  bookingId     String?
+  entityId      String
+  entityType    String
+  rating        Int
+  quality       Int?
+  communication Int?
+  value         Int?
+  punctuality   Int?
+  helpfulCount  Int      @default(0)
+  comment       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking       Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  posts         Post[]
 
   reviewReplies ReviewReply[]
+  helpfulVotes  ReviewHelpfulVote[]
 
   @@unique([bookingId])
   @@index([userId, entityId, entityType])
   @@map("reviews")
+}
+
+model ReviewHelpfulVote {
+  id        String   @id @default(uuid())
+  reviewId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, userId])
+  @@index([reviewId])
+  @@index([userId])
+  @@map("review_helpful_votes")
 }
 
 model ReviewReply {

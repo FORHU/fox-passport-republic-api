@@ -1,9 +1,10 @@
-import express from "express";
+import { Router } from "express";
+import { optionalAuth } from "../../middleware/auth.middleware";
 import LeaderboardCtrl from "./leaderboard.controller";
-import { authenticate } from "../../middleware/auth.middleware";
 
-const router = express.Router();
+const router = Router();
 
-router.get("/foxers", authenticate, LeaderboardCtrl.foxers);
+router.get("/citizens", optionalAuth, LeaderboardCtrl.getCitizens);
+router.get("/foxers", optionalAuth, LeaderboardCtrl.getFoxers);
 
 export default router;

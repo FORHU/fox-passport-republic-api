@@ -1,29 +1,60 @@
 import { Request, Response } from "express";
 import { sendServerError } from "../../utils/errors";
-import LeaderboardSvc from "./leaderboard.service";
+import LeaderboardService from "./leaderboard.service";
+import {
+  CitizenLeaderboardTab,
+  FoxerLeaderboardTab,
+} from "./leaderboard.types";
 
-function one(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
-}
-
-export default class LeaderboardCtrl {
+export class LeaderboardCtrl {
   /**
-   * GET /api/v1/leaderboard/foxers?role=&city=&tab=&limit=
-   * The Foxer leaderboard for a role, with the caller's own place pinned.
+   * GET /api/v1/leaderboard/citizens
+   * Query params:
+   *  - tab: "this_month" | "all_time" | "my_city"
+   *  - city: string (optional)
    */
-  static async foxers(req: Request, res: Response) {
+  static async getCitizens(req: Request, res: Response) {
     try {
-      const limit = Number(one(req.query.limit));
-      const board = await LeaderboardSvc.foxers({
-        viewerId: req.user!.userId,
-        role: one(req.query.role) ?? "",
-        tab: one(req.query.tab),
-        city: one(req.query.city),
-        limit: Number.isFinite(limit) ? limit : undefined,
-      });
-      return res.status(200).json({ success: true, data: board });
+      const userId = req.user?.userId ?? null;
+      const tab = (req.query.tab as CitizenLeaderboardTab) || "this_month";
+      const city = req.query.city ? String(req.query.city) : undefined;
+
+      const data = await LeaderboardService.getCitizenLeaderboard(
+        userId,
+        tab,
+        city,
+      );
+      return res.status(200).json({ success: true, data });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: false });
+    }
+  }
+
+  /**
+   * GET /api/v1/leaderboard/foxers
+   * Query params:
+   *  - tab: "top_rated" | "most_booked" | "rising"
+   *  - role: string (optional, e.g. "venueFoxer", "providerFoxer")
+   *  - city: string (optional)
+   */
+  static async getFoxers(req: Request, res: Response) {
+    try {
+      const userId = req.user?.userId ?? null;
+      const tab = (req.query.tab as FoxerLeaderboardTab) || "top_rated";
+      const role = req.query.role ? String(req.query.role) : undefined;
+      const city = req.query.city ? String(req.query.city) : undefined;
+
+      const data = await LeaderboardService.getFoxerLeaderboard(
+        userId,
+        tab,
+        role,
+        city,
+      );
+      return res.status(200).json({ success: true, data });
     } catch (e: unknown) {
       return sendServerError(res, e, { success: false });
     }
   }
 }
+
+export default LeaderboardCtrl;

@@ -151,8 +151,9 @@ const ALLOW_LIST = new Set([
   // Onboarding: the signed-in user records and reads their own tour steps.
   "onboarding.routes.ts GET /",
   "onboarding.routes.ts POST /:step",
-  // Leaderboard: any signed-in user reads the public board and their own place.
-  "leaderboard.routes.ts GET /foxers",
+  // Review helpful votes (§9.3): any signed-in citizen can toggle their own
+  // helpful vote on a review; ReviewSvc.toggleHelpfulVote blocks self-voting.
+  "review.routes.ts POST /:id/helpful",
 ]);
 
 const BANNED_GUARDS = ["requireRole", "requireAdmin", "requireHost"];

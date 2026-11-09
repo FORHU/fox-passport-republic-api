@@ -24,6 +24,10 @@ export default class ReviewCtrl {
         entityType: req.body.targetType || req.body.type || req.body.entityType,
         rating: req.body.rating,
         comment: req.body.comment,
+        quality: req.body.quality,
+        communication: req.body.communication,
+        value: req.body.value,
+        punctuality: req.body.punctuality,
       });
       return res.status(201).json({ success: true, data: review });
     } catch (e: unknown) {
@@ -34,17 +38,22 @@ export default class ReviewCtrl {
 
   static async getAllReviews(req: Request, res: Response) {
     try {
-      const { targetId, targetType, includeReplies } = req.query;
+      const { targetId, targetType, includeReplies, sort } = req.query;
       const includeRepliesFlag = includeReplies === "true";
+      const sortParam = typeof sort === "string" ? sort : undefined;
       if (targetId && targetType) {
         const reviews = await ReviewSvc.getReviewsByTarget(
           String(targetId),
           String(targetType),
           includeRepliesFlag,
+          sortParam,
         );
         return res.status(200).json({ success: true, data: reviews });
       }
-      const reviews = await ReviewSvc.getAllReviews(includeRepliesFlag);
+      const reviews = await ReviewSvc.getAllReviews(
+        includeRepliesFlag,
+        sortParam,
+      );
       return res.status(200).json({ success: true, data: reviews });
     } catch (e: unknown) {
       const error = e as Error;
@@ -72,9 +81,12 @@ export default class ReviewCtrl {
     try {
       const { listingId } = req.params;
       const includeReplies = req.query.includeReplies === "true";
+      const sort =
+        typeof req.query.sort === "string" ? req.query.sort : undefined;
       const result = await ReviewSvc.getListingReviews(
         listingId,
         includeReplies,
+        sort,
       );
       return res.status(200).json({ success: true, data: result });
     } catch (e: unknown) {
@@ -121,10 +133,19 @@ export default class ReviewCtrl {
 
   static async updateReview(req: Request, res: Response) {
     // `req.body` used to be forwarded to `prisma.review.update` untouched, so
-    // any column on Review was writable. Only these two ever should be.
+    // any column on Review was writable. Only rating, comment, and sub-ratings should be.
     const schema = Joi.object({
       rating: Joi.number().integer().min(1).max(5).optional(),
       comment: Joi.string().allow("").optional(),
+      quality: Joi.number().integer().min(1).max(5).allow(null).optional(),
+      communication: Joi.number()
+        .integer()
+        .min(1)
+        .max(5)
+        .allow(null)
+        .optional(),
+      value: Joi.number().integer().min(1).max(5).allow(null).optional(),
+      punctuality: Joi.number().integer().min(1).max(5).allow(null).optional(),
     }).min(1);
 
     const { error, value } = schema.validate(req.body);
@@ -171,6 +192,26 @@ export default class ReviewCtrl {
       return res
         .status(200)
         .json({ success: true, message: "Review deleted successfully" });
+    } catch (e: unknown) {
+      return res
+        .status(reviewMutationStatus(e))
+        .json({ success: false, message: (e as Error).message });
+    }
+  }
+
+  static async toggleHelpfulVote(req: Request, res: Response) {
+    try {
+      const voterId = req.user?.userId;
+      if (!voterId) {
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
+      }
+      const result = await ReviewSvc.toggleHelpfulVote(
+        String(req.params.id),
+        voterId,
+      );
+      return res.status(200).json({ success: true, data: result });
     } catch (e: unknown) {
       return res
         .status(reviewMutationStatus(e))

@@ -1,144 +1,191 @@
-import { UserPath } from "@prisma/client";
-import { AppError } from "../../utils/errors";
 import { cached } from "../../utils/cache.util";
-import RankSvc from "../passport/rank.service";
-import LeaderboardRepo, {
-  LEADERBOARD_ROLES,
-  LeaderboardRole,
-  LeaderboardRow,
-  Window,
-} from "./leaderboard.repository";
+import { UserPath } from "@prisma/client";
+import {
+  CitizenLeaderboardTab,
+  CitizenLeaderboardResponse,
+  CitizenLeaderboardEntry,
+  FoxerLeaderboardTab,
+  FoxerLeaderboardResponse,
+  FoxerLeaderboardEntry,
+} from "./leaderboard.types";
+import LeaderboardRepo from "./leaderboard.repository";
+import RewardService from "../reward/reward.service";
+import FoxerScoreService from "../foxer-score/foxer-score.service";
 
-/** Manila is UTC+8 all year; the month turns over there, not in UTC. */
-const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
+const LEADERBOARD_CACHE_TTL = 300; // 5 minutes cache
 
-/** How long a board is served before it is worked out again. */
-const BOARD_TTL_SECONDS = 120;
-
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 50;
-const MAX_CITY_LENGTH = 80;
-
-/** The tabs that exist so far. Top rated and Rising need the Foxer Score. */
-const TABS = ["most_booked"] as const;
-type Tab = (typeof TABS)[number];
-
-/**
- * The calendar month `now` falls in, in Manila time, as the instants it
- * starts and ends and a `YYYY-MM` label. The window is `[from, to)`.
- */
-export function manilaMonthWindow(now: Date): Window & { month: string } {
-  const manila = new Date(now.getTime() + MANILA_OFFSET_MS);
-  const year = manila.getUTCFullYear();
-  const monthIndex = manila.getUTCMonth();
-  return {
-    from: new Date(Date.UTC(year, monthIndex, 1) - MANILA_OFFSET_MS),
-    to: new Date(Date.UTC(year, monthIndex + 1, 1) - MANILA_OFFSET_MS),
-    month: `${year}-${String(monthIndex + 1).padStart(2, "0")}`,
-  };
-}
-
-export interface FoxerBoardEntry {
-  position: number;
+interface RawCitizenEntry {
   userId: string;
   name: string;
-  username: string | null;
-  image: string | null;
+  avatarUrl: string | null;
+  level: number;
   city: string | null;
-  role: LeaderboardRole;
-  rank: { number: number; name: string; rarity: string };
-  isMe: boolean;
 }
 
-export interface FoxerBoard {
-  tab: Tab;
-  role: LeaderboardRole;
-  city: string | null;
-  /** The Manila month the board counts, as `YYYY-MM`. */
-  month: string;
-  rows: FoxerBoardEntry[];
-  /** The caller's own place, even when it is below the rows; null if absent. */
-  me: FoxerBoardEntry | null;
-}
+export class LeaderboardService {
+  /**
+   * Retrieves the Citizen Leaderboard partitioned by this month, all-time, or city.
+   * XP amounts remain private (§8.1) — returns position, avatar, name, rank badge and level.
+   */
+  static async getCitizenLeaderboard(
+    userId: string | null,
+    tab: CitizenLeaderboardTab = "this_month",
+    city?: string,
+  ): Promise<CitizenLeaderboardResponse> {
+    const now = new Date();
+    const season = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-export default class LeaderboardSvc {
-  static isRole(value: string): value is LeaderboardRole {
-    return (LEADERBOARD_ROLES as readonly string[]).includes(value);
-  }
+    const cacheKey = `leaderboard:citizens:${tab}:${season}:${city || "global"}`;
 
-  private static toEntry(
-    row: LeaderboardRow,
-    role: LeaderboardRole,
-    viewerId: string,
-  ): FoxerBoardEntry {
-    const rank = RankSvc.forLevel(row.level, row.path as UserPath);
+    const rawEntries = await cached(
+      cacheKey,
+      LEADERBOARD_CACHE_TTL,
+      async () => {
+        if (tab === "all_time") {
+          return LeaderboardRepo.getCitizenAllTime(city, 50);
+        }
+        return LeaderboardRepo.getCitizenSeasonal(startOfMonth, city, 50);
+      },
+    );
+
+    const entries: CitizenLeaderboardEntry[] = (
+      rawEntries as RawCitizenEntry[]
+    ).map((item, idx) => ({
+      position: idx + 1,
+      userId: item.userId,
+      name: item.name,
+      avatarUrl: item.avatarUrl,
+      level: item.level,
+      rankTitle: RewardService.calculateRank(item.level, UserPath.user),
+      city: item.city,
+    }));
+
+    let userPosition: CitizenLeaderboardEntry | null = null;
+    if (userId) {
+      const match = entries.find((e) => e.userId === userId);
+      if (match) {
+        userPosition = match;
+      } else {
+        const userStanding =
+          await LeaderboardRepo.getUserCitizenStanding(userId);
+        if (userStanding) {
+          userPosition = {
+            position: entries.length + 1,
+            userId: userStanding.userId,
+            name: userStanding.name,
+            avatarUrl: userStanding.avatarUrl,
+            level: userStanding.level,
+            rankTitle: RewardService.calculateRank(
+              userStanding.level,
+              UserPath.user,
+            ),
+            city: userStanding.city,
+          };
+        }
+      }
+    }
+
     return {
-      position: row.position,
-      userId: row.userId,
-      name: row.name,
-      username: row.username,
-      image: row.image,
-      city: row.city,
-      role,
-      rank: { number: rank.number, name: rank.name, rarity: rank.rarity },
-      isMe: row.userId === viewerId,
+      entries,
+      userPosition,
+      tab,
+      season,
     };
   }
 
   /**
-   * The Foxer leaderboard for a role, ranked by completed bookings this month.
-   * Counts never leave the server: a row carries a position and a rank, not
-   * how many bookings it took.
+   * Retrieves the Foxer Leaderboard partitioned by top rated (Foxer Score),
+   * most booked (monthly completed bookings), or rising (30-day delta).
    */
-  static async foxers(params: {
-    viewerId: string;
-    role: string;
-    tab?: string;
-    city?: string;
-    limit?: number;
-    now?: Date;
-  }): Promise<FoxerBoard> {
-    if (!LeaderboardSvc.isRole(params.role)) {
-      throw new AppError(
-        `role must be one of: ${LEADERBOARD_ROLES.join(", ")}`,
-        400,
+  static async getFoxerLeaderboard(
+    userId: string | null,
+    tab: FoxerLeaderboardTab = "top_rated",
+    role?: string,
+    city?: string,
+  ): Promise<FoxerLeaderboardResponse> {
+    const cacheKey = `leaderboard:foxers:${tab}:${role || "all"}:${city || "all"}`;
+
+    const entries = await cached(cacheKey, LEADERBOARD_CACHE_TTL, async () => {
+      const candidates = await LeaderboardRepo.getFoxersForRanking(role, city);
+
+      const scored = await Promise.all(
+        candidates.map(async (f) => {
+          const scoreResult = await FoxerScoreService.computeFoxerScore(f.id);
+          const highestPath = f.passport?.paths.sort(
+            (a, b) => b.level - a.level,
+          )[0];
+          const foxerLevel = highestPath?.level ?? 1;
+          const foxerPath = highestPath?.path ?? UserPath.providerFoxer;
+
+          return {
+            userId: f.id,
+            name: f.name,
+            avatarUrl: f.image,
+            role: role || (f.roleType[0] ?? "Foxer"),
+            city: f.city,
+            rankTitle: RewardService.calculateRank(foxerLevel, foxerPath),
+            starRating: scoreResult.operationalMetrics.starRating,
+            reviewCount: scoreResult.operationalMetrics.rawReviewCount,
+            completedBookings: scoreResult.operationalMetrics.completedBookings,
+            foxerScore: scoreResult.foxerScore,
+            createdAt: f.createdAt,
+          };
+        }),
       );
-    }
-    const tab = params.tab ?? "most_booked";
-    if (!(TABS as readonly string[]).includes(tab)) {
-      throw new AppError(
-        `tab "${tab}" is not available yet; use: ${TABS.join(", ")}`,
-        400,
+
+      let filtered = scored;
+
+      if (tab === "top_rated") {
+        // §8.2: Minimum 3 completed bookings to qualify for Top Rated
+        filtered = scored
+          .filter((f) => f.completedBookings >= 3)
+          .sort((a, b) => b.foxerScore - a.foxerScore);
+      } else if (tab === "most_booked") {
+        filtered = scored.sort(
+          (a, b) => b.completedBookings - a.completedBookings,
+        );
+      } else if (tab === "rising") {
+        // Accounts created within 6 months
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        filtered = scored
+          .filter((f) => f.createdAt >= sixMonthsAgo)
+          .sort((a, b) => b.foxerScore - a.foxerScore);
+      }
+
+      return filtered.slice(0, 50).map((f, idx) => ({
+        position: idx + 1,
+        userId: f.userId,
+        name: f.name,
+        avatarUrl: f.avatarUrl,
+        role: f.role,
+        city: f.city,
+        rankTitle: f.rankTitle,
+        starRating: f.starRating,
+        reviewCount: f.reviewCount,
+        completedBookings: f.completedBookings,
+      }));
+    });
+
+    let userPosition: FoxerLeaderboardEntry | null = null;
+    if (userId) {
+      const match = (entries as FoxerLeaderboardEntry[]).find(
+        (e) => e.userId === userId,
       );
+      if (match) {
+        userPosition = match;
+      }
     }
 
-    const city = params.city?.trim() || null;
-    if (city && city.length > MAX_CITY_LENGTH) {
-      throw new AppError("city is too long", 400);
-    }
-    const limit = Math.min(
-      Math.max(1, Math.trunc(params.limit ?? DEFAULT_LIMIT)),
-      MAX_LIMIT,
-    );
-
-    const window = manilaMonthWindow(params.now ?? new Date());
-    const role = params.role;
-    const all = await cached(
-      `leaderboard:foxers:${tab}:${role}:${(city ?? "").toLowerCase()}:${window.month}`,
-      BOARD_TTL_SECONDS,
-      () => LeaderboardRepo.mostBooked(role, window, city),
-    );
-
-    const mine = all.find((r) => r.userId === params.viewerId);
     return {
-      tab: tab as Tab,
+      entries: entries as FoxerLeaderboardEntry[],
+      userPosition,
+      tab,
       role,
       city,
-      month: window.month,
-      rows: all
-        .slice(0, limit)
-        .map((r) => LeaderboardSvc.toEntry(r, role, params.viewerId)),
-      me: mine ? LeaderboardSvc.toEntry(mine, role, params.viewerId) : null,
     };
   }
 }
+
+export default LeaderboardService;

@@ -1,152 +1,200 @@
-import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
+import { UserPath, RoleType } from "@prisma/client";
 
-/** The Foxer roles the leaderboard can be filtered by. */
-export const LEADERBOARD_ROLES = [
-  "venue",
-  "event",
-  "gear",
-  "services",
-  "performers",
-] as const;
-export type LeaderboardRole = (typeof LEADERBOARD_ROLES)[number];
-
-/**
- * What each role counts and who may appear. `roles` are the account roles that
- * qualify a person for the role's board; `paths` are the XP paths their rank
- * is read from (the highest level among them).
- *
- * Counts are completed bookings: for venues, gear and services the
- * provider's approved transaction on a booking that is completed; for events
- * the host's own completed bookings. Nothing here is built from user input, so
- * the fragments can be interpolated safely.
- */
-const ROLE_CONFIG: Record<
-  LeaderboardRole,
-  { roles: string[]; paths: string[]; counts: (w: Window) => Prisma.Sql }
-> = {
-  venue: {
-    roles: ["venueFoxer"],
-    paths: ["venueFoxer"],
-    counts: (w) => providerCounts("event_venue_transactions", w),
-  },
-  event: {
-    roles: ["eventFoxer"],
-    paths: ["eventFoxer"],
-    counts: (w) => Prisma.sql`
-      SELECT e."organizerId" AS "userId", COUNT(*)::int AS "n"
-        FROM "bookings" b
-        JOIN "events" e ON e."id" = b."eventId"
-       WHERE b."status"::text = 'completed'
-         AND b."endAt" >= ${w.from} AND b."endAt" < ${w.to}
-       GROUP BY e."organizerId"`,
-  },
-  gear: {
-    roles: ["gearFoxer", "providerFoxer"],
-    paths: ["gearFoxer", "providerFoxer"],
-    counts: (w) => providerCounts("event_asset_transactions", w),
-  },
-  services: {
-    roles: ["serviceFoxer", "providerFoxer"],
-    paths: ["serviceFoxer", "providerFoxer"],
-    counts: (w) => providerCounts("event_service_transactions", w),
-  },
-  performers: {
-    roles: ["performerFoxer"],
-    paths: ["performerFoxer"],
-    counts: (w) => providerCounts("event_service_transactions", w),
-  },
-};
-
-export interface Window {
-  /** Inclusive start, as an instant. */
-  from: Date;
-  /** Exclusive end. */
-  to: Date;
-}
-
-/** Approved provider transactions on bookings that were completed. */
-function providerCounts(table: string, w: Window): Prisma.Sql {
-  return Prisma.sql`
-    SELECT t."providerId" AS "userId", COUNT(*)::int AS "n"
-      FROM ${Prisma.raw(`"${table}"`)} t
-      JOIN "bookings" b ON b."id" = t."bookingId"
-     WHERE t."status"::text = 'approved'
-       AND b."status"::text = 'completed'
-       AND b."endAt" >= ${w.from} AND b."endAt" < ${w.to}
-     GROUP BY t."providerId"`;
-}
-
-export interface LeaderboardRow {
-  position: number;
-  userId: string;
-  name: string;
-  username: string | null;
-  image: string | null;
-  city: string | null;
-  /** Highest level among the role's XP paths; 1 with none. */
-  level: number;
-  /** The path that level is on, so the rank takes the right names. */
-  path: string;
-}
-
-export default class LeaderboardRepo {
+export class LeaderboardRepo {
   /**
-   * Every Foxer of the role with at least one completed booking in the window,
-   * best first. Ties share a position (1, 1, 3). Ordered by name then id
-   * within a tie so the list does not shuffle between requests.
+   * Retrieves all-time top citizens ordered by progression level and total XP.
    */
-  static async mostBooked(
-    role: LeaderboardRole,
-    window: Window,
-    city: string | null,
-  ): Promise<LeaderboardRow[]> {
-    const cfg = ROLE_CONFIG[role];
-    const rows = await prisma.$queryRaw<
-      {
-        position: number;
-        userId: string;
-        name: string;
-        username: string | null;
-        image: string | null;
-        city: string | null;
-        level: number | null;
-        path: string | null;
-      }[]
-    >(Prisma.sql`
-      WITH counts AS (${cfg.counts(window)})
-      SELECT RANK() OVER (ORDER BY c."n" DESC)::int AS "position",
-             u."id" AS "userId",
-             u."name" AS "name",
-             u."username" AS "username",
-             u."image" AS "image",
-             u."city" AS "city",
-             best."level" AS "level",
-             best."path" AS "path"
-        FROM counts c
-        JOIN "users" u ON u."id" = c."userId"
-        LEFT JOIN LATERAL (
-          SELECT pp."level" AS "level", pp."path"::text AS "path"
-            FROM "passports" p
-            JOIN "passport_paths" pp ON pp."passportId" = p."id"
-           WHERE p."userId" = u."id"
-             AND pp."path"::text = ANY(${cfg.paths}::text[])
-           ORDER BY pp."level" DESC
-           LIMIT 1
-        ) best ON TRUE
-       WHERE u."roleType"::text[] && ${cfg.roles}::text[]
-         AND (${city}::text IS NULL OR lower(u."city") = lower(${city}::text))
-       ORDER BY c."n" DESC, u."name" ASC, u."id" ASC`);
+  static async getCitizenAllTime(city?: string, limit = 50) {
+    const paths = await prisma.passportPath.findMany({
+      where: {
+        path: UserPath.user,
+        ...(city
+          ? {
+              passport: {
+                user: {
+                  city: { equals: city, mode: "insensitive" },
+                },
+              },
+            }
+          : {}),
+      },
+      include: {
+        passport: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                image: true,
+                city: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ level: "desc" }, { totalXP: "desc" }],
+      take: limit,
+    });
 
-    return rows.map((r) => ({
-      position: r.position,
-      userId: r.userId,
-      name: r.name,
-      username: r.username,
-      image: r.image,
-      city: r.city,
-      level: r.level ?? 1,
-      path: r.path ?? cfg.paths[0],
-    }));
+    return paths
+      .filter((p) => p.passport?.user)
+      .map((p) => ({
+        userId: p.passport.user.id,
+        name: p.passport.user.name,
+        avatarUrl: p.passport.user.image,
+        city: p.passport.user.city,
+        level: p.level,
+        totalXP: p.totalXP,
+      }));
+  }
+
+  /**
+   * Retrieves seasonal citizen XP rankings since the given date (e.g. 1st of month).
+   */
+  static async getCitizenSeasonal(since: Date, city?: string, limit = 50) {
+    // 1. Group seasonal XP from immutable reward events
+    const seasonalGroups = await prisma.rewardEvent.groupBy({
+      by: ["userId"],
+      where: {
+        path: UserPath.user,
+        createdAt: { gte: since },
+        xp: { gt: 0 },
+        ...(city
+          ? {
+              user: {
+                city: { equals: city, mode: "insensitive" },
+              },
+            }
+          : {}),
+      },
+      _sum: { xp: true },
+      orderBy: {
+        _sum: { xp: "desc" },
+      },
+      take: limit,
+    });
+
+    if (seasonalGroups.length === 0) {
+      // Fallback to all-time if month has just begun with 0 events
+      return this.getCitizenAllTime(city, limit);
+    }
+
+    const userIds = seasonalGroups.map((g) => g.userId);
+    const [users, paths] = await Promise.all([
+      prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true, image: true, city: true },
+      }),
+      prisma.passportPath.findMany({
+        where: {
+          passport: { userId: { in: userIds } },
+          path: UserPath.user,
+        },
+        select: {
+          level: true,
+          passport: { select: { userId: true } },
+        },
+      }),
+    ]);
+
+    const userMap = new Map(users.map((u) => [u.id, u]));
+    const levelMap = new Map(paths.map((p) => [p.passport.userId, p.level]));
+
+    return seasonalGroups
+      .map((g) => {
+        const u = userMap.get(g.userId);
+        if (!u) return null;
+        return {
+          userId: u.id,
+          name: u.name,
+          avatarUrl: u.image,
+          city: u.city,
+          level: levelMap.get(u.id) ?? 1,
+          seasonalXP: g._sum.xp ?? 0,
+        };
+      })
+      .filter(Boolean) as {
+      userId: string;
+      name: string;
+      avatarUrl: string | null;
+      city: string | null;
+      level: number;
+      seasonalXP: number;
+    }[];
+  }
+
+  /**
+   * Retrieves user's own citizen standing.
+   */
+  static async getUserCitizenStanding(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        image: true,
+        city: true,
+      },
+    });
+
+    if (!user) return null;
+
+    const path = await prisma.passportPath.findFirst({
+      where: {
+        passport: { userId },
+        path: UserPath.user,
+      },
+      select: { level: true, totalXP: true },
+    });
+
+    return {
+      userId: user.id,
+      name: user.name,
+      avatarUrl: user.image,
+      city: user.city,
+      level: path?.level ?? 1,
+      totalXP: path?.totalXP ?? 0,
+    };
+  }
+
+  /**
+   * Retrieves active Foxers filtered by role and city.
+   */
+  static async getFoxersForRanking(role?: string, city?: string) {
+    const whereRole: RoleType[] = role
+      ? [role as RoleType]
+      : [
+          RoleType.providerFoxer,
+          RoleType.venueFoxer,
+          RoleType.eventFoxer,
+          RoleType.performerFoxer,
+          RoleType.gearFoxer,
+          RoleType.serviceFoxer,
+        ];
+
+    const users = await prisma.user.findMany({
+      where: {
+        roleType: { hasSome: whereRole },
+        ...(city ? { city: { equals: city, mode: "insensitive" } } : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        image: true,
+        city: true,
+        roleType: true,
+        createdAt: true,
+        passport: {
+          include: {
+            paths: true,
+          },
+        },
+      },
+    });
+
+    return users;
   }
 }
+
+export default LeaderboardRepo;

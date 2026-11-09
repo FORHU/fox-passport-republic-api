@@ -36,9 +36,32 @@ function mapRepliesList<T extends { reviewReplies?: unknown }>(
  */
 const REVIEW_LIMIT = 200;
 
+export type ReviewSort = "most_helpful" | "recent" | "highest" | "lowest";
+
+function getSortOrderBy(sort?: string) {
+  switch (sort) {
+    case "most_helpful":
+      return [
+        { helpfulCount: "desc" as const },
+        { createdAt: "desc" as const },
+      ];
+    case "highest":
+      return [{ rating: "desc" as const }, { createdAt: "desc" as const }];
+    case "lowest":
+      return [{ rating: "asc" as const }, { createdAt: "desc" as const }];
+    case "recent":
+    default:
+      return [{ createdAt: "desc" as const }];
+  }
+}
+
 export default class ReviewRepo {
   // READ ALL
-  static async getAllReviews(includeReplies = false, take = REVIEW_LIMIT) {
+  static async getAllReviews(
+    includeReplies = false,
+    take = REVIEW_LIMIT,
+    sort?: string,
+  ) {
     const reviews = await prisma.review.findMany({
       include: {
         user: USER_SELECT,
@@ -51,7 +74,7 @@ export default class ReviewRepo {
             }
           : {}),
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: getSortOrderBy(sort),
       take,
     });
     return includeReplies ? mapRepliesList(reviews) : reviews;
@@ -90,8 +113,9 @@ export default class ReviewRepo {
     entityId: string,
     includeReplies = false,
     take = REVIEW_LIMIT,
+    sort?: string,
   ) {
-    const [reviews, byRating] = await Promise.all([
+    const [reviews, byRating, subRatingsAgg] = await Promise.all([
       prisma.review.findMany({
         where: { entityId: String(entityId) },
         include: {
@@ -105,13 +129,22 @@ export default class ReviewRepo {
               }
             : {}),
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: getSortOrderBy(sort),
         take,
       }),
       prisma.review.groupBy({
         by: ["rating"],
         where: { entityId: String(entityId) },
         _count: { _all: true },
+      }),
+      prisma.review.aggregate({
+        where: { entityId: String(entityId) },
+        _avg: {
+          quality: true,
+          communication: true,
+          value: true,
+          punctuality: true,
+        },
       }),
     ]);
 
@@ -129,9 +162,20 @@ export default class ReviewRepo {
         total > 0 ? `${Math.round((counts[star] / total) * 100)}%` : "0%";
     }
 
+    const roundAvg = (val: number | null | undefined) =>
+      typeof val === "number" ? Math.round(val * 10) / 10 : null;
+
+    const subRatingAverages = {
+      quality: roundAvg(subRatingsAgg?._avg?.quality),
+      communication: roundAvg(subRatingsAgg?._avg?.communication),
+      value: roundAvg(subRatingsAgg?._avg?.value),
+      punctuality: roundAvg(subRatingsAgg?._avg?.punctuality),
+    };
+
     return {
       reviews: includeReplies ? mapRepliesList(reviews) : reviews,
       ratingDistribution,
+      subRatingAverages,
     };
   }
 
@@ -162,6 +206,10 @@ export default class ReviewRepo {
     entityType: string;
     rating: number;
     comment?: string;
+    quality?: number | null;
+    communication?: number | null;
+    value?: number | null;
+    punctuality?: number | null;
   }) {
     return prisma.review.create({
       data: {
@@ -171,6 +219,14 @@ export default class ReviewRepo {
         entityType: String(data.entityType),
         rating: data.rating,
         comment: data.comment,
+        ...(data.quality !== undefined ? { quality: data.quality } : {}),
+        ...(data.communication !== undefined
+          ? { communication: data.communication }
+          : {}),
+        ...(data.value !== undefined ? { value: data.value } : {}),
+        ...(data.punctuality !== undefined
+          ? { punctuality: data.punctuality }
+          : {}),
       },
       include: { user: USER_SELECT },
     });
@@ -182,6 +238,7 @@ export default class ReviewRepo {
     targetType: string,
     includeReplies = false,
     take = REVIEW_LIMIT,
+    sort?: string,
   ) {
     const reviews = await prisma.review.findMany({
       where: { entityId: String(targetId), entityType: String(targetType) },
@@ -196,7 +253,7 @@ export default class ReviewRepo {
             }
           : {}),
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: getSortOrderBy(sort),
       take,
     });
     return includeReplies ? mapRepliesList(reviews) : reviews;
@@ -207,6 +264,7 @@ export default class ReviewRepo {
     venueId: string,
     includeReplies = false,
     take = REVIEW_LIMIT,
+    sort?: string,
   ) {
     const reviews = await prisma.review.findMany({
       where: { entityType: "venue", entityId: String(venueId) },
@@ -221,7 +279,7 @@ export default class ReviewRepo {
             }
           : {}),
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: getSortOrderBy(sort),
       take,
     });
     return includeReplies ? mapRepliesList(reviews) : reviews;
@@ -232,6 +290,7 @@ export default class ReviewRepo {
     eventId: string,
     includeReplies = false,
     take = REVIEW_LIMIT,
+    sort?: string,
   ) {
     const reviews = await prisma.review.findMany({
       where: { entityType: "event", entityId: String(eventId) },
@@ -246,7 +305,7 @@ export default class ReviewRepo {
             }
           : {}),
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: getSortOrderBy(sort),
       take,
     });
     return includeReplies ? mapRepliesList(reviews) : reviews;
@@ -291,7 +350,14 @@ export default class ReviewRepo {
   // UPDATE
   static async updateReview(
     id: string,
-    data: Partial<{ rating: number; comment: string }>,
+    data: Partial<{
+      rating: number;
+      comment: string;
+      quality: number | null;
+      communication: number | null;
+      value: number | null;
+      punctuality: number | null;
+    }>,
   ) {
     return prisma.review.update({
       where: { id: String(id) },
@@ -303,6 +369,52 @@ export default class ReviewRepo {
   static async deleteReview(id: string) {
     return prisma.review.delete({
       where: { id: String(id) },
+    });
+  }
+
+  // HELPFUL VOTES
+  static async findHelpfulVote(reviewId: string, userId: string) {
+    return prisma.reviewHelpfulVote.findUnique({
+      where: {
+        reviewId_userId: {
+          reviewId: String(reviewId),
+          userId: String(userId),
+        },
+      },
+    });
+  }
+
+  static async addHelpfulVote(reviewId: string, userId: string) {
+    return prisma.$transaction(async (tx) => {
+      await tx.reviewHelpfulVote.create({
+        data: {
+          reviewId: String(reviewId),
+          userId: String(userId),
+        },
+      });
+      const updated = await tx.review.update({
+        where: { id: String(reviewId) },
+        data: { helpfulCount: { increment: 1 } },
+      });
+      return updated;
+    });
+  }
+
+  static async removeHelpfulVote(reviewId: string, userId: string) {
+    return prisma.$transaction(async (tx) => {
+      await tx.reviewHelpfulVote.delete({
+        where: {
+          reviewId_userId: {
+            reviewId: String(reviewId),
+            userId: String(userId),
+          },
+        },
+      });
+      const updated = await tx.review.update({
+        where: { id: String(reviewId) },
+        data: { helpfulCount: { decrement: 1 } },
+      });
+      return updated;
     });
   }
 }
