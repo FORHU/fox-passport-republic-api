@@ -3,6 +3,7 @@ import { prisma } from "../../utils/prisma";
 import { badRequest, conflict, notFound } from "../../utils/errors";
 import { userCache } from "../../utils/cache-namespaces";
 import NotificationService from "../notifications/user-notification.service";
+import OnboardingSvc from "../onboarding/onboarding.service";
 
 /** The documents an admin can be shown. Text in the DB, closed here. */
 export const ID_TYPES = [
@@ -174,7 +175,11 @@ export default class IdentityVerificationSvc {
     });
 
     // Public profiles are cached with the badge field in them.
-    if (decision === "approved") await userCache.invalidateAll();
+    if (decision === "approved") {
+      await userCache.invalidateAll();
+      // The approved ID earns its one-time reward. Never fails the review.
+      await OnboardingSvc.syncDetectedSteps(reviewed.userId).catch(() => {});
+    }
 
     await NotificationService.create({
       userId: reviewed.userId,

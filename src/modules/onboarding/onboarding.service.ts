@@ -13,6 +13,19 @@ const STEPS: Record<string, { action?: string; path?: UserPath }> = {
   foxer_tour: {},
 };
 
+/**
+ * Steps the server works out for itself from the account's data. They are not
+ * in `STEPS`, so the app cannot report them: a client call to
+ * `POST /onboarding/profile_complete` is refused as an unknown step.
+ */
+const DETECTED_STEPS: Record<string, { action: string; path: UserPath }> = {
+  profile_complete: { action: "complete_profile", path: UserPath.user },
+  id_verified: { action: "verify_identity", path: UserPath.user },
+};
+
+const filled = (value: string | null | undefined): boolean =>
+  typeof value === "string" && value.trim() !== "";
+
 export interface CompleteStepResult {
   step: string;
   completed: true;
@@ -49,6 +62,21 @@ export default class OnboardingSvc {
     }
 
     const { action, path } = STEPS[step];
+    const reward = await OnboardingSvc.pay(userId, step, action, path);
+    return { step, completed: true, alreadyCompleted: false, reward };
+  }
+
+  /**
+   * Pays a step's reward (when it has one) and records the step. The grant
+   * goes first and is idempotent on its own key, so a failure between the two
+   * writes is repaired by the next attempt instead of losing the reward.
+   */
+  private static async pay(
+    userId: string,
+    step: string,
+    action: string | undefined,
+    path: UserPath | undefined,
+  ) {
     let reward = { xpAwarded: 0, coinsAwarded: 0 };
     if (action) {
       const granted = await RewardService.grant({
@@ -63,12 +91,48 @@ export default class OnboardingSvc {
         coinsAwarded: granted.coinsAwarded,
       };
     }
-
     await OnboardingRepo.markCompleted(userId, step);
-    return { step, completed: true, alreadyCompleted: false, reward };
+    return reward;
   }
 
+  /**
+   * Pays the steps the account's own data has now earned: a profile with a
+   * photo, username, bio and city, and an approved ID. Safe to call at any
+   * time and as often as wanted; a step already recorded is left alone.
+   */
+  static async syncDetectedSteps(userId: string): Promise<void> {
+    const facts = await OnboardingRepo.findDetectionFacts(userId);
+    if (!facts) return;
+
+    const earned: string[] = [];
+    const hasPhoto =
+      filled(facts.profile?.imgId) ||
+      filled(facts.imgId) ||
+      filled(facts.image);
+    if (
+      hasPhoto &&
+      filled(facts.username) &&
+      filled(facts.bio) &&
+      filled(facts.city)
+    ) {
+      earned.push("profile_complete");
+    }
+    if (facts.identityVerifiedAt) earned.push("id_verified");
+
+    for (const step of earned) {
+      if (await OnboardingRepo.isCompleted(userId, step)) continue;
+      const { action, path } = DETECTED_STEPS[step];
+      await OnboardingSvc.pay(userId, step, action, path);
+    }
+  }
+
+  /**
+   * The steps this account has finished. The server-detected ones are worked
+   * out first, so an account that was already complete before this existed is
+   * paid and shown on its next visit. A failure there never hides the list.
+   */
   static async listCompleted(userId: string) {
+    await OnboardingSvc.syncDetectedSteps(userId).catch(() => {});
     const rows = await OnboardingRepo.findCompletedSteps(userId);
     return rows.map((r) => ({ step: r.step, completedAt: r.completedAt }));
   }

@@ -25,4 +25,24 @@ export default class OnboardingRepo {
       skipDuplicates: true,
     });
   }
+
+  /**
+   * What the server-detected steps are judged on: the four profile fields
+   * (the photo may live on the account or on its profile row) and whether an
+   * admin has approved the account's ID.
+   */
+  static async findDetectionFacts(userId: string) {
+    return prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        username: true,
+        bio: true,
+        city: true,
+        imgId: true,
+        image: true,
+        identityVerifiedAt: true,
+        profile: { select: { imgId: true } },
+      },
+    });
+  }
 }
