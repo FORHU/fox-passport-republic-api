@@ -14,8 +14,13 @@ model EventTemplate {
   targetCountry        String?                @default("Philippines")
   lat                  Float?
   lng                  Float?
+  // Deprecated: replaced by User.commissionPct (one rate per EventFoxer).
+  // Kept until every reader has moved over; dropped in a later migration.
   hostMarkupPct        Float                  @default(0)
-  platformFeePct       Float                  @default(0.05) //might change later on
+  // Deprecated: the fee comes from PlatformFeeConfig, per category. Stored as
+  // a fraction (0.05), which is why a value <= 1 was read as one. Kept until
+  // every reader has moved over; dropped in a later migration.
+  platformFeePct       Float                  @default(0.05)
   maxAttendees         Int?
   publicOpenAt         DateTime?
   createdAt            DateTime               @default(now())
@@ -114,6 +119,12 @@ model Event {
   itemsTotal           Decimal                    @default(0) @db.Decimal(12, 2)
   hostMarkupAmount     Decimal                    @default(0) @db.Decimal(12, 2)
   platformFeeAmount    Decimal                    @default(0) @db.Decimal(12, 2)
+  // Sum of the lines' 3% processing fee, which pays Stripe.
+  processingFeeAmount  Decimal                    @default(0) @db.Decimal(12, 2)
+  // The EventFoxer's commission rate (percent) as it was at this Event's first
+  // booking; every later booking on the Event uses it. Null until then, and
+  // for Events priced before per-EventFoxer commission existed.
+  commissionPct        Decimal?                   @db.Decimal(5, 2)
   // Only ever set by the direct-venue-booking path (BookingSvc.createBooking's
   // `venueId && !eventId` branch). A template-based Event's discount lives
   // per line item instead — InvoiceItem.discountAmount, via
@@ -166,6 +177,13 @@ model EventAssetTransaction {
   quantity             Int               @default(1)
   status               TransactionStatus @default(pending)
   agreedPrice          Decimal           @db.Decimal(12, 2)
+  // How this line was priced when it was booked (see EventVenueTransaction).
+  category             String?
+  commissionPct        Decimal?          @db.Decimal(5, 2)
+  commissionAmount     Decimal?          @db.Decimal(12, 2)
+  platformFeePct       Decimal?          @db.Decimal(5, 2)
+  platformFeeAmount    Decimal?          @db.Decimal(12, 2)
+  processingFeeAmount  Decimal?          @db.Decimal(12, 2)
   included             Boolean           @default(true)
   currency             String            @default("PHP")
   stripeTransferId     String?           @unique
@@ -196,6 +214,13 @@ model EventServiceTransaction {
   providerId           String
   status               TransactionStatus @default(pending)
   agreedPrice          Decimal           @db.Decimal(12, 2)
+  // How this line was priced when it was booked (see EventVenueTransaction).
+  category             String?
+  commissionPct        Decimal?          @db.Decimal(5, 2)
+  commissionAmount     Decimal?          @db.Decimal(12, 2)
+  platformFeePct       Decimal?          @db.Decimal(5, 2)
+  platformFeeAmount    Decimal?          @db.Decimal(12, 2)
+  processingFeeAmount  Decimal?          @db.Decimal(12, 2)
   included             Boolean           @default(true)
   currency             String            @default("PHP")
   stripeTransferId     String?           @unique
@@ -223,6 +248,16 @@ model EventVenueTransaction {
   providerId           String
   status               TransactionStatus @default(pending)
   agreedPrice          Decimal           @db.Decimal(12, 2)
+  // How this line was priced when it was booked: the Foxer's price is
+  // agreedPrice, and these are the rates and amounts added on top of it.
+  // Payouts, refunds and the client's breakdown read these, never today's
+  // rates. Null on lines booked before the per-category breakdown existed.
+  category             String?
+  commissionPct        Decimal?          @db.Decimal(5, 2)
+  commissionAmount     Decimal?          @db.Decimal(12, 2)
+  platformFeePct       Decimal?          @db.Decimal(5, 2)
+  platformFeeAmount    Decimal?          @db.Decimal(12, 2)
+  processingFeeAmount  Decimal?          @db.Decimal(12, 2)
   included             Boolean           @default(true)
   currency             String            @default("PHP")
   stripeTransferId     String?           @unique

@@ -171,6 +171,93 @@ export default class RewardRepo {
   }
 
   /**
+   * Grants whose Coins are still held: they carry Coins and have neither been
+   * released nor reversed.
+   */
+  private static pendingWhere(userId: string): Prisma.RewardEventWhereInput {
+    return {
+      userId,
+      coins: { gt: 0 },
+      lifecycles: {
+        none: {
+          type: {
+            in: [RewardLifecycleType.RELEASE, RewardLifecycleType.REVERSAL],
+          },
+        },
+      },
+    };
+  }
+
+  /** The ids of a user's grants whose Coins are still held. */
+  static async getPendingEventIds(userId: string): Promise<Set<string>> {
+    const held = await prisma.rewardEvent.findMany({
+      where: this.pendingWhere(userId),
+      select: { id: true },
+    });
+    return new Set(held.map((e) => e.id));
+  }
+
+  /** The Coins held for a user, not yet spendable. */
+  static async getPendingCoins(userId: string): Promise<number> {
+    const held = await prisma.rewardEvent.findMany({
+      where: this.pendingWhere(userId),
+      select: { coins: true },
+    });
+    return held.reduce((sum, e) => sum + e.coins, 0);
+  }
+
+  /**
+   * Whether a user has already had a paid booking attended: an attendance
+   * grant that paid Coins, which only a booking with a platform fee can.
+   */
+  static async hasPaidAttendance(userId: string): Promise<boolean> {
+    const found = await prisma.rewardEvent.findFirst({
+      where: { userId, action: "attend_event", coins: { gt: 0 } },
+      select: { id: true },
+    });
+    return !!found;
+  }
+
+  /**
+   * Releases every held grant of a user: one append-only RELEASE record per
+   * grant, and the Coins added to the spendable balance, in one transaction.
+   * Safe to call again: a released grant is no longer held.
+   */
+  static async releasePendingGrants(
+    userId: string,
+    reason: string,
+  ): Promise<{ released: number; coins: number }> {
+    return prisma.$transaction(async (tx) => {
+      const held = await tx.rewardEvent.findMany({
+        where: this.pendingWhere(userId),
+        select: { id: true, coins: true },
+      });
+      if (held.length === 0) return { released: 0, coins: 0 };
+
+      let total = 0;
+      for (const event of held) {
+        await tx.rewardLifecycle.create({
+          data: {
+            grantEventId: event.id,
+            userId,
+            type: RewardLifecycleType.RELEASE,
+            coinsDelta: event.coins,
+            reason,
+          },
+        });
+        total += event.coins;
+      }
+
+      await tx.passport.upsert({
+        where: { userId },
+        create: { userId, coins: total },
+        update: { coins: { increment: total } },
+      });
+      return { released: held.length, coins: total };
+    });
+  }
+
+  /**
    * Transactionally records an append-only reversal lifecycle event
    * and deducts the cached passport coins balance.
    */
@@ -193,8 +280,17 @@ export default class RewardRepo {
         },
       });
 
-      // 2. Decrement cached passport coins, clamping to 0 if necessary
-      if (data.coinsToReverse > 0) {
+      // 2. Decrement cached passport coins, clamping to 0 if necessary. Coins
+      // still held never reached the balance, so there is nothing to take
+      // back; the reversal record alone stops them from ever being released.
+      const wasReleased = await tx.rewardLifecycle.findFirst({
+        where: {
+          grantEventId: data.grantEventId,
+          type: RewardLifecycleType.RELEASE,
+        },
+        select: { id: true },
+      });
+      if (data.coinsToReverse > 0 && wasReleased) {
         const passport = await tx.passport.findUnique({
           where: { userId: data.userId },
           select: { coins: true },

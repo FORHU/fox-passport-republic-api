@@ -103,8 +103,8 @@ export const requirePermission = (permission: Permission) => {
 /**
  * `requirePermission`'s sibling for a route two different capabilities can
  * satisfy — e.g. `service.routes.ts`'s create/update/delete, which
- * `service:manage` (serviceFoxer) or `performer:manage` (performerFoxer) both
- * unlock, since both own rows of the same `Service` model. Kept separate from
+ * `service:manage` or `performer:manage` both unlock, since both cover rows
+ * of the same `Service` model. Kept separate from
  * `requirePermission` rather than adding a second overload, so its ~15
  * existing single-permission call sites are untouched.
  */

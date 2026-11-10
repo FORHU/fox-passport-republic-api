@@ -24,6 +24,32 @@ export interface CreateInvoiceParams {
     string,
     { voucherId: string; promotionId: string; discountAmount: number }
   >;
+  /**
+   * An Event priced with the per-line breakdown (#264 T12.1): the invoice
+   * charges exactly these totals instead of resolving a fee from
+   * `pricingContext`. `items[].amount` are the Foxer prices; the commission,
+   * FoxPassport fee and processing fee are recorded in `platformFeeSnapshot`.
+   */
+  eventCharges?: EventCharges;
+}
+
+/** What an Event checkout charges, from its lines' stored snapshots. */
+export interface EventCharges {
+  itemsTotal: number;
+  commissionTotal: number;
+  platformFee: number;
+  processingFee: number;
+  total: number;
+  lines: {
+    sourceId: string;
+    price: number;
+    commissionPct: number;
+    commission: number;
+    platformFeePct: number;
+    platformFee: number;
+    processingFee: number;
+    lineTotal: number;
+  }[];
 }
 
 export default class InvoiceSvc {
@@ -81,6 +107,50 @@ export default class InvoiceSvc {
             : item.amount;
         return sum + amt;
       }, 0);
+
+      // An Event with the per-line breakdown: charge its totals as they are.
+      // No discount (vouchers aren't offered on these, #264 Q7), and no fee
+      // rule lookup: every line already carries its fee.
+      if (data.eventCharges) {
+        const charges = data.eventCharges;
+        if (Math.abs(charges.itemsTotal - subtotalNum) > 0.005) {
+          throw new AppError(
+            `The Event's line prices (${charges.itemsTotal}) don't match its invoice items (${subtotalNum}).`,
+            500,
+            "EVENT_CHARGES_MISMATCH",
+          );
+        }
+        return tx.invoice.create({
+          data: {
+            payerId: data.payerId,
+            subtotalAmount: subtotalNum,
+            discountAmount: 0,
+            discountSnapshot: Prisma.JsonNull,
+            discountedSubtotal: subtotalNum,
+            platformFeeAmount: charges.platformFee,
+            platformFeeSnapshot: {
+              kind: "event_breakdown",
+              commissionTotal: charges.commissionTotal,
+              platformFee: charges.platformFee,
+              processingFee: charges.processingFee,
+              total: charges.total,
+              lines: charges.lines,
+            },
+            grossAmount: charges.total,
+            dueDate: data.dueDate,
+            items: {
+              create: data.items.map((item) => ({
+                amount: item.amount,
+                description: item.description,
+                sourceType: item.sourceType,
+                sourceId: item.sourceId,
+                discountAmount: 0,
+              })),
+            },
+          },
+          include: { items: true },
+        });
+      }
 
       const itemDiscounts = data.itemDiscounts ?? new Map();
       let itemDiscountsTotal = 0;

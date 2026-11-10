@@ -127,7 +127,7 @@ export default class AssetCtrl {
   }
 
   // Public browse for the search page — item-level pagination (city matches the
-  // owner's city, price filters the item itself; only gearFoxer-owned assets).
+  // owner's city, price filters the item itself; only Provider-owned assets).
   static async browseAssets(req: Request, res: Response) {
     try {
       const { city, maxPrice, page, limit, q } = req.query;

@@ -42,13 +42,13 @@ export async function seedSpecializations(prisma: PrismaClient, users: any[]) {
     rows.push(
       {
         userId: serviceFoxer.id,
-        roleType: "serviceFoxer",
+        roleType: "providerFoxer",
         category: "entertainment",
         source: "declared",
       },
       {
         userId: serviceFoxer.id,
-        roleType: "serviceFoxer",
+        roleType: "providerFoxer",
         category: "catering",
         source: "earned",
       },
@@ -59,13 +59,13 @@ export async function seedSpecializations(prisma: PrismaClient, users: any[]) {
     rows.push(
       {
         userId: gearFoxer.id,
-        roleType: "gearFoxer",
+        roleType: "providerFoxer",
         category: "sound_system",
         source: "earned",
       },
       {
         userId: gearFoxer.id,
-        roleType: "gearFoxer",
+        roleType: "providerFoxer",
         category: "decorations",
         source: "declared",
       },
@@ -99,7 +99,7 @@ export async function seedSpecializations(prisma: PrismaClient, users: any[]) {
       },
       {
         userId: multi.id,
-        roleType: "serviceFoxer",
+        roleType: "providerFoxer",
         category: "design",
         source: "declared",
       },
@@ -116,13 +116,13 @@ export async function seedSpecializations(prisma: PrismaClient, users: any[]) {
     rows.push(
       {
         userId: jasmine.id,
-        roleType: "serviceFoxer",
+        roleType: "providerFoxer",
         category: "entertainment",
         source: "declared",
       },
       {
         userId: jasmine.id,
-        roleType: "serviceFoxer",
+        roleType: "providerFoxer",
         category: "design",
         source: "earned",
       },
@@ -132,7 +132,7 @@ export async function seedSpecializations(prisma: PrismaClient, users: any[]) {
   if (marco) {
     rows.push({
       userId: marco.id,
-      roleType: "serviceFoxer",
+      roleType: "providerFoxer",
       category: "catering",
       source: "earned",
     });
@@ -142,13 +142,13 @@ export async function seedSpecializations(prisma: PrismaClient, users: any[]) {
     rows.push(
       {
         userId: sarah.id,
-        roleType: "serviceFoxer",
+        roleType: "providerFoxer",
         category: "service_staff",
         source: "declared",
       },
       {
         userId: sarah.id,
-        roleType: "serviceFoxer",
+        roleType: "providerFoxer",
         category: "entertainment",
         source: "earned",
       },
@@ -196,13 +196,13 @@ export async function seedSpecializations(prisma: PrismaClient, users: any[]) {
       rows.push(
         {
           userId: foxer.id,
-          roleType: "gearFoxer",
+          roleType: "providerFoxer",
           category: GF_CATEGORIES[i % GF_CATEGORIES.length],
           source: i % 3 === 0 ? "earned" : "declared",
         },
         {
           userId: foxer.id,
-          roleType: "gearFoxer",
+          roleType: "providerFoxer",
           category: GF_CATEGORIES[(i + 1) % GF_CATEGORIES.length],
           source: "earned",
         },
@@ -218,13 +218,13 @@ export async function seedSpecializations(prisma: PrismaClient, users: any[]) {
       rows.push(
         {
           userId: foxer.id,
-          roleType: "serviceFoxer",
+          roleType: "providerFoxer",
           category: SF_CATEGORIES[i % SF_CATEGORIES.length],
           source: i % 2 === 0 ? "earned" : "declared",
         },
         {
           userId: foxer.id,
-          roleType: "serviceFoxer",
+          roleType: "providerFoxer",
           category: SF_CATEGORIES[(i + 1) % SF_CATEGORIES.length],
           source: "declared",
         },

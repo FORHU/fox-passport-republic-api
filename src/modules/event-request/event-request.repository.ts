@@ -118,6 +118,16 @@ export default class EventRequestRepo {
     return count === 1;
   }
 
+  /** Completed events hosted by this organizer, for the Host Master milestone badge. */
+  static async countCompletedEventsByOrganizer(organizerId: string) {
+    return prisma.event.count({
+      where: {
+        organizerId,
+        eventStatus: EventStatus.completed,
+      },
+    });
+  }
+
   /**
    * Events that ended before `before` with live bookings and no check-in,
    * still unsettled and not yet flagged (EventRequestSvc.flagUnattendedPast).

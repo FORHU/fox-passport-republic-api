@@ -3,6 +3,11 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { bearer, emailOTP } from "better-auth/plugins";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { normalizeUsername, USERNAME_MESSAGE } from "../../utils/username";
+import {
+  PASSWORD_MAX,
+  PASSWORD_MIN,
+  passwordPolicyError,
+} from "../../utils/password-policy";
 import { prisma } from "../../utils/prisma";
 import { sendTemplatedEmail } from "../../utils/helpers";
 import {
@@ -15,6 +20,28 @@ import {
   FACEBOOK_APP_SECRET,
 } from "../../config";
 import bcrypt from "bcryptjs";
+
+// Better Auth routes that set a password, and the body field holding it.
+// Its own config only checks length; the hook below adds the character rules.
+const PASSWORD_FIELD_BY_PATH: Record<string, string> = {
+  "/sign-up/email": "password",
+  "/reset-password": "newPassword",
+  "/email-otp/reset-password": "password",
+  "/change-password": "newPassword",
+  "/set-password": "newPassword",
+};
+
+// Better Auth's emailOTP answers 200 for an unknown email and sends nothing, so
+// a client can't tell "code sent" from "no such account". These routes check
+// first and say so. That does reveal whether an email is registered; the
+// per-IP and per-account otpSendRateLimit in app.ts caps how fast anyone can ask.
+const PASSWORD_RESET_REQUEST_PATHS = new Set([
+  "/email-otp/request-password-reset",
+  "/forget-password/email-otp",
+]);
+
+export const NO_ACCOUNT_MESSAGE =
+  "No account found with this email. Please double-check your email and try again.";
 
 function checkUsername<T extends Record<string, unknown>>(user: T): T {
   if (user.username === undefined || user.username === null) return user;
@@ -111,6 +138,9 @@ export const auth = betterAuth({
     // A reset is what someone does when they think the account is exposed:
     // sign every device out, as the custom /auth/reset-password did.
     revokeSessionsOnPasswordReset: true,
+    // utils/password-policy.ts; the defaults were 8–128 (BUG-27).
+    minPasswordLength: PASSWORD_MIN,
+    maxPasswordLength: PASSWORD_MAX,
     password: {
       verify: async ({ password, hash }) => {
         return bcrypt.compare(password, hash);
@@ -129,6 +159,32 @@ export const auth = betterAuth({
     },
   },
   hooks: {
+    // The full password policy on every route that sets one, so a password
+    // the web would refuse can't be set by calling the API directly. Runs
+    // before the handler: nothing is created or changed when it fails.
+    before: createAuthMiddleware(async (ctx) => {
+      // A reset code is only sent to an account that exists. Lowercased the
+      // way the handler itself does before it looks the user up.
+      if (ctx.path && PASSWORD_RESET_REQUEST_PATHS.has(ctx.path)) {
+        const email = (ctx.body as Record<string, unknown> | undefined)?.email;
+        if (typeof email !== "string") return;
+        const user = await ctx.context.internalAdapter.findUserByEmail(
+          email.toLowerCase(),
+        );
+        if (!user) {
+          throw new APIError("NOT_FOUND", { message: NO_ACCOUNT_MESSAGE });
+        }
+        return;
+      }
+      const field = ctx.path ? PASSWORD_FIELD_BY_PATH[ctx.path] : undefined;
+      if (!field) return;
+      const password = (ctx.body as Record<string, unknown> | undefined)?.[
+        field
+      ];
+      if (typeof password !== "string") return;
+      const error = passwordPolicyError(password);
+      if (error) throw new APIError("BAD_REQUEST", { message: error });
+    }),
     // A sign-in replaces the session the request arrived with, as logging out
     // would. Signing in as someone else without logging out first used to
     // leave the first account's session valid for its full seven days, for

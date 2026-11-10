@@ -22,15 +22,32 @@ vi.mock("../src/modules/event/event.repository", () => ({
 
 const templates = vi.hoisted(() => ({
   getPublicTemplateWithItemOwners: vi.fn(),
-  calculateTotalsBreakdown: vi.fn(() => ({
-    itemsTotal: 0,
-    hostMarkupAmount: 0,
-    platformFeeAmount: 0,
-    totalAmount: 0,
-  })),
+  ownerCommissionPct: vi.fn(() => 10),
 }));
 vi.mock("../src/modules/event-template/event-template.service", () => ({
   default: templates,
+}));
+
+// The price breakdown (#264): one priced line per included row. Excluded
+// `tv2` has no line.
+const line = (itemId: string, price: number) => ({
+  kind: "asset",
+  itemId,
+  category: null,
+  quantity: 1,
+  unitPrice: price,
+  price,
+  commissionPct: 10,
+  commission: price / 10,
+  platformFeePct: 5,
+  platformFee: price / 20,
+  processingFeePct: 3,
+  processingFee: (price * 3) / 100,
+  lineTotal: price * 1.18,
+});
+const pricing = vi.hoisted(() => ({ calculateEventBreakdown: vi.fn() }));
+vi.mock("../src/modules/pricing/pricing.service", () => ({
+  default: pricing,
 }));
 
 const availability = vi.hoisted(() => ({ reserve: vi.fn() }));
@@ -96,6 +113,16 @@ beforeEach(() => {
   templates.getPublicTemplateWithItemOwners.mockResolvedValue(
     structuredClone(TEMPLATE),
   );
+  pricing.calculateEventBreakdown.mockResolvedValue({
+    lines: [line("ta1", 3000), line("ts1", 5000), line("tv1", 10000)],
+    itemsTotal: 18000,
+    commissionTotal: 1800,
+    platformFee: 900,
+    processingFee: 540,
+    total: 21240,
+    estimatedTotal: 21240,
+    currency: "PHP",
+  });
   availability.reserve.mockResolvedValue(undefined);
   createBooking = vi
     .spyOn(BookingSvc, "createBooking")
@@ -134,6 +161,47 @@ describe("BookingSvc.bookFromTemplate reservations", () => {
     });
     expect(createBooking).not.toHaveBeenCalled();
     expect(eventRepo.deleteUnbooked).toHaveBeenCalledWith("e1");
+  });
+
+  it("prices the Event with the breakdown and snapshots each included line (#264 T7/T8)", async () => {
+    await book();
+
+    expect(pricing.calculateEventBreakdown).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "t1" }),
+      10,
+      expect.objectContaining({ excludedVenueIds: ["tv2"] }),
+      { eventFoxerId: "foxer" },
+    );
+    expect(eventRepo.createFromTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemsTotal: 18000,
+        hostMarkupAmount: 1800,
+        platformFeeAmount: 900,
+        processingFeeAmount: 540,
+        totalAmount: 21240,
+        commissionPct: 10,
+      }),
+    );
+    expect(createBooking).toHaveBeenCalledWith(
+      expect.objectContaining({ totalAmount: 21240 }),
+    );
+
+    const rows = eventRepo.createEscrowTransactions.mock.calls[0][1];
+    expect(rows.assets[0]).toMatchObject({
+      agreedPrice: 3000,
+      commissionPct: 10,
+      commissionAmount: 300,
+      platformFeePct: 5,
+      platformFeeAmount: 150,
+      processingFeeAmount: 90,
+      included: true,
+    });
+    // The excluded venue keeps its old price, has no snapshot, and is never paid.
+    const tv2 = rows.venues.find(
+      (v: { venueId: string }) => v.venueId === "v2",
+    );
+    expect(tv2).toMatchObject({ included: false });
+    expect(tv2).not.toHaveProperty("commissionAmount");
   });
 
   it("cancels the booking when it loses a race for the dates", async () => {

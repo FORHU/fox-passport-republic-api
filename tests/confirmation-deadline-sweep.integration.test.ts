@@ -29,7 +29,7 @@ describe("ConfirmationDeadlineSweepSvc.runSweep — deadline expiration and race
         email: `sweep_provider_${runId}@test.com`,
         password: "pw",
         name: "Provider",
-        roleType: ["gearFoxer"],
+        roleType: ["providerFoxer"],
       },
     });
     customerId = customer.id;

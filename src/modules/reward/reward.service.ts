@@ -4,6 +4,7 @@ import { AppError, notFound } from "../../utils/errors";
 import RewardRepo from "./reward.repository";
 import PassportSvc from "../passport/passport.service";
 import PassportRepo from "../passport/passport.repository";
+import RankSvc from "../passport/rank.service";
 import {
   GrantRewardParams,
   GrantRewardResult,
@@ -16,22 +17,23 @@ import {
   RedeemRewardResult,
 } from "./reward.types";
 
+/**
+ * The one-time rewards whose Coins are held until the account's first attended
+ * paid booking (requirements/xp-and-coins.md, section 3.1), so a new account
+ * cannot farm free Coins without ever spending. The XP is paid at once.
+ */
+export const HELD_ACTIONS: ReadonlySet<string> = new Set([
+  "finish_intro",
+  "complete_profile",
+  "verify_identity",
+]);
+
 export default class RewardService {
   /**
    * Resolves rank title for a given level and path based on the 9-rank ladder.
    */
   static calculateRank(level: number, path: UserPath = UserPath.user): string {
-    const isCitizen = path === UserPath.user;
-
-    if (level >= 50) return "Legend";
-    if (level >= 40) return isCitizen ? "Vanguard" : "Luminary";
-    if (level >= 30) return isCitizen ? "Pioneer" : "Icon";
-    if (level >= 20) return isCitizen ? "Adventurer" : "Maestro";
-    if (level >= 15) return isCitizen ? "Voyager" : "Headliner";
-    if (level >= 10) return isCitizen ? "Trailblazer" : "Veteran";
-    if (level >= 5) return isCitizen ? "Explorer" : "Pro";
-    if (level >= 3) return isCitizen ? "Wanderer" : "Regular";
-    return isCitizen ? "Newcomer" : "Rookie";
+    return RankSvc.nameForLevel(level, path);
   }
 
   /**
@@ -103,9 +105,11 @@ export default class RewardService {
     }
 
     // 4. Daily Cap Check
+    const effectiveDailyCap =
+      rule?.dailyCap ?? (params.action === "review_helpful" ? 5 : undefined);
     if (
-      rule?.dailyCap &&
-      rule.dailyCap > 0 &&
+      effectiveDailyCap &&
+      effectiveDailyCap > 0 &&
       (xpToAward > 0 || coinsToAward > 0)
     ) {
       const startOfDay = this.getStartOfDayManila();
@@ -114,7 +118,7 @@ export default class RewardService {
         params.action,
         startOfDay,
       );
-      if (countToday >= rule.dailyCap) {
+      if (countToday >= effectiveDailyCap) {
         xpToAward = 0;
         coinsToAward = 0;
       }
@@ -146,6 +150,13 @@ export default class RewardService {
       }
     }
 
+    // The one-time Coins are held until a paid booking has been attended; once
+    // one has, they are paid at once.
+    const isPending =
+      coinsToAward > 0 &&
+      HELD_ACTIONS.has(params.action) &&
+      !(await RewardRepo.hasPaidAttendance(params.userId));
+
     // 6. Record Immutable Grant & Lifecycle in Database
     await RewardRepo.recordGrant({
       userId: params.userId,
@@ -156,7 +167,20 @@ export default class RewardService {
       xp: xpToAward,
       coins: coinsToAward,
       idempotencyKey,
+      isPending,
     });
+
+    // 6b. Attending a booking that paid a platform fee is what frees the held
+    // Coins. Free bookings do not count.
+    if (
+      params.action === "attend_event" &&
+      Number(params.bookingFeeAmount ?? 0) > 0
+    ) {
+      await RewardRepo.releasePendingGrants(
+        params.userId,
+        "Released after the first attended paid booking",
+      );
+    }
 
     // 7. Progress XP, Levels, Badges, and Perks through Passport Service
     if (xpToAward > 0) {
@@ -290,6 +314,7 @@ export default class RewardService {
     const { events, lifecycles } =
       await RewardRepo.getUserRewardHistory(userId);
 
+    const heldIds = await RewardRepo.getPendingEventIds(userId);
     const history: WalletHistoryItem[] = [];
 
     for (const ev of events) {
@@ -302,6 +327,7 @@ export default class RewardService {
         refType: ev.refType,
         refId: ev.refId,
         reason: `Earned from ${ev.action}`,
+        isPending: heldIds.has(ev.id),
         createdAt: ev.createdAt,
       });
     }
@@ -324,7 +350,7 @@ export default class RewardService {
 
     return {
       coins,
-      pendingCoins: 0,
+      pendingCoins: await RewardRepo.getPendingCoins(userId),
       totalEarnedCoins,
       level,
       rank: this.calculateRank(level, path),

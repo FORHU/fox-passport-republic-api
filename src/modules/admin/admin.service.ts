@@ -30,7 +30,6 @@ const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
 });
 import { cached, invalidate, versionedCache } from "../../utils/cache.util";
 import { notifyDecision } from "../notifications/decision-notification";
-import { isPerformerServiceCategory } from "../../types/permissions";
 import { sendDecisionEmail } from "../notifications/decision-email";
 import {
   announceAdminQueueChanged,
@@ -704,7 +703,7 @@ export default class AdminSvc {
       .then(({ default: PassportSvc, XP_REWARDS, UserPath }) =>
         PassportSvc.awardXP(
           asset.ownerId,
-          UserPath.gearFoxer,
+          UserPath.providerFoxer,
           XP_REWARDS.createListing,
         ),
       )
@@ -745,9 +744,7 @@ export default class AdminSvc {
       .then(({ default: PassportSvc, XP_REWARDS, UserPath }) =>
         PassportSvc.awardXP(
           service.ownerId,
-          isPerformerServiceCategory(service.category)
-            ? UserPath.performerFoxer
-            : UserPath.serviceFoxer,
+          UserPath.providerFoxer,
           XP_REWARDS.createListing,
         ),
       )

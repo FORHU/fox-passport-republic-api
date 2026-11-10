@@ -11,6 +11,8 @@ import { getVenueCoords } from "./city-coords";
 import { hashPassword } from "../../src/utils/password";
 
 const SEED_PASSWORD = "Password123!";
+const PARTNER_BIO =
+  "Fox Partner hosts curated venues across Luzon, from Tagaytay hillside villas to Makati rooftops.";
 
 export async function seedPartners(prisma: PrismaClient) {
   try {
@@ -29,13 +31,13 @@ export async function seedPartners(prisma: PrismaClient) {
         roleType: [
           "venueFoxer",
           "eventFoxer",
-          "gearFoxer",
-          "serviceFoxer",
+          "providerFoxer",
           "investor",
         ] as any,
         city: "Makati",
         state: "Metro Manila",
         country: "Philippines",
+        bio: PARTNER_BIO,
       },
       create: {
         email: "partner@example.com",
@@ -46,30 +48,25 @@ export async function seedPartners(prisma: PrismaClient) {
         roleType: [
           "venueFoxer",
           "eventFoxer",
-          "gearFoxer",
-          "serviceFoxer",
+          "providerFoxer",
           "investor",
         ] as any,
         city: "Makati",
         state: "Metro Manila",
         country: "Philippines",
+        bio: PARTNER_BIO,
       },
     });
     console.log(
-      `✓ Partner user: ${partner.email} — roles: [venueFoxer, eventFoxer, gearFoxer, serviceFoxer, investor]`,
+      `✓ Partner user: ${partner.email} — roles: [venueFoxer, eventFoxer, providerFoxer, investor]`,
     );
 
-    // Also promote multirole user to include gearFoxer
+    // Also promote multirole user to include providerFoxer
     await prisma.user
       .update({
         where: { email: "multirole@example.com" },
         data: {
-          roleType: [
-            "eventFoxer",
-            "venueFoxer",
-            "gearFoxer",
-            "serviceFoxer",
-          ] as any,
+          roleType: ["eventFoxer", "venueFoxer", "providerFoxer"] as any,
         },
       })
       .catch(() => {

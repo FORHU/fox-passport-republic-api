@@ -1,7 +1,8 @@
 import { AppError, notFound } from "../../utils/errors";
 import Stripe from "stripe";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
-import InvoiceSvc from "./invoice.service";
+import InvoiceSvc, { type EventCharges } from "./invoice.service";
+import { commissionPctOf } from "../pricing/event-breakdown";
 import CheckoutSvc from "./checkout.service";
 import PricingSvc from "../pricing/pricing.service";
 import RefundSvc from "../refund/refund.service";
@@ -37,6 +38,55 @@ export class BlockingItemsError extends AppError {
   }
 }
 
+/** A payable transaction row with its stored pricing snapshot (#264 T1). */
+type SnapshotRow = {
+  id: string;
+  agreedPrice: Prisma.Decimal;
+  commissionPct: Prisma.Decimal | null;
+  commissionAmount: Prisma.Decimal | null;
+  platformFeePct: Prisma.Decimal | null;
+  platformFeeAmount: Prisma.Decimal | null;
+  processingFeeAmount: Prisma.Decimal | null;
+  category: string | null;
+  venue?: { category: string } | null;
+  asset?: { category: string } | null;
+  service?: { category: string } | null;
+};
+
+function hasSnapshot(row: SnapshotRow): boolean {
+  return (
+    row.commissionPct != null &&
+    row.commissionAmount != null &&
+    row.platformFeePct != null &&
+    row.platformFeeAmount != null &&
+    row.processingFeeAmount != null
+  );
+}
+
+/** The listing's category, which picks the line's FoxPassport fee rule. */
+function listingCategory(row: SnapshotRow): string | null {
+  return (
+    row.category ??
+    row.venue?.category ??
+    row.asset?.category ??
+    row.service?.category ??
+    null
+  );
+}
+
+/**
+ * Vouchers aren't offered on Events priced with the per-line breakdown yet
+ * (#264 Q7, D11): a discount would have to say which of the commission, fee
+ * and Foxer price it comes out of.
+ */
+function vouchersNotOffered() {
+  return new AppError(
+    "Vouchers can't be used on events yet. Remove the code to continue.",
+    400,
+    "VOUCHERS_NOT_OFFERED_ON_EVENTS",
+  );
+}
+
 const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-08-27.basil",
 });
@@ -59,22 +109,24 @@ export default class EventCheckoutSvc {
       where: { id: eventId },
       include: {
         bookings: { select: { id: true }, take: 1 },
+        // `included: true`: an item the client left out of the package
+        // (`included: false`) is never charged (#264 review).
         venueTransactions: {
-          where: { status: "pending" },
+          where: { status: "pending", included: true },
           include: {
             venue: { select: { name: true, category: true } },
             provider: { select: { name: true } },
           },
         },
         assetTransactions: {
-          where: { status: { in: [...PAYABLE_STATUSES] } },
+          where: { status: { in: [...PAYABLE_STATUSES] }, included: true },
           include: {
             asset: { select: { name: true, category: true } },
             provider: { select: { name: true } },
           },
         },
         serviceTransactions: {
-          where: { status: { in: [...PAYABLE_STATUSES] } },
+          where: { status: { in: [...PAYABLE_STATUSES] }, included: true },
           include: {
             service: { select: { name: true, category: true } },
             provider: { select: { name: true } },
@@ -91,11 +143,19 @@ export default class EventCheckoutSvc {
     // charged, not have it quietly disappear.
     const [blockingAssets, blockingServices] = await Promise.all([
       tx.eventAssetTransaction.findMany({
-        where: { eventId, status: "pending_provider_confirmation" },
+        where: {
+          eventId,
+          status: "pending_provider_confirmation",
+          included: true,
+        },
         select: { id: true },
       }),
       tx.eventServiceTransaction.findMany({
-        where: { eventId, status: "pending_provider_confirmation" },
+        where: {
+          eventId,
+          status: "pending_provider_confirmation",
+          included: true,
+        },
         select: { id: true },
       }),
     ]);
@@ -193,7 +253,107 @@ export default class EventCheckoutSvc {
       });
     });
 
-    return { event, items, pricingItems, displayItems };
+    const charges = await this.eventCharges(event);
+
+    return { event, items, pricingItems, displayItems, charges };
+  }
+
+  /**
+   * What an Event priced with the per-line breakdown charges (#264 T12.1):
+   * each payable line's stored snapshot (Foxer price, commission, FoxPassport
+   * fee, processing fee). A line without one (an item added to the booking
+   * before snapshots were written) is priced now with the Event's own rate.
+   * Null for an Event priced before per-Event rates existed, which keeps the
+   * old checkout pricing unchanged.
+   */
+  private static async eventCharges(event: {
+    commissionPct: Prisma.Decimal | null;
+    venueTransactions: SnapshotRow[];
+    assetTransactions: SnapshotRow[];
+    serviceTransactions: SnapshotRow[];
+  }): Promise<EventCharges | null> {
+    if (event.commissionPct == null) return null;
+    const commissionPct = commissionPctOf(event.commissionPct);
+
+    // Same order as `items` in `getPayableItems`: venues, gear, services.
+    const rows: { row: SnapshotRow; kind: "venue" | "asset" | "service" }[] = [
+      ...event.venueTransactions.map((row) => ({
+        row,
+        kind: "venue" as const,
+      })),
+      ...event.assetTransactions.map((row) => ({
+        row,
+        kind: "asset" as const,
+      })),
+      ...event.serviceTransactions.map((row) => ({
+        row,
+        kind: "service" as const,
+      })),
+    ];
+
+    const unpriced = rows.filter(({ row }) => !hasSnapshot(row));
+    const priced = unpriced.length
+      ? await PricingSvc.calculateEventBreakdownForLines(
+          unpriced.map(({ row, kind }) => ({
+            kind,
+            listingId: row.id,
+            category: listingCategory(row),
+            // `agreedPrice` is already the whole line (price × quantity).
+            unitPrice: row.agreedPrice,
+          })),
+          commissionPct,
+        )
+      : null;
+    const pricedById = new Map(
+      unpriced.map(({ row }, i) => [row.id, priced!.lines[i]] as const),
+    );
+
+    let itemsTotal = new Prisma.Decimal(0);
+    let commissionTotal = new Prisma.Decimal(0);
+    let platformFee = new Prisma.Decimal(0);
+    let processingFee = new Prisma.Decimal(0);
+    const lines = rows.map(({ row }) => {
+      const now = pricedById.get(row.id);
+      const line = now
+        ? {
+            price: now.price,
+            commissionPct: now.commissionPct,
+            commission: now.commission,
+            platformFeePct: now.platformFeePct,
+            platformFee: now.platformFee,
+            processingFee: now.processingFee,
+          }
+        : {
+            price: row.agreedPrice.toNumber(),
+            commissionPct: row.commissionPct!.toNumber(),
+            commission: row.commissionAmount!.toNumber(),
+            platformFeePct: row.platformFeePct!.toNumber(),
+            platformFee: row.platformFeeAmount!.toNumber(),
+            processingFee: row.processingFeeAmount!.toNumber(),
+          };
+      const lineTotal = new Prisma.Decimal(line.price)
+        .plus(line.commission)
+        .plus(line.platformFee)
+        .plus(line.processingFee);
+      itemsTotal = itemsTotal.plus(line.price);
+      commissionTotal = commissionTotal.plus(line.commission);
+      platformFee = platformFee.plus(line.platformFee);
+      processingFee = processingFee.plus(line.processingFee);
+      return { sourceId: row.id, ...line, lineTotal: lineTotal.toNumber() };
+    });
+
+    return {
+      itemsTotal: itemsTotal.toNumber(),
+      commissionTotal: commissionTotal.toNumber(),
+      platformFee: platformFee.toNumber(),
+      processingFee: processingFee.toNumber(),
+      total: itemsTotal
+        .plus(commissionTotal)
+        .plus(platformFee)
+        .plus(processingFee)
+        .toNumber(),
+      lines,
+    };
   }
 
   /**
@@ -248,10 +408,11 @@ export default class EventCheckoutSvc {
         // back.
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`event-checkout:${eventId}`}, 0))`;
 
-        const { event, items, pricingItems } = await this.getPayableItems(
-          eventId,
-          tx,
-        );
+        const { event, items, pricingItems, charges } =
+          await this.getPayableItems(eventId, tx);
+        if (charges && voucherCodes.length > 0) {
+          throw vouchersNotOffered();
+        }
 
         if (event.clientId !== payerId) {
           throw new AppError(
@@ -339,6 +500,25 @@ export default class EventCheckoutSvc {
           // cancelled/failed/refunded — not blocking, falls through to a fresh invoice below.
         }
 
+        // An Event with the per-line breakdown: charge its lines' totals.
+        if (charges) {
+          const newInvoice = await InvoiceSvc.createInvoice(
+            {
+              payerId,
+              pricingContext: { transactionType: "event" },
+              items,
+              eventCharges: charges,
+              dueDate: event.startAt,
+            },
+            tx,
+          );
+          const newCheckout = await CheckoutSvc.createPendingCheckout(
+            tx,
+            newInvoice.id,
+          );
+          return { checkout: newCheckout, invoice: newInvoice };
+        }
+
         // Resolve every voucher code up front — a bad code (invalid,
         // matches nothing in this cart, two codes aimed at one item) must
         // fail the whole checkout attempt rather than silently create an
@@ -410,7 +590,7 @@ export default class EventCheckoutSvc {
     callerId: string,
     voucherCodes: string[] = [],
   ) {
-    const { event, items, pricingItems, displayItems } =
+    const { event, items, pricingItems, displayItems, charges } =
       await this.getPayableItems(eventId);
 
     if (event.clientId !== callerId) {
@@ -421,6 +601,27 @@ export default class EventCheckoutSvc {
     }
     if (items.length === 0) {
       throw new AppError("No payable transactions found for this event.", 400);
+    }
+
+    // An Event with the per-line breakdown (#264 T12.1): every line and the
+    // total, exactly as `createEventCheckout` will charge them.
+    if (charges) {
+      if (voucherCodes.length > 0) throw vouchersNotOffered();
+      return {
+        eventId,
+        currency: "PHP",
+        items: displayItems.map((display, i) => ({
+          ...display,
+          ...charges.lines[i],
+          discountAmount: 0,
+        })),
+        subtotalAmount: charges.itemsTotal,
+        commissionAmount: charges.commissionTotal,
+        discountAmount: 0,
+        platformFeeAmount: charges.platformFee,
+        processingFeeAmount: charges.processingFee,
+        grossAmount: charges.total,
+      };
     }
 
     const subtotal = items.reduce((sum, item) => {

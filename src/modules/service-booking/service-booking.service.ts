@@ -18,7 +18,6 @@ import NotificationService from "../notifications/user-notification.service";
 import PricingSvc from "../pricing/pricing.service";
 import PromotionSvc from "../promotion/promotion.service";
 import RefundSvc from "../refund/refund.service";
-import { isPerformerServiceCategory } from "../../types/permissions";
 import AvailabilitySvc from "../availability/availability.service";
 import { sendBookingConfirmationEmail } from "../../utils/emails/confirmation";
 import {
@@ -379,9 +378,6 @@ export default class ServiceBookingSvc {
       } catch (err) {
         console.error(`Payout failed for service booking ${id}`, err);
       }
-      const isPerformerListing = booking.service?.category
-        ? isPerformerServiceCategory(booking.service.category)
-        : false;
       import("../passport/passport.service")
         .then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
           const ownerId =
@@ -389,9 +385,7 @@ export default class ServiceBookingSvc {
           if (ownerId)
             return PassportSvc.awardXP(
               ownerId,
-              isPerformerListing
-                ? UserPath.performerFoxer
-                : UserPath.serviceFoxer,
+              UserPath.providerFoxer,
               XP_REWARDS.listingBooked,
             );
         })
@@ -402,9 +396,7 @@ export default class ServiceBookingSvc {
           const ownerId =
             booking.service?.ownerId ?? booking.service?.owner?.id;
           if (serviceId && ownerId)
-            return isPerformerListing
-              ? SpecializationSvc.checkPerformerFoxer(serviceId, ownerId)
-              : SpecializationSvc.checkServiceFoxer(serviceId, ownerId);
+            return SpecializationSvc.checkProviderService(serviceId, ownerId);
         })
         .catch(() => {});
     }

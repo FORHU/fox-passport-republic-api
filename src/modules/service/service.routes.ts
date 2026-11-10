@@ -13,7 +13,7 @@ router.get("/browse", ServiceCtrl.browseServices);
 router.get("/:id", ServiceCtrl.getServiceById);
 
 // Protected routes. `performer:manage` sits alongside `service:manage` since
-// performer-category Service rows are owned by performerFoxer — the
+// performer-category Service rows need `performer:manage` — the
 // category-specific check (which of the two a given `category` requires)
 // happens in the controller, once `category` is known; this route-level
 // gate only asks "does the caller hold either."

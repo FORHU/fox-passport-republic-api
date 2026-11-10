@@ -1,6 +1,20 @@
 import { prisma } from "../../utils/prisma";
 import { PlatformFeeConfig, Prisma } from "@prisma/client";
-import { PLATFORM_FEE_PERCENT } from "../../config";
+import { PLATFORM_FEE_PERCENT, PROCESSING_FEE_PERCENT } from "../../config";
+import {
+  buildEventBreakdown,
+  eventTemplateLines,
+  type EventBreakdown,
+  type EventBreakdownExclusions,
+  type EventBreakdownInputLine,
+  type EventTemplateForBreakdown,
+} from "./event-breakdown";
+import { AppError } from "../../utils/errors";
+import {
+  EVENT_ITEM_TRANSACTION_TYPE,
+  type EventItemFeeInput,
+  type EventItemFeeRate,
+} from "./event-item-fee";
 type Decimal = Prisma.Decimal;
 
 export interface PricingContext {
@@ -40,52 +54,314 @@ export interface PricingBreakdown {
   finalAmount: number;
 }
 
+/**
+ * The most specific rule in `rules` for `context`, or null. A rule that names a
+ * transaction type, category or subcategory only matches that value; among the
+ * matches, subcategory outweighs category, which outweighs transaction type,
+ * and `priority` breaks ties. Pure, so one fetched rule list can price many
+ * lines (see `resolveEventItemFeeRates`).
+ */
+export function pickPricingRule<
+  R extends Pick<
+    PlatformFeeConfig,
+    "transactionType" | "category" | "subcategory" | "priority"
+  >,
+>(
+  rules: readonly R[],
+  context: Pick<PricingContext, "transactionType" | "category" | "subcategory">,
+): R | null {
+  let bestMatch: R | null = null;
+  let matchScore = -1;
+
+  for (const rule of rules) {
+    let score = 0;
+
+    // Strict exclusions (if rule defines a context property, it must match)
+    if (
+      rule.transactionType &&
+      rule.transactionType !== context.transactionType
+    )
+      continue;
+    if (rule.category && rule.category !== context.category) continue;
+    if (rule.subcategory && rule.subcategory !== context.subcategory) continue;
+
+    // Scoring
+    if (rule.transactionType === context.transactionType) score += 10;
+    if (rule.category === context.category) score += 100;
+    if (rule.subcategory === context.subcategory) score += 1000;
+
+    score += rule.priority; // Allow manual override
+
+    if (score > matchScore) {
+      matchScore = score;
+      bestMatch = rule;
+    }
+  }
+
+  return bestMatch;
+}
+
+/** Rules in force right now: active, started, not yet ended. */
+function activeRuleWhere(now: Date): Prisma.PlatformFeeConfigWhereInput {
+  return {
+    active: true,
+    effectiveFrom: { lte: now },
+    OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: now } }],
+  };
+}
+
 export default class PricingSvc {
   /**
    * Resolves the most specific pricing rule based on context.
    */
   static async resolvePricingRule(context: PricingContext) {
     const rules = await prisma.platformFeeConfig.findMany({
-      where: {
-        active: true,
-        effectiveFrom: { lte: new Date() },
-        OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: new Date() } }],
-      },
+      where: activeRuleWhere(new Date()),
       orderBy: {
         priority: "desc",
       },
     });
 
-    let bestMatch: PlatformFeeConfig | null = null;
-    let matchScore = -1;
+    return pickPricingRule(rules, context);
+  }
 
-    for (const rule of rules) {
-      let score = 0;
+  /**
+   * The rules that can price an Event line: `event_item` rules in force that
+   * have a percentage. Catch-all rules (no transaction type) are left out on
+   * purpose: they were written for `event`/`sponsorship` pricing, and letting
+   * their `priority` or `subcategory` compete would let them override the
+   * `event_item` default, or block checkout with a fixed-amount-only rule.
+   */
+  private static fetchEventItemRules() {
+    return prisma.platformFeeConfig.findMany({
+      where: {
+        AND: [
+          activeRuleWhere(new Date()),
+          {
+            transactionType: EVENT_ITEM_TRANSACTION_TYPE,
+            percentage: { not: null },
+          },
+        ],
+      },
+      orderBy: { priority: "desc" },
+    });
+  }
 
-      // Strict exclusions (if rule defines a context property, it must match)
-      if (
-        rule.transactionType &&
-        rule.transactionType !== context.transactionType
-      )
-        continue;
-      if (rule.category && rule.category !== context.category) continue;
-      if (rule.subcategory && rule.subcategory !== context.subcategory)
-        continue;
+  private static pickEventItemRule(
+    rules: PlatformFeeConfig[],
+    item: { itemType?: string | null; listingCategory?: string | null },
+  ) {
+    return pickPricingRule(rules, {
+      transactionType: EVENT_ITEM_TRANSACTION_TYPE,
+      category: item.itemType ?? undefined,
+      subcategory: item.listingCategory ?? undefined,
+    });
+  }
 
-      // Scoring
-      if (rule.transactionType === context.transactionType) score += 10;
-      if (rule.category === context.category) score += 100;
-      if (rule.subcategory === context.subcategory) score += 1000;
+  /**
+   * The rule that would price one Event line, or null when none would and
+   * checkout would refuse it. The admin preview uses this, so it shows exactly
+   * what `resolveEventItemFeeRates` charges.
+   */
+  static async resolveEventItemFeeRule(item: {
+    itemType?: string | null;
+    listingCategory?: string | null;
+  }) {
+    const rules = await this.fetchEventItemRules();
+    return this.pickEventItemRule(rules, item);
+  }
 
-      score += rule.priority; // Allow manual override
+  /**
+   * The FoxPassport fee rate for every Foxer line on an Event, from one query
+   * (#264 T3.4). Only `event_item` rules with a percentage take part
+   * (`fetchEventItemRules`); among them `category` = item type and
+   * `subcategory` = the listing's category, so the admin's most specific rule
+   * wins and the default rule (no category) covers the rest.
+   *
+   * The result is index-aligned with `items`. Percentages are in percent and
+   * are never rescaled: a rule of 1 is 1%.
+   *
+   * Throws rather than pricing a line at 0% when no rule covers it. The
+   * default rule from migration
+   * `20261109130000_add_default_event_item_fee_rule` prevents that unless an
+   * admin deactivates or ends it.
+   */
+  static async resolveEventItemFeeRates(
+    items: readonly EventItemFeeInput[],
+  ): Promise<EventItemFeeRate[]> {
+    if (items.length === 0) return [];
+    return this.feeRatesFromRules(await this.fetchEventItemRules(), items);
+  }
 
-      if (score > matchScore) {
-        matchScore = score;
-        bestMatch = rule;
+  /** `resolveEventItemFeeRates` against rules already fetched. */
+  private static feeRatesFromRules(
+    rules: PlatformFeeConfig[],
+    items: readonly EventItemFeeInput[],
+  ): EventItemFeeRate[] {
+    return items.map((item) => {
+      const rule = this.pickEventItemRule(rules, item);
+      if (!rule || rule.percentage == null) {
+        const what = item.listingCategory
+          ? `${item.itemType} (${item.listingCategory})`
+          : item.itemType;
+        throw new AppError(
+          `No FoxPassport fee rule covers ${what} on an Event. ` +
+            `Add, reactivate or extend an "${EVENT_ITEM_TRANSACTION_TYPE}" fee rule with a percentage and no category.`,
+          500,
+          "EVENT_ITEM_FEE_RULE_MISSING",
+        );
       }
-    }
+      return {
+        percentage: rule.percentage.toNumber(),
+        ruleId: rule.id,
+        ruleName: rule.name,
+      };
+    });
+  }
 
-    return bestMatch;
+  /**
+   * The full price breakdown for an Event built from `template` (#264 T4):
+   * every Foxer line with its commission, FoxPassport fee and processing fee,
+   * plus the totals. See `event-breakdown.ts` for the formula and rounding.
+   *
+   * - `commissionPct` is the EventFoxer's rate: the Event's snapshot once it
+   *   has a booking, otherwise the EventFoxer's current rate. The caller picks.
+   * - The FoxPassport fee per line comes only from `event_item` fee rules
+   *   (`resolveEventItemFeeRates`), never from `PLATFORM_FEE_PERCENT` or the
+   *   template's `platformFeePct`.
+   * - The processing fee is `PROCESSING_FEE_PERCENT` unless `processingFeePct`
+   *   is given.
+   */
+  static async calculateEventBreakdown(
+    template: EventTemplateForBreakdown,
+    commissionPct: number,
+    exclusions?: EventBreakdownExclusions,
+    options?: { processingFeePct?: number; eventFoxerId?: string },
+  ): Promise<EventBreakdown> {
+    const [breakdown] = await this.calculateEventBreakdowns(
+      [
+        {
+          template,
+          commissionPct,
+          exclusions,
+          eventFoxerId: options?.eventFoxerId,
+        },
+      ],
+      options,
+    );
+    return breakdown;
+  }
+
+  /**
+   * `calculateEventBreakdown` for many templates with one fee-rule query, for
+   * the browse lists (#264 T6). Index-aligned with `entries`.
+   */
+  static async calculateEventBreakdowns(
+    entries: readonly {
+      template: EventTemplateForBreakdown;
+      commissionPct: number;
+      exclusions?: EventBreakdownExclusions;
+      /** The EventFoxer; their approved venue affiliations set those venues' prices. */
+      eventFoxerId?: string;
+    }[],
+    options?: { processingFeePct?: number },
+  ): Promise<EventBreakdown[]> {
+    const affiliationPrices = await this.fetchAffiliationVenuePrices(entries);
+    const linesPerEntry = entries.map((e) =>
+      eventTemplateLines(
+        e.template,
+        e.exclusions,
+        e.eventFoxerId ? affiliationPrices.get(e.eventFoxerId) : undefined,
+      ),
+    );
+    const rules = linesPerEntry.some((lines) => lines.length > 0)
+      ? await this.fetchEventItemRules()
+      : [];
+    return entries.map((entry, i) =>
+      this.breakdownFromRules(
+        rules,
+        linesPerEntry[i],
+        entry.commissionPct,
+        options,
+      ),
+    );
+  }
+
+  /**
+   * The price a venue's Mayor agreed with an EventFoxer, for every approved
+   * affiliation that lets them attach it (`template:attach`), by EventFoxer
+   * then venue id. That price is the Mayor's own price for this EventFoxer,
+   * so it replaces the listing price (#264, owner decision 2026-11-09). One
+   * query for every template in `entries`.
+   */
+  private static async fetchAffiliationVenuePrices(
+    entries: readonly {
+      template: EventTemplateForBreakdown;
+      eventFoxerId?: string;
+    }[],
+  ): Promise<Map<string, Map<string, Prisma.Decimal>>> {
+    const pairs = entries.flatMap((e) =>
+      e.eventFoxerId
+        ? (e.template.templateVenues ?? []).flatMap((tv) =>
+            tv.venue?.id
+              ? [{ venueId: tv.venue.id, eventFoxerId: e.eventFoxerId! }]
+              : [],
+          )
+        : [],
+    );
+    const byFoxer = new Map<string, Map<string, Prisma.Decimal>>();
+    if (pairs.length === 0) return byFoxer;
+
+    const affiliations = await prisma.venueEventFoxerAffiliation.findMany({
+      where: {
+        OR: pairs,
+        status: "approved",
+        permissions: { has: "template:attach" },
+        agreedPrice: { not: null },
+      },
+      select: { venueId: true, eventFoxerId: true, agreedPrice: true },
+    });
+    for (const a of affiliations) {
+      if (!a.agreedPrice) continue;
+      const venues = byFoxer.get(a.eventFoxerId) ?? new Map();
+      venues.set(a.venueId, a.agreedPrice);
+      byFoxer.set(a.eventFoxerId, venues);
+    }
+    return byFoxer;
+  }
+
+  /**
+   * The breakdown for lines that don't come from a template: a booked Event's
+   * transactions, priced at checkout when they have no stored snapshot (an
+   * item added to the booking afterwards, #264 T12.1).
+   */
+  static async calculateEventBreakdownForLines(
+    lines: readonly EventBreakdownInputLine[],
+    commissionPct: number,
+    options?: { processingFeePct?: number },
+  ): Promise<EventBreakdown> {
+    const rules = lines.length > 0 ? await this.fetchEventItemRules() : [];
+    return this.breakdownFromRules(rules, lines, commissionPct, options);
+  }
+
+  private static breakdownFromRules(
+    rules: PlatformFeeConfig[],
+    lines: readonly EventBreakdownInputLine[],
+    commissionPct: number,
+    options?: { processingFeePct?: number },
+  ): EventBreakdown {
+    const platformFees = this.feeRatesFromRules(
+      rules,
+      lines.map((line) => ({
+        itemType: line.kind,
+        listingCategory: line.category,
+      })),
+    );
+    return buildEventBreakdown(lines, {
+      commissionPct,
+      platformFees,
+      processingFeePct: options?.processingFeePct ?? PROCESSING_FEE_PERCENT,
+    });
   }
 
   /**

@@ -12,9 +12,9 @@ import { descriptionJoi, nameJoi, priceJoi } from "../../utils/limits";
 /**
  * The route-level gate (`requirePermissionAny(["service:manage",
  * "performer:manage"])`) only asks whether the caller holds *either*
- * permission. This asks the specific one `category` requires — a
- * serviceFoxer-only caller must not create/retarget a listing into a
- * performer category, and vice versa.
+ * permission. This asks the specific one `category` requires, so a caller
+ * holding only one of the two cannot create/retarget a listing into the
+ * other's categories. (Providers hold both.)
  */
 function assertCanManageCategory(
   req: Request,
@@ -24,9 +24,7 @@ function assertCanManageCategory(
     ? "performer:manage"
     : "service:manage";
   if (!can(req.user, required)) {
-    return isPerformerServiceCategory(category)
-      ? "You must be an approved Performer Foxer to manage this category"
-      : "You must be an approved Service Foxer to manage this category";
+    return "You must be an approved Provider to manage this category";
   }
   return null;
 }
@@ -137,7 +135,7 @@ export default class ServiceCtrl {
   }
 
   // Public browse for the search page — item-level pagination (city matches the
-  // owner's city, price filters the item itself; only serviceFoxer-owned services).
+  // owner's city, price filters the item itself; only Provider-owned services).
   static async browseServices(req: Request, res: Response) {
     try {
       const { city, maxPrice, page, limit, q } = req.query;

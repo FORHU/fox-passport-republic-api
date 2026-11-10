@@ -3,6 +3,9 @@ import { normalizeSocialLinks } from "../../utils/social-links";
 import { permissionsForUser } from "../../types/permissions";
 import { revokeAllSessions } from "../auth/sessions.service";
 import { hashPassword, verifyPassword } from "../../utils/password";
+import OnboardingSvc from "../onboarding/onboarding.service";
+import { recordChange, type AuditActor } from "../audit/audit.service";
+import { notFound } from "../../utils/errors";
 
 export const USERNAME_TAKEN = "Username already taken";
 
@@ -56,7 +59,7 @@ export default class ProfileSvc {
     // The links sent replace the ones stored; none left clears them.
     const links =
       socialLinks === undefined ? undefined : normalizeSocialLinks(socialLinks);
-    return ProfileRepo.updateProfile(userId, {
+    const updated = await ProfileRepo.updateProfile(userId, {
       ...rest,
       // An empty phone clears it: stored as null, not "".
       ...(phone !== undefined ? { phone: phone || null } : {}),
@@ -69,6 +72,11 @@ export default class ProfileSvc {
         ? { bio: bio.trim() === "" ? null : bio.trim() }
         : {}),
     } as Parameters<typeof ProfileRepo.updateProfile>[1]);
+
+    // A profile that now has a photo, username, bio and city earns its
+    // one-time reward. Never fails the save.
+    await OnboardingSvc.syncDetectedSteps(userId).catch(() => {});
+    return updated;
   }
 
   // Change password
@@ -111,6 +119,51 @@ export default class ProfileSvc {
     await revokeAllSessions(userId);
 
     return { message: "Password changed successfully" };
+  }
+
+  /** The EventFoxer's commission rate, in percent (#264 T5). */
+  static async getCommission(userId: string) {
+    const user = await ProfileRepo.findCommissionPct(userId);
+    if (!user) throw notFound("User");
+    return { commissionPct: user.commissionPct.toNumber() };
+  }
+
+  /**
+   * Sets the EventFoxer's one commission rate, which applies to every Event
+   * they created (#264 D5). Events with a booking that isn't cancelled keep
+   * the rate their clients saw (D6, Q11); the response lists the upcoming
+   * ones, so the EventFoxer knows which prices didn't move.
+   */
+  static async setCommission(
+    userId: string,
+    commissionPct: number,
+    actor: AuditActor,
+  ) {
+    const result = await ProfileRepo.updateCommissionPct(userId, commissionPct);
+    if (!result) throw notFound("User");
+
+    const previous = result.previous.toNumber();
+    const current = result.current.toNumber();
+    if (previous !== current) {
+      await recordChange(actor, "commission.update", userId, {
+        previous: { commissionPct: previous },
+        current: { commissionPct: current },
+      });
+    }
+
+    const kept = await ProfileRepo.findBookedUpcomingEvents(userId, new Date());
+    return {
+      commissionPct: current,
+      previousCommissionPct: previous,
+      // Each keeps its own rate. `null` means it was booked before rates were
+      // stored per Event, and is priced the way it was booked.
+      eventsKeepingTheirRate: kept.map((e) => ({
+        id: e.id,
+        name: e.name,
+        startAt: e.startAt,
+        commissionPct: e.commissionPct?.toNumber() ?? null,
+      })),
+    };
   }
 
   // Delete account

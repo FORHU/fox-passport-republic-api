@@ -1,184 +1,260 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Prisma } from "@prisma/client";
+import { prisma } from "../src/utils/prisma";
 import EventTemplateSvc from "../src/modules/event-template/event-template.service";
 
 /**
- * Guards the server-computed price breakdown described in
- * docs/adr/0001-host-markup-and-server-computed-event-total.md.
+ * The price every event template response carries (#264 T6): the per-line
+ * breakdown from `PricingSvc`, under the field names API consumers already
+ * read (`itemsTotal`, `hostMarkupAmount`, `platformFeeAmount`, `totalAmount`,
+ * `estimatedTotal`, `price`). It replaced `calculateTotalsBreakdown`, which
+ * charged the fee on the commission and read a 1% fee as 100%.
  *
- * The important case is Prisma `Decimal`: money columns are Decimal, and
- * decimal.js implements `valueOf()` as a *string*, so `0 + amount` concatenates
- * instead of adding. These tests pin the arithmetic against Decimal inputs, not
- * just plain numbers.
+ * Money columns are Prisma `Decimal`, whose `valueOf()` is a string, so the
+ * arithmetic is pinned against Decimal inputs, not just plain numbers.
  */
+
+vi.mock("../src/utils/prisma", () => ({
+  prisma: {
+    platformFeeConfig: { findMany: vi.fn() },
+    venueEventFoxerAffiliation: { findMany: vi.fn() },
+  },
+}));
+
 const dec = (n: string | number) => new Prisma.Decimal(n);
+const feeRules = prisma.platformFeeConfig.findMany as unknown as ReturnType<
+  typeof vi.fn
+>;
+const affiliations = prisma.venueEventFoxerAffiliation
+  .findMany as unknown as ReturnType<typeof vi.fn>;
 
-describe("calculateItemsTotal", () => {
-  it("returns 0 for an empty template", () => {
-    expect(EventTemplateSvc.calculateItemsTotal({})).toBe(0);
+const DEFAULT_FEE = {
+  id: "default",
+  name: "Event line default",
+  transactionType: "event_item",
+  category: null,
+  subcategory: null,
+  percentage: dec(5),
+  fixedAmount: null,
+  currency: "PHP",
+  priority: 0,
+  active: true,
+  effectiveFrom: new Date("2026-01-01"),
+  effectiveUntil: null,
+  createdAt: new Date("2026-01-01"),
+  updatedAt: new Date("2026-01-01"),
+};
+
+const owner = (commissionPct: number | Prisma.Decimal | string = 10) => ({
+  id: "foxer",
+  commissionPct,
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  feeRules.mockResolvedValue([DEFAULT_FEE]);
+  affiliations.mockResolvedValue([]);
+});
+
+describe("EventTemplateSvc.withBreakdown", () => {
+  it("prices an empty template at 0 without a fee query", async () => {
+    const t = await EventTemplateSvc.withBreakdown({ owner: owner() });
+    expect(t).toMatchObject({ itemsTotal: 0, totalAmount: 0, price: 0 });
+    expect(feeRules).not.toHaveBeenCalled();
   });
 
-  it("sums Decimal asset prices as numbers, not string concatenation", () => {
-    const total = EventTemplateSvc.calculateItemsTotal({
-      templateAssets: [
-        { id: "a1", agreedPrice: dec("100.00"), quantity: 2 },
-        { id: "a2", agreedPrice: dec("50.50"), quantity: 1 },
-      ],
-    });
-    expect(total).toBe(250.5);
-    expect(typeof total).toBe("number");
-  });
-
-  it("multiplies asset price by quantity, defaulting quantity to 1", () => {
-    expect(
-      EventTemplateSvc.calculateItemsTotal({
-        templateAssets: [{ id: "a1", agreedPrice: dec("75") }],
-      }),
-    ).toBe(75);
-  });
-
-  it("sums services and venues alongside assets", () => {
-    const total = EventTemplateSvc.calculateItemsTotal({
-      templateAssets: [{ id: "a1", agreedPrice: dec("100"), quantity: 1 }],
-      templateServices: [{ id: "s1", agreedPrice: dec("200") }],
-      templateVenues: [{ id: "v1", agreedPrice: dec("300") }],
-    });
-    expect(total).toBe(600);
-  });
-
-  it("falls back to the listed price when agreedPrice is absent", () => {
-    const total = EventTemplateSvc.calculateItemsTotal({
-      templateAssets: [{ id: "a1", asset: { price: dec("42") }, quantity: 1 }],
-      templateServices: [{ id: "s1", service: { price: dec("8") } }],
-      templateVenues: [{ id: "v1", venue: { price: dec("10") } }],
-    });
-    expect(total).toBe(60);
-  });
-
-  // `agreedPrice` is Decimal @default(0) and non-nullable, so an unnegotiated
-  // item arrives as Decimal(0) — a truthy object. The old `||` fallback never
-  // fired and these items were counted as 0.
-  it("falls back to the listed price when agreedPrice is Decimal(0)", () => {
-    const total = EventTemplateSvc.calculateItemsTotal({
+  it("sums Decimal prices as numbers, not string concatenation", async () => {
+    const t = await EventTemplateSvc.withBreakdown({
+      owner: owner(0),
       templateAssets: [
         {
           id: "a1",
-          agreedPrice: dec(0),
-          asset: { price: dec("42") },
+          quantity: 2,
+          asset: { price: dec("100.00"), category: "equipment" },
+        },
+        {
+          id: "a2",
           quantity: 1,
+          asset: { price: dec("50.50"), category: "equipment" },
         },
       ],
+    });
+    expect(t.itemsTotal).toBe(250.5);
+    expect(typeof t.itemsTotal).toBe("number");
+  });
+
+  it("uses the listing price, never a template row's agreedPrice (#264 D1, C6)", async () => {
+    const t = await EventTemplateSvc.withBreakdown({
+      owner: owner(0),
       templateServices: [
-        { id: "s1", agreedPrice: dec(0), service: { price: dec("8") } },
+        {
+          id: "s1",
+          agreedPrice: dec(1),
+          service: { price: dec("8000"), category: "dj" },
+        } as never,
       ],
+    });
+    expect(t.itemsTotal).toBe(8000);
+  });
+
+  it("charges the fees on the Foxer prices only, never on the commission", async () => {
+    const t = await EventTemplateSvc.withBreakdown({
+      owner: owner(10),
       templateVenues: [
-        { id: "v1", agreedPrice: dec(0), venue: { price: dec("10") } },
-      ],
-    });
-    expect(total).toBe(60);
-  });
-
-  it("prefers a negotiated price over the listed price", () => {
-    const total = EventTemplateSvc.calculateItemsTotal({
-      templateAssets: [
         {
-          id: "a1",
-          agreedPrice: dec("30"),
-          asset: { price: dec("999") },
-          quantity: 1,
+          id: "v1",
+          venue: { id: "venue", price: dec(10000), category: "hotel" },
         },
       ],
     });
-    expect(total).toBe(30);
+    // 10,000 + 10% commission + 5% fee on 10,000 + 3% processing on 10,000.
+    expect(t).toMatchObject({
+      itemsTotal: 10000,
+      hostMarkupAmount: 1000,
+      platformFeeAmount: 500,
+      processingFeeAmount: 300,
+      totalAmount: 11800,
+    });
   });
 
-  it("applies quantity to a listed-price fallback", () => {
-    const total = EventTemplateSvc.calculateItemsTotal({
-      templateAssets: [
-        {
-          id: "a1",
-          agreedPrice: dec(0),
-          asset: { price: dec("25") },
-          quantity: 4,
-        },
+  it("keeps estimatedTotal and price aligned with totalAmount, and returns every line", async () => {
+    const t = await EventTemplateSvc.withBreakdown({
+      owner: owner(10),
+      templateServices: [
+        { id: "s1", service: { price: dec(5000), category: "catering" } },
       ],
     });
-    expect(total).toBe(100);
+    expect(t.estimatedTotal).toBe(t.totalAmount);
+    expect(t.price).toBe(t.totalAmount);
+    expect(t.breakdown.lines).toHaveLength(1);
+    expect(t.breakdown.lines[0]).toMatchObject({
+      kind: "service",
+      lineTotal: 5900,
+    });
   });
 
-  it("counts an item with neither price as zero", () => {
-    expect(
-      EventTemplateSvc.calculateItemsTotal({
-        templateAssets: [{ id: "a1", agreedPrice: dec(0), quantity: 3 }],
-      }),
-    ).toBe(0);
+  it("reads the owner's rate from a cached (JSON) template, where it is a string", async () => {
+    const t = await EventTemplateSvc.withBreakdown({
+      owner: owner("12.5"),
+      templateServices: [
+        { id: "s1", service: { price: "1000.00", category: "dj" } },
+      ],
+    });
+    expect(t.hostMarkupAmount).toBe(125);
   });
 
-  it("skips excluded items", () => {
-    const total = EventTemplateSvc.calculateItemsTotal(
-      {
-        templateAssets: [
-          { id: "a1", agreedPrice: dec("100"), quantity: 1 },
-          { id: "a2", agreedPrice: dec("100"), quantity: 1 },
+  it("refuses a template loaded without its owner's rate, instead of 0% commission", async () => {
+    await expect(
+      EventTemplateSvc.withBreakdown({
+        templateServices: [
+          { id: "s1", service: { price: dec(1000), category: "dj" } },
         ],
-        templateVenues: [{ id: "v1", agreedPrice: dec("500") }],
+      }),
+    ).rejects.toThrow(/commission is missing/);
+  });
+
+  it("skips excluded items", async () => {
+    const t = await EventTemplateSvc.withBreakdown(
+      {
+        owner: owner(0),
+        templateServices: [
+          { id: "s1", service: { price: dec(200), category: "dj" } },
+          { id: "s2", service: { price: dec(300), category: "dj" } },
+        ],
       },
-      { excludedAssetIds: ["a2"], excludedVenueIds: ["v1"] },
+      { excludedServiceIds: ["s2"] },
     );
-    expect(total).toBe(100);
+    expect(t.itemsTotal).toBe(200);
+  });
+
+  it("prices an affiliated venue at the Mayor's agreed price for this EventFoxer", async () => {
+    affiliations.mockResolvedValue([
+      { venueId: "venue", eventFoxerId: "foxer", agreedPrice: dec(3000) },
+    ]);
+    const t = await EventTemplateSvc.withBreakdown({
+      ownerId: "foxer",
+      owner: owner(0),
+      templateVenues: [
+        {
+          id: "v1",
+          venue: { id: "venue", price: dec(5000), category: "hotel" },
+        },
+      ],
+    });
+    expect(t.itemsTotal).toBe(3000);
+    expect(affiliations.mock.calls[0][0].where).toMatchObject({
+      OR: [{ venueId: "venue", eventFoxerId: "foxer" }],
+      status: "approved",
+      permissions: { has: "template:attach" },
+    });
   });
 });
 
-describe("calculateTotalsBreakdown", () => {
-  it("adds Host markup, then the platform fee on top of both", () => {
-    // items 1000, 10% host markup = 100, 5% platform fee on 1100 = 55
-    const result = EventTemplateSvc.calculateTotalsBreakdown(
+describe("EventTemplateSvc.withBreakdownsForDisplay", () => {
+  it("shows a template that can't be priced without a price, and still prices the rest", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const list = await EventTemplateSvc.withBreakdownsForDisplay([
       {
-        hostMarkupPct: 10,
-        templateAssets: [{ id: "a1", agreedPrice: dec("1000"), quantity: 1 }],
+        id: "good",
+        owner: owner(10),
+        templateServices: [
+          { id: "s1", service: { price: 1000, category: "dj" } },
+        ],
       },
-      undefined,
-      5,
-    );
+      {
+        // Loaded without its listing's category: pricing refuses it.
+        id: "bad",
+        owner: owner(10),
+        templateServices: [{ id: "s2", service: { price: 1000 } }],
+      },
+    ]);
 
-    expect(result.itemsTotal).toBe(1000);
-    expect(result.hostMarkupAmount).toBe(100);
-    expect(result.platformFeeAmount).toBe(55);
-    expect(result.totalAmount).toBe(1155);
+    expect(list[0]).toMatchObject({ id: "good", price: 1180 });
+    expect(list[1]).toMatchObject({
+      id: "bad",
+      price: null,
+      totalAmount: null,
+      breakdown: null,
+    });
+    expect(error).toHaveBeenCalledWith(
+      "Could not price event template bad",
+      expect.anything(),
+    );
+    error.mockRestore();
   });
 
-  it("never carves the platform fee out of the item total", () => {
-    const result = EventTemplateSvc.calculateTotalsBreakdown(
+  it("prices every template with one fee-rule query when they are all fine", async () => {
+    await EventTemplateSvc.withBreakdownsForDisplay([
       {
-        hostMarkupPct: 0,
-        templateVenues: [{ id: "v1", agreedPrice: dec("200") }],
+        owner: owner(10),
+        templateServices: [{ id: "s1", service: { price: 1, category: "dj" } }],
       },
-      undefined,
-      5,
-    );
-    // Providers still see the full 200; the fee is additive.
-    expect(result.itemsTotal).toBe(200);
-    expect(result.totalAmount).toBe(210);
-  });
-
-  it("treats a missing hostMarkupPct as zero markup", () => {
-    const result = EventTemplateSvc.calculateTotalsBreakdown(
-      { templateAssets: [{ id: "a1", agreedPrice: dec("100"), quantity: 1 }] },
-      undefined,
-      0,
-    );
-    expect(result.hostMarkupAmount).toBe(0);
-    expect(result.totalAmount).toBe(100);
-  });
-
-  it("keeps estimatedTotal aligned with totalAmount", () => {
-    const result = EventTemplateSvc.calculateTotalsBreakdown(
       {
-        templateAssets: [{ id: "a1", agreedPrice: dec("123.45"), quantity: 1 }],
+        owner: owner(10),
+        templateServices: [{ id: "s2", service: { price: 1, category: "dj" } }],
       },
-      undefined,
-      0,
-    );
-    expect(result.estimatedTotal).toBe(result.totalAmount);
+    ]);
+    expect(feeRules).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("EventTemplateSvc.withBreakdowns", () => {
+  it("prices a whole list with one fee-rule query", async () => {
+    const list = await EventTemplateSvc.withBreakdowns([
+      {
+        owner: owner(10),
+        templateServices: [
+          { id: "s1", service: { price: 1000, category: "dj" } },
+        ],
+      },
+      {
+        owner: owner(20),
+        templateServices: [
+          { id: "s2", service: { price: 1000, category: "dj" } },
+        ],
+      },
+    ]);
+    expect(list.map((t) => t.hostMarkupAmount)).toEqual([100, 200]);
+    expect(feeRules).toHaveBeenCalledTimes(1);
   });
 });

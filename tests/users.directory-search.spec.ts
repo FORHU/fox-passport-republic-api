@@ -20,7 +20,13 @@ describe("roleTypesMatching", () => {
     expect(roleTypesMatching("Investors")).toEqual(["investor"]);
     expect(roleTypesMatching("venue foxer")).toEqual(["venueFoxer"]);
     expect(roleTypesMatching("event-foxers")).toEqual(["eventFoxer"]);
-    expect(roleTypesMatching("gear")).toEqual(["gearFoxer"]);
+    expect(roleTypesMatching("provider")).toEqual(["providerFoxer"]);
+  });
+
+  it("finds Providers by the retired supply role names", () => {
+    expect(roleTypesMatching("gear")).toEqual(["providerFoxer"]);
+    expect(roleTypesMatching("Talent Foxers")).toEqual(["providerFoxer"]);
+    expect(roleTypesMatching("performer")).toEqual(["providerFoxer"]);
   });
 
   it("matches nothing for ordinary or short terms", () => {

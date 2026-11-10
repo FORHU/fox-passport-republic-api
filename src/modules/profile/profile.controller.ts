@@ -3,8 +3,11 @@ import Joi from "joi";
 import ProfileSvc, { USERNAME_TAKEN } from "./profile.service";
 import { SUPPORTED_CURRENCIES } from "../fx/fx.service";
 import { usernameJoi } from "../../utils/username";
+import { passwordJoi } from "../../utils/password-policy";
 import { normalizePhone } from "../../utils/phone";
 import { nameJoi } from "../../utils/limits";
+import { sendServerError } from "../../utils/errors";
+import { VALIDATE_ALL, sendValidationError } from "../../utils/validation";
 
 // Kept in step with the web's usernameSchema (shared/lib/schema.ts) and
 // normalizePhone (shared/lib/phone.ts).
@@ -126,7 +129,7 @@ export default class ProfileCtrl {
 
       const schema = Joi.object({
         currentPassword: Joi.string().required(),
-        newPassword: Joi.string().min(6).required(),
+        newPassword: passwordJoi().required(),
         confirmPassword: Joi.string()
           .valid(Joi.ref("newPassword"))
           .required()
@@ -202,4 +205,53 @@ export default class ProfileCtrl {
       });
     }
   }
+
+  /** GET /v1/profile/commission: the EventFoxer's commission rate (#264 T5). */
+  static async getCommission(req: Request, res: Response) {
+    try {
+      const data = await ProfileSvc.getCommission(req.user!.userId);
+      return res.status(200).json({ success: true, data });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: true });
+    }
+  }
+
+  /**
+   * PUT /v1/profile/commission `{ commissionPct }`: one rate, 0–100 in percent
+   * with up to 2 decimals (the column is Decimal(5,2)), for every Event the
+   * EventFoxer created.
+   */
+  static async setCommission(req: Request, res: Response) {
+    try {
+      const { error, value } = COMMISSION_BODY_SCHEMA.validate(
+        req.body,
+        VALIDATE_ALL,
+      );
+      if (error) return sendValidationError(res, error);
+
+      const data = await ProfileSvc.setCommission(
+        req.user!.userId,
+        value.commissionPct,
+        { userId: req.user!.userId, email: req.user!.email },
+      );
+      return res.status(200).json({ success: true, data });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: true });
+    }
+  }
 }
+
+const COMMISSION_BODY_SCHEMA = Joi.object({
+  commissionPct: Joi.number()
+    .min(0)
+    .max(100)
+    .precision(2)
+    .strict()
+    .required()
+    .messages({
+      "number.base": "Enter the commission as a number, like 10 for 10%.",
+      "number.min": "The commission can't be below 0%.",
+      "number.max": "The commission can't be above 100%.",
+      "number.precision": "Use at most 2 decimals, like 12.5.",
+    }),
+});

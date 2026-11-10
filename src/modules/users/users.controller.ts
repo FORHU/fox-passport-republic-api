@@ -4,6 +4,7 @@ import { RoleType } from "@prisma/client";
 import UsersSvc from "./users.service";
 import { totalPages } from "../../utils/pagination";
 import { usernameJoi } from "../../utils/username";
+import { passwordJoi } from "../../utils/password-policy";
 import { nameJoi } from "../../utils/limits";
 
 export default class UsersCtrl {
@@ -12,7 +13,7 @@ export default class UsersCtrl {
     const schema = Joi.object({
       email: Joi.string().email().required(),
       username: usernameJoi().required(),
-      password: Joi.string().min(6).required(),
+      password: passwordJoi().required(),
       name: nameJoi().optional(),
     });
 
@@ -162,7 +163,7 @@ export default class UsersCtrl {
     const schema = Joi.object({
       email: Joi.string().email().optional(),
       username: usernameJoi().optional(),
-      password: Joi.string().min(6).optional(),
+      password: passwordJoi().optional(),
       name: nameJoi().optional(),
       role: Joi.string().optional(),
     }).min(1); // must send at least one field

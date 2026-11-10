@@ -163,7 +163,7 @@ describe("VenueAffiliationSvc", () => {
       });
       (prisma.user.findUnique as any).mockResolvedValue({
         id: "notorganizer",
-        roleType: ["serviceFoxer"],
+        roleType: ["providerFoxer"],
       });
 
       await expect(

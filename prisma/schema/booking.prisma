@@ -8,6 +8,8 @@ model Booking {
   totalAmount           Decimal                   @db.Decimal(12, 2)
   hostMarkup            Decimal                   @default(0) @db.Decimal(12, 2)
   platformFee           Decimal                   @default(0) @db.Decimal(12, 2)
+  // This booking's share of the 3% processing fee that pays Stripe.
+  processingFee         Decimal                   @default(0) @db.Decimal(12, 2)
   stripePaymentId       String?                   @unique
   status                BookingStatus             @default(pending)
   startAt               DateTime

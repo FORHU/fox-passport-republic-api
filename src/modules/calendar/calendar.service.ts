@@ -39,7 +39,7 @@ const EVENT_ROLE_RANK: Record<CalendarRole, number> = {
  * at once: events they booked (guest), run (host / organizer) or host at
  * their venue (venue), and the gear or services they rent out or supply —
  * directly or to an event (supplier). One endpoint, so a citizen, a Venue
- * Foxer and a Talent Foxer all read the same calendar shape.
+ * Foxer and a Provider all read the same calendar shape.
  *
  * Scoping mirrors the booking list (`BookingSvc.getAllBookings`): a viewer
  * only ever sees rows they are party to.

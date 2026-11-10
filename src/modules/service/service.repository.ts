@@ -87,15 +87,8 @@ export default class ServiceRepo {
         price: { lte: filters.maxPrice },
       }),
       owner: {
-        // performerFoxer owns performer-category rows of this same model —
-        // see PERFORMER_SERVICE_CATEGORIES in src/types/permissions.ts.
-        roleType: {
-          hasSome: [
-            "serviceFoxer",
-            "performerFoxer",
-            "providerFoxer",
-          ] as RoleType[],
-        },
+        // Providers own every Service row, performer categories included.
+        roleType: { has: RoleType.providerFoxer },
         ...(ownerCity && {
           city: { contains: ownerCity, mode: "insensitive" as const },
         }),

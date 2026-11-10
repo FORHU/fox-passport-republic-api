@@ -90,7 +90,7 @@ async function main() {
         email: faker.internet.email(),
         username: faker.internet.userName(),
         password: "hashedpassword123",
-        roleType: i % 2 === 0 ? ["gearFoxer"] : ["serviceFoxer"],
+        roleType: ["providerFoxer"],
         name: faker.person.fullName(),
       },
     });

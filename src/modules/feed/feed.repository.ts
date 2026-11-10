@@ -719,6 +719,12 @@ export default class FeedRepo {
             author: AUTHOR_SELECT,
             ...ENTITY_INCLUDE,
             originalPost: REPOST_SELECT,
+            // The viewer's own reaction, so saved posts carry isLikedByMe and
+            // myReaction like the feed list does (BUG-25).
+            likes: {
+              where: { userId },
+              select: { userId: true, type: true },
+            },
           },
         },
       },
@@ -726,7 +732,16 @@ export default class FeedRepo {
     const hasNextPage = saved.length > limit;
     const items = hasNextPage ? saved.slice(0, limit) : saved;
     const nextCursor = hasNextPage ? items[items.length - 1].postId : null;
-    return { posts: items.map((s) => s.post), nextCursor };
+    const posts = items.map(({ post }) => {
+      const { likes, ...rest } = post;
+      const myReaction = likes[0];
+      return {
+        ...rest,
+        isLikedByMe: !!myReaction,
+        myReaction: myReaction?.type ?? null,
+      };
+    });
+    return { posts, nextCursor };
   }
 
   static async hidePost(postId: string, userId: string) {

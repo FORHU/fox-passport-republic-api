@@ -28,7 +28,10 @@ export default class EventTemplateCtrl {
       targetCountry: Joi.string().optional(),
       lat: Joi.number().optional(),
       lng: Joi.number().optional(),
-      hostMarkupPct: Joi.number().min(0).max(100).optional(),
+      // Retired (#264 T6.1): the EventFoxer's one rate is set at
+      // PUT /v1/profile/commission. Still accepted so older clients don't get a
+      // 400, but dropped here and never saved.
+      hostMarkupPct: Joi.number().min(0).max(100).optional().strip(),
       maxAttendees: quantityJoi().optional(),
       cancellationPolicyId: Joi.string().uuid().optional(),
     });
@@ -68,7 +71,10 @@ export default class EventTemplateCtrl {
       targetCountry: Joi.string().optional(),
       lat: Joi.number().optional(),
       lng: Joi.number().optional(),
-      hostMarkupPct: Joi.number().min(0).max(100).optional(),
+      // Retired (#264 T6.1): the EventFoxer's one rate is set at
+      // PUT /v1/profile/commission. Still accepted so older clients don't get a
+      // 400, but dropped here and never saved.
+      hostMarkupPct: Joi.number().min(0).max(100).optional().strip(),
       maxAttendees: quantityJoi().allow(null).optional(),
       cancellationPolicyId: Joi.string().uuid().optional(),
     });
@@ -207,7 +213,9 @@ export default class EventTemplateCtrl {
       description: descriptionJoi().optional(),
       matchedAt: Joi.date().optional(),
       date: Joi.date().optional(),
-      agreedPrice: priceJoi().optional(),
+      // Ignored (#264 C6): an item is priced at its Foxer's own price, never
+      // one the EventFoxer sends. Accepted so older clients don't get a 400.
+      agreedPrice: priceJoi().optional().strip(),
       isOptional: Joi.boolean().optional(),
     }).or("assetId", "description");
 
@@ -290,7 +298,9 @@ export default class EventTemplateCtrl {
       description: descriptionJoi().optional(),
       matchedAt: Joi.date().optional(),
       date: Joi.date().optional(),
-      agreedPrice: priceJoi().optional(),
+      // Ignored (#264 C6): an item is priced at its Foxer's own price, never
+      // one the EventFoxer sends. Accepted so older clients don't get a 400.
+      agreedPrice: priceJoi().optional().strip(),
       isOptional: Joi.boolean().optional(),
     }).or("serviceId", "description");
 
@@ -360,7 +370,9 @@ export default class EventTemplateCtrl {
       description: descriptionJoi().optional(),
       matchedAt: Joi.date().optional(),
       date: Joi.date().optional(),
-      agreedPrice: priceJoi().optional(),
+      // Ignored (#264 C6): an item is priced at its Foxer's own price, never
+      // one the EventFoxer sends. Accepted so older clients don't get a 400.
+      agreedPrice: priceJoi().optional().strip(),
       isOptional: Joi.boolean().optional(),
     }).or("venueId", "description");
 

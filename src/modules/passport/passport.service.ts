@@ -2,13 +2,44 @@ import { UserPath } from "@prisma/client";
 import { cached } from "../../utils/cache.util";
 import { passportCache, PASSPORT_TTL } from "../../utils/cache-namespaces";
 import PassportRepo from "./passport.repository";
+import RankSvc from "./rank.service";
+import RewardRepo from "../reward/reward.repository";
 
-const XP_PER_LEVEL = 1000;
-const XP_MULTIPLIER = 1.15;
+// 9-Rank Ladder thresholds with rank-up Coins bonuses (requirements/xp-and-coins.md, section 4.2)
+export interface RankThreshold {
+  level: number;
+  citizenRank: string;
+  foxerRank: string;
+  coins: number;
+}
+
+export const RANK_THRESHOLDS: readonly RankThreshold[] = [
+  { level: 3, citizenRank: "Wanderer", foxerRank: "Regular", coins: 50 },
+  { level: 5, citizenRank: "Explorer", foxerRank: "Pro", coins: 100 },
+  { level: 10, citizenRank: "Trailblazer", foxerRank: "Veteran", coins: 200 },
+  { level: 15, citizenRank: "Voyager", foxerRank: "Headliner", coins: 300 },
+  { level: 20, citizenRank: "Adventurer", foxerRank: "Maestro", coins: 500 },
+  { level: 30, citizenRank: "Pioneer", foxerRank: "Icon", coins: 800 },
+  { level: 40, citizenRank: "Vanguard", foxerRank: "Luminary", coins: 1200 },
+  { level: 50, citizenRank: "Legend", foxerRank: "Legend", coins: 2000 },
+] as const;
+
+// Level curve (requirements/xp-and-coins.md, section 4.1): the XP that takes a
+// player from level `i` to `i + 1` is `XP_PER_LEVEL * XP_MULTIPLIER^(i - 1)`,
+// and stops growing at level `XP_COST_CAP_LEVEL`, so every level from there on
+// costs the same. Adventurer (level 20) needs 15,860 XP and Legend (50)
+// 124,414. The earlier 1000 * 1.15^(i - 1) with no cap needed 88,211 and
+// 6,275,408, which left every rank past level 10 out of reach.
+const XP_PER_LEVEL = 250;
+const XP_MULTIPLIER = 1.12;
+const XP_COST_CAP_LEVEL = 25;
 
 // Perk keys granted per path at specific level thresholds.
 // Order matters — lower levels first.
-const PERK_THRESHOLDS: Record<string, { level: number; perk: string }[]> = {
+export const PERK_THRESHOLDS: Record<
+  string,
+  { level: number; perk: string }[]
+> = {
   [UserPath.user]: [
     { level: 1, perk: "early_bird" },
     { level: 5, perk: "priority_access" },
@@ -26,21 +57,6 @@ const PERK_THRESHOLDS: Record<string, { level: number; perk: string }[]> = {
     { level: 3, perk: "city_badge" },
     { level: 8, perk: "venue_spotlight" },
     { level: 15, perk: "mayor_verified" },
-  ],
-  [UserPath.gearFoxer]: [
-    { level: 1, perk: "gear_verified" },
-    { level: 3, perk: "lower_fees" },
-    { level: 8, perk: "gear_featured" },
-  ],
-  [UserPath.serviceFoxer]: [
-    { level: 1, perk: "service_verified" },
-    { level: 3, perk: "service_lower_fees" },
-    { level: 8, perk: "service_featured" },
-  ],
-  [UserPath.performerFoxer]: [
-    { level: 1, perk: "performer_verified" },
-    { level: 3, perk: "service_lower_fees" },
-    { level: 8, perk: "performer_featured" },
   ],
   [UserPath.providerFoxer]: [
     { level: 1, perk: "provider_verified" },
@@ -65,16 +81,18 @@ const XP_REWARDS = {
   shareReviewPost: 20,
 };
 
-function xpRequiredForLevel(level: number): number {
+/** Total XP at which `level` starts. */
+export function xpRequiredForLevel(level: number): number {
   if (level <= 1) return 0;
   let total = 0;
   for (let i = 1; i < level; i++) {
-    total += Math.round(XP_PER_LEVEL * Math.pow(XP_MULTIPLIER, i - 1));
+    const step = Math.min(i, XP_COST_CAP_LEVEL);
+    total += Math.round(XP_PER_LEVEL * Math.pow(XP_MULTIPLIER, step - 1));
   }
   return total;
 }
 
-function calculateLevel(totalXP: number): {
+export function calculateLevel(totalXP: number): {
   level: number;
   currentXP: number;
   requiredXP: number;
@@ -110,6 +128,23 @@ export default class PassportSvc {
 
   static async getOrCreate(userId: string) {
     return PassportRepo.upsertPassport(userId);
+  }
+
+  /**
+   * The passport with each path's rank (number, name, rarity, and the next
+   * rank) alongside its level, so the app never works a rank out itself. Only
+   * adds a field; everything the passport already carried is unchanged.
+   */
+  static withRanks<T extends { paths: { path: UserPath; level: number }[] }>(
+    passport: T,
+  ) {
+    return {
+      ...passport,
+      paths: passport.paths.map((p) => ({
+        ...p,
+        rank: RankSvc.forLevel(p.level, p.path),
+      })),
+    };
   }
 
   static async getByUserId(userId: string) {
@@ -169,6 +204,9 @@ export default class PassportSvc {
           await PassportRepo.pushPerks(passport.id, [lvl1Perk]);
         }
       }
+      // Award starter rank badge
+      const starterBadge = path === UserPath.user ? "Newcomer" : "Rookie";
+      PassportSvc.awardBadgeByName(userId, starterBadge).catch(() => {});
     }
 
     // Award level-based badges when crossing thresholds
@@ -179,6 +217,42 @@ export default class PassportSvc {
         );
       if (prevLevel < 18 && level >= 18)
         PassportSvc.awardBadgeByName(userId, "Grand Mayor").catch(() => {});
+    }
+
+    // Award 9-Rank ladder bonuses (Coins & Badges) when level crosses thresholds
+    if (level !== prevLevel) {
+      const isCitizen = path === UserPath.user;
+      for (const t of RANK_THRESHOLDS) {
+        if (t.level > prevLevel && t.level <= level) {
+          const rankBadgeName = isCitizen ? t.citizenRank : t.foxerRank;
+          PassportSvc.awardBadgeByName(userId, rankBadgeName).catch(() => {});
+
+          if (t.coins > 0) {
+            const rankIdempotencyKey = `grant:${userId}:rank_up:${path}:${t.level}`;
+            RewardRepo.findEventByIdempotencyKey(rankIdempotencyKey)
+              .then(async (existingGrant) => {
+                if (!existingGrant) {
+                  await RewardRepo.recordGrant({
+                    userId,
+                    path,
+                    action: "rank_up",
+                    refType: "rank_level",
+                    refId: `${path}:${t.level}`,
+                    xp: 0,
+                    coins: t.coins,
+                    idempotencyKey: rankIdempotencyKey,
+                  });
+                }
+              })
+              .catch((err) => {
+                console.warn(
+                  "[PassportSvc] rank_up bonus coins grant failed:",
+                  err,
+                );
+              });
+          }
+        }
+      }
     }
 
     return { level, currentXP, requiredXP, totalXP: newTotalXP };

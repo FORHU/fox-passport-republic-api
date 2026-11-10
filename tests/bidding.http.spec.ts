@@ -18,7 +18,7 @@ describe("Bidding API (Supertest)", () => {
         email: `talent_${runId}@test.com`,
         username: `talent_${runId}`,
         password: "pw",
-        roleType: ["serviceFoxer"],
+        roleType: ["providerFoxer"],
         name: "Talent",
       },
     });
@@ -71,7 +71,7 @@ describe("Bidding API (Supertest)", () => {
     expect(res.body.success).toBe(false);
   });
 
-  it("POST /api/v1/bids/service - enforces serviceFoxer capability (triggers controller logic)", async () => {
+  it("POST /api/v1/bids/service - enforces the Provider capability (triggers controller logic)", async () => {
     // If we use unprivilegedToken, the service layer throws an error or the controller catches it
     const res = await request(app)
       .post("/api/v1/bids/service")
