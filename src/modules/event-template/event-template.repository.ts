@@ -66,7 +66,9 @@ export default class EventTemplateRepo {
             : undefined,
         },
         include: {
-          owner: { select: { id: true, name: true, email: true } },
+          owner: {
+            select: { id: true, name: true, email: true, commissionPct: true },
+          },
           images: true,
         },
       }),
@@ -111,7 +113,9 @@ export default class EventTemplateRepo {
       prisma.eventTemplate.findMany({
         where,
         include: {
-          owner: { select: { id: true, name: true, email: true } },
+          owner: {
+            select: { id: true, name: true, email: true, commissionPct: true },
+          },
           templateAssets: {
             include: { asset: { include: { images: { take: 1 } } } },
           },
@@ -214,11 +218,51 @@ export default class EventTemplateRepo {
           lat: true,
           lng: true,
           images: { take: 1, select: { url: true } },
-          templateVenues: {
-            take: 1,
-            select: { venue: { select: { city: true, price: true } } },
+          // Every item, with what the price breakdown needs (#264 T6): the
+          // card's price is the whole Event's, not the first venue's alone.
+          // The venue's `city` is still selected for the card's location.
+          templateAssets: {
+            select: {
+              id: true,
+              quantity: true,
+              asset: {
+                select: {
+                  id: true,
+                  price: true,
+                  category: true,
+                  ownerId: true,
+                },
+              },
+            },
           },
-          owner: { select: { id: true, name: true } },
+          templateServices: {
+            select: {
+              id: true,
+              service: {
+                select: {
+                  id: true,
+                  price: true,
+                  category: true,
+                  ownerId: true,
+                },
+              },
+            },
+          },
+          templateVenues: {
+            select: {
+              id: true,
+              venue: {
+                select: {
+                  id: true,
+                  city: true,
+                  price: true,
+                  category: true,
+                  mayorId: true,
+                },
+              },
+            },
+          },
+          owner: { select: { id: true, name: true, commissionPct: true } },
         },
         skip,
         take: limit,
@@ -244,6 +288,8 @@ export default class EventTemplateRepo {
     return prisma.eventTemplate.findUnique({
       where: { id, isPublic: true },
       include: {
+        // The EventFoxer's rate prices the booking (#264 T8).
+        owner: { select: { id: true, commissionPct: true } },
         templateAssets: { include: { asset: { include: { owner: true } } } },
         templateServices: {
           include: { service: { include: { owner: true } } },
@@ -313,7 +359,9 @@ export default class EventTemplateRepo {
     return prisma.eventTemplate.findUnique({
       where: { id },
       include: {
-        owner: { select: { id: true, name: true, email: true } },
+        owner: {
+          select: { id: true, name: true, email: true, commissionPct: true },
+        },
         templateAssets: { include: { asset: true } },
         templateServices: { include: { service: true } },
         templateVenues: { include: { venue: true } },
@@ -335,11 +383,13 @@ export default class EventTemplateRepo {
             : undefined,
         },
         include: {
-          owner: { select: { id: true, name: true, email: true } },
-          // NOTE: must match createTemplate/findTemplateById's include — without these,
-          // calculateTotalsBreakdown() has no template items to sum and silently
-          // returns 0 for itemsTotal/hostMarkupAmount/platformFeeAmount/totalAmount
-          // after every update (pre-existing bug, surfaced while testing hostMarkupPercent).
+          owner: {
+            select: { id: true, name: true, email: true, commissionPct: true },
+          },
+          // NOTE: must match findTemplateById's include: the price breakdown
+          // (EventTemplateSvc.withBreakdown) needs every item and the owner's
+          // commissionPct, or the response after an update would be priced
+          // without them.
           templateAssets: { include: { asset: true } },
           templateServices: { include: { service: true } },
           templateVenues: { include: { venue: true } },

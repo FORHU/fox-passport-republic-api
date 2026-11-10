@@ -122,11 +122,13 @@ export interface EventBreakdownRates {
 export const EVENT_CURRENCY = "PHP";
 
 /** A required, non-negative amount. Missing is refused, never read as 0. */
-function toDecimal(value: MoneyInput, what: string): Decimal {
+function toDecimal(
+  value: MoneyInput,
+  what: string,
+  load = "the listing's price",
+): Decimal {
   if (value === null || value === undefined || value === "") {
-    throw invalid(
-      `${what} is missing. Load the listing's price before pricing the Event.`,
-    );
+    throw invalid(`${what} is missing. Load ${load} before pricing the Event.`);
   }
   let d: Decimal;
   try {
@@ -250,6 +252,56 @@ export function buildEventBreakdown(
 }
 
 /**
+ * The totals under the field names event responses and the `events` table
+ * have always used, so current API consumers keep working (#264 T6.4):
+ * `hostMarkupAmount` now holds the commission total.
+ */
+export function breakdownTotals(b: EventBreakdown) {
+  return {
+    itemsTotal: b.itemsTotal,
+    hostMarkupAmount: b.commissionTotal,
+    platformFeeAmount: b.platformFee,
+    processingFeeAmount: b.processingFee,
+    totalAmount: b.total,
+    estimatedTotal: b.total,
+  };
+}
+
+/**
+ * What a transaction row stores about how its line was priced (the T1
+ * columns), so payouts, refunds and the client's breakdown never re-read
+ * today's rates. `agreedPrice` is the Foxer's price for the line.
+ */
+export function lineSnapshot(line: EventBreakdownLine) {
+  return {
+    agreedPrice: line.price,
+    category: line.category,
+    commissionPct: line.commissionPct,
+    commissionAmount: line.commission,
+    platformFeePct: line.platformFeePct,
+    platformFeeAmount: line.platformFee,
+    processingFeeAmount: line.processingFee,
+  };
+}
+
+/**
+ * A stored commission rate (Decimal, number, or a string after a cached JSON
+ * read) as a number. Refuses anything that isn't one, so a bad value can't
+ * price an Event at 0%.
+ */
+export function commissionPctOf(value: MoneyInput): number {
+  const n = toDecimal(
+    value,
+    "The EventFoxer's commission",
+    "the template owner's commissionPct",
+  ).toNumber();
+  if (n > 100) {
+    throw invalid(`The EventFoxer's commission must be 0 to 100, not ${n}.`);
+  }
+  return n;
+}
+
+/**
  * Template rows a booking leaves out, by template row id. The one definition
  * for both event pricing paths: `EventTemplateSvc.calculateItemsTotal` and
  * `eventTemplateLines` here.
@@ -340,14 +392,17 @@ function hasListing<L>(
 /**
  * A template's Foxer lines, in order: gear, then services, then venues.
  *
- * The price is the Foxer's **listing price** (plan D1). A template row's
- * `agreedPrice` is ignored; T6.3 removes the EventFoxer override that sets
- * it. A row whose listing no longer exists (`null`) has no Foxer to pay, so it
- * is left out, as is any row in `exclusions`.
+ * The price is the Foxer's **own price** (plan D1): the listing price, or for
+ * a venue, the price its Mayor agreed with this EventFoxer in an approved
+ * affiliation (`venuePrices`, by venue id). A template row's `agreedPrice` is
+ * ignored, since an EventFoxer could set it to anything (C6). A row whose
+ * listing no longer exists (`null`) has no Foxer to pay, so it is left out,
+ * as is any row in `exclusions`.
  */
 export function eventTemplateLines(
   template: EventTemplateForBreakdown,
   exclusions?: EventBreakdownExclusions,
+  venuePrices?: ReadonlyMap<string, MoneyInput>,
 ): EventBreakdownInputLine[] {
   const lines: EventBreakdownInputLine[] = [];
 
@@ -386,7 +441,10 @@ export function eventTemplateLines(
       listingId: tv.venue.id,
       foxerId: tv.venue.mayorId,
       category: requireCategory(tv.venue, "venue"),
-      unitPrice: tv.venue.price,
+      unitPrice:
+        (tv.venue.id !== undefined
+          ? venuePrices?.get(tv.venue.id)
+          : undefined) ?? tv.venue.price,
     });
   }
   return lines;

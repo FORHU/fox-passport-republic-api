@@ -113,6 +113,7 @@ export default class MatchSvc {
           totalAmount: eventRequest.totalAmount,
           hostMarkup: eventRequest.hostMarkupAmount,
           platformFee: eventRequest.platformFeeAmount,
+          processingFee: eventRequest.processingFeeAmount,
           status: "pending",
           startAt: eventRequest.startAt,
           endAt: eventRequest.endAt,

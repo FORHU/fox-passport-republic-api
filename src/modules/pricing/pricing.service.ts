@@ -6,6 +6,7 @@ import {
   eventTemplateLines,
   type EventBreakdown,
   type EventBreakdownExclusions,
+  type EventBreakdownInputLine,
   type EventTemplateForBreakdown,
 } from "./event-breakdown";
 import { AppError } from "../../utils/errors";
@@ -189,9 +190,14 @@ export default class PricingSvc {
     items: readonly EventItemFeeInput[],
   ): Promise<EventItemFeeRate[]> {
     if (items.length === 0) return [];
+    return this.feeRatesFromRules(await this.fetchEventItemRules(), items);
+  }
 
-    const rules = await this.fetchEventItemRules();
-
+  /** `resolveEventItemFeeRates` against rules already fetched. */
+  private static feeRatesFromRules(
+    rules: PlatformFeeConfig[],
+    items: readonly EventItemFeeInput[],
+  ): EventItemFeeRate[] {
     return items.map((item) => {
       const rule = this.pickEventItemRule(rules, item);
       if (!rule || rule.percentage == null) {
@@ -225,17 +231,127 @@ export default class PricingSvc {
    *   template's `platformFeePct`.
    * - The processing fee is `PROCESSING_FEE_PERCENT` unless `processingFeePct`
    *   is given.
-   *
-   * Nothing calls this yet; event pricing switches to it in T6 and T12.
    */
   static async calculateEventBreakdown(
     template: EventTemplateForBreakdown,
     commissionPct: number,
     exclusions?: EventBreakdownExclusions,
+    options?: { processingFeePct?: number; eventFoxerId?: string },
+  ): Promise<EventBreakdown> {
+    const [breakdown] = await this.calculateEventBreakdowns(
+      [
+        {
+          template,
+          commissionPct,
+          exclusions,
+          eventFoxerId: options?.eventFoxerId,
+        },
+      ],
+      options,
+    );
+    return breakdown;
+  }
+
+  /**
+   * `calculateEventBreakdown` for many templates with one fee-rule query, for
+   * the browse lists (#264 T6). Index-aligned with `entries`.
+   */
+  static async calculateEventBreakdowns(
+    entries: readonly {
+      template: EventTemplateForBreakdown;
+      commissionPct: number;
+      exclusions?: EventBreakdownExclusions;
+      /** The EventFoxer; their approved venue affiliations set those venues' prices. */
+      eventFoxerId?: string;
+    }[],
+    options?: { processingFeePct?: number },
+  ): Promise<EventBreakdown[]> {
+    const affiliationPrices = await this.fetchAffiliationVenuePrices(entries);
+    const linesPerEntry = entries.map((e) =>
+      eventTemplateLines(
+        e.template,
+        e.exclusions,
+        e.eventFoxerId ? affiliationPrices.get(e.eventFoxerId) : undefined,
+      ),
+    );
+    const rules = linesPerEntry.some((lines) => lines.length > 0)
+      ? await this.fetchEventItemRules()
+      : [];
+    return entries.map((entry, i) =>
+      this.breakdownFromRules(
+        rules,
+        linesPerEntry[i],
+        entry.commissionPct,
+        options,
+      ),
+    );
+  }
+
+  /**
+   * The price a venue's Mayor agreed with an EventFoxer, for every approved
+   * affiliation that lets them attach it (`template:attach`), by EventFoxer
+   * then venue id. That price is the Mayor's own price for this EventFoxer,
+   * so it replaces the listing price (#264, owner decision 2026-11-09). One
+   * query for every template in `entries`.
+   */
+  private static async fetchAffiliationVenuePrices(
+    entries: readonly {
+      template: EventTemplateForBreakdown;
+      eventFoxerId?: string;
+    }[],
+  ): Promise<Map<string, Map<string, Prisma.Decimal>>> {
+    const pairs = entries.flatMap((e) =>
+      e.eventFoxerId
+        ? (e.template.templateVenues ?? []).flatMap((tv) =>
+            tv.venue?.id
+              ? [{ venueId: tv.venue.id, eventFoxerId: e.eventFoxerId! }]
+              : [],
+          )
+        : [],
+    );
+    const byFoxer = new Map<string, Map<string, Prisma.Decimal>>();
+    if (pairs.length === 0) return byFoxer;
+
+    const affiliations = await prisma.venueEventFoxerAffiliation.findMany({
+      where: {
+        OR: pairs,
+        status: "approved",
+        permissions: { has: "template:attach" },
+        agreedPrice: { not: null },
+      },
+      select: { venueId: true, eventFoxerId: true, agreedPrice: true },
+    });
+    for (const a of affiliations) {
+      if (!a.agreedPrice) continue;
+      const venues = byFoxer.get(a.eventFoxerId) ?? new Map();
+      venues.set(a.venueId, a.agreedPrice);
+      byFoxer.set(a.eventFoxerId, venues);
+    }
+    return byFoxer;
+  }
+
+  /**
+   * The breakdown for lines that don't come from a template: a booked Event's
+   * transactions, priced at checkout when they have no stored snapshot (an
+   * item added to the booking afterwards, #264 T12.1).
+   */
+  static async calculateEventBreakdownForLines(
+    lines: readonly EventBreakdownInputLine[],
+    commissionPct: number,
     options?: { processingFeePct?: number },
   ): Promise<EventBreakdown> {
-    const lines = eventTemplateLines(template, exclusions);
-    const platformFees = await this.resolveEventItemFeeRates(
+    const rules = lines.length > 0 ? await this.fetchEventItemRules() : [];
+    return this.breakdownFromRules(rules, lines, commissionPct, options);
+  }
+
+  private static breakdownFromRules(
+    rules: PlatformFeeConfig[],
+    lines: readonly EventBreakdownInputLine[],
+    commissionPct: number,
+    options?: { processingFeePct?: number },
+  ): EventBreakdown {
+    const platformFees = this.feeRatesFromRules(
+      rules,
       lines.map((line) => ({
         itemType: line.kind,
         listingCategory: line.category,

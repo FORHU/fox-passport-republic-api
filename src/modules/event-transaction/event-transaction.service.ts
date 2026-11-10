@@ -1,6 +1,8 @@
 import EventTransactionRepo from "./event-transaction.repository";
 import EventRequestRepo from "../event-request/event-request.repository";
 import EventTemplateRepo from "../event-template/event-template.repository";
+import PricingSvc from "../pricing/pricing.service";
+import { commissionPctOf, lineSnapshot } from "../pricing/event-breakdown";
 import { TransactionStatus } from "@prisma/client";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
 import AvailabilitySvc from "../availability/availability.service";
@@ -69,6 +71,23 @@ export default class EventTransactionSvc {
     const template = await EventTemplateRepo.findTemplateById(event.templateId);
     if (!template) throw new Error("Template not found");
 
+    // How each line is priced (#264 T7.1): with the rate stored on the Event
+    // when it was priced, so the rows match what the client was quoted. An
+    // Event priced before per-Event rates existed stores no snapshot and
+    // keeps its old prices.
+    const snapshots = new Map<string, ReturnType<typeof lineSnapshot>>();
+    if (event.commissionPct != null) {
+      const breakdown = await PricingSvc.calculateEventBreakdown(
+        template,
+        commissionPctOf(event.commissionPct),
+        undefined,
+        { eventFoxerId: template.ownerId },
+      );
+      for (const line of breakdown.lines) {
+        if (line.itemId) snapshots.set(line.itemId, lineSnapshot(line));
+      }
+    }
+
     const dateRange = { start: event.startAt, end: event.endAt };
     const assetItems = template.templateAssets.filter((item) => item.asset);
     const serviceItems = template.templateServices.filter(
@@ -103,6 +122,7 @@ export default class EventTransactionSvc {
               providerId: item.asset!.ownerId,
               quantity: item.quantity,
               agreedPrice: item.asset!.price.toNumber() * item.quantity,
+              ...snapshots.get(item.id),
               currency: item.currency,
             },
             tx,
@@ -119,6 +139,7 @@ export default class EventTransactionSvc {
               serviceId: item.serviceId!,
               providerId: item.service!.ownerId,
               agreedPrice: item.service!.price,
+              ...snapshots.get(item.id),
               currency: item.currency,
             },
             tx,
@@ -136,6 +157,7 @@ export default class EventTransactionSvc {
               venueId: item.venueId!,
               providerId: item.venue.mayorId,
               agreedPrice: item.venue.price,
+              ...snapshots.get(item.id),
               currency: item.currency,
               status: item.matched
                 ? TransactionStatus.approved

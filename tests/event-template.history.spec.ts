@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const repo = vi.hoisted(() => ({
   findTemplateById: vi.fn(),
   updateTemplate: vi.fn(async () => ({
+    owner: { id: "foxer", commissionPct: 10 },
     templateAssets: [],
     templateServices: [],
     templateVenues: [],
@@ -50,8 +51,10 @@ describe("updateTemplate records the History", () => {
     await EventTemplateSvc.updateTemplate({
       id: "t1",
       ownerId: "foxer",
-      data: { name: "Fiesta Birthday", maxAttendees: 120, hostMarkupPct: 12 },
+      data: { name: "Fiesta Birthday", maxAttendees: 120 },
     });
+    // hostMarkupPct is no longer a package detail (#264 T6.1): the
+    // EventFoxer's one rate lives on their profile.
     expect(audit.recordChangeBy).toHaveBeenCalledWith(
       "foxer",
       "package.edit",
@@ -59,7 +62,6 @@ describe("updateTemplate records the History", () => {
       {
         changes: {
           maxAttendees: { from: 100, to: 120 },
-          hostMarkupPct: { from: 10, to: 12 },
         },
       },
     );

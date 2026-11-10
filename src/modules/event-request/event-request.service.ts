@@ -4,6 +4,8 @@ import { toEnum } from "../../utils/enums";
 import EventRequestRepo from "./event-request.repository";
 import EventTemplateRepo from "../event-template/event-template.repository";
 import EventTemplateSvc from "../event-template/event-template.service";
+import PricingSvc from "../pricing/pricing.service";
+import { breakdownTotals } from "../pricing/event-breakdown";
 import { can } from "../../types/permissions";
 import { sendApprovedEmail } from "../../utils/emails/approved";
 import { sendRejectedEmail } from "../../utils/emails/rejected";
@@ -36,7 +38,11 @@ export default class EventRequestSvc {
       startAt: data.startAt,
       endAt: data.endAt,
       guestCount: data.guestCount,
-      totalAmount: data.totalAmount ?? 0,
+      // Never the client's own figure (#264 T9.2): a booking on this Event
+      // charges `totalAmount`, so a client could set their own price. A
+      // direct Event has no Foxers, so it costs nothing (Q6). The field is
+      // still accepted so older clients don't get a 400.
+      totalAmount: 0,
       requestStatus: "approved",
     });
   }
@@ -58,22 +64,25 @@ export default class EventRequestSvc {
     const template = await EventTemplateRepo.findTemplateById(data.templateId);
     if (!template) throw new Error("Template not found");
 
-    const templateTotals = EventTemplateSvc.calculateTotalsBreakdown(template);
-    const hasTemplateItems =
-      (template.templateAssets?.length ?? 0) > 0 ||
-      (template.templateServices?.length ?? 0) > 0 ||
-      (template.templateVenues?.length ?? 0) > 0;
-
-    const totalAmount = hasTemplateItems
-      ? templateTotals.totalAmount
-      : (data.totalAmount ?? 0);
-    const itemsTotal = hasTemplateItems ? templateTotals.itemsTotal : 0;
-    const hostMarkupAmount = hasTemplateItems
-      ? templateTotals.hostMarkupAmount
-      : 0;
-    const platformFeeAmount = hasTemplateItems
-      ? templateTotals.platformFeeAmount
-      : 0;
+    // Priced by the server from the template's Foxers (#264 T9.1), never
+    // from data.totalAmount: a client used to set the price of a request
+    // with no items itself. A request with no Foxers yet costs nothing until
+    // the EventFoxer adds them (Q6). The EventFoxer's rate is stored on the
+    // Event, so this price never moves when they change it later.
+    const commissionPct = EventTemplateSvc.ownerCommissionPct(template);
+    const breakdown = await PricingSvc.calculateEventBreakdown(
+      template,
+      commissionPct,
+      undefined,
+      { eventFoxerId: template.ownerId },
+    );
+    const {
+      totalAmount,
+      itemsTotal,
+      hostMarkupAmount,
+      platformFeeAmount,
+      processingFeeAmount,
+    } = breakdownTotals(breakdown);
 
     // 2. Create Event without transactions (will be created after confirmation)
     return EventRequestRepo.create(
@@ -91,6 +100,8 @@ export default class EventRequestSvc {
         itemsTotal,
         hostMarkupAmount,
         platformFeeAmount,
+        processingFeeAmount,
+        commissionPct,
         targetCity: template.targetCity ?? undefined,
         targetState: template.targetState ?? undefined,
         targetCountry: template.targetCountry ?? undefined,

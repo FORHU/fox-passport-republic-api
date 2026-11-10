@@ -18,13 +18,16 @@ const HISTORY_FIELDS = [
   "targetCity",
   "targetState",
   "targetCountry",
-  "hostMarkupPct",
   "maxAttendees",
 ] as const;
-import { PLATFORM_FEE_PERCENT } from "../../config";
+import PricingSvc from "../pricing/pricing.service";
 import {
-  isExcludedRow,
+  breakdownTotals,
+  commissionPctOf,
+  type EventBreakdown,
   type EventBreakdownExclusions,
+  type EventTemplateForBreakdown,
+  type MoneyInput,
 } from "../pricing/event-breakdown";
 import { eventTemplateCache } from "../../utils/cache-namespaces";
 import { fingerprint } from "../../utils/cache.util";
@@ -39,70 +42,35 @@ import { fingerprint } from "../../utils/cache.util";
 const TEMPLATE_TTL = 120;
 
 /**
- * A money column as Prisma returns it, a plain number from an in-memory draft,
- * or a `string`.
- *
- * The string is what a `Decimal` becomes after a JSON round-trip, so it is the
- * shape every *cached* read here produces - see `Jsonified` in
- * `cache.util.ts`. Adding it was not a widening for convenience: `tsc` refused
- * the cached reads until it was there, which is the whole point of that type.
- * `toAmount` below already went through `Number()`, so nothing about the
- * arithmetic changes.
+ * A template the price breakdown can run on: its items (see
+ * `EventTemplateForBreakdown`) and its owner, whose one commission rate
+ * applies to every Event they created (#264 D5). Every template query here
+ * loads `owner.commissionPct`; a missing owner is refused, never priced at 0%.
  */
-type Amount = Prisma.Decimal | number | string | null | undefined;
+export type TemplateForPricing = EventTemplateForBreakdown & {
+  ownerId?: string;
+  owner?: { id?: string; commissionPct?: MoneyInput } | null;
+};
 
-/**
- * Money columns come back as Prisma `Decimal`, whose `valueOf()` is a *string*.
- * `a + b` on two of those concatenates rather than adds, so every amount is
- * converted through here before arithmetic.
- */
-function toAmount(value: Amount): number {
-  if (value === null || value === undefined) return 0;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-}
+/** What every template response adds: the totals under their old names, plus every line (#264 T6.4). */
+type Priced<T> = T &
+  ReturnType<typeof breakdownTotals> & {
+    price: number;
+    breakdown: EventBreakdown;
+  };
 
-/**
- * Price for one attached item: the negotiated price when there is one,
- * otherwise the supplier's listed price.
- *
- * `agreedPrice` is `Decimal @default(0)` and non-nullable, so it always arrives
- * as a *truthy object*. The original `agreedPrice || listed` therefore never
- * fell back, and items nobody had negotiated a price for were silently counted
- * as 0. Comparing the converted number restores the intended fallback.
- */
-function itemPrice(agreedPrice: Amount, listedPrice: Amount): number {
-  const agreed = toAmount(agreedPrice);
-  return agreed > 0 ? agreed : toAmount(listedPrice);
-}
-
-interface PricedItem {
-  /** Optional: the lite browse query selects prices without row ids. */
-  id?: string;
-  agreedPrice?: Amount;
-}
-
-/**
- * The minimum shape `calculateItemsTotal` needs. Deliberately structural rather
- * than a single `EventTemplateGetPayload`, because callers pass templates loaded
- * with different `include` sets as well as unsaved drafts.
- */
-export interface TemplateForPricing {
-  /** Percentage the Host adds on top of the summed item prices. */
-  hostMarkupPct?: number | null;
-  /** Optional per-template platform fee override percentage (e.g. 0.05 or 5). */
-  platformFeePct?: number | null;
-  templateAssets?:
-    | (PricedItem & {
-        quantity?: number | null;
-        asset?: { price?: Amount } | null;
-      })[]
-    | null;
-  templateServices?:
-    (PricedItem & { service?: { price?: Amount } | null })[] | null;
-  templateVenues?:
-    (PricedItem & { venue?: { price?: Amount } | null })[] | null;
-}
+/** A template shown without a price because it couldn't be priced (see `withBreakdownsForDisplay`). */
+const UNPRICED = {
+  itemsTotal: null,
+  hostMarkupAmount: null,
+  platformFeeAmount: null,
+  processingFeeAmount: null,
+  totalAmount: null,
+  estimatedTotal: null,
+  price: null,
+  breakdown: null,
+} as const;
+type Unpriced<T> = T & typeof UNPRICED;
 
 export default class EventTemplateSvc {
   static async createTemplate(data: {
@@ -117,14 +85,10 @@ export default class EventTemplateSvc {
     targetCountry?: string;
     lat?: number;
     lng?: number;
-    hostMarkupPct?: number;
     maxAttendees?: number;
   }) {
     const template = await EventTemplateRepo.createTemplate(data);
-    return {
-      ...template,
-      ...this.calculateTotalsBreakdown(template),
-    };
+    return this.withBreakdownForDisplay(template);
   }
 
   static async updateTemplate(params: {
@@ -141,7 +105,6 @@ export default class EventTemplateSvc {
       targetCountry?: string;
       lat?: number;
       lng?: number;
-      hostMarkupPct: number;
       maxAttendees: number | null;
     }>;
   }) {
@@ -174,10 +137,7 @@ export default class EventTemplateSvc {
       await recordChangeBy(ownerId, "package.edit", id, { changes });
     }
 
-    return {
-      ...template,
-      ...this.calculateTotalsBreakdown(template),
-    };
+    return this.withBreakdownForDisplay(template);
   }
 
   /**
@@ -264,16 +224,12 @@ export default class EventTemplateSvc {
       ["event_boost", "featured_listing"],
       "ownerId",
     );
+    const priced = await this.withBreakdownsForDisplay(sorted);
     return {
-      templates: sorted.map((t) => {
-        const totals = this.calculateTotalsBreakdown(t);
-        return {
-          ...t,
-          ...totals,
-          price: totals.totalAmount,
-          rating: "rating" in t ? t.rating : null,
-        };
-      }),
+      templates: priced.map((t) => ({
+        ...t,
+        rating: "rating" in t ? t.rating : null,
+      })),
       total,
     };
   }
@@ -307,15 +263,12 @@ export default class EventTemplateSvc {
     );
     const { default: PassportSvc } =
       await import("../passport/passport.service");
-    const withTotals = templates.map((t) => {
-      const totals = this.calculateTotalsBreakdown(t);
-      return {
+    const withTotals = (await this.withBreakdownsForDisplay(templates)).map(
+      (t) => ({
         ...t,
-        ...totals,
-        price: totals.totalAmount,
         rating: "rating" in t ? t.rating : null,
-      };
-    });
+      }),
+    );
     const sorted = await PassportSvc.sortByFeaturedPerk(
       withTotals,
       ["event_boost", "featured_listing"],
@@ -324,7 +277,7 @@ export default class EventTemplateSvc {
     // maxPrice is enforced after price computation (server-computed totalAmount)
     const filtered =
       filters.maxPrice != null
-        ? sorted.filter((t) => (t.price ?? 0) <= filters.maxPrice!)
+        ? sorted.filter((t) => t.price != null && t.price <= filters.maxPrice!)
         : sorted;
     return { templates: filtered, total };
   }
@@ -383,101 +336,89 @@ export default class EventTemplateSvc {
     if (!template) {
       throw notFound("Event template");
     }
-    return {
+    return this.withBreakdownForDisplay(template);
+  }
+
+  /**
+   * The template with its full price breakdown (#264 T6): every Foxer line
+   * with its commission, FoxPassport fee and processing fee, from
+   * `PricingSvc`. This replaces the old `calculateTotalsBreakdown`, which
+   * charged the fee on the commission and read a 1% fee as 100%.
+   */
+  static async withBreakdown<T extends TemplateForPricing>(
+    template: T,
+    exclusions?: EventBreakdownExclusions,
+  ): Promise<Priced<T>> {
+    const [priced] = await this.withBreakdowns([template], exclusions);
+    return priced;
+  }
+
+  /** `withBreakdown` for a list, with one fee-rule query for all of them. */
+  static async withBreakdowns<T extends TemplateForPricing>(
+    templates: readonly T[],
+    exclusions?: EventBreakdownExclusions,
+  ): Promise<Priced<T>[]> {
+    const breakdowns = await PricingSvc.calculateEventBreakdowns(
+      templates.map((template) => ({
+        template,
+        commissionPct: this.ownerCommissionPct(template),
+        exclusions,
+        eventFoxerId: template.ownerId ?? template.owner?.id,
+      })),
+    );
+    return templates.map((template, i) => ({
       ...template,
-      ...this.calculateTotalsBreakdown(template),
-    };
+      ...breakdownTotals(breakdowns[i]),
+      price: breakdowns[i].total,
+      breakdown: breakdowns[i],
+    }));
   }
 
   /**
-   * Sum the raw price of all (non-excluded) items in the template — no markup,
-   * no platform fee. Used as the base for calculateTotalsBreakdown, and kept
-   * standalone since a few callers only need the raw supplier total.
+   * `withBreakdowns` for showing templates (browse, detail, the response to
+   * a save). A template that can't be priced (bad stored data, or no fee
+   * rule) comes back with every amount `null` and the error logged, instead
+   * of failing the whole page: the old pricing never threw, so one bad
+   * template must not take the browse list down. Booking, requests and
+   * checkout price with `PricingSvc` directly and still refuse.
    */
-  static calculateItemsTotal(
-    template: TemplateForPricing,
-    exclusions?: EventBreakdownExclusions,
-  ): number {
-    let total = 0;
-
-    // Exclusions use the same rule as the new breakdown (`isExcludedRow`): a
-    // row loaded without its id, when exclusions were asked for, throws
-    // instead of charging for an item the client removed.
-
-    // Sum Assets
-    if (template.templateAssets) {
-      template.templateAssets.forEach((ta) => {
-        if (isExcludedRow(exclusions?.excludedAssetIds, ta.id, "asset")) return;
-        const price = itemPrice(ta.agreedPrice, ta.asset?.price);
-        const qty = ta.quantity || 1;
-        total += price * qty;
-      });
+  static async withBreakdownsForDisplay<T extends TemplateForPricing>(
+    templates: readonly T[],
+  ): Promise<(Priced<T> | Unpriced<T>)[]> {
+    try {
+      return await this.withBreakdowns(templates);
+    } catch {
+      // Rare: price each on its own, so only the bad ones go unpriced.
+      return Promise.all(
+        templates.map(async (template) => {
+          try {
+            return await this.withBreakdown(template);
+          } catch (e) {
+            console.error(
+              `Could not price event template ${(template as { id?: string }).id ?? "(no id)"}`,
+              e,
+            );
+            return { ...template, ...UNPRICED };
+          }
+        }),
+      );
     }
-
-    // Sum Services
-    if (template.templateServices) {
-      template.templateServices.forEach((ts) => {
-        if (isExcludedRow(exclusions?.excludedServiceIds, ts.id, "service"))
-          return;
-        total += itemPrice(ts.agreedPrice, ts.service?.price);
-      });
-    }
-
-    // Sum Venues
-    if (template.templateVenues) {
-      template.templateVenues.forEach((tv) => {
-        if (isExcludedRow(exclusions?.excludedVenueIds, tv.id, "venue")) return;
-        total += itemPrice(tv.agreedPrice, tv.venue?.price);
-      });
-    }
-
-    return total;
   }
 
-  /** @deprecated use calculateItemsTotal / calculateTotalsBreakdown */
-  static calculateTotalAmount(template: TemplateForPricing): number {
-    return this.calculateItemsTotal(template);
+  /** `withBreakdownsForDisplay` for one template. */
+  static async withBreakdownForDisplay<T extends TemplateForPricing>(
+    template: T,
+  ): Promise<Priced<T> | Unpriced<T>> {
+    const [shown] = await this.withBreakdownsForDisplay([template]);
+    return shown;
   }
 
   /**
-   * Full server-computed price breakdown for an EventTemplate. This is the only
-   * source of truth for what a citizen owes when booking from a template — never
-   * trust a client-supplied totalAmount (see docs/adr/0001-host-markup-and-server-computed-event-total.md).
-   *
-   * platformFee is additive on top of itemsTotal + hostMarkup, never carved out of
-   * the Host's or any provider's share (see docs/adr/0002-stripe-connect-payouts.md).
+   * The template owner's commission rate. Refuses a template loaded without
+   * its owner's rate rather than pricing it at 0%.
    */
-  static calculateTotalsBreakdown(
-    template: TemplateForPricing,
-    exclusions?: EventBreakdownExclusions,
-    platformFeePercent?: number,
-  ): {
-    itemsTotal: number;
-    hostMarkupAmount: number;
-    platformFeeAmount: number;
-    totalAmount: number;
-    estimatedTotal: number;
-  } {
-    const feePct =
-      platformFeePercent ??
-      (template.platformFeePct != null
-        ? template.platformFeePct <= 1
-          ? template.platformFeePct * 100
-          : template.platformFeePct
-        : PLATFORM_FEE_PERCENT);
-
-    const itemsTotal = this.calculateItemsTotal(template, exclusions);
-    const hostMarkupAmount = itemsTotal * ((template.hostMarkupPct ?? 0) / 100);
-    const platformFeeAmount = (itemsTotal + hostMarkupAmount) * (feePct / 100);
-    const totalAmount = itemsTotal + hostMarkupAmount + platformFeeAmount;
-
-    return {
-      itemsTotal,
-      hostMarkupAmount,
-      platformFeeAmount,
-      totalAmount,
-      estimatedTotal: totalAmount, // kept for backward compatibility with existing API consumers
-    };
+  static ownerCommissionPct(template: TemplateForPricing): number {
+    return commissionPctOf(template.owner?.commissionPct);
   }
 
   static async attachAsset(
@@ -488,7 +429,7 @@ export default class EventTemplateSvc {
     description?: string,
     matchedAt?: Date,
     date?: Date,
-    agreedPrice?: number,
+    _agreedPrice?: number,
     isOptional?: boolean,
   ) {
     await this.verifyOwnership(templateId, ownerId);
@@ -501,7 +442,7 @@ export default class EventTemplateSvc {
         undefined,
         description,
         matchedAt,
-        agreedPrice,
+        undefined,
         isOptional,
       );
     }
@@ -532,12 +473,10 @@ export default class EventTemplateSvc {
       this.validateMatchData(true, description, matchedAt);
     }
 
-    // Default agreedPrice to the asset's own listed price (* quantity) when the Host
-    // doesn't negotiate a different one — without this, agreedPrice silently defaults
-    // to 0 at the repo layer, which is what providers actually get paid (the citizen's
-    // total is computed from the live price, so an unset agreedPrice meant the citizen
-    // was charged correctly but the provider would be paid $0).
-    const finalAgreedPrice = agreedPrice ?? asset.price.toNumber() * quantity;
+    // The Foxer's own listing price (* quantity), never one the EventFoxer
+    // sends (#264 D1, C6): _agreedPrice is accepted for older callers and
+    // ignored. Pricing reads the listing itself; this keeps the row honest.
+    const finalAgreedPrice = asset.price.toNumber() * quantity;
 
     return EventTemplateRepo.attachAsset(
       templateId,
@@ -570,7 +509,7 @@ export default class EventTemplateSvc {
     description?: string,
     matchedAt?: Date,
     date?: Date,
-    agreedPrice?: number,
+    _agreedPrice?: number,
     isOptional?: boolean,
   ) {
     await this.verifyOwnership(templateId, ownerId);
@@ -582,7 +521,7 @@ export default class EventTemplateSvc {
         undefined,
         description,
         matchedAt,
-        agreedPrice,
+        undefined,
         isOptional,
       );
     }
@@ -611,8 +550,8 @@ export default class EventTemplateSvc {
       this.validateMatchData(true, description, matchedAt);
     }
 
-    // See attachAsset's comment — default to the service's own listed price.
-    const finalAgreedPrice = agreedPrice ?? service.price.toNumber();
+    // See attachAsset: the service's own listing price, never the EventFoxer's.
+    const finalAgreedPrice = service.price.toNumber();
 
     return EventTemplateRepo.attachService(
       templateId,
@@ -644,7 +583,7 @@ export default class EventTemplateSvc {
     description?: string,
     matchedAt?: Date,
     date?: Date,
-    agreedPrice?: number,
+    _agreedPrice?: number,
     isOptional?: boolean,
   ) {
     await this.verifyOwnership(templateId, ownerId);
@@ -656,7 +595,7 @@ export default class EventTemplateSvc {
         undefined,
         description,
         matchedAt,
-        agreedPrice,
+        undefined,
         isOptional,
       );
     }
@@ -679,7 +618,7 @@ export default class EventTemplateSvc {
     // holding an approved VenueEventFoxerAffiliation with "template:attach"
     // for this venue — the Studio's "Apply to host here" gate is UX only;
     // this is the check that actually enforces it.
-    let affiliation: { agreedPrice: Amount } | null = null;
+    let affiliation: { agreedPrice: Prisma.Decimal | null } | null = null;
     if (venue.mayorId !== ownerId) {
       const { default: VenueAffiliationSvc } =
         await import("../venue-affiliation/venue-affiliation.service");
@@ -713,15 +652,14 @@ export default class EventTemplateSvc {
       this.validateMatchData(true, description, matchedAt);
     }
 
-    // Prefer an explicit price, then the affiliation's pre-agreed package
-    // price (see attachAsset's comment for the non-affiliated default), then
-    // the venue's own listed price.
+    // The Mayor's own price for this EventFoxer: the affiliation's agreed
+    // price when there is one, else the venue's listing price. Never one the
+    // EventFoxer sends (#264 C6). Pricing looks the affiliation up itself
+    // (PricingSvc.calculateEventBreakdowns), so the two always agree.
     const finalAgreedPrice =
-      agreedPrice ??
-      (affiliation?.agreedPrice != null
-        ? toAmount(affiliation.agreedPrice)
-        : undefined) ??
-      venue.price.toNumber();
+      affiliation?.agreedPrice != null
+        ? affiliation.agreedPrice.toNumber()
+        : venue.price.toNumber();
 
     return EventTemplateRepo.attachVenue(
       templateId,
