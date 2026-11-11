@@ -754,6 +754,7 @@ export default class UsersRepo {
           select: {
             id: true,
             perks: true,
+            paths: { select: { path: true } },
             stamps: {
               orderBy: { createdAt: "desc" },
               select: {
