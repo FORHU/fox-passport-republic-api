@@ -50,11 +50,12 @@ beforeEach(() => {
 
 describe("login rate limit", () => {
   it("answers 429 once an account's failed attempts run out", async () => {
-    const { loginRateLimit: limiter } = await freshLimiters();
+    const { loginRateLimit: limiter, LOGIN_ACCOUNT_LIMIT } =
+      await freshLimiters();
     const app = appWith(limiter);
 
     // The per-account budget is the tighter of the two, so it trips first.
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < LOGIN_ACCOUNT_LIMIT; i++) {
       const res = await post(app, {
         email: "victim@example.com",
         password: "wrong",
@@ -72,12 +73,13 @@ describe("login rate limit", () => {
   });
 
   it("keys the account budget on the normalised address", async () => {
-    const { loginRateLimit: limiter } = await freshLimiters();
+    const { loginRateLimit: limiter, LOGIN_ACCOUNT_LIMIT } =
+      await freshLimiters();
     const app = appWith(limiter);
 
     // Casing and surrounding space must not buy a fresh budget, or the limit is
     // one `.toUpperCase()` away from being bypassed entirely.
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < LOGIN_ACCOUNT_LIMIT; i++) {
       await post(app, { email: "Victim@Example.com ", password: "wrong" });
     }
 
@@ -89,15 +91,16 @@ describe("login rate limit", () => {
   });
 
   it("does not spend an account's budget on a different account", async () => {
-    const { loginRateLimit: limiter } = await freshLimiters();
+    const { loginRateLimit: limiter, LOGIN_ACCOUNT_LIMIT } =
+      await freshLimiters();
     const app = appWith(limiter);
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < LOGIN_ACCOUNT_LIMIT; i++) {
       await post(app, { email: "victim@example.com", password: "wrong" });
     }
 
-    // Same IP, different account. The per-IP budget is 30 and only 10 are spent,
-    // so this must still be served - otherwise everyone behind one office NAT
+    // Same IP, different account. The per-IP budget is larger than the
+    // account's and only the account's is spent, so this must still be served - otherwise everyone behind one office NAT
     // is locked out by one attacker.
     const other = await post(app, {
       email: "bystander@example.com",
@@ -107,12 +110,13 @@ describe("login rate limit", () => {
   });
 
   it("does not count successful sign-ins", async () => {
-    const { loginRateLimit: limiter } = await freshLimiters();
+    const { loginRateLimit: limiter, LOGIN_ACCOUNT_LIMIT } =
+      await freshLimiters();
     const app = appWith(limiter, () => 200);
 
     // Well past the failure budget. Signing in and out repeatedly is ordinary
     // use and must never accumulate toward a lockout.
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < LOGIN_ACCOUNT_LIMIT + 5; i++) {
       const res = await post(app, {
         email: "regular@example.com",
         password: "correct",
@@ -141,13 +145,22 @@ describe("otp send rate limit", () => {
 
 describe("requests naming no account", () => {
   it("are not pooled into one shared budget", async () => {
-    const { loginRateLimit: limiter } = await freshLimiters();
+    const {
+      loginRateLimit: limiter,
+      LOGIN_ACCOUNT_LIMIT,
+      LOGIN_IP_LIMIT,
+    } = await freshLimiters();
     const app = appWith(limiter);
 
     // A malformed body has no address to key on. If those all landed in one
     // bucket, unrelated clients would exhaust a single budget between them.
-    // The per-IP limit of 30 still applies, so ask for fewer than that.
-    for (let i = 0; i < 25; i++) {
+    // Go past the account budget, but stay under the per-IP limit, which
+    // still applies to them.
+    for (
+      let i = 0;
+      i < Math.min(LOGIN_ACCOUNT_LIMIT + 5, LOGIN_IP_LIMIT - 1);
+      i++
+    ) {
       const res = await post(app, { password: "wrong" });
       expect(res.status).toBe(401);
     }
