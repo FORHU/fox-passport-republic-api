@@ -367,6 +367,92 @@ export default class RewardRepo {
    * Transactionally executes coin deduction, Promotion/Voucher creation,
    * CoinRedemption tracking, and lifecycle logging.
    */
+  /**
+   * Token vouchers past their expiry that were never used and whose Tokens
+   * have not been returned yet. A voucher counts as used while it has a
+   * VoucherRedemption row; cancelling the booking deletes that row and frees
+   * the voucher again.
+   */
+  static async findExpiredUnusedRedemptions(now: Date, take = 500) {
+    return prisma.coinRedemption.findMany({
+      where: {
+        status: "completed",
+        expiresAt: { lt: now },
+        voucherId: { not: null },
+        voucher: { redemptions: { none: {} } },
+      },
+      select: {
+        id: true,
+        userId: true,
+        coinsSpent: true,
+        voucher: { select: { code: true } },
+      },
+      orderBy: { expiresAt: "asc" },
+      take,
+    });
+  }
+
+  /**
+   * Returns an expired, unused voucher's full Token price, once. Claiming the
+   * redemption (status completed -> returned) and writing the VOUCHER_RETURN
+   * row happen in one transaction, so a re-run or a parallel run pays nothing
+   * more. The original REDEMPTION row is never changed; the return points to
+   * it through `reversalOf`.
+   */
+  static async recordVoucherReturn(data: {
+    redemptionId: string;
+    userId: string;
+    coins: number;
+    voucherCode: string;
+  }): Promise<boolean> {
+    return prisma.$transaction(async (tx) => {
+      const claimed = await tx.coinRedemption.updateMany({
+        where: { id: data.redemptionId, status: "completed" },
+        data: { status: "returned" },
+      });
+      if (claimed.count === 0) return false;
+
+      const redemptionRow = await tx.rewardLifecycle.findFirst({
+        where: {
+          userId: data.userId,
+          type: RewardLifecycleType.REDEMPTION,
+          reason: { endsWith: `(${data.voucherCode})` },
+        },
+        select: { id: true, grantEventId: true },
+      });
+      const grantEventId =
+        redemptionRow?.grantEventId ??
+        (
+          await tx.rewardEvent.findFirst({
+            where: { userId: data.userId },
+            orderBy: { createdAt: "desc" },
+            select: { id: true },
+          })
+        )?.id;
+      if (!grantEventId) {
+        throw new Error(
+          `No ledger entry to attach the voucher return to (redemption ${data.redemptionId})`,
+        );
+      }
+
+      await tx.rewardLifecycle.create({
+        data: {
+          grantEventId,
+          userId: data.userId,
+          type: RewardLifecycleType.VOUCHER_RETURN,
+          coinsDelta: data.coins,
+          reversalOf: redemptionRow?.id ?? null,
+          reason: `VOUCHER_EXPIRED: Tokens returned for unused voucher ${data.voucherCode}`,
+        },
+      });
+      await tx.passport.update({
+        where: { userId: data.userId },
+        data: { coins: { increment: data.coins } },
+      });
+      return true;
+    });
+  }
+
   static async executeRedemptionTransaction(data: {
     userId: string;
     reward: {
