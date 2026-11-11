@@ -15,6 +15,38 @@ export default class ProviderSpecialtySvc {
   }
 
   /**
+   * Adds `specialties: [{ slug, name }]` to each Provider in `users`, built from
+   * the specializations the query already loaded. People who are not Providers
+   * are returned as they were.
+   */
+  static async attach<
+    T extends {
+      roleType?: string[];
+      foxerSpecializations?: { roleType: string; category: string }[];
+    },
+  >(users: T[]) {
+    const catalog = await this.list();
+    const names = new Map(catalog.map((c) => [c.slug, c.name]));
+    return users.map((user) => {
+      if (!user.roleType?.includes("providerFoxer")) return user;
+      const slugs = [
+        ...new Set(
+          (user.foxerSpecializations ?? [])
+            .filter((s) => s.roleType === "providerFoxer")
+            .map((s) => s.category),
+        ),
+      ];
+      return {
+        ...user,
+        specialties: slugs.map((slug) => ({
+          slug,
+          name: names.get(slug) ?? slug,
+        })),
+      };
+    });
+  }
+
+  /**
    * Checks a declared list against the catalog. Returns the cleaned list (each
    * slug once, in the order given) or a message the caller can show as is.
    */

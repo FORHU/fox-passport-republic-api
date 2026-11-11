@@ -1,4 +1,5 @@
 import SearchRepo from "./search.repository";
+import ProviderSpecialtySvc from "../users/provider-specialty.service";
 import { cached, fingerprint } from "../../utils/cache.util";
 
 export default class SearchSvc {
@@ -18,11 +19,26 @@ export default class SearchSvc {
     category?: string,
     page = 1,
     limit = 30,
+    specialty?: string,
   ) {
     return cached(
-      `search:byLocation:${fingerprint({ location, category, page, limit })}`,
+      `search:byLocation:${fingerprint({ location, category, page, limit, specialty })}`,
       60,
-      () => SearchRepo.searchByLocation(location, category, page, limit),
+      async () => {
+        const result = await SearchRepo.searchByLocation(
+          location,
+          category,
+          page,
+          limit,
+          specialty,
+        );
+        const [gearFoxers, serviceFoxers, performerFoxers] = await Promise.all([
+          ProviderSpecialtySvc.attach(result.gearFoxers),
+          ProviderSpecialtySvc.attach(result.serviceFoxers),
+          ProviderSpecialtySvc.attach(result.performerFoxers),
+        ]);
+        return { ...result, gearFoxers, serviceFoxers, performerFoxers };
+      },
     );
   }
 }
