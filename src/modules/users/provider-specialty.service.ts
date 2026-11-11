@@ -49,8 +49,14 @@ export default class ProviderSpecialtySvc {
   /**
    * Checks a declared list against the catalog. Returns the cleaned list (each
    * slug once, in the order given) or a message the caller can show as is.
+   * `alreadyHeld` are slugs the Provider has now, such as one earned from a
+   * completed booking: they stay valid even without a catalog row, so a client
+   * can send back the list it was given. Anything new must be in the catalog.
    */
-  static async check(declared: unknown): Promise<SpecialtyCheck> {
+  static async check(
+    declared: unknown,
+    alreadyHeld: string[] = [],
+  ): Promise<SpecialtyCheck> {
     const none = "Choose at least one specialty";
     if (!Array.isArray(declared)) return { ok: false, message: none };
 
@@ -59,7 +65,10 @@ export default class ProviderSpecialtySvc {
     ];
     if (slugs.length === 0) return { ok: false, message: none };
 
-    const valid = new Set((await this.list()).map((c) => c.slug));
+    const valid = new Set([
+      ...(await this.list()).map((c) => c.slug),
+      ...alreadyHeld,
+    ]);
     const unknown = slugs.filter((s) => !valid.has(s));
     if (unknown.length > 0) {
       return { ok: false, message: `Unknown specialty: ${unknown.join(", ")}` };

@@ -118,6 +118,22 @@ describe("ProfileSvc.setProviderSpecialties", () => {
     expect(repo.replaceProviderSpecialties).toHaveBeenCalled();
   });
 
+  it("accepts the list it was given back, even a specialty with no catalog row", async () => {
+    asProvider(["dj", "other"]);
+    await ProfileSvc.setProviderSpecialties("u1", ["dj", "other"]);
+    expect(repo.replaceProviderSpecialties).not.toHaveBeenCalled();
+  });
+
+  it("lets a Provider drop a specialty with no catalog row", async () => {
+    asProvider(["dj", "other"]);
+    await ProfileSvc.setProviderSpecialties("u1", ["dj"]);
+    expect(repo.replaceProviderSpecialties).toHaveBeenCalledWith(
+      "u1",
+      ["other"],
+      [],
+    );
+  });
+
   it("writes nothing when the list has not changed", async () => {
     asProvider(["dj", "photography"]);
     await ProfileSvc.setProviderSpecialties("u1", ["photography", "dj"]);

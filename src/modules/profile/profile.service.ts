@@ -127,10 +127,9 @@ export default class ProfileSvc {
       throw new SpecialtyError("Only Providers have specialties");
     }
 
-    const check = await ProviderSpecialtySvc.check(declared);
-    if (!check.ok) throw new SpecialtyError(check.message);
-
     const current = await ProfileRepo.findProviderSpecialtyCategories(userId);
+    const check = await ProviderSpecialtySvc.check(declared, current);
+    if (!check.ok) throw new SpecialtyError(check.message);
     const next = new Set(check.slugs);
     const removed = current.filter((slug) => !next.has(slug));
     const added = check.slugs.filter((slug) => !current.includes(slug));

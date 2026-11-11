@@ -89,6 +89,18 @@ describe("ProviderSpecialtySvc.check", () => {
     });
   });
 
+  it("lets a Provider keep a specialty they already hold, catalog row or not", async () => {
+    await expect(
+      ProviderSpecialtySvc.check(["dj", "other"], ["other"]),
+    ).resolves.toEqual({ ok: true, slugs: ["dj", "other"] });
+  });
+
+  it("still refuses a new slug that is not in the catalog", async () => {
+    await expect(
+      ProviderSpecialtySvc.check(["dj", "plumbing"], ["other"]),
+    ).resolves.toEqual({ ok: false, message: "Unknown specialty: plumbing" });
+  });
+
   it("trims each slug and keeps it once", async () => {
     await expect(
       ProviderSpecialtySvc.check([" dj ", "dj", "photography"]),
