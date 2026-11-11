@@ -130,14 +130,6 @@ export default class AppointmentRepo {
           where: { roleType: "organizer" },
           select: { category: true },
         },
-        passport: {
-          select: {
-            paths: {
-              where: { path: "organizer" },
-              select: { level: true, totalXP: true },
-            },
-          },
-        },
       },
       orderBy: { name: "asc" },
       take: filter.limit,

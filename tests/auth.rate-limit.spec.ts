@@ -50,7 +50,8 @@ beforeEach(() => {
 
 describe("login rate limit", () => {
   it("answers 429 once an account's failed attempts run out", async () => {
-    const { loginRateLimit: limiter } = await freshLimiters();
+    const { loginRateLimit: limiter, LOGIN_ACCOUNT_LIMIT } =
+      await freshLimiters();
     const app = appWith(limiter);
 
     // The per-account budget (30) is the tighter of the two, so it trips first.
@@ -72,7 +73,8 @@ describe("login rate limit", () => {
   });
 
   it("keys the account budget on the normalised address", async () => {
-    const { loginRateLimit: limiter } = await freshLimiters();
+    const { loginRateLimit: limiter, LOGIN_ACCOUNT_LIMIT } =
+      await freshLimiters();
     const app = appWith(limiter);
 
     // Casing and surrounding space must not buy a fresh budget, or the limit is
@@ -89,7 +91,8 @@ describe("login rate limit", () => {
   });
 
   it("does not spend an account's budget on a different account", async () => {
-    const { loginRateLimit: limiter } = await freshLimiters();
+    const { loginRateLimit: limiter, LOGIN_ACCOUNT_LIMIT } =
+      await freshLimiters();
     const app = appWith(limiter);
 
     for (let i = 0; i < 30; i++) {
@@ -107,12 +110,13 @@ describe("login rate limit", () => {
   });
 
   it("does not count successful sign-ins", async () => {
-    const { loginRateLimit: limiter } = await freshLimiters();
+    const { loginRateLimit: limiter, LOGIN_ACCOUNT_LIMIT } =
+      await freshLimiters();
     const app = appWith(limiter, () => 200);
 
     // Well past the failure budget. Signing in and out repeatedly is ordinary
     // use and must never accumulate toward a lockout.
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < LOGIN_ACCOUNT_LIMIT + 5; i++) {
       const res = await post(app, {
         email: "regular@example.com",
         password: "correct",
@@ -141,7 +145,11 @@ describe("otp send rate limit", () => {
 
 describe("requests naming no account", () => {
   it("are not pooled into one shared budget", async () => {
-    const { loginRateLimit: limiter } = await freshLimiters();
+    const {
+      loginRateLimit: limiter,
+      LOGIN_ACCOUNT_LIMIT,
+      LOGIN_IP_LIMIT,
+    } = await freshLimiters();
     const app = appWith(limiter);
 
     // A malformed body has no address to key on. If those all landed in one

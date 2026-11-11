@@ -1,4 +1,9 @@
-import { Prisma } from "@prisma/client";
+import {
+  ItemBookingStatus,
+  Prisma,
+  RoleType,
+  ServiceCategory,
+} from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { userCache, eventTemplateCache } from "../../utils/cache-namespaces";
 
@@ -290,6 +295,110 @@ export default class ProfileRepo {
         where: { id: String(userId) },
         select: { id: true },
       }),
+    );
+  }
+  /** The roles a user holds. */
+  static async findRoleTypes(userId: string): Promise<RoleType[]> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { roleType: true },
+    });
+    return user?.roleType ?? [];
+  }
+
+  /** The specialties a Provider has, declared or earned. */
+  static async findProviderSpecialtyCategories(
+    userId: string,
+  ): Promise<string[]> {
+    const rows = await prisma.foxerSpecialization.findMany({
+      where: { userId, roleType: RoleType.providerFoxer },
+      select: { category: true },
+      orderBy: { category: "asc" },
+    });
+    return rows.map((r) => r.category);
+  }
+
+  /**
+   * Which of `categories` still have a booking ahead for this Provider: a
+   * service or an asset in that category with an open booking that has not
+   * ended. Specialties span both vocabularies, so each is matched against the
+   * kind of listing that carries it.
+   */
+  static async categoriesWithUpcomingBookings(
+    userId: string,
+    categories: string[],
+  ): Promise<string[]> {
+    if (categories.length === 0) return [];
+
+    const now = new Date();
+    const open = {
+      notIn: [ItemBookingStatus.completed, ItemBookingStatus.cancelled],
+    };
+    const serviceValues = Object.values(ServiceCategory) as string[];
+    const serviceCategories = categories.filter((c) =>
+      serviceValues.includes(c),
+    ) as ServiceCategory[];
+
+    const [services, assets] = await Promise.all([
+      serviceCategories.length === 0
+        ? []
+        : prisma.service.findMany({
+            where: {
+              ownerId: userId,
+              deletedAt: null,
+              category: { in: serviceCategories },
+              bookings: {
+                some: { status: open, scheduledDate: { gte: now } },
+              },
+            },
+            select: { category: true },
+            distinct: ["category"],
+          }),
+      prisma.asset.findMany({
+        where: {
+          ownerId: userId,
+          deletedAt: null,
+          category: { in: categories },
+          bookings: { some: { status: open, endDate: { gte: now } } },
+        },
+        select: { category: true },
+        distinct: ["category"],
+      }),
+    ]);
+
+    return [
+      ...new Set([
+        ...services.map((s) => s.category as string),
+        ...assets.map((a) => a.category),
+      ]),
+    ];
+  }
+
+  /** Removes and adds a Provider's specialties together, so a failure leaves them as they were. */
+  static async replaceProviderSpecialties(
+    userId: string,
+    remove: string[],
+    add: string[],
+  ) {
+    await this.retiring(
+      prisma.$transaction([
+        prisma.foxerSpecialization.deleteMany({
+          where: {
+            userId,
+            roleType: RoleType.providerFoxer,
+            category: { in: remove },
+          },
+        }),
+        prisma.foxerSpecialization.createMany({
+          data: add.map((category) => ({
+            userId,
+            roleType: RoleType.providerFoxer,
+            category,
+            source: "declared",
+          })),
+          skipDuplicates: true,
+        }),
+      ]),
     );
   }
 }
