@@ -165,9 +165,30 @@ function money(d: Decimal): Decimal {
   return d.toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 }
 
-/** `amount × pct%`, rounded to 2 decimals. */
-function percentOf(amount: Decimal, pct: Decimal): Decimal {
-  return money(amount.times(pct).dividedBy(100));
+/**
+ * `amount × pct%`, rounded to 2 decimals, half-up. Exported so refunds round
+ * exactly as lines were priced (#264 T14).
+ */
+export function percentOf(
+  amount: Decimal | number,
+  pct: Decimal | number,
+): Decimal {
+  return money(new Decimal(amount).times(pct).dividedBy(100));
+}
+
+/**
+ * `part`'s share of `amount`, when `amount` is taken out of `whole`
+ * (e.g. the Foxer price's share of a refund of the whole line), rounded like
+ * `percentOf`. 0 when `whole` is 0.
+ */
+export function shareOf(
+  amount: Decimal | number,
+  part: Decimal | number,
+  whole: Decimal | number,
+): Decimal {
+  const w = new Decimal(whole);
+  if (w.isZero()) return new Decimal(0);
+  return money(new Decimal(amount).times(part).dividedBy(w));
 }
 
 /** Price every line and total them. Pure: the caller supplies the rates. */
