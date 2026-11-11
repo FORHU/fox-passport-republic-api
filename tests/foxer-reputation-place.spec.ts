@@ -27,6 +27,12 @@ vi.mock("../src/modules/foxer-score/foxer-score.repository", () => ({
   },
 }));
 
+vi.mock("../src/modules/leaderboard/leaderboard.repository", () => ({
+  default: {
+    getFoxerSince: vi.fn(async () => new Date("2026-02-01T00:00:00Z")),
+  },
+}));
+
 const getFoxerLeaderboard = vi.hoisted(() => vi.fn());
 vi.mock("../src/modules/leaderboard/leaderboard.service", () => ({
   default: { getFoxerLeaderboard },

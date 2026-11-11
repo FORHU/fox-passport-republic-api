@@ -26,10 +26,16 @@ export interface FoxerLeaderboardEntry {
   avatarUrl: string | null;
   role: string;
   city: string | null;
-  rankTitle: string;
+  /** The star rating, one decimal; null with fewer than 5 reviews ("New"). */
+  paws: number | null;
+  /** Kept for clients that still read it; same average, never null. */
   starRating: number;
   reviewCount: number;
   completedBookings: number;
+  /** Role approval date, falling back to account creation (ISO). */
+  foxerSince: string;
+  /** Identity check approved. */
+  isVerified: boolean;
 }
 
 export interface FoxerLeaderboardResponse {

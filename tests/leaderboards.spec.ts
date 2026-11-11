@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import LeaderboardService from "../src/modules/leaderboard/leaderboard.service";
+import LeaderboardService, {
+  pawsRankingScore,
+} from "../src/modules/leaderboard/leaderboard.service";
 import LeaderboardRepo from "../src/modules/leaderboard/leaderboard.repository";
 import FoxerScoreService from "../src/modules/foxer-score/foxer-score.service";
 
@@ -15,6 +17,13 @@ vi.mock("../src/modules/leaderboard/leaderboard.repository", () => ({
 vi.mock("../src/modules/foxer-score/foxer-score.service", () => ({
   default: {
     computeFoxerScore: vi.fn(),
+  },
+}));
+
+vi.mock("../src/modules/foxer-score/foxer-score.repository", () => ({
+  default: {
+    // Platform average used as C in the Paws ranking
+    getPlatformAvgRating: vi.fn(async () => 4.5),
   },
 }));
 
@@ -114,7 +123,8 @@ describe("Leaderboards Engine (Specification §8)", () => {
         image: null,
         city: "Manila",
         roleType: ["venueFoxer"],
-        createdAt: new Date(),
+        createdAt: new Date("2026-01-10T00:00:00Z"),
+        roleRequests: [{ reviewedAt: new Date("2026-02-01T00:00:00Z") }],
         passport: {
           paths: [{ path: "venueFoxer", level: 12 }],
         },
@@ -125,7 +135,8 @@ describe("Leaderboards Engine (Specification §8)", () => {
         image: null,
         city: "Manila",
         roleType: ["venueFoxer"],
-        createdAt: new Date(),
+        createdAt: new Date("2026-03-05T00:00:00Z"),
+        roleRequests: [],
         passport: {
           paths: [{ path: "venueFoxer", level: 2 }],
         },
@@ -145,8 +156,10 @@ describe("Leaderboards Engine (Specification §8)", () => {
               foxerScore: 88,
               operationalMetrics: {
                 starRating: 4.9,
+                avgRating: 4.9,
                 rawReviewCount: 15,
                 completedBookings: 10,
+                isIdentityVerified: true,
               },
             } as any;
           }
@@ -154,8 +167,10 @@ describe("Leaderboards Engine (Specification §8)", () => {
             foxerScore: 95,
             operationalMetrics: {
               starRating: 5.0,
+              avgRating: 5.0,
               rawReviewCount: 1,
               completedBookings: 1, // < 3 threshold
+              isIdentityVerified: false,
             },
           } as any;
         },
@@ -174,6 +189,92 @@ describe("Leaderboards Engine (Specification §8)", () => {
       expect(res.entries[0].starRating).toBe(4.9);
       expect(res.entries[0].reviewCount).toBe(15);
       expect(res.entries[0].completedBookings).toBe(10);
+      // Paws fields (RR-2), with these names
+      expect(res.entries[0]).toMatchObject({
+        paws: 4.9,
+        foxerSince: "2026-02-01T00:00:00.000Z",
+        isVerified: true,
+      });
+      expect(res.entries[0]).not.toHaveProperty("rankTitle");
     });
+
+    it("ranks Top rated by Paws (Bayesian): 4.9 from 100 reviews beats 5.0 from 1", async () => {
+      vi.mocked(LeaderboardRepo.getFoxersForRanking).mockResolvedValue(
+        mockFoxers as any,
+      );
+      vi.mocked(FoxerScoreService.computeFoxerScore).mockImplementation(
+        async (userId: string) =>
+          ({
+            // The Foxer Score no longer decides Top rated
+            foxerScore: userId === "foxer-1" ? 60 : 99,
+            operationalMetrics:
+              userId === "foxer-1"
+                ? {
+                    starRating: 4.9,
+                    avgRating: 4.9,
+                    rawReviewCount: 100,
+                    completedBookings: 100,
+                    isIdentityVerified: true,
+                  }
+                : {
+                    starRating: 5.0,
+                    avgRating: 5.0,
+                    rawReviewCount: 1,
+                    completedBookings: 5,
+                    isIdentityVerified: true,
+                  },
+          }) as any,
+      );
+
+      const res = await LeaderboardService.getFoxerLeaderboard(
+        null,
+        "top_rated",
+        "venueFoxer",
+      );
+
+      expect(res.entries.map((e) => e.userId)).toEqual(["foxer-1", "foxer-2"]);
+      // Fewer than 5 reviews shows "New": no Paws
+      expect(res.entries[1].paws).toBeNull();
+      // No approved role request: falls back to the account's creation
+      expect(res.entries[1].foxerSince).toBe("2026-03-05T00:00:00.000Z");
+    });
+
+    it("breaks a Paws tie on completed bookings", async () => {
+      vi.mocked(LeaderboardRepo.getFoxersForRanking).mockResolvedValue(
+        mockFoxers as any,
+      );
+      vi.mocked(FoxerScoreService.computeFoxerScore).mockImplementation(
+        async (userId: string) =>
+          ({
+            foxerScore: 50,
+            operationalMetrics: {
+              starRating: 4.7,
+              avgRating: 4.7,
+              rawReviewCount: 20,
+              completedBookings: userId === "foxer-1" ? 4 : 30,
+              isIdentityVerified: false,
+            },
+          }) as any,
+      );
+
+      const res = await LeaderboardService.getFoxerLeaderboard(
+        null,
+        "top_rated",
+        "venueFoxer",
+      );
+
+      expect(res.entries.map((e) => e.userId)).toEqual(["foxer-2", "foxer-1"]);
+    });
+  });
+});
+
+describe("pawsRankingScore", () => {
+  it("pulls a small review count towards the platform average", () => {
+    // 5.0 from 1 review with prior 5 and C = 4.5: (1x5 + 5x4.5) / 6
+    expect(pawsRankingScore(1, 5, 4.5, 5)).toBeCloseTo(4.583, 3);
+    // 4.9 from 100 reviews stays close to 4.9
+    expect(pawsRankingScore(100, 4.9, 4.5, 5)).toBeCloseTo(4.881, 3);
+    // No reviews and no prior: the platform average
+    expect(pawsRankingScore(0, 0, 4.5, 0)).toBe(4.5);
   });
 });
