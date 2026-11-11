@@ -9,7 +9,6 @@ import { breakdownTotals } from "../pricing/event-breakdown";
 import { can } from "../../types/permissions";
 import { sendApprovedEmail } from "../../utils/emails/approved";
 import { sendRejectedEmail } from "../../utils/emails/rejected";
-import OrganizerXpService from "../appointment/organizer-xp.service";
 import AppointmentAccess from "../appointment/appointment.access";
 import NotificationService from "../notifications/user-notification.service";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
@@ -250,23 +249,14 @@ export default class EventRequestSvc {
   }
 
   private static async onCompleted(eventId: string) {
-    // Organizers of the Event, and of the Venue it was held at, earn on the
-    // Organizer path (ADR 0005). Idempotent, and never throws.
-    void OrganizerXpService.onEventCompleted(eventId);
-
-    // completeEvent XP to the Event Foxer who organised it (eventFoxer path).
-    // Not idempotent itself: the conditional write in syncStatusFromBookings
-    // is what makes it run once.
+    // Host Master badge for the Event Foxer who organised it. XP is retired
+    // (requirements/xp-and-coins.md). The conditional write in
+    // syncStatusFromBookings is what makes this run once.
     const event = await EventRequestRepo.findById(eventId);
     const organizerId = event?.organizerId;
     if (organizerId) {
       import("../passport/passport.service")
-        .then(async ({ default: PassportSvc, XP_REWARDS, UserPath }) => {
-          await PassportSvc.awardXP(
-            organizerId,
-            UserPath.eventFoxer,
-            XP_REWARDS.completeEvent,
-          );
+        .then(async ({ default: PassportSvc }) => {
           // Milestone badge: Host Master (50+ hosted events)
           const completedCount =
             await EventRequestRepo.countCompletedEventsByOrganizer(organizerId);

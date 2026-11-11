@@ -487,39 +487,15 @@ export default class ReviewSvc {
       return {
         helpful: false,
         helpfulCount: Math.max(0, updated.helpfulCount),
-        xpAwarded: 0,
       };
     }
 
     const updated = await ReviewRepo.addHelpfulVote(reviewId, voterId);
     await reviewCache.invalidateAll();
 
-    let xpAwarded = 0;
-    try {
-      const { default: RewardService } =
-        await import("../reward/reward.service");
-      const { UserPath } = await import("../passport/passport.service");
-      const grantResult = await RewardService.grant({
-        userId: review.userId,
-        path: UserPath.user,
-        action: "review_helpful",
-        refType: "review_helpful",
-        refId: `${reviewId}:${voterId}`,
-        idempotencyKey: `grant:${review.userId}:review_helpful:${reviewId}:${voterId}`,
-        xpOverride: 2,
-        coinsOverride: 0,
-      });
-      if (!grantResult.isIdempotentReplay) {
-        xpAwarded = grantResult.xpAwarded;
-      }
-    } catch {
-      // Non-blocking if reward grant fails
-    }
-
     return {
       helpful: true,
       helpfulCount: updated.helpfulCount,
-      xpAwarded,
     };
   }
 }

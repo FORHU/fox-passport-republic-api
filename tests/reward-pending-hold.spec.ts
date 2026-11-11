@@ -231,10 +231,9 @@ describe("holding the one-time Coins until a paid booking is attended", () => {
   });
 
   describe("while no paid booking has been attended", () => {
-    it("pays the XP at once but holds the Coins", async () => {
+    it("holds the Coins", async () => {
       const result = await intro();
 
-      expect(result.xpAwarded).toBe(50);
       expect(result.coinsAwarded).toBe(20);
       // Not spendable, and no RELEASE yet.
       expect(coinsOf()).toBe(0);

@@ -398,7 +398,8 @@ export default class FeedService {
       notifyMediaTags(mediaTags, user.userId, post.id).catch(() => {});
     }
 
-    // 3. Award XP & Coins via RewardService (with daily anti-spam cap and idempotency)
+    // 3. Award Tokens via RewardService (with daily anti-spam cap and idempotency).
+    // Foxer posts paid XP only, which is retired, so they pay nothing.
     try {
       const { default: RewardService } =
         await import("../reward/reward.service");
@@ -418,37 +419,12 @@ export default class FeedService {
           refType: "post",
           refId: post.id,
         });
-      } else {
-        let targetPath: UserPath = UserPath.user;
-        if (type === PostType.venue_spotlight) targetPath = UserPath.venueFoxer;
-        else if (
-          type === PostType.gear_offering ||
-          type === PostType.service_offering
-        ) {
-          // A Provider earns on their own path; a Partner spotlighting supply
-          // earns on theirs.
-          targetPath = user.roleType.includes("providerFoxer")
-            ? UserPath.providerFoxer
-            : user.roleType.includes("investor")
-              ? UserPath.investor
-              : UserPath.user;
-        } else if (type === PostType.event_announcement)
-          targetPath = UserPath.eventFoxer;
-        else if (type === PostType.partner_announcement)
-          targetPath = UserPath.investor;
-
-        await RewardService.grant({
-          userId: user.userId,
-          path: targetPath,
-          action: "post_feed",
-          refType: "post",
-          refId: post.id,
-          xpOverride: 25,
-          coinsOverride: 0,
-        });
       }
-    } catch (xpError) {
-      console.warn("[FeedService] Best-effort XP award failed:", xpError);
+    } catch (rewardError) {
+      console.warn(
+        "[FeedService] Best-effort reward grant failed:",
+        rewardError,
+      );
     }
 
     // 4. Milestone badge: active community posting

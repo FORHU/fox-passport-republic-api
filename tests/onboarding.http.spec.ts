@@ -52,7 +52,7 @@ describe("Onboarding API (Supertest)", () => {
     expect(first.body.data).toMatchObject({
       step: "intro",
       alreadyCompleted: false,
-      reward: { xpAwarded: 50, coinsAwarded: 20 },
+      reward: { coinsAwarded: 20 },
     });
 
     const again = await request(app)
@@ -61,7 +61,7 @@ describe("Onboarding API (Supertest)", () => {
     expect(again.status).toBe(200);
     expect(again.body.data).toMatchObject({
       alreadyCompleted: true,
-      reward: { xpAwarded: 0, coinsAwarded: 0 },
+      reward: { coinsAwarded: 0 },
     });
 
     const events = await prisma.rewardEvent.count({

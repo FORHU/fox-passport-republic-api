@@ -279,7 +279,7 @@ describe("RewardService & Immutable Ledger Foundation", () => {
   });
 
   describe("Reward Granting & Idempotency", () => {
-    it("grants XP and Coins atomically and updates cached balance", async () => {
+    it("grants Tokens only, atomically, and updates cached balance", async () => {
       const res = await RewardService.grant({
         userId: "user-1",
         action: "attend_event",
@@ -288,17 +288,14 @@ describe("RewardService & Immutable Ledger Foundation", () => {
         bookingFeeAmount: 50, // ₱50 fee -> ₱20 budget = 100 Coins
       });
 
-      expect(res.xpAwarded).toBe(100);
-      expect(res.coinsAwarded).toBe(40);
-      expect(res.isIdempotentReplay).toBeFalsy();
+      expect(res).toEqual({ coinsAwarded: 40 });
 
       const balance = await RewardService.getBalance("user-1");
       expect(balance).toBe(40);
-      expect(PassportSvc.awardXP).toHaveBeenCalledWith(
-        "user-1",
-        UserPath.user,
-        100,
-      );
+      // XP is retired: nothing earns it, and the ledger row records none
+      expect(PassportSvc.awardXP).not.toHaveBeenCalled();
+      const grant = await RewardRepo.findEventByRef("booking", "booking-1");
+      expect(grant?.xp).toBe(0);
     });
 
     it("returns existing reward result without double-awarding on replay", async () => {
@@ -326,8 +323,10 @@ describe("RewardService & Immutable Ledger Foundation", () => {
       expect(second.isIdempotentReplay).toBe(true);
       expect(second.coinsAwarded).toBe(40);
 
-      // PassportSvc.awardXP called only once
-      expect(PassportSvc.awardXP).toHaveBeenCalledTimes(1);
+      // Only one ledger row for the key
+      expect(
+        [...mockDb.events.values()].filter((e) => e.idempotencyKey === key),
+      ).toHaveLength(1);
     });
 
     it("enforces once-only constraint on introductory rewards", async () => {
@@ -338,7 +337,6 @@ describe("RewardService & Immutable Ledger Foundation", () => {
         refId: "intro",
       });
 
-      expect(first.xpAwarded).toBe(50);
       expect(first.coinsAwarded).toBe(20);
 
       const second = await RewardService.grant({
@@ -348,7 +346,6 @@ describe("RewardService & Immutable Ledger Foundation", () => {
         refId: "intro-repeat",
       });
 
-      expect(second.xpAwarded).toBe(0);
       expect(second.coinsAwarded).toBe(0);
     });
 
@@ -360,7 +357,6 @@ describe("RewardService & Immutable Ledger Foundation", () => {
         refId: "post-1",
       });
 
-      expect(first.xpAwarded).toBe(15);
       expect(first.coinsAwarded).toBe(3);
 
       const second = await RewardService.grant({
@@ -371,8 +367,28 @@ describe("RewardService & Immutable Ledger Foundation", () => {
       });
 
       // Daily cap is 1; second attempt awards 0
-      expect(second.xpAwarded).toBe(0);
       expect(second.coinsAwarded).toBe(0);
+    });
+
+    it("pays nothing for an inactive rule, such as the retired Foxer-only five_star_review", async () => {
+      mockDb.rules.set("five_star_review", {
+        action: "five_star_review",
+        xp: 25,
+        coins: 10,
+        active: false,
+        onceOnly: false,
+      });
+
+      const res = await RewardService.grant({
+        userId: "foxer-1",
+        path: UserPath.providerFoxer,
+        action: "five_star_review",
+        refType: "review",
+        refId: "review-1",
+      });
+
+      expect(res).toEqual({ coinsAwarded: 0 });
+      expect(mockDb.events.size).toBe(0);
     });
   });
 
@@ -386,7 +402,6 @@ describe("RewardService & Immutable Ledger Foundation", () => {
         bookingFeeAmount: 0,
       });
 
-      expect(res.xpAwarded).toBe(100);
       expect(res.coinsAwarded).toBe(0);
     });
 
@@ -426,7 +441,7 @@ describe("RewardService & Immutable Ledger Foundation", () => {
   });
 
   describe("Append-Only Reversals", () => {
-    it("creates an append-only reversal lifecycle event and reverses XP and Coins", async () => {
+    it("creates an append-only reversal lifecycle event and reverses the Tokens", async () => {
       await RewardService.grant({
         userId: "user-cancel",
         action: "attend_event",
@@ -445,23 +460,18 @@ describe("RewardService & Immutable Ledger Foundation", () => {
       });
 
       expect(rev.reversed).toBe(true);
-      expect(rev.xpReversed).toBe(100);
       expect(rev.coinsReversed).toBe(40);
 
       // Balance decremented
       const finalBalance = await RewardService.getBalance("user-cancel");
       expect(finalBalance).toBe(0);
 
-      // XP reversed via PassportSvc.awardXP with negative amount
-      expect(PassportSvc.awardXP).toHaveBeenCalledWith(
-        "user-cancel",
-        UserPath.user,
-        -100,
-      );
+      // Stored XP is left as it is
+      expect(PassportSvc.awardXP).not.toHaveBeenCalled();
 
       // Original grant event remains intact (immutable)
       const grant = await RewardRepo.findEventByRef("booking", "b-cancel-1");
-      expect(grant?.xp).toBe(100);
+      expect(grant?.xp).toBe(0);
       expect(grant?.coins).toBe(40);
 
       // Lifecycle contains REVERSAL record

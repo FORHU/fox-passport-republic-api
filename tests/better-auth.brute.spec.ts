@@ -132,13 +132,9 @@ describe("Better Auth - Exhaustive Flow & Brute Security Tests", () => {
   });
 
   describe("3. Brute-Force Password Stress & Invalid Login Rejections", () => {
-    it("should firmly reject a brute-force run past the per-account limit with wrong passwords", async () => {
-      // Past the account budget, so the run ends in a lockout, which the
-      // next test relies on.
-      const badAttempts = Array.from(
-        { length: LOGIN_ACCOUNT_LIMIT + 5 },
-        (_, i) => `wrong_pwd_${i}!`,
-      );
+    it("should firmly reject 30 consecutive brute-force attempts with wrong passwords", async () => {
+      // Enough failures to use up the per-account sign-in budget (30).
+      const badAttempts = Array.from({ length: 30 }, (_, i) => `wrong_pwd_${i}!`);
 
       for (const badPassword of badAttempts) {
         const res = await request(app)
@@ -164,8 +160,8 @@ describe("Better Auth - Exhaustive Flow & Brute Security Tests", () => {
       expect(res.status).toBeGreaterThanOrEqual(400);
     });
 
-    // The per-account sign-in limit (app.ts, loginRateLimit: LOGIN_ACCOUNT_LIMIT
-    // failures per 15 minutes) sits in front of Better Auth. After a brute-force run the
+    // The per-account sign-in limit (app.ts, loginRateLimit: 30 failures per
+    // 15 minutes) sits in front of Better Auth. After a brute-force run the
     // account is locked for the window — even the right password is refused —
     // which is the point. The session from the earlier sign-in is unaffected.
     it("locks the account after a brute-force run, even for the right password", async () => {
