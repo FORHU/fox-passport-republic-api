@@ -53,8 +53,8 @@ describe("login rate limit", () => {
     const { loginRateLimit: limiter } = await freshLimiters();
     const app = appWith(limiter);
 
-    // The per-account budget is the tighter of the two, so it trips first.
-    for (let i = 0; i < 10; i++) {
+    // The per-account budget (30) is the tighter of the two, so it trips first.
+    for (let i = 0; i < 30; i++) {
       const res = await post(app, {
         email: "victim@example.com",
         password: "wrong",
@@ -77,7 +77,7 @@ describe("login rate limit", () => {
 
     // Casing and surrounding space must not buy a fresh budget, or the limit is
     // one `.toUpperCase()` away from being bypassed entirely.
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 30; i++) {
       await post(app, { email: "Victim@Example.com ", password: "wrong" });
     }
 
@@ -92,11 +92,11 @@ describe("login rate limit", () => {
     const { loginRateLimit: limiter } = await freshLimiters();
     const app = appWith(limiter);
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 30; i++) {
       await post(app, { email: "victim@example.com", password: "wrong" });
     }
 
-    // Same IP, different account. The per-IP budget is 30 and only 10 are spent,
+    // Same IP, different account. The per-IP budget is 100 and only 30 are spent,
     // so this must still be served - otherwise everyone behind one office NAT
     // is locked out by one attacker.
     const other = await post(app, {
@@ -146,7 +146,7 @@ describe("requests naming no account", () => {
 
     // A malformed body has no address to key on. If those all landed in one
     // bucket, unrelated clients would exhaust a single budget between them.
-    // The per-IP limit of 30 still applies, so ask for fewer than that.
+    // The per-IP limit of 100 still applies, so ask for fewer than that.
     for (let i = 0; i < 25; i++) {
       const res = await post(app, { password: "wrong" });
       expect(res.status).toBe(401);
