@@ -17,7 +17,6 @@ export interface FoxerOperationalMetrics {
   responsivenessRate: number;
   cancellationRate: number;
   isIdentityVerified: boolean;
-  foxerLevel: number;
 }
 
 export interface FoxerScoreResult {
@@ -116,16 +115,12 @@ export function calculateReliabilityScore(
   };
 }
 
-export function calculateTrustScore(
-  isIdentityVerified: boolean,
-  foxerLevel: number,
-): number {
-  const identityPart = isIdentityVerified ? 3 : 0;
-  const rankPart = Math.min(
-    2,
-    Math.max(0, ((Math.max(1, foxerLevel) - 1) / 49) * 2),
-  );
-  return Math.round((identityPart + rankPart) * 10) / 10;
+/**
+ * Trust is worth 5 points and comes from a verified identity only. Levels and
+ * ranks no longer exist, so they add nothing.
+ */
+export function calculateTrustScore(isIdentityVerified: boolean): number {
+  return isIdentityVerified ? 5 : 0;
 }
 
 export default class FoxerScoreService {
@@ -168,10 +163,7 @@ export default class FoxerScoreService {
       reliabilityStats.cancelledCount,
     );
 
-    const trustScore = calculateTrustScore(
-      trustFactors.isVerified,
-      trustFactors.foxerLevel,
-    );
+    const trustScore = calculateTrustScore(trustFactors.isVerified);
 
     const compositeTotal =
       ratingScore +
@@ -200,7 +192,6 @@ export default class FoxerScoreService {
         responsivenessRate,
         cancellationRate,
         isIdentityVerified: trustFactors.isVerified,
-        foxerLevel: trustFactors.foxerLevel,
       },
     };
   }

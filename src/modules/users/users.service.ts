@@ -112,14 +112,11 @@ export default class UsersSvc {
         // Built from what others may see, not by removing what they may
         // not: `createdAt` dates the stamp as surely as `eventDate`, and a
         // field added to the query later stays private by default.
-        stamps: profile.passport.stamps.map(
-          ({ id, xpEarned, venueId, venue }) => ({
-            id,
-            xpEarned,
-            venueId,
-            venue,
-          }),
-        ),
+        stamps: profile.passport.stamps.map(({ id, venueId, venue }) => ({
+          id,
+          venueId,
+          venue,
+        })),
       },
     };
   }

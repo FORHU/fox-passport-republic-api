@@ -754,14 +754,7 @@ export default class UsersRepo {
           select: {
             id: true,
             perks: true,
-            paths: {
-              select: {
-                path: true,
-                level: true,
-                currentXP: true,
-                totalXP: true,
-              },
-            },
+            paths: { select: { path: true } },
             stamps: {
               orderBy: { createdAt: "desc" },
               select: {
@@ -770,7 +763,6 @@ export default class UsersRepo {
                 eventDate: true,
                 location: true,
                 venueId: true,
-                xpEarned: true,
                 imageUrl: true,
                 createdAt: true,
                 venue: {
@@ -884,7 +876,6 @@ export default class UsersRepo {
               select: {
                 id: true,
                 eventName: true,
-                xpEarned: true,
               },
             },
           },

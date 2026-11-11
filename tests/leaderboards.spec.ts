@@ -5,9 +5,6 @@ import FoxerScoreService from "../src/modules/foxer-score/foxer-score.service";
 
 vi.mock("../src/modules/leaderboard/leaderboard.repository", () => ({
   default: {
-    getCitizenAllTime: vi.fn(),
-    getCitizenSeasonal: vi.fn(),
-    getUserCitizenStanding: vi.fn(),
     getFoxersForRanking: vi.fn(),
   },
 }));
@@ -30,80 +27,6 @@ vi.mock("../src/utils/cache.util", async (importOriginal) => {
 describe("Leaderboards Engine (Specification §8)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  describe("Citizen Leaderboard (§8.1)", () => {
-    const mockCitizens = [
-      {
-        userId: "user-1",
-        name: "Alice",
-        avatarUrl: "https://example.com/alice.jpg",
-        city: "Manila",
-        level: 15,
-        totalXP: 5400,
-      },
-      {
-        userId: "user-2",
-        name: "Bob",
-        avatarUrl: null,
-        city: "Cebu",
-        level: 10,
-        totalXP: 2500,
-      },
-    ];
-
-    it("ranks all_time citizens and strictly protects XP privacy", async () => {
-      vi.mocked(LeaderboardRepo.getCitizenAllTime).mockResolvedValue(
-        mockCitizens as any,
-      );
-
-      const res = await LeaderboardService.getCitizenLeaderboard(
-        "user-1",
-        "all_time",
-      );
-
-      expect(res.entries).toHaveLength(2);
-      expect(res.entries[0]).toEqual({
-        position: 1,
-        userId: "user-1",
-        name: "Alice",
-        avatarUrl: "https://example.com/alice.jpg",
-        level: 15,
-        rankTitle: "Voyager",
-        city: "Manila",
-      });
-
-      // Strict privacy check: totalXP or seasonalXP must NEVER leak in response entries
-      expect((res.entries[0] as any).totalXP).toBeUndefined();
-      expect((res.entries[0] as any).seasonalXP).toBeUndefined();
-      expect(res.userPosition?.position).toBe(1);
-    });
-
-    it("pins requesting user standing when outside top entries", async () => {
-      vi.mocked(LeaderboardRepo.getCitizenSeasonal).mockResolvedValue(
-        mockCitizens as any,
-      );
-      vi.mocked(LeaderboardRepo.getUserCitizenStanding).mockResolvedValue({
-        userId: "user-outside",
-        name: "Outside Citizen",
-        avatarUrl: null,
-        city: "Davao",
-        level: 3,
-        totalXP: 300,
-      } as any);
-
-      const res = await LeaderboardService.getCitizenLeaderboard(
-        "user-outside",
-        "this_month",
-      );
-
-      expect(res.entries).toHaveLength(2);
-      expect(res.userPosition).toBeDefined();
-      expect(res.userPosition?.userId).toBe("user-outside");
-      expect(res.userPosition?.position).toBe(3);
-      expect(res.userPosition?.rankTitle).toBe("Wanderer");
-      expect((res.userPosition as any).totalXP).toBeUndefined();
-    });
   });
 
   describe("Foxer Leaderboard (§8.2)", () => {

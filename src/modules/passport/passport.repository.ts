@@ -92,16 +92,6 @@ export default class PassportRepo {
     });
   }
 
-  /** Every passport with its paths, for the leaderboard. */
-  static async findAllWithPaths() {
-    return prisma.passport.findMany({
-      include: {
-        paths: true,
-        user: { select: { id: true, name: true, imgId: true, roleType: true } },
-      },
-    });
-  }
-
   /** The booking a stamp would be issued for, with what the stamp displays. */
   static async findBookingForStamp(bookingId: string) {
     return prisma.booking.findUnique({
