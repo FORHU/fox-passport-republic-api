@@ -763,7 +763,6 @@ export default class UsersRepo {
                 eventDate: true,
                 location: true,
                 venueId: true,
-                xpEarned: true,
                 imageUrl: true,
                 createdAt: true,
                 venue: {
@@ -877,7 +876,6 @@ export default class UsersRepo {
               select: {
                 id: true,
                 eventName: true,
-                xpEarned: true,
               },
             },
           },

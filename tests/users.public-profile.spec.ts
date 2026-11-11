@@ -24,7 +24,6 @@ const STAMP = {
   eventDate: new Date("2027-06-12T00:00:00Z"),
   location: "12 Mabini St",
   imageUrl: "https://example.com/wedding.jpg",
-  xpEarned: 50,
   createdAt: new Date("2027-06-12T22:00:00Z"),
   venueId: "v1",
   venue: { id: "v1", name: "Sky Hall", city: "Cebu" },
@@ -45,7 +44,6 @@ describe("UsersSvc.getPublicProfile", () => {
       const [stamp] = profile.passport!.stamps;
       expect(stamp).toEqual({
         id: "s1",
-        xpEarned: 50,
         venueId: "v1",
         venue: { id: "v1", name: "Sky Hall", city: "Cebu" },
       });

@@ -4,8 +4,15 @@ import { passportCache, PASSPORT_TTL } from "../../utils/cache-namespaces";
 import PassportRepo from "./passport.repository";
 import RewardRepo from "../reward/reward.repository";
 
-/** What a passport path no longer reveals to a client. */
+/** What a passport path and a stamp no longer reveal to a client. */
 const RETIRED_PATH_FIELDS = ["level", "currentXP", "totalXP"] as const;
+const RETIRED_STAMP_FIELDS = ["xpEarned"] as const;
+
+function without(item: object, keys: readonly string[]) {
+  const copy: Record<string, unknown> = { ...item };
+  for (const key of keys) delete copy[key];
+  return copy;
+}
 
 // 9-Rank Ladder thresholds with rank-up Coins bonuses (requirements/xp-and-coins.md, section 4.2)
 export interface RankThreshold {
@@ -134,17 +141,23 @@ export default class PassportSvc {
 
   /**
    * XP, levels and ranks are retired. The passport keeps each path but not what
-   * measured progress along it: level, currentXP and totalXP. The data stays in
+   * measured progress along it: level, currentXP and totalXP, and a stamp keeps
+   * no xpEarned. The data stays in
    * the database; it is just never sent.
    */
-  static withoutXp<T extends { paths: object[] }>(passport: T) {
+  static withoutXp<T extends { paths: object[]; stamps?: object[] }>(
+    passport: T,
+  ) {
     return {
       ...passport,
-      paths: passport.paths.map((p) => {
-        const copy: Record<string, unknown> = { ...p };
-        for (const key of RETIRED_PATH_FIELDS) delete copy[key];
-        return copy;
-      }),
+      paths: passport.paths.map((p) => without(p, RETIRED_PATH_FIELDS)),
+      ...(passport.stamps
+        ? {
+            stamps: passport.stamps.map((s) =>
+              without(s, RETIRED_STAMP_FIELDS),
+            ),
+          }
+        : {}),
     };
   }
 

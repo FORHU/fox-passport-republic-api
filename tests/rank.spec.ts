@@ -154,6 +154,20 @@ describe("PassportSvc.withoutXp", () => {
     ]);
   });
 
+  it("drops xpEarned from each stamp and keeps the rest", () => {
+    const out = PassportSvc.withoutXp({
+      paths: [],
+      stamps: [
+        { id: "s1", venueId: "v1", xpEarned: 50 },
+        { id: "s2", venueId: "v2", xpEarned: 50 },
+      ],
+    });
+    expect(out.stamps).toEqual([
+      { id: "s1", venueId: "v1" },
+      { id: "s2", venueId: "v2" },
+    ]);
+  });
+
   it("handles a passport with no paths yet", () => {
     expect(PassportSvc.withoutXp({ paths: [] }).paths).toEqual([]);
   });
