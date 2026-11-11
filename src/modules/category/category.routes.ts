@@ -10,6 +10,8 @@ const router = express.Router();
 // Category CRUD routes
 router.get("/", CategoryCtrl.getAllCategories);
 router.get("/top-level", CategoryCtrl.getTopLevelCategories);
+// Before "/:id" so it is not read as an id.
+router.get("/provider-specialties", CategoryCtrl.getProviderSpecialties);
 router.get("/:id", CategoryCtrl.getCategoryById);
 router.get("/slug/:slug", CategoryCtrl.getCategoryBySlug);
 router.post(
