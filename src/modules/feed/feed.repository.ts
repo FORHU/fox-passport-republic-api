@@ -857,6 +857,15 @@ export default class FeedRepo {
     });
   }
 
+  /** The post's comment counter as stored and who may see the post, or null
+   * if the post is gone. */
+  static async findCommentsCount(postId: string) {
+    return prisma.post.findUnique({
+      where: { id: postId },
+      select: { commentsCount: true, visibility: true },
+    });
+  }
+
   static async findCommentById(id: string) {
     return prisma.postComment.findUnique({
       where: { id },
