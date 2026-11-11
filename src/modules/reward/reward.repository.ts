@@ -358,15 +358,14 @@ export default class RewardRepo {
         where: { userId },
         orderBy: { createdAt: "desc" },
         take: 50,
+        include: {
+          grantEvent: { select: { refType: true, refId: true } },
+        },
       }),
     ]);
     return { events, lifecycles };
   }
 
-  /**
-   * Transactionally executes coin deduction, Promotion/Voucher creation,
-   * CoinRedemption tracking, and lifecycle logging.
-   */
   /**
    * Token vouchers past their expiry that were never used and whose Tokens
    * have not been returned yet. A voucher counts as used while it has a
@@ -453,6 +452,10 @@ export default class RewardRepo {
     });
   }
 
+  /**
+   * Transactionally executes coin deduction, Promotion/Voucher creation,
+   * CoinRedemption tracking, and lifecycle logging.
+   */
   static async executeRedemptionTransaction(data: {
     userId: string;
     reward: {
