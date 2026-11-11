@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const prisma = vi.hoisted(() => ({
   savedPost: { findMany: vi.fn() },
+  postLike: { groupBy: vi.fn() },
 }));
 vi.mock("../src/utils/prisma", () => ({ prisma }));
 
@@ -24,7 +25,10 @@ const savedRow = (
   post: { id: postId, likesCount: 3, commentsCount: 1, likes },
 });
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  prisma.postLike.groupBy.mockResolvedValue([]);
+});
 
 describe("FeedRepo.findSavedPosts", () => {
   it("asks only for the viewer's own reaction", async () => {
@@ -52,6 +56,7 @@ describe("FeedRepo.findSavedPosts", () => {
         commentsCount: 1,
         isLikedByMe: true,
         myReaction: "love",
+        reactionCounts: [],
       },
       {
         id: "not-liked",
@@ -59,6 +64,7 @@ describe("FeedRepo.findSavedPosts", () => {
         commentsCount: 1,
         isLikedByMe: false,
         myReaction: null,
+        reactionCounts: [],
       },
     ]);
     expect(nextCursor).toBeNull();
