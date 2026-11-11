@@ -1,6 +1,7 @@
 import { AppError, notFound } from "../../utils/errors";
 import Stripe from "stripe";
 import BookingRepo from "./booking.repository";
+import { withPlace } from "./booking.place";
 import EventRepo from "../event/event.repository";
 import EventRequestRepo from "../event-request/event-request.repository";
 import EventRequestSvc from "../event-request/event-request.service";
@@ -1123,13 +1124,20 @@ export default class BookingSvc {
     return bookingCache.cached(
       `user:${userId}:${page}:${limit}`,
       BOOKING_TTL,
-      () => BookingRepo.findByUserId(userId, skip, limit),
+      async () => {
+        const { bookings, total } = await BookingRepo.findByUserId(
+          userId,
+          skip,
+          limit,
+        );
+        return { bookings: bookings.map(withPlace), total };
+      },
     );
   }
 
   static async getUpcomingBookings(userId: string) {
-    return bookingCache.cached(`upcoming:${userId}`, BOOKING_TTL, () =>
-      BookingRepo.findUpcomingByUserId(userId),
+    return bookingCache.cached(`upcoming:${userId}`, BOOKING_TTL, async () =>
+      (await BookingRepo.findUpcomingByUserId(userId)).map(withPlace),
     );
   }
 

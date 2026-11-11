@@ -4,6 +4,23 @@ import { BookingWithRelations } from "../../types/prisma.d";
 import { bookingCache } from "../../utils/cache-namespaces";
 import { RESERVING_TRANSACTION_STATUSES } from "../availability/availability.types";
 
+/**
+ * What a ticket needs to say where its event is: the booked venue's spot, and
+ * the event template's as the fallback. `booking.place.ts` picks between them.
+ */
+const PLACE_INCLUDE = {
+  event: { include: { template: { select: { lat: true, lng: true } } } },
+  venueTransactions: {
+    where: {
+      included: true,
+      status: { in: [...RESERVING_TRANSACTION_STATUSES] },
+    },
+    orderBy: { createdAt: "asc" },
+    select: { venue: { select: { lat: true, lng: true } } },
+    take: 1,
+  },
+} satisfies Prisma.BookingInclude;
+
 export default class BookingRepo {
   /**
    * Retires the cached booking reads. Wrapped around **every** write below.
@@ -470,7 +487,7 @@ export default class BookingRepo {
     const [bookings, total] = await Promise.all([
       prisma.booking.findMany({
         where,
-        include: { event: true },
+        include: PLACE_INCLUDE,
         orderBy: { createdAt: "desc" },
         skip,
         take,
@@ -487,7 +504,7 @@ export default class BookingRepo {
         status: { notIn: ["cancelled", "completed"] },
         startAt: { gte: new Date() },
       },
-      include: { event: true },
+      include: PLACE_INCLUDE,
       orderBy: { startAt: "asc" },
     });
   }
