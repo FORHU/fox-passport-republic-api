@@ -2,8 +2,17 @@ import { UserPath } from "@prisma/client";
 import { cached } from "../../utils/cache.util";
 import { passportCache, PASSPORT_TTL } from "../../utils/cache-namespaces";
 import PassportRepo from "./passport.repository";
-import RankSvc from "./rank.service";
 import RewardRepo from "../reward/reward.repository";
+
+/** What a passport path and a stamp no longer reveal to a client. */
+const RETIRED_PATH_FIELDS = ["level", "currentXP", "totalXP"] as const;
+const RETIRED_STAMP_FIELDS = ["xpEarned"] as const;
+
+function without(item: object, keys: readonly string[]) {
+  const copy: Record<string, unknown> = { ...item };
+  for (const key of keys) delete copy[key];
+  return copy;
+}
 
 // 9-Rank Ladder thresholds with rank-up Coins bonuses (requirements/xp-and-coins.md, section 4.2)
 export interface RankThreshold {
@@ -131,19 +140,24 @@ export default class PassportSvc {
   }
 
   /**
-   * The passport with each path's rank (number, name, rarity, and the next
-   * rank) alongside its level, so the app never works a rank out itself. Only
-   * adds a field; everything the passport already carried is unchanged.
+   * XP, levels and ranks are retired. The passport keeps each path but not what
+   * measured progress along it: level, currentXP and totalXP, and a stamp keeps
+   * no xpEarned. The data stays in
+   * the database; it is just never sent.
    */
-  static withRanks<T extends { paths: { path: UserPath; level: number }[] }>(
+  static withoutXp<T extends { paths: object[]; stamps?: object[] }>(
     passport: T,
   ) {
     return {
       ...passport,
-      paths: passport.paths.map((p) => ({
-        ...p,
-        rank: RankSvc.forLevel(p.level, p.path),
-      })),
+      paths: passport.paths.map((p) => without(p, RETIRED_PATH_FIELDS)),
+      ...(passport.stamps
+        ? {
+            stamps: passport.stamps.map((s) =>
+              without(s, RETIRED_STAMP_FIELDS),
+            ),
+          }
+        : {}),
     };
   }
 
@@ -161,6 +175,7 @@ export default class PassportSvc {
     await PassportRepo.upsertUserBadge(passport.id, badge.id);
   }
 
+  /** @deprecated XP is retired (RR-1, api#298); nothing calls this. Removed with the rank code. */
   static async awardXP(userId: string, path: UserPath, amount: number) {
     const passport = await PassportSvc.getOrCreate(userId);
 
@@ -415,26 +430,6 @@ export default class PassportSvc {
       () => PassportRepo.findPerksByUserId(userId),
     );
     return passport?.perks ?? [];
-  }
-
-  static async getLeaderboard(limit = 20) {
-    // Every passport in the database, with paths and users, sorted in memory.
-    // The most expensive read here and the same answer for everyone.
-    const passports = await passportCache.cached(
-      "leaderboard:all",
-      PASSPORT_TTL,
-      () => PassportRepo.findAllWithPaths(),
-    );
-
-    return passports
-      .map((p) => {
-        const totalXP = p.paths.reduce((sum, path) => sum + path.totalXP, 0);
-        const totalLevel = p.paths.reduce((sum, path) => sum + path.level, 0);
-        return { userId: p.userId, user: p.user, totalXP, totalLevel };
-      })
-      .sort((a, b) => b.totalXP - a.totalXP)
-      .slice(0, limit)
-      .map((entry, index) => ({ rank: index + 1, ...entry }));
   }
 }
 

@@ -33,7 +33,7 @@ export interface CompleteStepResult {
   step: string;
   completed: true;
   alreadyCompleted: boolean;
-  reward: { xpAwarded: number; coinsAwarded: number };
+  reward: { coinsAwarded: number };
 }
 
 export default class OnboardingSvc {
@@ -60,7 +60,7 @@ export default class OnboardingSvc {
         step,
         completed: true,
         alreadyCompleted: true,
-        reward: { xpAwarded: 0, coinsAwarded: 0 },
+        reward: { coinsAwarded: 0 },
       };
     }
 
@@ -80,7 +80,7 @@ export default class OnboardingSvc {
     action: string | undefined,
     path: UserPath | undefined,
   ) {
-    let reward = { xpAwarded: 0, coinsAwarded: 0 };
+    let reward = { coinsAwarded: 0 };
     if (action) {
       const granted = await RewardService.grant({
         userId,
@@ -89,10 +89,7 @@ export default class OnboardingSvc {
         refType: "onboarding",
         refId: step,
       });
-      reward = {
-        xpAwarded: granted.xpAwarded,
-        coinsAwarded: granted.coinsAwarded,
-      };
+      reward = { coinsAwarded: granted.coinsAwarded };
     }
     await OnboardingRepo.markCompleted(userId, step);
     return reward;

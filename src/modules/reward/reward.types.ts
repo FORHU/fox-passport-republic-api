@@ -6,17 +6,13 @@ export interface GrantRewardParams {
   action: string;
   refType: string;
   refId: string;
-  xpOverride?: number;
   coinsOverride?: number;
   idempotencyKey?: string;
   bookingFeeAmount?: number; // When action is booking-tied, the platform fee collected
 }
 
 export interface GrantRewardResult {
-  xpAwarded: number;
   coinsAwarded: number;
-  newLevel: number;
-  newRank: string;
   isIdempotentReplay?: boolean;
 }
 
@@ -30,7 +26,6 @@ export interface ReverseRewardParams {
 
 export interface ReverseRewardResult {
   reversed: boolean;
-  xpReversed: number;
   coinsReversed: number;
   grantEventId?: string;
 }
@@ -53,9 +48,7 @@ export interface RewardCatalogItem {
   rewardType: string;
   discountPhp: number | null;
   discountPercentage: number | null;
-  minLevel: number;
   canAfford: boolean;
-  levelQualified: boolean;
 }
 
 export interface WalletHistoryItem {
@@ -63,7 +56,6 @@ export interface WalletHistoryItem {
   type: "grant" | "lifecycle";
   action?: string;
   lifecycleType?: string;
-  xp: number;
   coinsDelta: number;
   refType?: string;
   refId?: string;
@@ -77,8 +69,6 @@ export interface WalletSummary {
   coins: number;
   pendingCoins: number;
   totalEarnedCoins: number;
-  level: number;
-  rank: string;
   history: WalletHistoryItem[];
 }
 

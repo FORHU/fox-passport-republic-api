@@ -19,6 +19,7 @@ export default class SearchRepo {
     category?: string,
     page = 1,
     limit = 30,
+    specialty?: string,
   ) {
     const skip = (page - 1) * limit;
     const cityFilter = location
@@ -36,17 +37,28 @@ export default class SearchRepo {
       ...(cityFilter && { targetCity: cityFilter }),
       ...(eventCategory && { category: eventCategory }),
     };
+    // A Provider is found under each specialty they declared, on its own.
+    const specialtyWhere = specialty
+      ? {
+          foxerSpecializations: {
+            some: { roleType: RoleType.providerFoxer, category: specialty },
+          },
+        }
+      : {};
     const gearFoxerWhere = {
       roleType: { has: RoleType.providerFoxer },
       ...(cityFilter && { city: cityFilter }),
+      ...specialtyWhere,
     };
     const serviceFoxerWhere = {
       roleType: { has: RoleType.providerFoxer },
       ...(cityFilter && { city: cityFilter }),
+      ...specialtyWhere,
     };
     const performerFoxerWhere = {
       roleType: { has: RoleType.providerFoxer },
       ...(cityFilter && { city: cityFilter }),
+      ...specialtyWhere,
     };
     // A performer-category `category` param narrows the performer section to
     // that specific category; otherwise it shows the full performer set.

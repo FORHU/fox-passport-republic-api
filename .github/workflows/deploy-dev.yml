@@ -127,6 +127,10 @@ jobs:
           # than degrading. BETTER_AUTH_URL is the origin it issues cookies for.
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           BETTER_AUTH_URL: ${{ vars.BETTER_AUTH_URL || secrets.BETTER_AUTH_URL }}
+          # CDN in front of the video bucket. getVideoUrl (src/utils/s3.ts) stores
+          # each new video's link at upload time; without this, links point at the
+          # private bucket and answer 403.
+          VIDEO_CDN_URL: ${{ vars.VIDEO_CDN_URL }}
         run: |
           set -euo pipefail
           umask 077
@@ -147,7 +151,7 @@ jobs:
           for k in SECRET_KEY \
                    MAILER_PASSWORD STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET \
                    GOOGLE_CLIENT_SECRET FACEBOOK_APP_SECRET \
-                   BETTER_AUTH_SECRET BETTER_AUTH_URL; do
+                   BETTER_AUTH_SECRET BETTER_AUTH_URL VIDEO_CDN_URL; do
             v="${!k:-}"
             [ -n "$v" ] && printf '%s=%s\n' "$k" "$v" >> env.tmp
           done

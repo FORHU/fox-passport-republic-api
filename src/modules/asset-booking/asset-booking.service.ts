@@ -388,17 +388,6 @@ export default class AssetBookingSvc {
       } catch (err) {
         console.error(`Payout failed for asset booking ${id}`, err);
       }
-      import("../passport/passport.service")
-        .then(({ default: PassportSvc, XP_REWARDS, UserPath }) => {
-          const ownerId = booking.asset?.ownerId ?? booking.asset?.owner?.id;
-          if (ownerId)
-            return PassportSvc.awardXP(
-              ownerId,
-              UserPath.providerFoxer,
-              XP_REWARDS.listingBooked,
-            );
-        })
-        .catch(() => {});
       import("../users/specialization.service")
         .then(({ default: SpecializationSvc }) => {
           const assetId = booking.asset?.id ?? booking.assetId;

@@ -3,6 +3,7 @@ import request from "supertest";
 import app from "../src/app";
 import { prisma } from "../src/utils/prisma";
 import redisUtil from "../src/utils/redis.util";
+import { LOGIN_ACCOUNT_LIMIT } from "../src/middleware/rate-limit.middleware";
 
 describe("Better Auth - Exhaustive Flow & Brute Security Tests", () => {
   const testEmail = `brute.test.${Date.now()}@example.com`;
@@ -131,8 +132,9 @@ describe("Better Auth - Exhaustive Flow & Brute Security Tests", () => {
   });
 
   describe("3. Brute-Force Password Stress & Invalid Login Rejections", () => {
-    it("should firmly reject 20 consecutive brute-force attempts with wrong passwords", async () => {
-      const badAttempts = Array.from({ length: 20 }, (_, i) => `wrong_pwd_${i}!`);
+    it("should firmly reject 30 consecutive brute-force attempts with wrong passwords", async () => {
+      // Enough failures to use up the per-account sign-in budget (30).
+      const badAttempts = Array.from({ length: 30 }, (_, i) => `wrong_pwd_${i}!`);
 
       for (const badPassword of badAttempts) {
         const res = await request(app)
@@ -158,7 +160,7 @@ describe("Better Auth - Exhaustive Flow & Brute Security Tests", () => {
       expect(res.status).toBeGreaterThanOrEqual(400);
     });
 
-    // The per-account sign-in limit (app.ts, loginRateLimit: 10 failures per
+    // The per-account sign-in limit (app.ts, loginRateLimit: 30 failures per
     // 15 minutes) sits in front of Better Auth. After a brute-force run the
     // account is locked for the window — even the right password is refused —
     // which is the point. The session from the earlier sign-in is unaffected.

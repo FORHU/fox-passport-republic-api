@@ -1,5 +1,5 @@
 import { prisma } from "../../utils/prisma";
-import { EventCategory } from "@prisma/client";
+import { EventCategory, VenueCategory } from "@prisma/client";
 import { cached, invalidate } from "../../utils/cache.util";
 
 /** The two roots of the catalog; every other category sits under one of them. */
@@ -223,6 +223,22 @@ export default class CategoryRepo {
     return prisma.category.findMany({
       where: { parentCategoryId: null },
       orderBy: { slug: "asc" },
+    });
+  }
+
+  /**
+   * The specialties a Provider can declare: the listing subcategories that are
+   * not venue categories, since a Provider lists services and equipment, never a
+   * venue. Read live, so a subcategory an admin adds is valid at once.
+   */
+  static async getProviderSpecialties() {
+    return prisma.category.findMany({
+      where: {
+        parent: { slug: "listing" },
+        slug: { notIn: Object.values(VenueCategory) },
+      },
+      select: { slug: true, name: true },
+      orderBy: { name: "asc" },
     });
   }
 }

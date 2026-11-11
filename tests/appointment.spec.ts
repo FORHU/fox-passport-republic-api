@@ -772,7 +772,6 @@ describe("Organizer requests", () => {
         imgId: null,
         city: "Davao",
         foxerSpecializations: [{ category: "wedding" }],
-        passport: { paths: [{ level: 3, totalXP: 2500 }] },
       },
     ]);
     const [card] = await AppointmentService.searchOrganizers(
@@ -785,9 +784,9 @@ describe("Organizer requests", () => {
       imgId: null,
       city: "Davao",
       specializations: ["wedding"],
-      level: 3,
-      totalXP: 2500,
     });
     expect(card).not.toHaveProperty("email");
+    expect(card).not.toHaveProperty("level");
+    expect(card).not.toHaveProperty("totalXP");
   });
 });

@@ -6,8 +6,15 @@ import { hashPassword, verifyPassword } from "../../utils/password";
 import OnboardingSvc from "../onboarding/onboarding.service";
 import { recordChange, type AuditActor } from "../audit/audit.service";
 import { notFound } from "../../utils/errors";
+import { RoleType } from "@prisma/client";
+import ProviderSpecialtySvc from "../users/provider-specialty.service";
 
 export const USERNAME_TAKEN = "Username already taken";
+
+/** A refused specialty edit; the form shows it under the specialties field. */
+export class SpecialtyError extends Error {
+  readonly field = "specialties";
+}
 
 export default class ProfileSvc {
   // Get user profile
@@ -22,7 +29,14 @@ export default class ProfileSvc {
     // where its server-side guards learn what the person may do - and deriving
     // it here means it cannot go stale against the table the way a column
     // would. The API never reads it back: `can()` re-derives from the role.
-    return { ...user, permissions: permissionsForUser(user) };
+    const specialties = user.roleType.includes(RoleType.providerFoxer)
+      ? await ProfileSvc.getProviderSpecialties(userId)
+      : undefined;
+    return {
+      ...user,
+      permissions: permissionsForUser(user),
+      ...(specialties ? { specialties } : {}),
+    };
   }
 
   // Update profile
@@ -41,8 +55,14 @@ export default class ProfileSvc {
       bio?: string;
       socialLinks?: Record<string, string>;
       preferredCurrency?: string;
+      specialties?: string[];
     },
   ) {
+    // Specialties are checked first, so a refused edit saves nothing else.
+    if (data.specialties !== undefined) {
+      await ProfileSvc.setProviderSpecialties(userId, data.specialties);
+    }
+
     // Check if username is already taken (if updating username)
     if (data.username) {
       const existingUser = await ProfileRepo.findByUsernameExcludingUserId(
@@ -55,7 +75,14 @@ export default class ProfileSvc {
       }
     }
 
-    const { profileImage, phone, bio, socialLinks, ...rest } = data;
+    const {
+      profileImage,
+      phone,
+      bio,
+      socialLinks,
+      specialties: _specialties,
+      ...rest
+    } = data;
     // The links sent replace the ones stored; none left clears them.
     const links =
       socialLinks === undefined ? undefined : normalizeSocialLinks(socialLinks);
@@ -77,6 +104,49 @@ export default class ProfileSvc {
     // one-time reward. Never fails the save.
     await OnboardingSvc.syncDetectedSteps(userId).catch(() => {});
     return updated;
+  }
+
+  /** A Provider's specialties as `{ slug, name }`, named from the catalog. */
+  static async getProviderSpecialties(userId: string) {
+    const [slugs, catalog] = await Promise.all([
+      ProfileRepo.findProviderSpecialtyCategories(userId),
+      ProviderSpecialtySvc.list(),
+    ]);
+    const names = new Map(catalog.map((c) => [c.slug, c.name]));
+    return slugs.map((slug) => ({ slug, name: names.get(slug) ?? slug }));
+  }
+
+  /**
+   * Replaces a Provider's specialties with `declared`. A Provider keeps at
+   * least one, every one must be in the catalog, and one with a booking ahead
+   * stays until that booking is done.
+   */
+  static async setProviderSpecialties(userId: string, declared: unknown) {
+    const roles = await ProfileRepo.findRoleTypes(userId);
+    if (!roles.includes(RoleType.providerFoxer)) {
+      throw new SpecialtyError("Only Providers have specialties");
+    }
+
+    const current = await ProfileRepo.findProviderSpecialtyCategories(userId);
+    const check = await ProviderSpecialtySvc.check(declared, current);
+    if (!check.ok) throw new SpecialtyError(check.message);
+    const next = new Set(check.slugs);
+    const removed = current.filter((slug) => !next.has(slug));
+    const added = check.slugs.filter((slug) => !current.includes(slug));
+
+    const blocked = await ProfileRepo.categoriesWithUpcomingBookings(
+      userId,
+      removed,
+    );
+    if (blocked.length > 0) {
+      throw new SpecialtyError(
+        `You can't remove ${blocked.join(", ")} while it has upcoming bookings`,
+      );
+    }
+
+    if (removed.length > 0 || added.length > 0) {
+      await ProfileRepo.replaceProviderSpecialties(userId, removed, added);
+    }
   }
 
   // Change password
