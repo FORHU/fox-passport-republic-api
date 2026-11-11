@@ -746,14 +746,9 @@ export default class AdminSvc {
   static async approveVenue(id: string) {
     const venue = await AdminRepo.approveVenue(id);
 
-    // Award mayor XP + City Builder badge (fire-and-forget)
+    // City Builder badge (fire-and-forget)
     import("../passport/passport.service")
-      .then(async ({ default: PassportSvc, XP_REWARDS, UserPath }) => {
-        await PassportSvc.awardXP(
-          venue.mayorId,
-          UserPath.venueFoxer,
-          XP_REWARDS.mayorVenueApproved,
-        );
+      .then(async ({ default: PassportSvc }) => {
         const approvedCount = await AdminRepo.countApprovedVenues(
           venue.mayorId,
         );
@@ -791,16 +786,6 @@ export default class AdminSvc {
   static async approveAsset(id: string) {
     const asset = await AdminRepo.approveAsset(id);
 
-    import("../passport/passport.service")
-      .then(({ default: PassportSvc, XP_REWARDS, UserPath }) =>
-        PassportSvc.awardXP(
-          asset.ownerId,
-          UserPath.providerFoxer,
-          XP_REWARDS.createListing,
-        ),
-      )
-      .catch(() => {});
-
     // "venues" is the channel an owner's listings screen listens on - assets,
     // services and venues all share it. Carried over rather than corrected.
     await this.settled({
@@ -831,16 +816,6 @@ export default class AdminSvc {
 
   static async approveService(id: string) {
     const service = await AdminRepo.approveService(id);
-
-    import("../passport/passport.service")
-      .then(({ default: PassportSvc, XP_REWARDS, UserPath }) =>
-        PassportSvc.awardXP(
-          service.ownerId,
-          UserPath.providerFoxer,
-          XP_REWARDS.createListing,
-        ),
-      )
-      .catch(() => {});
 
     await this.settled({
       ownerId: service.ownerId,

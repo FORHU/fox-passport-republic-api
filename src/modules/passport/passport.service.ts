@@ -161,6 +161,7 @@ export default class PassportSvc {
     await PassportRepo.upsertUserBadge(passport.id, badge.id);
   }
 
+  /** @deprecated XP is retired (RR-1, api#298); nothing calls this. Removed with the rank code. */
   static async awardXP(userId: string, path: UserPath, amount: number) {
     const passport = await PassportSvc.getOrCreate(userId);
 

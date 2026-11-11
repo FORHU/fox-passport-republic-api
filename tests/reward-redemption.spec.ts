@@ -174,7 +174,7 @@ describe("Reward Service & Redemption Engine (Phase 2)", () => {
   });
 
   describe("getCatalog", () => {
-    it("returns audience-scoped catalog with canAfford and levelQualified flags", async () => {
+    it("returns audience-scoped catalog with canAfford and no level lock", async () => {
       mockDb.passports.set("user-1", {
         userId: "user-1",
         coins: 150,
@@ -192,17 +192,17 @@ describe("Reward Service & Redemption Engine (Phase 2)", () => {
       const rwd20 = catalog.find((c) => c.id === "rwd-20");
       expect(rwd20).toBeDefined();
       expect(rwd20?.canAfford).toBe(true); // 150 >= 100
-      expect(rwd20?.levelQualified).toBe(true); // level 2 >= 1
+      expect(rwd20).not.toHaveProperty("levelQualified");
+      expect(rwd20).not.toHaveProperty("minLevel");
 
       const rwd50 = catalog.find((c) => c.id === "rwd-50");
       expect(rwd50).toBeDefined();
       expect(rwd50?.canAfford).toBe(false); // 150 < 250
-      expect(rwd50?.levelQualified).toBe(false); // level 2 < 3
     });
   });
 
   describe("getWallet", () => {
-    it("returns spendable coins, rank, level, and transaction history", async () => {
+    it("returns spendable coins and transaction history, without level, rank or XP", async () => {
       mockDb.passports.set("user-1", {
         userId: "user-1",
         coins: 350,
@@ -232,11 +232,12 @@ describe("Reward Service & Redemption Engine (Phase 2)", () => {
       const wallet = await RewardService.getWallet("user-1", UserPath.user);
 
       expect(wallet.coins).toBe(350);
-      expect(wallet.level).toBe(5);
-      expect(wallet.rank).toBe("Explorer");
+      expect(wallet).not.toHaveProperty("level");
+      expect(wallet).not.toHaveProperty("rank");
       expect(wallet.history).toHaveLength(2);
       expect(wallet.history[0].type).toBe("lifecycle"); // newer
       expect(wallet.history[1].type).toBe("grant");
+      expect(wallet.history[1]).not.toHaveProperty("xp");
     });
   });
 
@@ -256,19 +257,19 @@ describe("Reward Service & Redemption Engine (Phase 2)", () => {
       ).rejects.toThrow("Insufficient coins");
     });
 
-    it("rejects redemption when user level is below minLevel", async () => {
+    it("redeems a reward whatever the level (no minLevel lock)", async () => {
       mockDb.passports.set("user-low", {
         userId: "user-low",
         coins: 1000,
         paths: [{ path: UserPath.user, level: 1 }],
       });
 
-      await expect(
-        RewardService.redeem({
-          userId: "user-low",
-          rewardId: "rwd-50", // requires level 3
-        }),
-      ).rejects.toThrow("Minimum level 3 required");
+      const result = await RewardService.redeem({
+        userId: "user-low",
+        rewardId: "rwd-50", // minLevel 3 in the catalog row, no longer checked
+      });
+
+      expect(result.success).toBe(true);
     });
 
     it("deducts coins, records REDEMPTION lifecycle, and creates an owner-scoped voucher", async () => {
