@@ -6,6 +6,7 @@ import { registerSocketGateway } from "./infrastructure/socket/socket.gateway";
 import { scheduleBookingReminders } from "./jobs/booking-reminders.job";
 import { scheduleConfirmationDeadlineSweep } from "./jobs/confirmation-deadline-sweep.job";
 import { scheduleUnattendedEventsSweep } from "./jobs/unattended-events.job";
+import { scheduleVoucherReturn } from "./jobs/voucher-return.job";
 
 const httpServer = createServer(app);
 
@@ -17,6 +18,7 @@ registerSocketGateway(io);
 scheduleBookingReminders();
 scheduleConfirmationDeadlineSweep();
 scheduleUnattendedEventsSweep();
+scheduleVoucherReturn();
 
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);

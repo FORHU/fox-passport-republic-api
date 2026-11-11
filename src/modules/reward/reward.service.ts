@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { UserPath } from "@prisma/client";
+import { RewardLifecycleType, UserPath } from "@prisma/client";
 import { AppError, notFound } from "../../utils/errors";
 import RewardRepo from "./reward.repository";
 import PassportRepo from "../passport/passport.repository";
@@ -209,6 +209,39 @@ export default class RewardService {
   }
 
   /**
+   * Nightly: returns the full Token price of every Token voucher that expired
+   * completely unused (requirements/xp-and-coins.md, section 3.4). Idempotent
+   * per voucher; one failure is logged and does not stop the rest.
+   */
+  static async returnExpiredVouchers(
+    now: Date = new Date(),
+  ): Promise<{ returned: number; tokens: number; failed: number }> {
+    const due = await RewardRepo.findExpiredUnusedRedemptions(now);
+    let returned = 0;
+    let tokens = 0;
+    let failed = 0;
+    for (const r of due) {
+      if (!r.voucher) continue;
+      try {
+        const done = await RewardRepo.recordVoucherReturn({
+          redemptionId: r.id,
+          userId: r.userId,
+          coins: r.coinsSpent,
+          voucherCode: r.voucher.code,
+        });
+        if (done) {
+          returned += 1;
+          tokens += r.coinsSpent;
+        }
+      } catch (err) {
+        failed += 1;
+        console.error(`[RewardService] voucher return failed for ${r.id}`, err);
+      }
+    }
+    return { returned, tokens, failed };
+  }
+
+  /**
    * Gets spendable Coins balance.
    */
   static async getBalance(userId: string): Promise<number> {
@@ -278,12 +311,24 @@ export default class RewardService {
     }
 
     for (const lc of lifecycles) {
+      // A release or reversal acts on its grant, so it shows what that grant
+      // was for (refType/refId, e.g. the booking). `action` stays on grants
+      // only, so clients keep labelling lifecycle rows by their reason.
+      // Redemptions and voucher returns are tied to a voucher; the reason
+      // names it.
+      const ofGrant =
+        lc.type === RewardLifecycleType.RELEASE ||
+        lc.type === RewardLifecycleType.REVERSAL;
       history.push({
         id: lc.id,
         type: "lifecycle",
         lifecycleType: lc.type,
         coinsDelta: lc.coinsDelta,
         reason: lc.reason,
+        ...(ofGrant && {
+          refType: lc.grantEvent.refType,
+          refId: lc.grantEvent.refId,
+        }),
         createdAt: lc.createdAt,
       });
     }
