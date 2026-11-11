@@ -38,16 +38,6 @@ export default class PassportCtrl {
     }
   }
 
-  static async getLeaderboard(req: Request, res: Response) {
-    try {
-      const limit = Math.min(Number(req.query.limit) || 20, 50);
-      const data = await PassportSvc.getLeaderboard(limit);
-      return res.status(200).json({ success: true, data });
-    } catch (e: unknown) {
-      return sendServerError(res, e, { success: true });
-    }
-  }
-
   // host_support perk: returns priority support contact — 403 without perk
   static async getPrioritySupportContact(req: Request, res: Response) {
     try {

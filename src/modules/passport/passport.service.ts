@@ -417,26 +417,6 @@ export default class PassportSvc {
     );
     return passport?.perks ?? [];
   }
-
-  static async getLeaderboard(limit = 20) {
-    // Every passport in the database, with paths and users, sorted in memory.
-    // The most expensive read here and the same answer for everyone.
-    const passports = await passportCache.cached(
-      "leaderboard:all",
-      PASSPORT_TTL,
-      () => PassportRepo.findAllWithPaths(),
-    );
-
-    return passports
-      .map((p) => {
-        const totalXP = p.paths.reduce((sum, path) => sum + path.totalXP, 0);
-        const totalLevel = p.paths.reduce((sum, path) => sum + path.level, 0);
-        return { userId: p.userId, user: p.user, totalXP, totalLevel };
-      })
-      .sort((a, b) => b.totalXP - a.totalXP)
-      .slice(0, limit)
-      .map((entry, index) => ({ rank: index + 1, ...entry }));
-  }
 }
 
 export { XP_REWARDS, UserPath };
