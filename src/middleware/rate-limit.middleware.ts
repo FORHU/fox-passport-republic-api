@@ -130,14 +130,14 @@ const TOO_MANY_REQUESTS =
 export const loginRateLimit = [
   perIp({
     windowMs: FIFTEEN_MINUTES,
-    limit: 30,
+    limit: 100,
     message: TOO_MANY_ATTEMPTS,
     prefix: "login",
     failuresOnly: true,
   }),
   perAccount({
     windowMs: FIFTEEN_MINUTES,
-    limit: 10,
+    limit: 30,
     message: TOO_MANY_ATTEMPTS,
     prefix: "login",
     failuresOnly: true,

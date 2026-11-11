@@ -21,7 +21,9 @@ export default class MatchController {
           .optional(),
         guestCount: Joi.number().integer().min(1).required(),
         requestContent: Joi.string().allow("", null).optional(),
-        totalAmount: Joi.number().min(0).optional(),
+        // Ignored (#264 T10.1): the server prices a Match from its Foxers.
+        // Accepted so older clients don't get a 400, then dropped here.
+        totalAmount: Joi.number().min(0).optional().strip(),
         venueId: Joi.string().uuid().optional(),
       });
 
@@ -34,7 +36,6 @@ export default class MatchController {
         endDate,
         guestCount,
         requestContent,
-        totalAmount,
         venueId,
         foxerId,
       } = value;
@@ -52,11 +53,11 @@ export default class MatchController {
         endDate: endDate ? new Date(endDate) : undefined,
         guestCount,
         requestContent,
-        totalAmount,
         venueId,
       });
 
-      // Only create a Stripe payment intent when there's a known amount to charge
+      // Only create a Stripe payment intent when the server-computed total is
+      // above 0 (#264 T10.3): a Match with no Foxers yet costs nothing (Q6).
       if (eventRequest.totalAmount.gt(0)) {
         const { clientSecret } = await PaymentSvc.createPaymentIntent({
           amount: eventRequest.totalAmount.toNumber(),

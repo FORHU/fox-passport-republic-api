@@ -4,6 +4,7 @@ import {
   EventTemplateStatus,
   ItemBookingStatus,
   PaymentStatus,
+  PayoutSourceType,
   Prisma,
   RefundStatus,
   RoleType,
@@ -15,6 +16,8 @@ import AdminRepo, { queuePage } from "./admin.repository";
 import EventRequestSvc from "../event-request/event-request.service";
 import RefundSvc from "../refund/refund.service";
 import PaymentRepo from "../payment/payment.repository";
+import { eventBreakdownLines } from "../payment/event-breakdown-snapshot";
+import { shareOf } from "../pricing/event-breakdown";
 import { prisma } from "../../utils/prisma";
 import { STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents } from "../../utils/pricing";
@@ -436,6 +439,13 @@ export default class AdminSvc {
     // same item at once can't both approve a refund that exceeds what's
     // actually left — the second one's own recompute, done after the first
     // has committed, sees the reduced remaining balance.
+    let clawBack: {
+      foxer: Prisma.Decimal;
+      foxerId: string;
+      commission: Prisma.Decimal;
+      bookingId: string | null;
+      organizerId: string | null;
+    } | null = null;
     const { refundId, payment, alreadyPaidOut } = await prisma.$transaction(
       async (tx) => {
         if (data.kind === "asset") {
@@ -467,29 +477,6 @@ export default class AdminSvc {
           RefundStatus.pending,
           RefundStatus.succeeded,
         ];
-        const refundFilter =
-          data.kind === "asset"
-            ? {
-                assetTransactionId: data.transactionId,
-                status: { in: countedStatuses },
-              }
-            : {
-                serviceTransactionId: data.transactionId,
-                status: { in: countedStatuses },
-              };
-        const alreadyRefunded = await tx.refund.aggregate({
-          _sum: { amount: true },
-          where: refundFilter,
-        });
-        const remaining =
-          row.agreedPrice.toNumber() -
-          (alreadyRefunded._sum?.amount?.toNumber() ?? 0);
-        if (data.amount > remaining) {
-          throw new Error(
-            `Refund amount exceeds the remaining refundable balance for this item (remaining: ${remaining})`,
-          );
-        }
-
         const invoiceItem = await tx.invoiceItem.findFirst({
           where: {
             sourceType:
@@ -497,6 +484,9 @@ export default class AdminSvc {
                 ? "event_asset_transaction"
                 : "event_service_transaction",
             sourceId: data.transactionId,
+            invoice: {
+              payments: { some: { status: "paid" } },
+            },
           },
           include: {
             invoice: {
@@ -511,9 +501,43 @@ export default class AdminSvc {
           },
         });
         const invoicePayment = invoiceItem?.invoice.payments[0];
-        if (!invoicePayment) {
+        if (!invoiceItem || !invoicePayment) {
           throw new Error(
             "No paid payment found for this item — nothing to refund",
+          );
+        }
+
+        // Every refund already on this line: an admin's (tagged with the
+        // transaction) and an Event cancellation's (tagged with the invoice
+        // item), so the same money is never refunded twice.
+        const alreadyRefunded = await tx.refund.aggregate({
+          _sum: { amount: true },
+          where: {
+            status: { in: countedStatuses },
+            OR: [
+              { invoiceItemId: invoiceItem.id },
+              data.kind === "asset"
+                ? { assetTransactionId: data.transactionId }
+                : { serviceTransactionId: data.transactionId },
+            ],
+          },
+        });
+        // What the client was charged for this line, from the invoice they
+        // paid: with the per-line breakdown (#264), the Foxer price plus its
+        // commission, FoxPassport fee and processing fee, all refundable
+        // (D10). An older invoice charged the item amount only.
+        const line = eventBreakdownLines(
+          invoiceItem.invoice.platformFeeSnapshot,
+        ).get(data.transactionId);
+        const linePaid = line
+          ? new Prisma.Decimal(line.lineTotal)
+          : invoiceItem.amount;
+        const remaining = linePaid
+          .sub(alreadyRefunded._sum?.amount ?? 0)
+          .toNumber();
+        if (data.amount > remaining) {
+          throw new Error(
+            `Refund amount exceeds the remaining refundable balance for this item (remaining: ${remaining})`,
           );
         }
 
@@ -521,6 +545,7 @@ export default class AdminSvc {
           data: {
             paymentId: invoicePayment.id,
             bookingId: row.bookingId ?? undefined,
+            invoiceItemId: invoiceItem.id,
             amount: data.amount,
             reason: data.reason,
             status: "pending",
@@ -531,12 +556,27 @@ export default class AdminSvc {
           },
         });
 
-        // Disclosed operational limitation, not automated here: no payout
-        // reversal exists anywhere in this codebase (confirmed by direct
-        // grep during Phase B planning). If the provider's payout for this
-        // item already fired, this refund still proceeds — the platform
-        // absorbs it or pursues the provider out-of-band; it is not clawed
-        // back automatically.
+        // Who gives back what once the refund goes out (below): the Foxer
+        // their price's share, the EventFoxer their commission's share.
+        // FoxPassport absorbs its fee and the processing fee.
+        const event = await tx.event.findUnique({
+          where: { id: row.eventId },
+          select: { organizerId: true },
+        });
+        clawBack = {
+          foxer: line
+            ? shareOf(data.amount, line.price, line.lineTotal)
+            : new Prisma.Decimal(data.amount),
+          foxerId: row.providerId,
+          commission: line
+            ? shareOf(data.amount, line.commission, line.lineTotal)
+            : new Prisma.Decimal(0),
+          bookingId: row.bookingId,
+          organizerId: event?.organizerId ?? null,
+        };
+
+        // Reported to the admin: a payout that already went out is reversed
+        // below, best effort (a failed reversal is logged, not retried).
         const alreadyPaidOut = await tx.payout.findFirst({
           where: {
             sourceType:
@@ -577,6 +617,7 @@ export default class AdminSvc {
         where: { id: refundId },
         data: { status: finalStatus, providerReference: stripeRefund.id },
       });
+      await this.clawBackItemizedRefund(data, clawBack);
       return { ...updated, alreadyPaidOutWarning: alreadyPaidOut };
     } catch (err) {
       await prisma.refund.update({
@@ -584,6 +625,57 @@ export default class AdminSvc {
         data: { status: "failed" },
       });
       throw err;
+    }
+  }
+
+  /**
+   * After an itemized refund goes out, takes back the Foxer's share from
+   * their payout and the EventFoxer's commission share from theirs (#264
+   * review), the same rule an Event cancellation follows. Best effort: a
+   * failed reversal is logged and never fails the refund itself.
+   */
+  private static async clawBackItemizedRefund(
+    data: { kind: "asset" | "service"; transactionId: string },
+    clawBack: {
+      foxer: Prisma.Decimal;
+      foxerId: string;
+      commission: Prisma.Decimal;
+      bookingId: string | null;
+      organizerId: string | null;
+    } | null,
+  ) {
+    if (!clawBack) return;
+    const { default: PayoutSvc } = await import("../payout/payout.service");
+    await PayoutSvc.reversePayoutForSource(data.transactionId, clawBack.foxer, {
+      providerId: clawBack.foxerId,
+      sourceType:
+        data.kind === "asset"
+          ? PayoutSourceType.event_asset_transaction
+          : PayoutSourceType.event_service_transaction,
+    }).catch((e) =>
+      console.error(
+        `Payout reversal failed for ${data.kind} transaction ${data.transactionId}`,
+        e,
+      ),
+    );
+    if (
+      clawBack.commission.greaterThan(0) &&
+      clawBack.bookingId &&
+      clawBack.organizerId
+    ) {
+      await PayoutSvc.reversePayoutForSource(
+        clawBack.bookingId,
+        clawBack.commission,
+        {
+          providerId: clawBack.organizerId,
+          sourceType: PayoutSourceType.event_host_markup,
+        },
+      ).catch((e) =>
+        console.error(
+          `Commission reversal failed for booking ${clawBack.bookingId}`,
+          e,
+        ),
+      );
     }
   }
 

@@ -20,7 +20,6 @@ export default class MatchSvc {
     endDate?: Date;
     guestCount: number;
     requestContent: string;
-    totalAmount: number;
     venueId?: string;
   }) {
     // Read-only lookups that decide WHICH template to use — safe to do ahead
@@ -99,7 +98,6 @@ export default class MatchSvc {
           endAt:
             data.endDate ?? new Date(data.date.getTime() + 4 * 60 * 60 * 1000),
           guestCount: data.guestCount,
-          totalAmount: data.totalAmount,
         },
         tx,
       );

@@ -14,6 +14,7 @@
     "seed:multirole": "pnpm exec tsx prisma/seeder/multirole-scenario.seeder.ts",
     "seed:organizers": "pnpm exec tsx prisma/seeder/organizer-scenario.seeder.ts",
     "seed:reels": "pnpm exec tsx prisma/seeder/reels.seeder.ts",
+    "seed:reels:remote": "pnpm exec tsx prisma/seeder/reels-remote.seeder.ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "vitest run",
     "test:watch": "vitest",
