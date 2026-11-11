@@ -2,7 +2,6 @@ import crypto from "node:crypto";
 import { UserPath } from "@prisma/client";
 import { AppError, notFound } from "../../utils/errors";
 import RewardRepo from "./reward.repository";
-import PassportSvc from "../passport/passport.service";
 import PassportRepo from "../passport/passport.repository";
 import RankSvc from "../passport/rank.service";
 import {
@@ -50,7 +49,9 @@ export default class RewardService {
   }
 
   /**
-   * Grants XP and Coins atomically and idempotently.
+   * Grants Tokens (the `coins` ledger) atomically and idempotently. XP is
+   * retired (requirements/xp-and-coins.md, section 2): nothing earns it, and
+   * the XP already stored stays as it is.
    * Enforces once-only rules, daily caps, and the 40% booking fee liability budget.
    */
   static async grant(params: GrantRewardParams): Promise<GrantRewardResult> {
@@ -63,33 +64,15 @@ export default class RewardService {
     const existingEvent =
       await RewardRepo.findEventByIdempotencyKey(idempotencyKey);
     if (existingEvent) {
-      const passport = await PassportRepo.findByUserId(params.userId);
-      const currentPath = passport?.paths.find((p) => p.path === path);
-      const level = currentPath?.level ?? 1;
-
-      return {
-        xpAwarded: existingEvent.xp,
-        coinsAwarded: existingEvent.coins,
-        newLevel: level,
-        newRank: this.calculateRank(level, path),
-        isIdempotentReplay: true,
-      };
+      return { coinsAwarded: existingEvent.coins, isIdempotentReplay: true };
     }
 
     // 2. Resolve Rule Configuration
     const rule = await RewardRepo.findRuleByAction(params.action);
     if (rule && !rule.active) {
-      const passport = await PassportRepo.findByUserId(params.userId);
-      const level = passport?.paths.find((p) => p.path === path)?.level ?? 1;
-      return {
-        xpAwarded: 0,
-        coinsAwarded: 0,
-        newLevel: level,
-        newRank: this.calculateRank(level, path),
-      };
+      return { coinsAwarded: 0 };
     }
 
-    let xpToAward = params.xpOverride ?? rule?.xp ?? 0;
     let coinsToAward = params.coinsOverride ?? rule?.coins ?? 0;
 
     // 3. Once-Only Check
@@ -99,7 +82,6 @@ export default class RewardService {
         params.action,
       );
       if (completed) {
-        xpToAward = 0;
         coinsToAward = 0;
       }
     }
@@ -107,11 +89,7 @@ export default class RewardService {
     // 4. Daily Cap Check
     const effectiveDailyCap =
       rule?.dailyCap ?? (params.action === "review_helpful" ? 5 : undefined);
-    if (
-      effectiveDailyCap &&
-      effectiveDailyCap > 0 &&
-      (xpToAward > 0 || coinsToAward > 0)
-    ) {
+    if (effectiveDailyCap && effectiveDailyCap > 0 && coinsToAward > 0) {
       const startOfDay = this.getStartOfDayManila();
       const countToday = await RewardRepo.countDailyActions(
         params.userId,
@@ -119,7 +97,6 @@ export default class RewardService {
         startOfDay,
       );
       if (countToday >= effectiveDailyCap) {
-        xpToAward = 0;
         coinsToAward = 0;
       }
     }
@@ -164,7 +141,7 @@ export default class RewardService {
       action: params.action,
       refType: params.refType,
       refId: params.refId,
-      xp: xpToAward,
+      xp: 0,
       coins: coinsToAward,
       idempotencyKey,
       isPending,
@@ -182,26 +159,12 @@ export default class RewardService {
       );
     }
 
-    // 7. Progress XP, Levels, Badges, and Perks through Passport Service
-    if (xpToAward > 0) {
-      await PassportSvc.awardXP(params.userId, path, xpToAward);
-    }
-
-    const passport = await PassportRepo.findByUserId(params.userId);
-    const updatedPath = passport?.paths.find((p) => p.path === path);
-    const finalLevel = updatedPath?.level ?? 1;
-
-    return {
-      xpAwarded: xpToAward,
-      coinsAwarded: coinsToAward,
-      newLevel: finalLevel,
-      newRank: this.calculateRank(finalLevel, path),
-    };
+    return { coinsAwarded: coinsToAward };
   }
 
   /**
    * Reverses an existing grant on cancellation or refund by creating an append-only
-   * REVERSAL lifecycle record and reversing XP on the user's path.
+   * REVERSAL lifecycle record. XP already stored is left as it is.
    */
   static async reverse(
     params: ReverseRewardParams,
@@ -216,7 +179,6 @@ export default class RewardService {
     if (!grantEvent) {
       return {
         reversed: false,
-        xpReversed: 0,
         coinsReversed: 0,
       };
     }
@@ -226,7 +188,6 @@ export default class RewardService {
     if (alreadyReversed) {
       return {
         reversed: false,
-        xpReversed: 0,
         coinsReversed: 0,
         grantEventId: grantEvent.id,
       };
@@ -240,18 +201,8 @@ export default class RewardService {
       reason: params.reason,
     });
 
-    // 2. Reverse XP on Path
-    if (grantEvent.xp > 0) {
-      await PassportSvc.awardXP(
-        grantEvent.userId,
-        grantEvent.path,
-        -grantEvent.xp,
-      );
-    }
-
     return {
       reversed: true,
-      xpReversed: grantEvent.xp,
       coinsReversed: grantEvent.coins,
       grantEventId: grantEvent.id,
     };
@@ -265,7 +216,8 @@ export default class RewardService {
   }
 
   /**
-   * Retrieves the rewards catalog filtered by target audience and user level.
+   * Retrieves the rewards catalog filtered by target audience. There is no level
+   * lock: anyone can redeem what they can afford.
    */
   static async getCatalog(
     userId: string,
@@ -274,8 +226,6 @@ export default class RewardService {
   ): Promise<RewardCatalogItem[]> {
     const passport = await PassportRepo.findByUserId(userId);
     const coinsBalance = passport?.coins ?? 0;
-    const currentPath = passport?.paths.find((p) => p.path === path);
-    const userLevel = currentPath?.level ?? 1;
 
     const defaultAudience = path === UserPath.user ? "citizen" : "foxer";
     const audienceToFetch = targetAudience || defaultAudience;
@@ -293,22 +243,18 @@ export default class RewardService {
       discountPercentage: r.discountPercentage
         ? Number(r.discountPercentage)
         : null,
-      minLevel: r.minLevel,
       canAfford: coinsBalance >= r.coinCost,
-      levelQualified: userLevel >= r.minLevel,
     }));
   }
 
   /**
-   * Retrieves user's wallet overview including spendable coins, level, rank, and ledger history.
+   * Retrieves user's wallet overview: spendable Tokens, pending Tokens and ledger history.
    */
   static async getWallet(
     userId: string,
-    path: UserPath = UserPath.user,
+    _path: UserPath = UserPath.user,
   ): Promise<WalletSummary> {
     const passport = await PassportRepo.findByUserId(userId);
-    const currentPath = passport?.paths.find((p) => p.path === path);
-    const level = currentPath?.level ?? 1;
     const coins = passport?.coins ?? 0;
 
     const { events, lifecycles } =
@@ -322,7 +268,6 @@ export default class RewardService {
         id: ev.id,
         type: "grant",
         action: ev.action,
-        xp: ev.xp,
         coinsDelta: ev.coins,
         refType: ev.refType,
         refId: ev.refId,
@@ -337,7 +282,6 @@ export default class RewardService {
         id: lc.id,
         type: "lifecycle",
         lifecycleType: lc.type,
-        xp: 0,
         coinsDelta: lc.coinsDelta,
         reason: lc.reason,
         createdAt: lc.createdAt,
@@ -352,8 +296,6 @@ export default class RewardService {
       coins,
       pendingCoins: await RewardRepo.getPendingCoins(userId),
       totalEarnedCoins,
-      level,
-      rank: this.calculateRank(level, path),
       history,
     };
   }
@@ -363,7 +305,6 @@ export default class RewardService {
    * and creates an owner-scoped voucher adhering to the 50% platform fee limit.
    */
   static async redeem(params: RedeemRewardParams): Promise<RedeemRewardResult> {
-    const path = params.path ?? UserPath.user;
     const reward = await RewardRepo.findRewardById(params.rewardId);
     if (!reward || !reward.active) {
       throw notFound("Reward");
@@ -372,16 +313,6 @@ export default class RewardService {
     const passport = await PassportRepo.findByUserId(params.userId);
     if (!passport) {
       throw notFound("User passport");
-    }
-
-    const currentPath = passport.paths.find((p) => p.path === path);
-    const userLevel = currentPath?.level ?? 1;
-
-    if (userLevel < reward.minLevel) {
-      throw new AppError(
-        `Minimum level ${reward.minLevel} required to redeem this reward (your level is ${userLevel}).`,
-        400,
-      );
     }
 
     const currentBalance = passport.coins;

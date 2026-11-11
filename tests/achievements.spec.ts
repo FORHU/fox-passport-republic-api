@@ -46,9 +46,7 @@ describe("Achievements Engine (Specification §6)", () => {
   });
 
   describe("Tier Progression & Target Calculation", () => {
-    const regularDef = CITIZEN_ACHIEVEMENTS.find(
-      (a) => a.key === "regular",
-    )!;
+    const regularDef = CITIZEN_ACHIEVEMENTS.find((a) => a.key === "regular")!;
 
     it("evaluates tier 0 when below first tier target", async () => {
       const result = await AchievementSvc.evaluateAchievement(
@@ -77,11 +75,8 @@ describe("Achievements Engine (Specification §6)", () => {
       expect(result.currentTier).toBe(1);
       expect(result.nextTier).toBe(2);
       expect(result.targetCount).toBe(10);
-      expect(PassportSvc.awardXP).toHaveBeenCalledWith(
-        userId,
-        regularDef.path,
-        regularDef.tiers[0].xp,
-      );
+      // XP is retired: the tier pays its Coins only
+      expect(PassportSvc.awardXP).not.toHaveBeenCalled();
       expect(RewardRepo.recordGrant).toHaveBeenCalledWith(
         expect.objectContaining({
           userId,

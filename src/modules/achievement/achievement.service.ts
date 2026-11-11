@@ -55,11 +55,6 @@ export class AchievementSvc {
           await RewardRepo.findEventByIdempotencyKey(idempotencyKey);
 
         if (!alreadyGranted) {
-          // Award XP
-          if (t.xp > 0) {
-            await PassportSvc.awardXP(userId, def.path, t.xp).catch(() => {});
-          }
-
           // Award Coins if not social-only
           if (t.coins > 0 && !def.isSocialOnly) {
             await RewardRepo.recordGrant({
