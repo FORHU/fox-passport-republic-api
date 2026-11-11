@@ -369,6 +369,27 @@ describe("RewardService & Immutable Ledger Foundation", () => {
       // Daily cap is 1; second attempt awards 0
       expect(second.coinsAwarded).toBe(0);
     });
+
+    it("pays nothing for an inactive rule, such as the retired Foxer-only five_star_review", async () => {
+      mockDb.rules.set("five_star_review", {
+        action: "five_star_review",
+        xp: 25,
+        coins: 10,
+        active: false,
+        onceOnly: false,
+      });
+
+      const res = await RewardService.grant({
+        userId: "foxer-1",
+        path: UserPath.providerFoxer,
+        action: "five_star_review",
+        refType: "review",
+        refId: "review-1",
+      });
+
+      expect(res).toEqual({ coinsAwarded: 0 });
+      expect(mockDb.events.size).toBe(0);
+    });
   });
 
   describe("Platform Fee Liability Budget Enforcement (40% Cap)", () => {
