@@ -5,6 +5,7 @@ import { hashPassword } from "../../utils/password";
 import { userCache } from "../../utils/cache-namespaces";
 import { fingerprint } from "../../utils/cache.util";
 import AdminSvc from "../admin/admin.service";
+import ProviderSpecialtySvc from "./provider-specialty.service";
 
 /**
  * Two minutes.
@@ -64,8 +65,8 @@ export default class UsersSvc {
     return userCache.cached(
       `foxers:${fingerprint({ limit, page, roleTypes, specialization, city, maxPrice, search })}`,
       USER_TTL,
-      () =>
-        UsersRepo.findFoxers(
+      async () => {
+        const result = await UsersRepo.findFoxers(
           limit,
           page,
           roleTypes,
@@ -73,7 +74,12 @@ export default class UsersSvc {
           city,
           maxPrice,
           search,
-        ),
+        );
+        return {
+          ...result,
+          foxers: await ProviderSpecialtySvc.attach(result.foxers),
+        };
+      },
     );
   }
 
@@ -81,9 +87,10 @@ export default class UsersSvc {
   static async getFoxerById(id: string) {
     // The `throw` stays outside: `cached` stores a resolved value, so a
     // missing foxer has to keep failing after the entry is warm.
-    const foxer = await userCache.cached(`foxer:${id}`, USER_TTL, () =>
-      UsersRepo.findFoxerById(id),
-    );
+    const foxer = await userCache.cached(`foxer:${id}`, USER_TTL, async () => {
+      const found = await UsersRepo.findFoxerById(id);
+      return found ? (await ProviderSpecialtySvc.attach([found]))[0] : found;
+    });
     if (!foxer) throw new Error("Foxer not found");
     return foxer;
   }
