@@ -25,4 +25,5 @@ export interface FoxerLeaderboardResponse {
   tab: FoxerLeaderboardTab;
   role?: string;
   city?: string;
+  specialty?: string;
 }

@@ -191,6 +191,43 @@ describe("Leaderboards Engine (Specification §8)", () => {
   });
 });
 
+describe("Foxer leaderboard specialty filter (RR-2 A3)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("passes the specialty to the ranking query and echoes it back", async () => {
+    vi.mocked(LeaderboardRepo.getFoxersForRanking).mockResolvedValue([]);
+
+    const res = await LeaderboardService.getFoxerLeaderboard(
+      null,
+      "top_rated",
+      "providerFoxer",
+      "Manila",
+      "photography",
+    );
+
+    expect(LeaderboardRepo.getFoxersForRanking).toHaveBeenCalledWith(
+      "providerFoxer",
+      "Manila",
+      "photography",
+    );
+    expect(res.specialty).toBe("photography");
+  });
+
+  it("leaves the board unfiltered without a specialty", async () => {
+    vi.mocked(LeaderboardRepo.getFoxersForRanking).mockResolvedValue([]);
+
+    await LeaderboardService.getFoxerLeaderboard(null, "top_rated");
+
+    expect(LeaderboardRepo.getFoxersForRanking).toHaveBeenCalledWith(
+      undefined,
+      undefined,
+      undefined,
+    );
+  });
+});
+
 describe("pawsRankingScore", () => {
   it("pulls a small review count towards the platform average", () => {
     // 5.0 from 1 review with prior 5 and C = 4.5: (1x5 + 5x4.5) / 6
