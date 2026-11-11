@@ -66,6 +66,13 @@ class LeaderboardRepo {
         city: true,
         roleType: true,
         createdAt: true,
+        // The first approved role is when they became a Foxer (foxerSince).
+        roleRequests: {
+          where: { status: "approved", reviewedAt: { not: null } },
+          select: { reviewedAt: true },
+          orderBy: { reviewedAt: "asc" },
+          take: 1,
+        },
         passport: {
           include: {
             paths: true,
@@ -75,6 +82,24 @@ class LeaderboardRepo {
     });
 
     return users;
+  }
+
+  /** When they became a Foxer: their first approved role, else sign-up. */
+  static async getFoxerSince(userId: string): Promise<Date | null> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        createdAt: true,
+        roleRequests: {
+          where: { status: "approved", reviewedAt: { not: null } },
+          select: { reviewedAt: true },
+          orderBy: { reviewedAt: "asc" },
+          take: 1,
+        },
+      },
+    });
+    if (!user) return null;
+    return user.roleRequests[0]?.reviewedAt ?? user.createdAt;
   }
 }
 
