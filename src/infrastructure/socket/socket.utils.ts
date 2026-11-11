@@ -42,6 +42,16 @@ export const emitInvalidateToUser = (
   io.to(userRoom(userId)).emit(SOCKET_EVENTS.DATA_INVALIDATE, { topic });
 };
 
+/** Sends an event to every connected client, signed in or not. */
+export const emitToAll = <T>(
+  io: Server | undefined,
+  event: string,
+  payload: T,
+) => {
+  if (!io) return;
+  io.emit(event, payload);
+};
+
 export const emitInvalidateToAdmins = (io: Server, topic: InvalidateTopic) => {
   io.to(ADMIN_ROOM).emit(SOCKET_EVENTS.DATA_INVALIDATE, { topic });
 };

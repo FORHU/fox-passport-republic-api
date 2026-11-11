@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../src/utils/prisma";
+import { only } from "./helpers/cleanup";
 
 /**
  * #264 T13 (payouts) and T14 (refunds) against a real database, with the
@@ -36,6 +37,11 @@ vi.mock("stripe", () => ({
     transfers = { createReversal: vi.fn() };
     webhooks = { constructEvent: vi.fn() };
   },
+}));
+// Cancelling sends a notification without waiting for it; stub it so it can't
+// write after cleanup has deleted its user.
+vi.mock("../src/modules/notifications/user-notification.service", () => ({
+  default: { create: vi.fn().mockResolvedValue({}) },
 }));
 
 const EventRequestSvc = (
@@ -206,20 +212,18 @@ describe("event payment refunds and payouts (database)", () => {
     ).id;
   });
 
+  // Every filter is a list of ids this run created; see `only`.
   afterAll(async () => {
     const eventId = ids.event;
+    const payerId = only(ids.client);
     await prisma.refund.deleteMany({
-      where: { payment: { invoice: { payerId: ids.client } } },
+      where: { payment: { invoice: { payerId } } },
     });
-    await prisma.payment.deleteMany({
-      where: { invoice: { payerId: ids.client } },
-    });
-    await prisma.checkout.deleteMany({
-      where: { invoice: { payerId: ids.client } },
-    });
-    await prisma.invoice.deleteMany({ where: { payerId: ids.client } });
+    await prisma.payment.deleteMany({ where: { invoice: { payerId } } });
+    await prisma.checkout.deleteMany({ where: { invoice: { payerId } } });
+    await prisma.invoice.deleteMany({ where: { payerId } });
     await prisma.requestIdempotencyKey.deleteMany({
-      where: { requesterId: ids.admin },
+      where: { requesterId: only(ids.admin) },
     });
     if (eventId) {
       await prisma.eventServiceTransaction.deleteMany({ where: { eventId } });
@@ -227,14 +231,16 @@ describe("event payment refunds and payouts (database)", () => {
       await prisma.booking.deleteMany({ where: { eventId } });
       await prisma.event.deleteMany({ where: { id: eventId } });
     }
-    await prisma.eventTemplate.deleteMany({ where: { id: ids.template } });
+    await prisma.eventTemplate.deleteMany({
+      where: { id: only(ids.template) },
+    });
     await prisma.platformFeeConfig.deleteMany({
-      where: { id: ids.cateringRule },
+      where: { id: only(ids.cateringRule) },
     });
     await prisma.service.deleteMany({
-      where: { id: { in: [ids.catering, ids.djService] } },
+      where: { id: only(ids.catering, ids.djService) },
     });
-    await prisma.venue.deleteMany({ where: { id: ids.venue } });
+    await prisma.venue.deleteMany({ where: { id: only(ids.venue) } });
     await prisma.cancellationPolicy.deleteMany({
       where: { id: { in: policyIds } },
     });
