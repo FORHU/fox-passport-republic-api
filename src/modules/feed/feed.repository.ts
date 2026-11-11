@@ -50,13 +50,6 @@ const AUTHOR_SELECT = {
     passport: {
       select: {
         id: true,
-        paths: {
-          select: {
-            path: true,
-            level: true,
-            totalXP: true,
-          },
-        },
         userBadges: {
           select: {
             badge: {

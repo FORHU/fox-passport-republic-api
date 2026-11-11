@@ -119,32 +119,42 @@ describe("RankSvc", () => {
   });
 });
 
-describe("PassportSvc.withRanks", () => {
-  it("adds a rank to each path and leaves everything else alone", () => {
+describe("PassportSvc.withoutXp", () => {
+  it("drops level and XP from each path and leaves everything else alone", () => {
     const passport = {
       id: "p1",
       coins: 120,
       perks: ["early_bird"],
       paths: [
-        { id: "a", path: UserPath.user, level: 20, totalXP: 15860 },
-        { id: "b", path: UserPath.venueFoxer, level: 3, totalXP: 530 },
+        {
+          id: "a",
+          path: UserPath.user,
+          level: 20,
+          currentXP: 40,
+          totalXP: 15860,
+        },
+        {
+          id: "b",
+          path: UserPath.venueFoxer,
+          level: 3,
+          currentXP: 10,
+          totalXP: 530,
+        },
       ],
     };
 
-    const out = PassportSvc.withRanks(passport);
+    const out = PassportSvc.withoutXp(passport);
 
     expect(out.id).toBe("p1");
     expect(out.coins).toBe(120);
     expect(out.perks).toEqual(["early_bird"]);
-    expect(out.paths[0]).toMatchObject({
-      id: "a",
-      totalXP: 15860,
-      rank: { number: 6, name: "Adventurer" },
-    });
-    expect(out.paths[1].rank.name).toBe("Regular");
+    expect(out.paths).toEqual([
+      { id: "a", path: UserPath.user },
+      { id: "b", path: UserPath.venueFoxer },
+    ]);
   });
 
   it("handles a passport with no paths yet", () => {
-    expect(PassportSvc.withRanks({ paths: [] }).paths).toEqual([]);
+    expect(PassportSvc.withoutXp({ paths: [] }).paths).toEqual([]);
   });
 });

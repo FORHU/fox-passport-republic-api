@@ -754,14 +754,6 @@ export default class UsersRepo {
           select: {
             id: true,
             perks: true,
-            paths: {
-              select: {
-                path: true,
-                level: true,
-                currentXP: true,
-                totalXP: true,
-              },
-            },
             stamps: {
               orderBy: { createdAt: "desc" },
               select: {

@@ -498,15 +498,12 @@ export default class AppointmentService {
       limit: 20,
     });
     return rows.map((u) => {
-      const path = u.passport?.paths[0];
       return {
         id: u.id,
         name: u.name,
         imgId: u.imgId,
         city: u.city,
         specializations: u.foxerSpecializations.map((s) => s.category),
-        level: path?.level ?? 1,
-        totalXP: path?.totalXP ?? 0,
       };
     });
   }

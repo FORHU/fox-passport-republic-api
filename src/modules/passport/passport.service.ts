@@ -2,8 +2,10 @@ import { UserPath } from "@prisma/client";
 import { cached } from "../../utils/cache.util";
 import { passportCache, PASSPORT_TTL } from "../../utils/cache-namespaces";
 import PassportRepo from "./passport.repository";
-import RankSvc from "./rank.service";
 import RewardRepo from "../reward/reward.repository";
+
+/** What a passport path no longer reveals to a client. */
+const RETIRED_PATH_FIELDS = ["level", "currentXP", "totalXP"] as const;
 
 // 9-Rank Ladder thresholds with rank-up Coins bonuses (requirements/xp-and-coins.md, section 4.2)
 export interface RankThreshold {
@@ -131,19 +133,18 @@ export default class PassportSvc {
   }
 
   /**
-   * The passport with each path's rank (number, name, rarity, and the next
-   * rank) alongside its level, so the app never works a rank out itself. Only
-   * adds a field; everything the passport already carried is unchanged.
+   * XP, levels and ranks are retired. The passport keeps each path but not what
+   * measured progress along it: level, currentXP and totalXP. The data stays in
+   * the database; it is just never sent.
    */
-  static withRanks<T extends { paths: { path: UserPath; level: number }[] }>(
-    passport: T,
-  ) {
+  static withoutXp<T extends { paths: object[] }>(passport: T) {
     return {
       ...passport,
-      paths: passport.paths.map((p) => ({
-        ...p,
-        rank: RankSvc.forLevel(p.level, p.path),
-      })),
+      paths: passport.paths.map((p) => {
+        const copy: Record<string, unknown> = { ...p };
+        for (const key of RETIRED_PATH_FIELDS) delete copy[key];
+        return copy;
+      }),
     };
   }
 

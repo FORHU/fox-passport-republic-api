@@ -8,7 +8,7 @@ export default class PassportCtrl {
       const passport = await PassportSvc.getOrCreate(req.user!.userId);
       return res
         .status(200)
-        .json({ success: true, data: PassportSvc.withRanks(passport) });
+        .json({ success: true, data: PassportSvc.withoutXp(passport) });
     } catch (e: unknown) {
       return sendServerError(res, e, { success: true });
     }
@@ -23,7 +23,7 @@ export default class PassportCtrl {
           .json({ success: false, message: "Passport not found" });
       return res
         .status(200)
-        .json({ success: true, data: PassportSvc.withRanks(passport) });
+        .json({ success: true, data: PassportSvc.withoutXp(passport) });
     } catch (e: unknown) {
       return sendServerError(res, e, { success: true });
     }
