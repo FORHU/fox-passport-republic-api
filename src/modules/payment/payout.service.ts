@@ -83,6 +83,11 @@ export default class PaymentPayoutSvc {
         // transferred funds for a booking that could still be cancelled or
         // disputed. Only `sponsorship` has no such "rendered" checkpoint, so
         // it's the one source type this function still settles immediately.
+        // Event lines (#264 T13.1): each Foxer's stored line price and the
+        // EventFoxer's commission are paid by
+        // PayoutSvc.createPayoutsForEventBooking at `completed`; the
+        // FoxPassport fee and processing fee are never paid out. Sponsorships
+        // stay as they are until Q8 is decided.
         if (item.sourceType !== PayoutSourceType.sponsorship) continue;
 
         const sponsorship = await tx.partnershipProposal.findUnique({

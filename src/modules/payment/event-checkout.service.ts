@@ -1,8 +1,17 @@
 import { AppError, notFound } from "../../utils/errors";
 import Stripe from "stripe";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
-import InvoiceSvc, { type EventCharges } from "./invoice.service";
-import { commissionPctOf } from "../pricing/event-breakdown";
+import InvoiceSvc from "./invoice.service";
+import {
+  eventBreakdownLines,
+  type EventCharges,
+} from "./event-breakdown-snapshot";
+import {
+  commissionPctOf,
+  lineSnapshot,
+  percentOf,
+  shareOf,
+} from "../pricing/event-breakdown";
 import CheckoutSvc from "./checkout.service";
 import PricingSvc from "../pricing/pricing.service";
 import RefundSvc from "../refund/refund.service";
@@ -14,6 +23,7 @@ import { STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents, formatCurrency } from "../../utils/pricing";
 import {
   InvoiceSourceType,
+  PayoutSourceType,
   Prisma,
   RefundStatus,
   TransactionStatus,
@@ -73,6 +83,22 @@ function listingCategory(row: SnapshotRow): string | null {
     null
   );
 }
+
+/** Refunds that count against a line: issued, or on their way. */
+const COUNTED_REFUND_STATUSES: RefundStatus[] = [
+  RefundStatus.pending,
+  RefundStatus.succeeded,
+];
+
+/** The Payout source type for each kind of Event line. */
+const PAYOUT_SOURCE_TYPE = {
+  [InvoiceSourceType.event_venue_transaction]:
+    PayoutSourceType.event_venue_transaction,
+  [InvoiceSourceType.event_asset_transaction]:
+    PayoutSourceType.event_asset_transaction,
+  [InvoiceSourceType.event_service_transaction]:
+    PayoutSourceType.event_service_transaction,
+} as const;
 
 /**
  * Vouchers aren't offered on Events priced with the per-line breakdown yet
@@ -271,7 +297,17 @@ export default class EventCheckoutSvc {
     venueTransactions: SnapshotRow[];
     assetTransactions: SnapshotRow[];
     serviceTransactions: SnapshotRow[];
-  }): Promise<EventCharges | null> {
+  }): Promise<
+    | (EventCharges & {
+        /** Lines priced just now, whose snapshot checkout stores on the row. */
+        newSnapshots: {
+          kind: "venue" | "asset" | "service";
+          id: string;
+          snapshot: ReturnType<typeof lineSnapshot>;
+        }[];
+      })
+    | null
+  > {
     if (event.commissionPct == null) return null;
     const commissionPct = commissionPctOf(event.commissionPct);
 
@@ -307,6 +343,11 @@ export default class EventCheckoutSvc {
     const pricedById = new Map(
       unpriced.map(({ row }, i) => [row.id, priced!.lines[i]] as const),
     );
+    const newSnapshots = unpriced.map(({ row, kind }, i) => ({
+      kind,
+      id: row.id,
+      snapshot: lineSnapshot(priced!.lines[i]),
+    }));
 
     let itemsTotal = new Prisma.Decimal(0);
     let commissionTotal = new Prisma.Decimal(0);
@@ -353,7 +394,31 @@ export default class EventCheckoutSvc {
         .plus(processingFee)
         .toNumber(),
       lines,
+      newSnapshots,
     };
+  }
+
+  /**
+   * Stores the snapshot of each line checkout priced just now, inside the
+   * checkout transaction (#264 T13): payouts and refunds then read the same
+   * commission and fees the client was charged.
+   */
+  private static async storeNewSnapshots(
+    tx: AppTransactionClient,
+    newSnapshots: NonNullable<
+      Awaited<ReturnType<typeof EventCheckoutSvc.eventCharges>>
+    >["newSnapshots"],
+  ) {
+    for (const { kind, id, snapshot } of newSnapshots) {
+      const data = { ...snapshot };
+      if (kind === "venue") {
+        await tx.eventVenueTransaction.update({ where: { id }, data });
+      } else if (kind === "asset") {
+        await tx.eventAssetTransaction.update({ where: { id }, data });
+      } else {
+        await tx.eventServiceTransaction.update({ where: { id }, data });
+      }
+    }
   }
 
   /**
@@ -502,6 +567,7 @@ export default class EventCheckoutSvc {
 
         // An Event with the per-line breakdown: charge its lines' totals.
         if (charges) {
+          await this.storeNewSnapshots(tx, charges.newSnapshots);
           const newInvoice = await InvoiceSvc.createInvoice(
             {
               payerId,
@@ -735,7 +801,8 @@ export default class EventCheckoutSvc {
     type CancellableTx = {
       id: string;
       status: TransactionStatus;
-      sourceType: InvoiceSourceType;
+      providerId: string;
+      sourceType: keyof typeof PAYOUT_SOURCE_TYPE;
       policy: {
         rules: { hoursBeforeEvent: number; refundPercent: number }[];
       } | null;
@@ -744,18 +811,21 @@ export default class EventCheckoutSvc {
       ...event.venueTransactions.map((tx) => ({
         id: tx.id,
         status: tx.status,
+        providerId: tx.providerId,
         sourceType: InvoiceSourceType.event_venue_transaction,
         policy: tx.venue.cancellationPolicy,
       })),
       ...event.assetTransactions.map((tx) => ({
         id: tx.id,
         status: tx.status,
+        providerId: tx.providerId,
         sourceType: InvoiceSourceType.event_asset_transaction,
         policy: tx.asset.cancellationPolicy,
       })),
       ...event.serviceTransactions.map((tx) => ({
         id: tx.id,
         status: tx.status,
+        providerId: tx.providerId,
         sourceType: InvoiceSourceType.event_service_transaction,
         policy: tx.service.cancellationPolicy,
       })),
@@ -818,7 +888,45 @@ export default class EventCheckoutSvc {
     }
 
     const refunds = [];
+    // Issued or pending: a wallet refund (GCash, Maya) often comes back
+    // `pending`, and it's still money on its way back to the client.
     let totalRefunded = new Prisma.Decimal(0);
+    // An invoice charged with the per-line breakdown records each line's
+    // whole total (#264 T12.1); older invoices don't.
+    const chargedLines = eventBreakdownLines(fullInvoice.platformFeeSnapshot);
+
+    // Refunds already issued on this payment (an admin's itemized refund,
+    // say), by line, so a line is never refunded past what was charged.
+    const earlier = await prisma.refund.findMany({
+      where: {
+        paymentId: payment.id,
+        status: { in: COUNTED_REFUND_STATUSES },
+      },
+      select: {
+        amount: true,
+        invoiceItemId: true,
+        assetTransactionId: true,
+        serviceTransactionId: true,
+      },
+    });
+    const txIdOfItem = new Map(
+      fullInvoice.items.map((i) => [i.id, i.sourceId] as const),
+    );
+    const refundedByTx = new Map<string, Prisma.Decimal>();
+    let refundedBefore = new Prisma.Decimal(0);
+    for (const r of earlier) {
+      refundedBefore = refundedBefore.add(r.amount);
+      const txId =
+        (r.invoiceItemId && txIdOfItem.get(r.invoiceItemId)) ??
+        r.assetTransactionId ??
+        r.serviceTransactionId;
+      if (txId) {
+        refundedByTx.set(
+          txId,
+          (refundedByTx.get(txId) ?? new Prisma.Decimal(0)).add(r.amount),
+        );
+      }
+    }
 
     for (const tx of allTx) {
       const invoiceItem = fullInvoice.items.find((i) => i.sourceId === tx.id);
@@ -828,7 +936,27 @@ export default class EventCheckoutSvc {
         event.startAt,
         tx.policy,
       );
-      const refundAmount = invoiceItem.amount.mul(refundPercent).div(100);
+      // The Foxer's policy % applies to the WHOLE line (#264 T14.1, owner
+      // decision 2026-11-10): Foxer price + commission + FoxPassport fee +
+      // processing fee, so a 100% policy returns everything the client paid
+      // for the line. An older invoice refunds the item amount, as before.
+      // Stripe keeps its own fee on a refund; FoxPassport absorbs it (Q3).
+      const line = chargedLines.get(tx.id);
+      const charged = new Prisma.Decimal(
+        line ? line.lineTotal : invoiceItem.amount,
+      );
+      const left = Prisma.Decimal.max(
+        0,
+        charged.sub(refundedByTx.get(tx.id) ?? 0),
+      );
+      const refundAmount = Prisma.Decimal.min(
+        percentOf(charged, refundPercent),
+        left,
+      );
+      // Only the Foxer's share of the refund is clawed back from their payout.
+      const foxerRefund = line
+        ? shareOf(refundAmount, line.price, line.lineTotal)
+        : refundAmount;
 
       let stripeRefundId: string | null = null;
       let status: RefundStatus = RefundStatus.succeeded;
@@ -868,11 +996,14 @@ export default class EventCheckoutSvc {
         },
       });
       refunds.push(refundRow);
-      if (status === RefundStatus.succeeded) {
+      if (COUNTED_REFUND_STATUSES.includes(status)) {
         totalRefunded = totalRefunded.add(refundAmount);
       }
 
-      await PayoutSvc.reversePayoutForSource(tx.id, refundAmount).catch((e) =>
+      await PayoutSvc.reversePayoutForSource(tx.id, foxerRefund, {
+        providerId: tx.providerId,
+        sourceType: PAYOUT_SOURCE_TYPE[tx.sourceType],
+      }).catch((e) =>
         console.error(
           `Payout reversal failed for ${tx.id} (event ${eventId})`,
           e,
@@ -903,7 +1034,8 @@ export default class EventCheckoutSvc {
         where: { id: invoice.id },
         data: {
           status:
-            totalRefunded.toNumber() >= fullInvoice.grossAmount.toNumber()
+            refundedBefore.add(totalRefunded).toNumber() >=
+            fullInvoice.grossAmount.toNumber()
               ? "refunded"
               : "partially_refunded",
         },

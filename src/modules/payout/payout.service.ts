@@ -1,8 +1,23 @@
 import Stripe from "stripe";
 import { prisma } from "../../utils/prisma";
-import { PayoutSourceType, PayoutStatus, Prisma } from "@prisma/client";
+import {
+  PayoutSourceType,
+  PayoutStatus,
+  Prisma,
+  TransactionStatus,
+} from "@prisma/client";
 import { STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents } from "../../utils/pricing";
+import {
+  eventBreakdownLines,
+  type EventChargeLine,
+} from "../payment/event-breakdown-snapshot";
+
+/** Line statuses the client isn't paying for, so they earn no commission. */
+const UNPAID_LINE_STATUSES = new Set<TransactionStatus>([
+  TransactionStatus.rejected,
+  TransactionStatus.cancelled,
+]);
 
 const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-08-27.basil",
@@ -180,8 +195,19 @@ export default class PayoutSvc {
   static async reversePayoutForSource(
     sourceId: string,
     refundedAmount: Prisma.Decimal | number,
+    /**
+     * Which payout on this source: an investor's revenue-share payout shares
+     * the owner's `sourceId`, so callers that know the recipient pass it.
+     */
+    target: { providerId?: string; sourceType?: PayoutSourceType } = {},
   ): Promise<void> {
-    const payout = await prisma.payout.findFirst({ where: { sourceId } });
+    const payout = await prisma.payout.findFirst({
+      where: {
+        sourceId,
+        ...(target.providerId ? { providerId: target.providerId } : {}),
+        ...(target.sourceType ? { sourceType: target.sourceType } : {}),
+      },
+    });
     if (!payout) return;
 
     const refundedNum =
@@ -405,6 +431,61 @@ export default class PayoutSvc {
    * The platform's own platformFeeAmount is never paid out — it simply stays
    * in the platform's Stripe balance (Separate Charges and Transfers).
    */
+  /**
+   * The EventFoxer's commission for a booking (#264 T13.1). On an Event
+   * paid through an invoice with the per-line breakdown, the commission the
+   * client was actually charged on each line (`chargedLines`, from the
+   * invoice), so an item added after booking pays its commission too, and a
+   * line that was never charged (or was rejected or cancelled since) pays
+   * none. Otherwise (an older Event, or one paid through an older invoice)
+   * the Event's markup, as before. The FoxPassport fee and processing fee
+   * are never paid to anyone (T13.2).
+   */
+  static eventFoxerCommission(
+    booking: {
+      event: { hostMarkupAmount: Prisma.Decimal };
+      assetTransactions: { id: string; status: TransactionStatus }[];
+      serviceTransactions: { id: string; status: TransactionStatus }[];
+      venueTransactions: { id: string; status: TransactionStatus }[];
+    },
+    chargedLines: Map<string, EventChargeLine>,
+  ): Prisma.Decimal {
+    if (chargedLines.size === 0) return booking.event.hostMarkupAmount;
+    return [
+      ...booking.assetTransactions,
+      ...booking.serviceTransactions,
+      ...booking.venueTransactions,
+    ]
+      .filter((tx) => !UNPAID_LINE_STATUSES.has(tx.status))
+      .reduce(
+        (sum, tx) => sum.add(chargedLines.get(tx.id)?.commission ?? 0),
+        new Prisma.Decimal(0),
+      );
+  }
+
+  /** The lines a booking's paid Event invoice charged, by transaction id. */
+  private static async chargedLinesForBooking(booking: {
+    assetTransactions: { id: string }[];
+    serviceTransactions: { id: string }[];
+    venueTransactions: { id: string }[];
+  }): Promise<Map<string, EventChargeLine>> {
+    const ids = [
+      ...booking.assetTransactions,
+      ...booking.serviceTransactions,
+      ...booking.venueTransactions,
+    ].map((tx) => tx.id);
+    if (ids.length === 0) return new Map();
+    const invoice = await prisma.invoice.findFirst({
+      where: {
+        status: { in: ["paid", "partially_refunded"] },
+        items: { some: { sourceId: { in: ids } } },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { platformFeeSnapshot: true },
+    });
+    return eventBreakdownLines(invoice?.platformFeeSnapshot);
+  }
+
   static async createPayoutsForEventBooking(bookingId: string) {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
@@ -482,8 +563,9 @@ export default class PayoutSvc {
     }
     // Host's own cut — one per booking (sourceId = booking.id is fine here, there's
     // only ever one Host per Event).
+    const chargedLines = await this.chargedLinesForBooking(booking);
     const hostAmount = await this.splitForInvestors(
-      booking.event.hostMarkupAmount.toNumber(),
+      this.eventFoxerCommission(booking, chargedLines).toNumber(),
       { targetEventId: booking.eventId },
       booking.id,
       jobs,
