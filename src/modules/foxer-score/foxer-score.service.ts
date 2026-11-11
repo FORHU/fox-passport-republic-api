@@ -1,4 +1,5 @@
 import FoxerScoreRepo from "./foxer-score.repository";
+import LeaderboardRepo from "../leaderboard/leaderboard.repository";
 
 export interface FoxerScoreBreakdown {
   ratingScore: number; // 0 to 45
@@ -10,6 +11,8 @@ export interface FoxerScoreBreakdown {
 
 export interface FoxerOperationalMetrics {
   starRating: number;
+  /** The unrounded average, for ranking (Paws). */
+  avgRating: number;
   rawReviewCount: number;
   isNew: boolean;
   bayesianRating: number;
@@ -33,6 +36,8 @@ export interface FoxerLeaderboardPlace {
 }
 
 export interface PublicFoxerProfileReputation {
+  /** The star rating drawn as paws, one decimal; null under 5 reviews ("New"). */
+  paws: number | null;
   starRating: number | null;
   reviewCount: number;
   isNew: boolean;
@@ -40,6 +45,10 @@ export interface PublicFoxerProfileReputation {
   responseRatePercent: number;
   cancellationRatePercent: number;
   isIdentityVerified: boolean;
+  /** Same as isIdentityVerified, under the name the leaderboard rows use. */
+  isVerified: boolean;
+  /** Role approval date, falling back to account creation (ISO). */
+  foxerSince: string | null;
   labels: string[];
   /** Null when they are not on a board: outside the top 50, or too new. */
   leaderboard: FoxerLeaderboardPlace | null;
@@ -185,6 +194,7 @@ export default class FoxerScoreService {
       },
       operationalMetrics: {
         starRating: Math.round(reviewStats.avgRating * 10) / 10,
+        avgRating: reviewStats.avgRating,
         rawReviewCount: reviewStats.reviewCount,
         isNew: reviewStats.reviewCount < 5,
         bayesianRating,
@@ -214,12 +224,17 @@ export default class FoxerScoreService {
     if (operationalMetrics.isNew && operationalMetrics.completedBookings >= 3)
       labels.push("Rising");
 
-    const leaderboard = await this.findLeaderboardPlace(userId);
+    const [leaderboard, foxerSince] = await Promise.all([
+      this.findLeaderboardPlace(userId),
+      LeaderboardRepo.getFoxerSince(userId),
+    ]);
+    const paws = operationalMetrics.isNew
+      ? null
+      : operationalMetrics.starRating;
 
     return {
-      starRating: operationalMetrics.isNew
-        ? null
-        : operationalMetrics.starRating,
+      paws,
+      starRating: paws,
       reviewCount: operationalMetrics.rawReviewCount,
       isNew: operationalMetrics.isNew,
       completedBookings: operationalMetrics.completedBookings,
@@ -230,6 +245,8 @@ export default class FoxerScoreService {
         operationalMetrics.cancellationRate * 100,
       ),
       isIdentityVerified: operationalMetrics.isIdentityVerified,
+      isVerified: operationalMetrics.isIdentityVerified,
+      foxerSince: foxerSince?.toISOString() ?? null,
       labels,
       leaderboard,
     };

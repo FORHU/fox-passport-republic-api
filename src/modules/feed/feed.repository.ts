@@ -348,10 +348,40 @@ export default class FeedRepo {
       formatted = items;
     }
 
+    const reactionCounts = await FeedRepo.findReactionCounts(
+      formatted.map((p) => p.id),
+    );
     return {
-      posts: formatted,
+      posts: formatted.map((p) => ({
+        ...p,
+        reactionCounts: reactionCounts.get(p.id) ?? [],
+      })),
       nextCursor,
     };
+  }
+
+  /**
+   * How many of each reaction every post in [postIds] has, most chosen first,
+   * so a client can show the post's reaction emojis beside its total. One
+   * grouped query for the whole page; posts with no reactions are absent.
+   */
+  static async findReactionCounts(
+    postIds: string[],
+  ): Promise<Map<string, { type: string; count: number }[]>> {
+    const counts = new Map<string, { type: string; count: number }[]>();
+    if (postIds.length === 0) return counts;
+    const rows = await prisma.postLike.groupBy({
+      by: ["postId", "type"],
+      where: { postId: { in: postIds } },
+      _count: { type: true },
+    });
+    for (const r of rows) {
+      const list = counts.get(r.postId) ?? [];
+      list.push({ type: r.type, count: r._count.type });
+      counts.set(r.postId, list);
+    }
+    for (const list of counts.values()) list.sort((a, b) => b.count - a.count);
+    return counts;
   }
 
   static async getFollowingIds(userId: string): Promise<Set<string>> {
@@ -421,10 +451,12 @@ export default class FeedRepo {
           .then((f) => !!f)
       : false;
     const { likes: _likes, ...rest } = post;
+    const reactionCounts = await FeedRepo.findReactionCounts([post.id]);
     return {
       ...rest,
       isLikedByMe: !!myReaction,
       myReaction: myReaction?.type ?? null,
+      reactionCounts: reactionCounts.get(post.id) ?? [],
       isFollowingAuthor,
     };
   }
@@ -726,6 +758,9 @@ export default class FeedRepo {
     const hasNextPage = saved.length > limit;
     const items = hasNextPage ? saved.slice(0, limit) : saved;
     const nextCursor = hasNextPage ? items[items.length - 1].postId : null;
+    const reactionCounts = await FeedRepo.findReactionCounts(
+      items.map(({ post }) => post.id),
+    );
     const posts = items.map(({ post }) => {
       const { likes, ...rest } = post;
       const myReaction = likes[0];
@@ -733,6 +768,7 @@ export default class FeedRepo {
         ...rest,
         isLikedByMe: !!myReaction,
         myReaction: myReaction?.type ?? null,
+        reactionCounts: reactionCounts.get(post.id) ?? [],
       };
     });
     return { posts, nextCursor };
@@ -815,13 +851,13 @@ export default class FeedRepo {
     });
   }
 
-  /** The post's comment counter as stored, or null if the post is gone. */
+  /** The post's comment counter as stored and who may see the post, or null
+   * if the post is gone. */
   static async findCommentsCount(postId: string) {
-    const post = await prisma.post.findUnique({
+    return prisma.post.findUnique({
       where: { id: postId },
-      select: { commentsCount: true },
+      select: { commentsCount: true, visibility: true },
     });
-    return post?.commentsCount ?? null;
   }
 
   static async findCommentById(id: string) {

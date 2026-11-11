@@ -143,12 +143,17 @@ async function notifyMediaTags(
 /**
  * Tells every open feed the post's comment count, read back from the stored
  * counter so concurrent comments cannot leave a client on a stale number.
+ * Public posts only: the event goes to every connected socket, so a
+ * followers-only or only-me post's activity would reach people who cannot
+ * see the post. Those posts' counts refresh on the commenter's own reload.
  * Best-effort: the comment is already saved.
  */
 function broadcastCommentsCount(postId: string): void {
   FeedRepo.findCommentsCount(postId)
-    .then((count) => {
-      if (count !== null) announcePostCommentsCount(postId, count);
+    .then((post) => {
+      if (post?.visibility === PostVisibility.public) {
+        announcePostCommentsCount(postId, post.commentsCount);
+      }
     })
     .catch(() => {});
 }

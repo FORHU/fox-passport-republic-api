@@ -3,8 +3,9 @@
 enum RewardLifecycleType {
   RELEASE
   REDEMPTION
-  EXPIRY
+  EXPIRY // unused: Tokens never expire (rewards spec, 2026-11-11)
   REVERSAL
+  VOUCHER_RETURN // Tokens returned for a Token voucher that expired unused
 }
 
 model RewardRule {
@@ -99,7 +100,7 @@ model CoinRedemption {
   rewardId   String
   coinsSpent Int
   voucherId  String?    @unique
-  status     String     @default("completed") // "completed", "cancelled"
+  status     String     @default("completed") // "completed", "cancelled", "returned" (expired unused, Tokens returned)
   expiresAt  DateTime?
   createdAt  DateTime   @default(now())
 
