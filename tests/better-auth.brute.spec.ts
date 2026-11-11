@@ -3,6 +3,7 @@ import request from "supertest";
 import app from "../src/app";
 import { prisma } from "../src/utils/prisma";
 import redisUtil from "../src/utils/redis.util";
+import { LOGIN_ACCOUNT_LIMIT } from "../src/middleware/rate-limit.middleware";
 
 describe("Better Auth - Exhaustive Flow & Brute Security Tests", () => {
   const testEmail = `brute.test.${Date.now()}@example.com`;

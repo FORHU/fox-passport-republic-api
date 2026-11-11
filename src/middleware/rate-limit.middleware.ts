@@ -28,6 +28,10 @@ import { createRateLimitStore } from "../utils/rate-limit-store";
  */
 
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
+
+/** Failed sign-ins allowed per window. Exported so tests follow the config. */
+export const LOGIN_IP_LIMIT = 100;
+export const LOGIN_ACCOUNT_LIMIT = 30;
 const ONE_HOUR = 60 * 60 * 1000;
 
 /**
@@ -130,14 +134,14 @@ const TOO_MANY_REQUESTS =
 export const loginRateLimit = [
   perIp({
     windowMs: FIFTEEN_MINUTES,
-    limit: 100,
+    limit: LOGIN_IP_LIMIT,
     message: TOO_MANY_ATTEMPTS,
     prefix: "login",
     failuresOnly: true,
   }),
   perAccount({
     windowMs: FIFTEEN_MINUTES,
-    limit: 30,
+    limit: LOGIN_ACCOUNT_LIMIT,
     message: TOO_MANY_ATTEMPTS,
     prefix: "login",
     failuresOnly: true,

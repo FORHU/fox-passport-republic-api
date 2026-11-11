@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import RoleRequestService, { retiredRoleError } from "./role-request.service";
 import FileSvc from "../file/file.service";
+import ProviderSpecialtySvc from "../users/provider-specialty.service";
 import { signPrivateFiles } from "../../utils/private-files";
 import {
   EventCategory,
@@ -106,6 +107,21 @@ export default class RoleRequestController {
           .json({ success: false, message: "Invalid role type" });
       }
 
+      // A Provider names at least one catalog specialty and has no maximum.
+      // Checked before any document is stored, so a refused application leaves
+      // no private upload behind.
+      if (roleType === RoleType.providerFoxer) {
+        const specialties = await ProviderSpecialtySvc.check(
+          data.specializations,
+        );
+        if (!specialties.ok) {
+          return res
+            .status(400)
+            .json({ success: false, message: specialties.message });
+        }
+        data.specializations = specialties.slugs;
+      }
+
       // Store each uploaded document
       const files = req.files as
         Record<string, Express.Multer.File[]> | undefined;
@@ -126,8 +142,10 @@ export default class RoleRequestController {
         }
       }
 
-      // Enforce max 3 declared specializations
+      // Venue and Event Foxers declare at most 3 specializations; a Provider has
+      // no maximum (checked above).
       if (
+        roleType !== RoleType.providerFoxer &&
         Array.isArray(data.specializations) &&
         data.specializations.length > 3
       ) {

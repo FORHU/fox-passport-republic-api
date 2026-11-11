@@ -79,7 +79,9 @@ export default class UsersCtrl {
       const limit = Math.min(Number(req.query.limit) || 9, 30);
       const page = Math.max(Number(req.query.page) || 1, 1);
       const roleType = req.query.roleType as string | undefined;
-      const specialization = req.query.specialization as string | undefined;
+      // `specialty` is the name clients use now; `specialization` still works.
+      const specialization = (req.query.specialty ??
+        req.query.specialization) as string | undefined;
       const city = req.query.city as string | undefined;
       const maxPrice = req.query.maxPrice
         ? Number(req.query.maxPrice)

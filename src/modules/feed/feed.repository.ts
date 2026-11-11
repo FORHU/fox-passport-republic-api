@@ -50,13 +50,7 @@ const AUTHOR_SELECT = {
     passport: {
       select: {
         id: true,
-        paths: {
-          select: {
-            path: true,
-            level: true,
-            totalXP: true,
-          },
-        },
+        paths: { select: { path: true } },
         userBadges: {
           select: {
             badge: {
@@ -819,6 +813,15 @@ export default class FeedRepo {
 
       return comment;
     });
+  }
+
+  /** The post's comment counter as stored, or null if the post is gone. */
+  static async findCommentsCount(postId: string) {
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { commentsCount: true },
+    });
+    return post?.commentsCount ?? null;
   }
 
   static async findCommentById(id: string) {

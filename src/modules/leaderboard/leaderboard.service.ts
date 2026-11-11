@@ -1,15 +1,10 @@
 import { cached } from "../../utils/cache.util";
-import { UserPath } from "@prisma/client";
 import {
-  CitizenLeaderboardTab,
-  CitizenLeaderboardResponse,
-  CitizenLeaderboardEntry,
   FoxerLeaderboardTab,
   FoxerLeaderboardResponse,
   FoxerLeaderboardEntry,
 } from "./leaderboard.types";
 import LeaderboardRepo from "./leaderboard.repository";
-import RewardService from "../reward/reward.service";
 import FoxerScoreService from "../foxer-score/foxer-score.service";
 import FoxerScoreRepo from "../foxer-score/foxer-score.repository";
 import {
@@ -38,86 +33,7 @@ export function pawsRankingScore(
   return (v * R + p * C) / (v + p);
 }
 
-interface RawCitizenEntry {
-  userId: string;
-  name: string;
-  avatarUrl: string | null;
-  level: number;
-  city: string | null;
-}
-
 export class LeaderboardService {
-  /**
-   * Retrieves the Citizen Leaderboard partitioned by this month, all-time, or city.
-   * XP amounts remain private (§8.1) — returns position, avatar, name, rank badge and level.
-   */
-  static async getCitizenLeaderboard(
-    userId: string | null,
-    tab: CitizenLeaderboardTab = "this_month",
-    city?: string,
-  ): Promise<CitizenLeaderboardResponse> {
-    const now = new Date();
-    const season = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    const cacheKey = `leaderboard:citizens:${tab}:${season}:${city || "global"}`;
-
-    const rawEntries = await cached(
-      cacheKey,
-      LEADERBOARD_CACHE_TTL,
-      async () => {
-        if (tab === "all_time") {
-          return LeaderboardRepo.getCitizenAllTime(city, 50);
-        }
-        return LeaderboardRepo.getCitizenSeasonal(startOfMonth, city, 50);
-      },
-    );
-
-    const entries: CitizenLeaderboardEntry[] = (
-      rawEntries as RawCitizenEntry[]
-    ).map((item, idx) => ({
-      position: idx + 1,
-      userId: item.userId,
-      name: item.name,
-      avatarUrl: item.avatarUrl,
-      level: item.level,
-      rankTitle: RewardService.calculateRank(item.level, UserPath.user),
-      city: item.city,
-    }));
-
-    let userPosition: CitizenLeaderboardEntry | null = null;
-    if (userId) {
-      const match = entries.find((e) => e.userId === userId);
-      if (match) {
-        userPosition = match;
-      } else {
-        const userStanding =
-          await LeaderboardRepo.getUserCitizenStanding(userId);
-        if (userStanding) {
-          userPosition = {
-            position: entries.length + 1,
-            userId: userStanding.userId,
-            name: userStanding.name,
-            avatarUrl: userStanding.avatarUrl,
-            level: userStanding.level,
-            rankTitle: RewardService.calculateRank(
-              userStanding.level,
-              UserPath.user,
-            ),
-            city: userStanding.city,
-          };
-        }
-      }
-    }
-
-    return {
-      entries,
-      userPosition,
-      tab,
-      season,
-    };
-  }
-
   /**
    * Retrieves the Foxer Leaderboard: top rated (Paws, Bayesian), most booked
    * (completed bookings), or rising (Foxers under 6 months, by Foxer Score).

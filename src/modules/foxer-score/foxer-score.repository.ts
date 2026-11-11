@@ -1,5 +1,4 @@
 import { prisma } from "../../utils/prisma";
-import { UserPath } from "@prisma/client";
 
 export default class FoxerScoreRepo {
   /**
@@ -214,33 +213,14 @@ export default class FoxerScoreRepo {
   /**
    * Obtains verification status and highest level across Foxer role paths.
    */
-  static async getTrustFactors(userId: string): Promise<{
-    isVerified: boolean;
-    foxerLevel: number;
-  }> {
+  static async getTrustFactors(
+    userId: string,
+  ): Promise<{ isVerified: boolean }> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        identityVerifiedAt: true,
-        passport: {
-          include: {
-            paths: true,
-          },
-        },
-      },
+      select: { identityVerifiedAt: true },
     });
 
-    const isVerified = Boolean(user?.identityVerifiedAt);
-    const foxerPaths =
-      user?.passport?.paths.filter((p) => p.path !== UserPath.user) ?? [];
-    const maxFoxerLevel = foxerPaths.reduce(
-      (max, p) => Math.max(max, p.level),
-      1,
-    );
-
-    return {
-      isVerified,
-      foxerLevel: maxFoxerLevel,
-    };
+    return { isVerified: Boolean(user?.identityVerifiedAt) };
   }
 }

@@ -114,16 +114,12 @@ describe("Foxer Score Calculation (requirements/xp-and-coins.md section 9.1)", (
   });
 
   describe("Trust Component (Weight: 5 pts)", () => {
-    it("grants 3 points for identity verification and 0 for level 1", () => {
-      expect(calculateTrustScore(true, 1)).toBe(3);
+    it("grants the full 5 points for a verified identity", () => {
+      expect(calculateTrustScore(true)).toBe(5);
     });
 
-    it("grants 0 points for unverified at level 1", () => {
-      expect(calculateTrustScore(false, 1)).toBe(0);
-    });
-
-    it("grants full 5 points for verified identity at Legend rank (level 50)", () => {
-      expect(calculateTrustScore(true, 50)).toBe(5);
+    it("grants 0 points when the identity is not verified", () => {
+      expect(calculateTrustScore(false)).toBe(0);
     });
   });
 });
