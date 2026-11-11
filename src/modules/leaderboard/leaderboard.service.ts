@@ -43,12 +43,13 @@ export class LeaderboardService {
     tab: FoxerLeaderboardTab = "top_rated",
     role?: string,
     city?: string,
+    specialty?: string,
   ): Promise<FoxerLeaderboardResponse> {
-    const cacheKey = `leaderboard:foxers:${tab}:${role || "all"}:${city || "all"}`;
+    const cacheKey = `leaderboard:foxers:${tab}:${role || "all"}:${city || "all"}:${specialty || "all"}`;
 
     const entries = await cached(cacheKey, LEADERBOARD_CACHE_TTL, async () => {
       const [candidates, platformAvg] = await Promise.all([
-        LeaderboardRepo.getFoxersForRanking(role, city),
+        LeaderboardRepo.getFoxersForRanking(role, city, specialty),
         FoxerScoreRepo.getPlatformAvgRating(),
       ]);
 
@@ -141,6 +142,7 @@ export class LeaderboardService {
       tab,
       role,
       city,
+      specialty,
     };
   }
 }
