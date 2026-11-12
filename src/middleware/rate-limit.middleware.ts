@@ -1,4 +1,4 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, { type RateLimitInfo } from "express-rate-limit";
 import { Request, Response } from "express";
 import { createRateLimitStore } from "../utils/rate-limit-store";
 
@@ -36,15 +36,28 @@ const ONE_HOUR = 60 * 60 * 1000;
 
 /**
  * 429 in the same shape as every other error the API answers with, so clients
- * that already parse `{ success, message }` need no special case.
+ * that already parse `{ success, message }` need no special case. It names the
+ * wait: "a few minutes" read wrong when the window was an hour.
  */
 function reject(message: string) {
   return (req: Request, res: Response) => {
     console.warn(
       `🚦 Rate limit: ${req.method} ${req.originalUrl} from ${req.ip}`,
     );
-    res.status(429).json({ success: false, message });
+    res
+      .status(429)
+      .json({ success: false, message: `${message} ${waitFor(req)}` });
   };
+}
+
+function waitFor(req: Request & { rateLimit?: RateLimitInfo }): string {
+  const resetTime = req.rateLimit?.resetTime;
+  if (!resetTime) return "Please wait a few minutes and try again.";
+  const minutes = Math.max(
+    1,
+    Math.ceil((resetTime.getTime() - Date.now()) / 60_000),
+  );
+  return `Please try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`;
 }
 
 /**
@@ -122,10 +135,8 @@ function perAccount({
   });
 }
 
-const TOO_MANY_ATTEMPTS =
-  "Too many attempts. Please wait a few minutes and try again.";
-const TOO_MANY_REQUESTS =
-  "Too many requests. Please wait a few minutes and try again.";
+const TOO_MANY_ATTEMPTS = "Too many attempts.";
+const TOO_MANY_REQUESTS = "Too many requests.";
 
 /**
  * Sign-in. Failure-only, so ordinary use never accumulates: the budget exists
@@ -161,27 +172,42 @@ export const registerRateLimit = [
   }),
 ];
 
+/** Codes mailed per hour, for each of the two kinds below. Exported for tests. */
+export const OTP_SEND_ACCOUNT_LIMIT = 10;
+export const OTP_SEND_IP_LIMIT = 50;
+
 /**
- * Endpoints that send mail - forgot-password, resend-verification-otp.
+ * Endpoints that send mail.
  *
  * Counted in full rather than failure-only, because here the successful request
  * is the abuse: each one puts a message in someone's inbox, and an attacker
  * needs no valid credential to trigger it.
+ *
+ * Verification resends and password resets get a budget each. Sharing one, a
+ * few resends left no reset for the same email for an hour. The per-IP budget
+ * is the loose one: everyone behind an office or carrier IP shares it.
  */
-export const otpSendRateLimit = [
-  perIp({
-    windowMs: ONE_HOUR,
-    limit: 10,
-    message: TOO_MANY_REQUESTS,
-    prefix: "otp-send",
-  }),
-  perAccount({
-    windowMs: ONE_HOUR,
-    limit: 5,
-    message: TOO_MANY_REQUESTS,
-    prefix: "otp-send",
-  }),
-];
+function otpSendLimit(prefix: string) {
+  return [
+    perIp({
+      windowMs: ONE_HOUR,
+      limit: OTP_SEND_IP_LIMIT,
+      message: TOO_MANY_REQUESTS,
+      prefix,
+    }),
+    perAccount({
+      windowMs: ONE_HOUR,
+      limit: OTP_SEND_ACCOUNT_LIMIT,
+      message: TOO_MANY_REQUESTS,
+      prefix,
+    }),
+  ];
+}
+
+/** send-verification-otp. Keys stay under `rl:otp-send:*`. */
+export const verificationOtpSendRateLimit = otpSendLimit("otp-send:verify");
+/** request-password-reset and forget-password. */
+export const resetOtpSendRateLimit = otpSendLimit("otp-send:reset");
 
 /**
  * Endpoints that check a one-time code - verify-email, reset-password.

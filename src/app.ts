@@ -13,7 +13,8 @@ import { auth } from "./infrastructure/auth/better-auth";
 import {
   loginRateLimit,
   registerRateLimit,
-  otpSendRateLimit,
+  verificationOtpSendRateLimit,
+  resetOtpSendRateLimit,
   otpVerifyRateLimit,
 } from "./middleware/rate-limit.middleware";
 
@@ -103,12 +104,15 @@ const both = (path: string) => [`/api/auth${path}`, `/api/v1/auth${path}`];
 app.post(both("/sign-in/email"), loginRateLimit);
 app.post(both("/sign-up/email"), registerRateLimit);
 app.post(
+  both("/email-otp/send-verification-otp"),
+  verificationOtpSendRateLimit,
+);
+app.post(
   [
-    ...both("/email-otp/send-verification-otp"),
     ...both("/email-otp/request-password-reset"),
     ...both("/forget-password/email-otp"),
   ],
-  otpSendRateLimit,
+  resetOtpSendRateLimit,
 );
 app.post(
   [
