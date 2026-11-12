@@ -1,28 +1,11 @@
-import fs from "fs";
-import path from "path";
 import { Resend } from "resend";
 import { RESEND_API_KEY, FRONTEND_URL } from "../../config";
 import { sendEmail as sendViaMailer } from "../mailer";
 
-export const LOGO_DATA_URI = (() => {
-  const logoPath = path.join(
-    process.cwd(),
-    "..",
-    "fox-passport-republic-app",
-    "public",
-    "logofox.png",
-  );
-  try {
-    if (fs.existsSync(logoPath)) {
-      const ext = path.extname(logoPath).slice(1);
-      const data = fs.readFileSync(logoPath);
-      return `data:image/${ext};base64,${data.toString("base64")}`;
-    }
-  } catch {
-    // fall through to URL fallback
-  }
-  return `${FRONTEND_URL}/logofox.png`;
-})();
+// The logo every email shows: the web app's public `foxonlylogo.png`. Always a
+// URL, never an inline data URI, because Gmail blocks data-URI images
+// (api#335). The name is kept for the existing imports.
+export const LOGO_DATA_URI = `${FRONTEND_URL}/foxonlylogo.png`;
 
 export const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 export const FROM_ADDRESS =
