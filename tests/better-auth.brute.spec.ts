@@ -63,18 +63,33 @@ describe("Better Auth - Exhaustive Flow & Brute Security Tests", () => {
         });
 
       expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty("token");
+      // No session until the email is verified (requireEmailVerification).
+      expect(res.body.token).toBeNull();
       expect(res.body).toHaveProperty("user");
       expect(res.body.user.email).toBe(testEmail);
-
-      sessionToken = res.body.token;
       userId = res.body.user.id;
-      sessionCookies = res.headers["set-cookie"] as unknown as string[];
 
       // Verify persistence in PostgreSQL
       const dbUser = await prisma.user.findUnique({ where: { email: testEmail } });
       expect(dbUser).toBeDefined();
       expect(dbUser?.email).toBe(testEmail);
+      expect(dbUser?.isEmailVerified).toBe(false);
+      expect(await prisma.session.count({ where: { userId } })).toBe(0);
+    });
+
+    it("should sign in once the email is verified", async () => {
+      await prisma.user.update({
+        where: { email: testEmail },
+        data: { isEmailVerified: true },
+      });
+      const res = await request(app)
+        .post("/api/auth/sign-in/email")
+        .send({ email: testEmail, password: testPassword });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty("token");
+      sessionToken = res.body.token;
+      sessionCookies = res.headers["set-cookie"] as unknown as string[];
 
       const dbSession = await prisma.session.findUnique({ where: { token: sessionToken } });
       expect(dbSession).toBeDefined();

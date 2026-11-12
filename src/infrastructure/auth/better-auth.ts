@@ -1,4 +1,4 @@
-import { betterAuth } from "better-auth";
+import { betterAuth, BASE_ERROR_CODES } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { bearer, emailOTP } from "better-auth/plugins";
 import { APIError, createAuthMiddleware } from "better-auth/api";
@@ -103,7 +103,13 @@ export const auth = betterAuth({
   account: {
     modelName: "Account",
     // Today a Google/Facebook sign-in with an existing email joins that
-    // account; keep that (an open decision in the app's NEXT.md §3).
+    // account; keep that (an open decision in the app's NEXT.md §3). Better
+    // Auth only joins it once that account's own email is verified
+    // (`requireLocalEmailVerified`, on by default), and answers
+    // `account_not_linked` until then: otherwise whoever registered the email
+    // with a password, without owning it, would share the account with the
+    // Google user. requireEmailVerification below is how such an account gets
+    // verified.
     accountLinking: {
       enabled: true,
       trustedProviders: ["google", "facebook"],
@@ -133,8 +139,21 @@ export const auth = betterAuth({
   verification: {
     modelName: "Verification",
   },
+  // With requireEmailVerification, a refused sign-in also emails a fresh code
+  // (sent by emailOTP below, overrideDefaultEmailVerification), so the code
+  // screen the web and mobile open on that 403 has one waiting.
+  emailVerification: {
+    sendOnSignIn: true,
+  },
   emailAndPassword: {
     enabled: true,
+    // An unverified email can't sign in with its password: 403
+    // EMAIL_NOT_VERIFIED, which the web and mobile already answer with the
+    // code screen. Without it an unverified account was usable forever and
+    // could never link Google/Facebook (see accountLinking above).
+    // Sign-up then returns no session (token: null); both clients already send
+    // the new user to the code screen and then to sign in.
+    requireEmailVerification: true,
     // A reset is what someone does when they think the account is exposed:
     // sign every device out, as the custom /auth/reset-password did.
     revokeSessionsOnPasswordReset: true,
@@ -184,6 +203,23 @@ export const auth = betterAuth({
       if (typeof password !== "string") return;
       const error = passwordPolicyError(password);
       if (error) throw new APIError("BAD_REQUEST", { message: error });
+      // requireEmailVerification makes Better Auth answer a sign-up with a
+      // taken email as if it had worked, so as not to reveal the account. This
+      // product already reveals it (password reset above), and the web and
+      // mobile show "User already exists", so keep that answer.
+      if (ctx.path === "/sign-up/email") {
+        const email = (ctx.body as Record<string, unknown> | undefined)?.email;
+        if (typeof email !== "string") return;
+        const user = await ctx.context.internalAdapter.findUserByEmail(
+          email.toLowerCase(),
+        );
+        if (user) {
+          throw APIError.from(
+            "UNPROCESSABLE_ENTITY",
+            BASE_ERROR_CODES.USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL,
+          );
+        }
+      }
     }),
     // A sign-in replaces the session the request arrived with, as logging out
     // would. Signing in as someone else without logging out first used to
@@ -216,7 +252,10 @@ export const auth = betterAuth({
       otpLength: 6,
       expiresIn: 5 * 60,
       allowedAttempts: 5,
-      sendVerificationOnSignUp: true,
+      // Better Auth's own verification email (on sign-up, and on a sign-in
+      // refused for an unverified email) is sent as this code instead of a
+      // link. Replaces sendVerificationOnSignUp, which only covered sign-up.
+      overrideDefaultEmailVerification: true,
       async sendVerificationOTP({ email, otp, type }) {
         // Passwordless sign-in and email change by code are not features
         // this product offers; refuse rather than open a new way in.

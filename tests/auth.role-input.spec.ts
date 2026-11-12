@@ -24,9 +24,11 @@ beforeAll(async () => {
   await redisUtil.initialize().catch(() => {});
   const redis = redisUtil.getClient();
   if (redis) {
-    for await (const keys of redis.scanIterator({ MATCH: "rl:register:*" })) {
-      const batch = Array.isArray(keys) ? keys : [keys];
-      if (batch.length) await redis.del(batch);
+    for (const match of ["rl:login:*", "rl:register:*"]) {
+      for await (const keys of redis.scanIterator({ MATCH: match })) {
+        const batch = Array.isArray(keys) ? keys : [keys];
+        if (batch.length) await redis.del(batch);
+      }
     }
   }
   await cleanUp();
@@ -53,8 +55,19 @@ describe("roles can't be set from the request", () => {
         roleType: ["venueFoxer"],
       });
     expect(res.status).toBe(200);
-    token = res.body.token;
     expect(await stored()).toEqual({ systemRole: "user", roleType: [] });
+
+    // Sign-up gives no session until the email is verified
+    // (requireEmailVerification): verify this test account and sign in.
+    await prisma.user.update({
+      where: { email },
+      data: { isEmailVerified: true },
+    });
+    const signIn = await request(app)
+      .post("/api/auth/sign-in/email")
+      .send({ email, password: "SuperSecurePassword123!" });
+    expect(signIn.status).toBe(200);
+    token = signIn.body.token;
   });
 
   it("/update-user refuses them", async () => {
