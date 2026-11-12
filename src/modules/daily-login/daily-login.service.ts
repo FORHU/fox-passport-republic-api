@@ -1,5 +1,8 @@
 import { AppError } from "../../utils/errors";
-import { DAILY_LOGIN_MONTHLY_CAP_TOKENS } from "../../config";
+import {
+  DAILY_LOGIN_DAY7_BONUS_TOKENS,
+  DAILY_LOGIN_MONTHLY_CAP_TOKENS,
+} from "../../config";
 import RewardRepo from "../reward/reward.repository";
 import RewardService from "../reward/reward.service";
 import DailyLoginRepo, { DAILY_LOGIN_ACTION } from "./daily-login.repository";
@@ -51,6 +54,26 @@ export function streakOf(claimed: ReadonlySet<string>, today: string): number {
   return streak;
 }
 
+export const CYCLE_LENGTH = 7;
+
+/**
+ * Which day of the 7-day cycle today is: the day being claimed, or, once it is
+ * claimed, the day that was. A missed day starts the streak, and the cycle,
+ * over at day 1.
+ */
+export function cycleDayOf(streak: number, claimedToday: boolean): number {
+  return claimedToday
+    ? ((streak - 1) % CYCLE_LENGTH) + 1
+    : (streak % CYCLE_LENGTH) + 1;
+}
+
+/** What each of the seven days pays: [base x 6, base plus the day 7 bonus]. */
+export function cycleAmounts(base: number, day7Bonus: number): number[] {
+  return Array.from({ length: CYCLE_LENGTH }, (_, i) =>
+    i === CYCLE_LENGTH - 1 ? base + day7Bonus : base,
+  );
+}
+
 function isUniqueViolation(e: unknown): boolean {
   return (e as { code?: string } | null)?.code === "P2002";
 }
@@ -73,10 +96,16 @@ export default class DailyLoginSvc {
     const today = manilaDay(now);
     const claimed = new Set(days);
     const claimedToday = claimed.has(today);
-    const amount = rule?.active ? rule.coins : 0;
+    const base = rule?.active ? rule.coins : 0;
+    const streak = streakOf(claimed, today);
+    const cycleDay = cycleDayOf(streak, claimedToday);
+    const cycle = cycleAmounts(
+      base,
+      base > 0 ? DAILY_LOGIN_DAY7_BONUS_TOKENS : 0,
+    );
 
     let reason: DailyLoginStatus["reason"] = null;
-    if (amount <= 0) reason = "inactive";
+    if (base <= 0) reason = "inactive";
     else if (!emailVerified) reason = "email_not_verified";
     else if (monthlyEarned >= DAILY_LOGIN_MONTHLY_CAP_TOKENS)
       reason = "cap_reached";
@@ -85,8 +114,11 @@ export default class DailyLoginSvc {
       claimedToday,
       canClaim: !claimedToday && reason === null,
       reason,
-      amount,
-      streak: streakOf(claimed, today),
+      amount: cycle[cycleDay - 1],
+      nextAmount: cycle[cycleDay % CYCLE_LENGTH],
+      streak,
+      cycleDay,
+      cycle,
       monthlyCap: DAILY_LOGIN_MONTHLY_CAP_TOKENS,
       monthlyEarned,
       nextClaimAt: nextManilaMidnight(now).toISOString(),

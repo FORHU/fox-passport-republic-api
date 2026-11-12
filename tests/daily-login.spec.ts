@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import DailyLoginSvc, {
+  cycleAmounts,
+  cycleDayOf,
   dayBefore,
   manilaDay,
   manilaMonthStart,
@@ -98,6 +100,37 @@ describe("streakOf", () => {
   });
 });
 
+describe("the 7-day cycle", () => {
+  it("starts at day 1 with no streak", () => {
+    expect(cycleDayOf(0, false)).toBe(1);
+  });
+
+  it("is the day after the streak while today is unclaimed", () => {
+    expect(cycleDayOf(1, false)).toBe(2);
+    expect(cycleDayOf(6, false)).toBe(7);
+  });
+
+  it("is the day just claimed once today is claimed", () => {
+    expect(cycleDayOf(1, true)).toBe(1);
+    expect(cycleDayOf(3, true)).toBe(3);
+    expect(cycleDayOf(7, true)).toBe(7);
+  });
+
+  it("wraps to day 1 after day 7, however long the streak", () => {
+    expect(cycleDayOf(7, false)).toBe(1);
+    expect(cycleDayOf(8, true)).toBe(1);
+    expect(cycleDayOf(15, false)).toBe(2);
+  });
+
+  it("pays the same every day with no day 7 bonus", () => {
+    expect(cycleAmounts(15, 0)).toEqual([15, 15, 15, 15, 15, 15, 15]);
+  });
+
+  it("adds the bonus on day 7 only: 5 a day and +20 on day 7 is 5 plus 15", () => {
+    expect(cycleAmounts(5, 15)).toEqual([5, 5, 5, 5, 5, 5, 20]);
+  });
+});
+
 describe("DailyLoginSvc.getStatus", () => {
   it("is claimable for a verified person who has not claimed today", async () => {
     given({ days: ["2026-11-12"] });
@@ -107,6 +140,9 @@ describe("DailyLoginSvc.getStatus", () => {
       canClaim: true,
       reason: null,
       amount: 15,
+      nextAmount: 15,
+      cycleDay: 2,
+      cycle: [15, 15, 15, 15, 15, 15, 15],
       streak: 1,
       monthlyCap: 100,
       monthlyEarned: 0,

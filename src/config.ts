@@ -162,6 +162,14 @@ export const DAILY_LOGIN_MONTHLY_CAP_TOKENS = readCountEnv(
   "DAILY_LOGIN_MONTHLY_CAP_TOKENS",
   100,
 );
+// Daily login runs in a 7-day cycle: days 1 to 6 pay the rule's amount, and
+// day 7 pays that plus this bonus. 0 pays the same every day, which is the
+// spec's flat amount; the blueprint's +5 a day with +20 on day 7 is a rule of 5
+// and a bonus of 15.
+export const DAILY_LOGIN_DAY7_BONUS_TOKENS = readCountEnv(
+  "DAILY_LOGIN_DAY7_BONUS_TOKENS",
+  0,
+);
 
 export const PLATFORM_FEE_PERCENT = readPercentEnv(
   "PLATFORM_FEE_PERCENT",

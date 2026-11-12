@@ -6,10 +6,16 @@ export interface DailyLoginStatus {
   claimedToday: boolean;
   canClaim: boolean;
   reason: DailyLoginBlock | null;
-  /** What a claim pays today, before the monthly cap trims it. */
+  /** What today's claim pays, before the monthly cap trims it. */
   amount: number;
+  /** What the next day's claim pays. */
+  nextAmount: number;
   /** Days in a row claimed, counting today when claimed, else up to yesterday. */
   streak: number;
+  /** Which day of the 7-day cycle today is (1 to 7), claimed or not. */
+  cycleDay: number;
+  /** What each of the seven days pays, day 1 first. */
+  cycle: number[];
   monthlyCap: number;
   /** Tokens daily login has paid this Manila month. */
   monthlyEarned: number;
