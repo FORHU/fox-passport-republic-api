@@ -34,7 +34,7 @@ const PASSWORD_FIELD_BY_PATH: Record<string, string> = {
 // Better Auth's emailOTP answers 200 for an unknown email and sends nothing, so
 // a client can't tell "code sent" from "no such account". These routes check
 // first and say so. That does reveal whether an email is registered; the
-// per-IP and per-account otpSendRateLimit in app.ts caps how fast anyone can ask.
+// per-IP and per-account resetOtpSendRateLimit in app.ts caps how fast anyone can ask.
 const PASSWORD_RESET_REQUEST_PATHS = new Set([
   "/email-otp/request-password-reset",
   "/forget-password/email-otp",
