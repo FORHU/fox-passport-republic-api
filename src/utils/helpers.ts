@@ -1,7 +1,14 @@
 import fs from "fs";
 import path from "path";
 import { sendEmail } from "./mailer";
-import { LOGO_DATA_URI } from "./emails/base";
+
+/**
+ * The logo in templated emails: a small PNG on the card's own dark colour,
+ * sent inside the email and referenced as `cid:`. A hosted transparent PNG
+ * was shrunk by Gmail until only the ears showed (api#335).
+ */
+export const EMAIL_LOGO_CID = "foxpassport-logo";
+const EMAIL_LOGO_PATH = path.join(process.cwd(), "email-template/fox-logo.png");
 
 /**
  
@@ -24,6 +31,8 @@ export interface EmailAttachment {
   path?: string;
   content?: string | Buffer;
   contentType?: string;
+  /** Content ID: the HTML shows this attachment inline as `cid:<cid>`. */
+  cid?: string;
 }
 
 export interface SendTemplatedEmailParams {
@@ -46,7 +55,15 @@ export const sendTemplatedEmail = async ({
     to: email_data.email,
     subject,
     html,
-    attachments,
+    attachments: [
+      ...attachments,
+      {
+        filename: "foxpassport.png",
+        path: EMAIL_LOGO_PATH,
+        contentType: "image/png",
+        cid: EMAIL_LOGO_CID,
+      },
+    ],
   });
 };
 
@@ -82,7 +99,7 @@ export const getHTMLContents = ({
   let html = fs.readFileSync(filePath, "utf8");
   const data: Record<string, string | number> = {
     ...email_data,
-    LOGO_URL: LOGO_DATA_URI,
+    LOGO_URL: `cid:${EMAIL_LOGO_CID}`,
     YEAR: new Date().getFullYear(),
   };
   for (const key in data) {

@@ -1,3 +1,4 @@
+import fs from "fs";
 import type { Attachment } from "nodemailer/lib/mailer";
 import {
   SendMailOptions,
@@ -41,6 +42,18 @@ export async function sendEmail({
         to,
         subject,
         html: html ?? text ?? "",
+        // Resend names nodemailer's `cid` `contentId` and needs the bytes.
+        attachments: attachments?.map((a) => ({
+          filename: typeof a.filename === "string" ? a.filename : undefined,
+          content:
+            typeof a.content === "string" || Buffer.isBuffer(a.content)
+              ? a.content
+              : typeof a.path === "string"
+                ? fs.readFileSync(a.path)
+                : undefined,
+          contentType: a.contentType,
+          contentId: a.cid,
+        })),
       });
       if (error) throw new Error(`${error.name}: ${error.message}`);
       console.log(`Resend email sent to ${to}: ${subject}`);

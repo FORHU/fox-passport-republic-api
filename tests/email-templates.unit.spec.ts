@@ -3,7 +3,8 @@ import { getHTMLContents } from "../src/utils/helpers";
 
 /**
  * The code emails (api#335): every placeholder is filled, the address appears
- * only where it is meant to, and the logo is a hosted image. No network.
+ * only where it is meant to, and the logo is the inline `cid:` image. No
+ * network.
  */
 
 const email = "someone+test@example.com";
@@ -31,8 +32,8 @@ describe.each([
     expect(html).not.toContain(`${OTP_CODE}_EMAIL`);
   });
 
-  it("uses the hosted logo, not a data URI", () => {
-    expect(html).toMatch(/src="[^"]*\/foxonlylogo\.png"/);
+  it("shows the logo sent inside the email, not a data URI", () => {
+    expect(html).toContain('src="cid:foxpassport-logo"');
     expect(html).not.toContain("data:image");
   });
 });
