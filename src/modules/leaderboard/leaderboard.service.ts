@@ -87,13 +87,17 @@ export class LeaderboardService {
 
       if (tab === "top_rated") {
         // Ranked by Paws (Bayesian), ties on completed bookings; a minimum of
-        // completed bookings to appear (rewards spec section 7.2).
+        // completed bookings to appear (rewards spec section 7.2). A Foxer with
+        // too few reviews to show Paws ("New") comes after every Foxer who has
+        // them: their score is pulled toward the platform average, so on score
+        // alone they could rank above someone whose Paws are on show.
         filtered = scored
           .filter(
             (f) => f.completedBookings >= LEADERBOARD_TOP_RATED_MIN_BOOKINGS,
           )
           .sort(
             (a, b) =>
+              Number(b.paws !== null) - Number(a.paws !== null) ||
               b.pawsScore - a.pawsScore ||
               b.completedBookings - a.completedBookings,
           );
