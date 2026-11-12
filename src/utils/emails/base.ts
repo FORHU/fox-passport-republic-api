@@ -136,16 +136,25 @@ export async function sendResendEmail({
   }
 
   try {
-    await resend.emails.send({
+    // Resend reports a refusal in `error` instead of throwing (api#332).
+    const { error } = await resend.emails.send({
       from: FROM_ADDRESS,
       to,
       subject,
       html,
     });
+    if (error) throw new Error(`${error.name}: ${error.message}`);
     console.log(`Resend email sent to ${to}: ${subject}`);
     return true;
   } catch (error) {
-    console.error(`Resend email failed to ${to}:`, error);
-    return false;
+    console.error(`Resend email failed to ${to}, trying SMTP:`, error);
+    try {
+      await sendViaMailer({ to, subject, html });
+      console.log(`Email sent via SMTP fallback to ${to}: ${subject}`);
+      return true;
+    } catch (smtpError) {
+      console.error(`SMTP fallback email failed to ${to}:`, smtpError);
+      return false;
+    }
   }
 }
