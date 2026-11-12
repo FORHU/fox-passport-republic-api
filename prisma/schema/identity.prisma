@@ -126,6 +126,8 @@ model User {
   onboardings              UserOnboarding[]
   ownedVouchers            Voucher[]                    @relation("UserVouchers")
   coinRedemptions          CoinRedemption[]
+  facebookConnection       FacebookConnection?
+  facebookShares           FacebookShare[]
 
   @@map("users")
 }

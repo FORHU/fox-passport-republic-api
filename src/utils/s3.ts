@@ -240,6 +240,71 @@ export async function uploadVideoToS3(params: {
   return params.key;
 }
 
+/**
+ * The key of a video this API stored, from its saved link: the CDN's address or
+ * the bucket's own (older posts kept bucket links, see getVideoUrl). Null for
+ * any other host, so a link someone typed into a post is never fetched.
+ */
+export function videoKeyFromUrl(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  const origins = [
+    VIDEO_CDN_URL?.replace(/\/+$/, ""),
+    VIDEO_BUCKET
+      ? `https://${VIDEO_BUCKET}.s3.${videoRegion}.amazonaws.com`
+      : undefined,
+  ].filter((o): o is string => Boolean(o));
+
+  for (const origin of origins) {
+    let base: URL;
+    try {
+      base = new URL(origin);
+    } catch {
+      continue;
+    }
+    const prefix = base.pathname.replace(/\/+$/, "");
+    if (
+      parsed.origin === base.origin &&
+      parsed.pathname.startsWith(`${prefix}/`)
+    ) {
+      let key: string;
+      try {
+        key = decodeURIComponent(parsed.pathname.slice(prefix.length + 1));
+      } catch {
+        return null; // a malformed %-escape is no link this API wrote
+      }
+      return key && !key.includes("..") ? key : null;
+    }
+  }
+  return null;
+}
+
+/** A stored video's bytes, or null when the bucket has no such object. */
+export async function getVideoObject(
+  key: string,
+): Promise<{ body: Buffer; contentType: string } | null> {
+  if (!VIDEO_BUCKET) throw new Error("No video bucket is configured");
+  try {
+    const res = await videoClient.send(
+      new GetObjectCommand({ Bucket: VIDEO_BUCKET, Key: key }),
+    );
+    if (!res.Body) return null;
+    const bytes = await res.Body.transformToByteArray();
+    return {
+      body: Buffer.from(bytes),
+      contentType: res.ContentType || "video/mp4",
+    };
+  } catch (err) {
+    const name = (err as { name?: string })?.name;
+    if (name === "NoSuchKey" || name === "NotFound") return null;
+    throw err;
+  }
+}
+
 // --- Private documents -------------------------------------------------------
 //
 // Government IDs, clearances and proof of funds never get a stable public URL:
