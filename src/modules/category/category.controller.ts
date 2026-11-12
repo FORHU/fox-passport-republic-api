@@ -2,7 +2,6 @@ import { sendServerError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
 import CategorySvc from "./category.service";
-import ProviderSpecialtySvc from "../users/provider-specialty.service";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
 import { sendValidationError, VALIDATE_ALL } from "../../utils/validation";
 
@@ -60,16 +59,6 @@ export default class CategoryController {
       });
     } catch (e: unknown) {
       return sendServerError(res, e, { success: true });
-    }
-  }
-
-  // GET THE SPECIALTIES A PROVIDER CAN PICK (apply form, profile, search)
-  static async getProviderSpecialties(_req: Request, res: Response) {
-    try {
-      const data = await ProviderSpecialtySvc.list();
-      return res.status(200).json({ success: true, count: data.length, data });
-    } catch (e: unknown) {
-      return sendServerError(res, e, { success: false });
     }
   }
 
