@@ -40,7 +40,11 @@ class LeaderboardRepo {
   /**
    * Retrieves active Foxers filtered by role and city.
    */
-  static async getFoxersForRanking(role?: string, city?: string) {
+  static async getFoxersForRanking(
+    role?: string,
+    city?: string,
+    specialty?: string,
+  ) {
     // A Provider board can be narrowed to what they list. The retired role
     // names (and the app's gear/services/performers) still name those boards.
     const supplyKind = role ? PROVIDER_BOARD_BY_ROLE[role] : undefined;
@@ -58,6 +62,15 @@ class LeaderboardRepo {
         roleType: { hasSome: whereRole },
         ...(supplyKind ? PROVIDER_BOARD_WHERE[supplyKind] : {}),
         ...(city ? { city: { equals: city, mode: "insensitive" } } : {}),
+        // A Provider appears under each specialty they declared (as search
+        // does, RR-3).
+        ...(specialty
+          ? {
+              foxerSpecializations: {
+                some: { roleType: RoleType.providerFoxer, category: specialty },
+              },
+            }
+          : {}),
       },
       select: {
         id: true,
@@ -66,6 +79,13 @@ class LeaderboardRepo {
         city: true,
         roleType: true,
         createdAt: true,
+        // The first approved role is when they became a Foxer (foxerSince).
+        roleRequests: {
+          where: { status: "approved", reviewedAt: { not: null } },
+          select: { reviewedAt: true },
+          orderBy: { reviewedAt: "asc" },
+          take: 1,
+        },
         passport: {
           include: {
             paths: true,
@@ -75,6 +95,24 @@ class LeaderboardRepo {
     });
 
     return users;
+  }
+
+  /** When they became a Foxer: their first approved role, else sign-up. */
+  static async getFoxerSince(userId: string): Promise<Date | null> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        createdAt: true,
+        roleRequests: {
+          where: { status: "approved", reviewedAt: { not: null } },
+          select: { reviewedAt: true },
+          orderBy: { reviewedAt: "asc" },
+          take: 1,
+        },
+      },
+    });
+    if (!user) return null;
+    return user.roleRequests[0]?.reviewedAt ?? user.createdAt;
   }
 }
 

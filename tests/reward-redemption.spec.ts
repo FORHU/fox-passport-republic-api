@@ -239,6 +239,50 @@ describe("Reward Service & Redemption Engine (Phase 2)", () => {
       expect(wallet.history[1].type).toBe("grant");
       expect(wallet.history[1]).not.toHaveProperty("xp");
     });
+
+    it("shows the grant's booking on a release or reversal, not on a redemption or voucher return", async () => {
+      mockDb.passports.set("user-2", {
+        userId: "user-2",
+        coins: 100,
+        paths: [{ path: UserPath.user, level: 1 }],
+      });
+      const grantEvent = {
+        refType: "booking",
+        refId: "bkg-9",
+      };
+      mockDb.lifecycles.push(
+        {
+          id: "lc-rel",
+          userId: "user-2",
+          type: RewardLifecycleType.RELEASE,
+          coinsDelta: 40,
+          reason: "Released after the first attended paid booking",
+          grantEvent,
+          createdAt: new Date("2026-11-05T10:00:00Z"),
+        },
+        {
+          id: "lc-ret",
+          userId: "user-2",
+          type: RewardLifecycleType.VOUCHER_RETURN,
+          coinsDelta: 100,
+          reason: "VOUCHER_EXPIRED: Tokens returned for unused voucher RWD-X",
+          grantEvent,
+          createdAt: new Date("2026-11-06T10:00:00Z"),
+        },
+      );
+
+      const wallet = await RewardService.getWallet("user-2", UserPath.user);
+      const release = wallet.history.find((h) => h.id === "lc-rel");
+      const ret = wallet.history.find((h) => h.id === "lc-ret");
+
+      expect(release).toMatchObject({ refType: "booking", refId: "bkg-9" });
+      expect(release).not.toHaveProperty("action");
+      expect(ret).toMatchObject({
+        lifecycleType: "VOUCHER_RETURN",
+        coinsDelta: 100,
+      });
+      expect(ret).not.toHaveProperty("refId");
+    });
   });
 
   describe("redeem", () => {

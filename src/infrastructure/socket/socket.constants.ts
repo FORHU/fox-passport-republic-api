@@ -79,6 +79,11 @@ export const SOCKET_EVENTS = {
    * can clear `pinnedAt` off whatever it thought was pinned before and set
    * it on the new one without a REST refetch. */
   MESSAGE_PINNED: "message:pinned",
+  /** A Republic post's comment count changed — carries the post id and the
+   * new count, sent to everyone connected. The feed is public and lists
+   * many posts at once, so refetching it on every comment (what a
+   * DATA_INVALIDATE would ask for) costs far more than the number itself. */
+  POST_COMMENTS_COUNT: "post:comments_count",
 } as const;
 
 export type SocketEvent = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];

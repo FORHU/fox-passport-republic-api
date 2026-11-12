@@ -128,6 +128,32 @@ export const STRIPE_WEBHOOK_SECRET = process.env
 // never carved out of provider/host shares. See docs/adr/0002-stripe-connect-payouts.md.
 // Checked at startup like PROCESSING_FEE_PERCENT: unset or empty still means 5,
 // but "5%" or 300 now stops the API instead of charging NaN or 300%.
+/**
+ * A whole number setting read from the environment: unset or empty means the
+ * fallback; anything else must be a whole number from 0 up, or the API stops.
+ */
+function readCountEnv(name: string, fallback: number): number {
+  const value = process.env[name];
+  if (value === undefined || value.trim() === "") return fallback;
+  const parsed = Number(value.trim());
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(
+      `${name} is "${value}". Refusing to start: it must be a whole number from 0 up.`,
+    );
+  }
+  return parsed;
+}
+
+// Foxer leaderboard, Top rated (rewards spec section 7.2). Paws are ranked by
+// the Bayesian average (v x R + p x C) / (v + p); p is the prior. A Foxer needs
+// this many completed bookings to appear. Read from the environment until the
+// admin settings screens exist (RR-8).
+export const LEADERBOARD_PAWS_PRIOR = readCountEnv("LEADERBOARD_PAWS_PRIOR", 5);
+export const LEADERBOARD_TOP_RATED_MIN_BOOKINGS = readCountEnv(
+  "LEADERBOARD_TOP_RATED_MIN_BOOKINGS",
+  3,
+);
+
 export const PLATFORM_FEE_PERCENT = readPercentEnv(
   "PLATFORM_FEE_PERCENT",
   process.env.PLATFORM_FEE_PERCENT,

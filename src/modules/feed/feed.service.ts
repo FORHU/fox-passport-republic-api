@@ -12,6 +12,7 @@ import NotificationService from "../notifications/user-notification.service";
 import { prisma } from "../../utils/prisma";
 import { AuthenticatedUser } from "../../types/auth";
 import { can } from "../../types/permissions";
+import { announcePostCommentsCount } from "../../infrastructure/socket/invalidate";
 
 export interface MediaTagInput {
   mediaUrl: string;
@@ -137,6 +138,24 @@ async function notifyMediaTags(
       ),
     ),
   );
+}
+
+/**
+ * Tells every open feed the post's comment count, read back from the stored
+ * counter so concurrent comments cannot leave a client on a stale number.
+ * Public posts only: the event goes to every connected socket, so a
+ * followers-only or only-me post's activity would reach people who cannot
+ * see the post. Those posts' counts refresh on the commenter's own reload.
+ * Best-effort: the comment is already saved.
+ */
+function broadcastCommentsCount(postId: string): void {
+  FeedRepo.findCommentsCount(postId)
+    .then((post) => {
+      if (post?.visibility === PostVisibility.public) {
+        announcePostCommentsCount(postId, post.commentsCount);
+      }
+    })
+    .catch(() => {});
 }
 
 export default class FeedService {
@@ -669,6 +688,8 @@ export default class FeedService {
       parentId,
     );
 
+    broadcastCommentsCount(postId);
+
     notifyMentions(trimmed, user.userId, {
       postId,
       commentId: comment.id,
@@ -759,7 +780,9 @@ export default class FeedService {
       throw new AppError("Unauthorized to delete this comment", 403);
     }
 
-    return FeedRepo.deleteComment(commentId);
+    const deleted = await FeedRepo.deleteComment(commentId);
+    broadcastCommentsCount(deleted.postId);
+    return deleted;
   }
 
   static async toggleCommentLike(commentId: string, user: AuthenticatedUser) {

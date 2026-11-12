@@ -110,8 +110,11 @@ vi.mock("../src/utils/prisma", () => ({
     },
     rewardLifecycle: {
       findFirst: vi.fn(async ({ where }: any) => lifecycleFind(where)),
+      // Like Prisma's `include: { grantEvent }`, attach each row's grant.
       findMany: vi.fn(async ({ where }: any) =>
-        db.lifecycles.filter((l) => l.userId === where.userId),
+        db.lifecycles
+          .filter((l) => l.userId === where.userId)
+          .map((l) => ({ ...l, grantEvent: db.events.get(l.grantEventId) })),
       ),
     },
     passport: {
