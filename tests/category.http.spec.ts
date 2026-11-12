@@ -19,6 +19,11 @@ const svc = vi.hoisted(() => ({
     id,
     ...data,
   })),
+  getProviderSpecialties: vi.fn(async () => [
+    { slug: "dj", name: "DJ" },
+    { slug: "photography", name: "Photography" },
+  ]),
+  getCategoryById: vi.fn(async () => null),
 }));
 vi.mock("../src/modules/category/category.service", () => ({ default: svc }));
 
@@ -43,6 +48,26 @@ const valid = {
 };
 
 beforeEach(() => vi.clearAllMocks());
+
+describe("GET /api/v1/categories/provider-specialties", () => {
+  it("lists the Provider specialties without signing in, and is not taken as an id", async () => {
+    const res = await request(app).get(
+      "/api/v1/categories/provider-specialties",
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      success: true,
+      count: 2,
+      data: [
+        { slug: "dj", name: "DJ" },
+        { slug: "photography", name: "Photography" },
+      ],
+    });
+    expect(svc.getProviderSpecialties).toHaveBeenCalledTimes(1);
+    expect(svc.getCategoryById).not.toHaveBeenCalled();
+  });
+});
 
 describe("POST /api/v1/categories/create", () => {
   it("creates for an admin and passes the actor for the audit log", async () => {
