@@ -189,3 +189,47 @@ if (Boolean(facebookAppId) !== Boolean(facebookAppSecret)) {
 
 export const FACEBOOK_APP_ID = facebookAppId;
 export const FACEBOOK_APP_SECRET = facebookAppSecret;
+
+// Sharing posts to Facebook Pages. Separate from sign-in: Better Auth never
+// sees these tokens. A Meta app built for "Sign in with Facebook" can't always
+// be given the Pages use case, so sharing may use a Meta app of its own:
+// FACEBOOK_PAGES_APP_ID / _SECRET, both or neither. Unset, it uses the sign-in
+// app above.
+const facebookPagesAppId =
+  process.env.FACEBOOK_PAGES_APP_ID?.trim() || undefined;
+const facebookPagesAppSecret =
+  process.env.FACEBOOK_PAGES_APP_SECRET?.trim() || undefined;
+if (Boolean(facebookPagesAppId) !== Boolean(facebookPagesAppSecret)) {
+  throw new Error(
+    "FACEBOOK_PAGES_APP_ID and FACEBOOK_PAGES_APP_SECRET must be provided together.",
+  );
+}
+export const FACEBOOK_PAGES_APP_ID = facebookPagesAppId;
+export const FACEBOOK_PAGES_APP_SECRET = facebookPagesAppSecret;
+// Sharing is on only when an app and this key are both set. The key encrypts
+// the stored Page and user tokens (AES-256-GCM): 32 random bytes, base64
+// (`openssl rand -base64 32`). A key that is set but not 32 bytes stops the
+// API at boot instead of failing the first time someone connects.
+const facebookTokenKeyRaw =
+  process.env.FACEBOOK_TOKEN_ENCRYPTION_KEY?.trim() || undefined;
+if (
+  facebookTokenKeyRaw &&
+  Buffer.from(facebookTokenKeyRaw, "base64").length !== 32
+) {
+  throw new Error(
+    "FACEBOOK_TOKEN_ENCRYPTION_KEY must be 32 bytes, base64-encoded (openssl rand -base64 32).",
+  );
+}
+export const FACEBOOK_TOKEN_ENCRYPTION_KEY = facebookTokenKeyRaw;
+// The Graph API version every call is pinned to.
+export const FACEBOOK_GRAPH_VERSION =
+  process.env.FACEBOOK_GRAPH_VERSION?.trim() || "v26.0";
+// Set when the Meta app is a Business app using Facebook Login for Business:
+// the login dialog then takes this configuration instead of a scope list.
+export const FACEBOOK_LOGIN_CONFIG_ID =
+  process.env.FACEBOOK_LOGIN_CONFIG_ID?.trim() || undefined;
+// Where Meta sends the browser back after the Page permission dialog. It must
+// be listed under the Meta app's Valid OAuth Redirect URIs.
+export const FACEBOOK_PAGES_REDIRECT_URI =
+  process.env.FACEBOOK_PAGES_REDIRECT_URI?.trim() ||
+  `${BETTER_AUTH_URL.replace(/\/+$/, "")}/api/v1/integrations/facebook/callback`;

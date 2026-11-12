@@ -131,6 +131,16 @@ jobs:
           # each new video's link at upload time; without this, links point at the
           # private bucket and answer 403.
           VIDEO_CDN_URL: ${{ vars.VIDEO_CDN_URL }}
+          # Sharing posts to Facebook Pages (api#320). Off until the key is set:
+          # it encrypts the stored Page and user tokens. The rest are optional
+          # (src/config.ts has the defaults).
+          FACEBOOK_TOKEN_ENCRYPTION_KEY: ${{ secrets.FACEBOOK_TOKEN_ENCRYPTION_KEY }}
+          # A Meta app of its own for Page sharing; unset, the sign-in app shares.
+          FACEBOOK_PAGES_APP_ID: ${{ vars.FACEBOOK_PAGES_APP_ID }}
+          FACEBOOK_PAGES_APP_SECRET: ${{ secrets.FACEBOOK_PAGES_APP_SECRET }}
+          FACEBOOK_GRAPH_VERSION: ${{ vars.FACEBOOK_GRAPH_VERSION }}
+          FACEBOOK_LOGIN_CONFIG_ID: ${{ vars.FACEBOOK_LOGIN_CONFIG_ID }}
+          FACEBOOK_PAGES_REDIRECT_URI: ${{ vars.FACEBOOK_PAGES_REDIRECT_URI }}
         run: |
           set -euo pipefail
           umask 077
@@ -151,7 +161,10 @@ jobs:
           for k in SECRET_KEY \
                    MAILER_PASSWORD STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET \
                    GOOGLE_CLIENT_SECRET FACEBOOK_APP_SECRET \
-                   BETTER_AUTH_SECRET BETTER_AUTH_URL VIDEO_CDN_URL; do
+                   BETTER_AUTH_SECRET BETTER_AUTH_URL VIDEO_CDN_URL \
+                   FACEBOOK_TOKEN_ENCRYPTION_KEY FACEBOOK_GRAPH_VERSION \
+                   FACEBOOK_PAGES_APP_ID FACEBOOK_PAGES_APP_SECRET \
+                   FACEBOOK_LOGIN_CONFIG_ID FACEBOOK_PAGES_REDIRECT_URI; do
             v="${!k:-}"
             [ -n "$v" ] && printf '%s=%s\n' "$k" "$v" >> env.tmp
           done
