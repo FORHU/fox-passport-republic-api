@@ -141,6 +141,12 @@ jobs:
           FACEBOOK_GRAPH_VERSION: ${{ vars.FACEBOOK_GRAPH_VERSION }}
           FACEBOOK_LOGIN_CONFIG_ID: ${{ vars.FACEBOOK_LOGIN_CONFIG_ID }}
           FACEBOOK_PAGES_REDIRECT_URI: ${{ vars.FACEBOOK_PAGES_REDIRECT_URI }}
+          # SMTP server for MAILER_EMAIL (src/utils/mailer.ts). Without a host,
+          # nodemailer falls back to localhost and no email leaves the server
+          # (api#332). Gmail: smtp.gmail.com, 587, false.
+          MAILER_TRANSPORT_HOST: ${{ vars.MAILER_TRANSPORT_HOST }}
+          MAILER_TRANSPORT_PORT: ${{ vars.MAILER_TRANSPORT_PORT }}
+          MAILER_TRANSPORT_SECURE: ${{ vars.MAILER_TRANSPORT_SECURE }}
         run: |
           set -euo pipefail
           umask 077
@@ -164,7 +170,9 @@ jobs:
                    BETTER_AUTH_SECRET BETTER_AUTH_URL VIDEO_CDN_URL \
                    FACEBOOK_TOKEN_ENCRYPTION_KEY FACEBOOK_GRAPH_VERSION \
                    FACEBOOK_PAGES_APP_ID FACEBOOK_PAGES_APP_SECRET \
-                   FACEBOOK_LOGIN_CONFIG_ID FACEBOOK_PAGES_REDIRECT_URI; do
+                   FACEBOOK_LOGIN_CONFIG_ID FACEBOOK_PAGES_REDIRECT_URI \
+                   MAILER_TRANSPORT_HOST MAILER_TRANSPORT_PORT \
+                   MAILER_TRANSPORT_SECURE; do
             v="${!k:-}"
             [ -n "$v" ] && printf '%s=%s\n' "$k" "$v" >> env.tmp
           done
