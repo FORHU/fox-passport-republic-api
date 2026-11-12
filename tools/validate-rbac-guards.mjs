@@ -66,6 +66,17 @@ const MAX_UNGUARDED_ROUTES = 179;
 const ALLOW_LIST = new Set([
   // "users.routes.ts GET /:id/profile — self-service, no separate permission needed",
 
+  // Facebook Page sharing (api#320). Each route acts only on the caller's own
+  // connection; sharing also checks in FacebookService that the caller wrote
+  // the post. Self-service, so no capability permission applies.
+  "facebook.routes.ts GET /",
+  "facebook.routes.ts DELETE /",
+  "facebook.routes.ts GET /connect-url",
+  "facebook.routes.ts GET /pages",
+  "facebook.routes.ts PUT /page",
+  "facebook.routes.ts POST /shares",
+  "facebook.routes.ts GET /shares/:postId",
+
   // Foxer Score management console: self-service operational metrics for authenticated Foxer.
   "foxer-score.routes.ts GET /me",
   // Achievements engine: self-service personal progress and rewards evaluation for authenticated user.
