@@ -154,6 +154,15 @@ export const LEADERBOARD_TOP_RATED_MIN_BOOKINGS = readCountEnv(
   3,
 );
 
+// Daily login (RR-7, rewards spec section 3): the most Tokens it pays in one
+// Manila month, so it stops there. The amount paid each day lives in the
+// `daily_login` RewardRule. Read from the environment until the admin settings
+// screens exist (RR-8).
+export const DAILY_LOGIN_MONTHLY_CAP_TOKENS = readCountEnv(
+  "DAILY_LOGIN_MONTHLY_CAP_TOKENS",
+  100,
+);
+
 export const PLATFORM_FEE_PERCENT = readPercentEnv(
   "PLATFORM_FEE_PERCENT",
   process.env.PLATFORM_FEE_PERCENT,
