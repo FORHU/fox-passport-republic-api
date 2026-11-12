@@ -33,12 +33,16 @@ export async function sendEmail({
 }): Promise<string> {
   if (resendClient) {
     try {
-      await resendClient.emails.send({
+      // Resend reports a refused email (unverified domain, bad key) in
+      // `error`; it does not throw. Unchecked, every refusal was logged as
+      // sent and the SMTP fallback never ran (api#332).
+      const { error } = await resendClient.emails.send({
         from: FROM_ADDRESS,
         to,
         subject,
         html: html ?? text ?? "",
       });
+      if (error) throw new Error(`${error.name}: ${error.message}`);
       console.log(`Resend email sent to ${to}: ${subject}`);
       return "Email sent successfully";
     } catch (error) {
