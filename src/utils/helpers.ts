@@ -83,12 +83,28 @@ export const getHTMLContents = ({
   const data: Record<string, string | number> = {
     ...email_data,
     LOGO_URL: LOGO_DATA_URI,
+    YEAR: new Date().getFullYear(),
   };
   for (const key in data) {
-    html = html.replace(new RegExp(key, "g"), String(data[key]));
+    const value = String(data[key]);
+    // `{{key}}` is the placeholder. A function replacement keeps a `$` in the
+    // value literal.
+    html = html.replace(
+      new RegExp(`\\{\\{${escapeRegExp(key)}\\}\\}`, "g"),
+      () => value,
+    );
+    // Older templates use bare UPPER_CASE keys (EVENT_NAME). Those still work,
+    // but only as whole words, and never lowercase keys: replacing the key
+    // `email` everywhere turned "Verify your email" into the address (api#335).
+    if (/^[A-Z][A-Z0-9_]*$/.test(key)) {
+      html = html.replace(new RegExp(`\\b${key}\\b`, "g"), () => value);
+    }
   }
   return html;
 };
+
+const escapeRegExp = (s: string): string =>
+  s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export const stringBacktickToArray = (input: string = ""): string[] => {
   return input
