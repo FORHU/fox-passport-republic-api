@@ -128,10 +128,11 @@ describe("login rate limit", () => {
 
 describe("otp send rate limit", () => {
   it("counts successful sends, because the send is the abuse", async () => {
-    const { otpSendRateLimit: limiter } = await freshLimiters();
+    const { verificationOtpSendRateLimit: limiter, OTP_SEND_ACCOUNT_LIMIT } =
+      await freshLimiters();
     const app = appWith(limiter, () => 200);
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < OTP_SEND_ACCOUNT_LIMIT; i++) {
       const res = await post(app, { email: "target@example.com" });
       expect(res.status).toBe(200);
     }
@@ -140,6 +141,34 @@ describe("otp send rate limit", () => {
     // here would leave mail bombing entirely unmetered.
     const blocked = await post(app, { email: "target@example.com" });
     expect(blocked.status).toBe(429);
+    // The window is an hour; the message says how long, not "a few minutes".
+    expect(blocked.body.message).toMatch(/try again in \d+ minutes?\./);
+  });
+
+  it("keeps verification resends and password resets apart", async () => {
+    const {
+      verificationOtpSendRateLimit,
+      resetOtpSendRateLimit,
+      OTP_SEND_ACCOUNT_LIMIT,
+    } = await freshLimiters();
+    const app = express();
+    app.use(express.json());
+    app.post("/verify", verificationOtpSendRateLimit, (_req, res) => {
+      res.json({ success: true });
+    });
+    app.post("/reset", resetOtpSendRateLimit, (_req, res) => {
+      res.json({ success: true });
+    });
+    const body = { email: "target@example.com" };
+
+    for (let i = 0; i < OTP_SEND_ACCOUNT_LIMIT; i++) {
+      await request(app).post("/verify").send(body);
+    }
+    expect((await request(app).post("/verify").send(body)).status).toBe(429);
+
+    // Resending verification codes must not leave the same email without a
+    // way to reset its password for an hour.
+    expect((await request(app).post("/reset").send(body)).status).toBe(200);
   });
 });
 
