@@ -1,5 +1,6 @@
 /** Why a citizen cannot claim right now; null when they can. */
-export type DailyLoginBlock = "inactive" | "email_not_verified" | "cap_reached";
+export type DailyLoginBlock =
+  "inactive" | "email_not_verified" | "no_attended_booking" | "cap_reached";
 
 export interface DailyLoginStatus {
   /** Today (Manila) has already been claimed. */

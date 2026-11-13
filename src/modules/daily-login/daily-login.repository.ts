@@ -27,6 +27,27 @@ export class DailyLoginRepo {
     return events.map((e) => e.refId);
   }
 
+  /**
+   * Whether this person has had a paid booking attended since [since]: an
+   * `attend_event` grant that paid Tokens, which only a booking with a platform
+   * fee can (the same test as RewardRepo.hasPaidAttendance, for one month).
+   */
+  static async hasPaidAttendanceSince(
+    userId: string,
+    since: Date,
+  ): Promise<boolean> {
+    const found = await prisma.rewardEvent.findFirst({
+      where: {
+        userId,
+        action: "attend_event",
+        coins: { gt: 0 },
+        createdAt: { gte: since },
+      },
+      select: { id: true },
+    });
+    return !!found;
+  }
+
   /** Tokens daily login has paid this person since [since]. */
   static async sumCoinsSince(userId: string, since: Date): Promise<number> {
     const agg = await prisma.rewardEvent.aggregate({

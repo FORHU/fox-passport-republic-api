@@ -37,6 +37,7 @@ function given(opts: {
   emailVerified?: boolean | null;
   days?: string[];
   earned?: number;
+  attended?: boolean;
   rule?: ReturnType<typeof rule> | null;
 }) {
   vi.spyOn(DailyLoginRepo, "getEmailVerified").mockResolvedValue(
@@ -46,6 +47,9 @@ function given(opts: {
     opts.days ?? [],
   );
   vi.spyOn(DailyLoginRepo, "sumCoinsSince").mockResolvedValue(opts.earned ?? 0);
+  vi.spyOn(DailyLoginRepo, "hasPaidAttendanceSince").mockResolvedValue(
+    opts.attended ?? true,
+  );
   vi.spyOn(RewardRepo, "findRuleByAction").mockResolvedValue(
     opts.rule === undefined ? rule() : opts.rule,
   );
@@ -122,12 +126,12 @@ describe("the 7-day cycle", () => {
     expect(cycleDayOf(15, false)).toBe(2);
   });
 
-  it("pays the same every day with no day 7 bonus", () => {
+  it("pays the same every day with a step of 0", () => {
     expect(cycleAmounts(15, 0)).toEqual([15, 15, 15, 15, 15, 15, 15]);
   });
 
-  it("adds the bonus on day 7 only: 5 a day and +20 on day 7 is 5 plus 15", () => {
-    expect(cycleAmounts(5, 15)).toEqual([5, 5, 5, 5, 5, 5, 20]);
+  it("starts at the base and rises by the step each day", () => {
+    expect(cycleAmounts(15, 10)).toEqual([15, 25, 35, 45, 55, 65, 75]);
   });
 });
 
@@ -139,10 +143,10 @@ describe("DailyLoginSvc.getStatus", () => {
       claimedToday: false,
       canClaim: true,
       reason: null,
-      amount: 15,
-      nextAmount: 15,
+      amount: 25,
+      nextAmount: 35,
       cycleDay: 2,
-      cycle: [15, 15, 15, 15, 15, 15, 15],
+      cycle: [15, 25, 35, 45, 55, 65, 75],
       streak: 1,
       monthlyCap: 100,
       monthlyEarned: 0,
@@ -163,6 +167,26 @@ describe("DailyLoginSvc.getStatus", () => {
     const s = await DailyLoginSvc.getStatus(USER, NOW);
     expect(s.canClaim).toBe(false);
     expect(s.reason).toBe("email_not_verified");
+  });
+
+  it("blocks without a paid booking attended this month and says why", async () => {
+    const since = vi
+      .spyOn(DailyLoginRepo, "hasPaidAttendanceSince")
+      .mockResolvedValue(false);
+    given({ attended: false });
+    const s = await DailyLoginSvc.getStatus(USER, NOW);
+    expect(s.canClaim).toBe(false);
+    expect(s.reason).toBe("no_attended_booking");
+    expect(since).toHaveBeenCalledWith(USER, manilaMonthStart(NOW));
+  });
+
+  it("does not pay a claim without an attended booking", async () => {
+    given({ attended: false });
+    const grant = vi.spyOn(RewardService, "grant");
+    const result = await DailyLoginSvc.claim(USER, NOW);
+    expect(grant).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ claimed: false, coinsAwarded: 0 });
+    expect(result.status.reason).toBe("no_attended_booking");
   });
 
   it("blocks at the monthly cap", async () => {

@@ -1,6 +1,6 @@
 import { AppError } from "../../utils/errors";
 import {
-  DAILY_LOGIN_DAY7_BONUS_TOKENS,
+  DAILY_LOGIN_STEP_TOKENS,
   DAILY_LOGIN_MONTHLY_CAP_TOKENS,
 } from "../../config";
 import RewardRepo from "../reward/reward.repository";
@@ -67,11 +67,9 @@ export function cycleDayOf(streak: number, claimedToday: boolean): number {
     : (streak % CYCLE_LENGTH) + 1;
 }
 
-/** What each of the seven days pays: [base x 6, base plus the day 7 bonus]. */
-export function cycleAmounts(base: number, day7Bonus: number): number[] {
-  return Array.from({ length: CYCLE_LENGTH }, (_, i) =>
-    i === CYCLE_LENGTH - 1 ? base + day7Bonus : base,
-  );
+/** What each of the seven days pays: [base, base + step, base + 2 x step, ...]. */
+export function cycleAmounts(base: number, step: number): number[] {
+  return Array.from({ length: CYCLE_LENGTH }, (_, i) => base + step * i);
 }
 
 function isUniqueViolation(e: unknown): boolean {
@@ -87,10 +85,12 @@ export default class DailyLoginSvc {
     const emailVerified = await DailyLoginRepo.getEmailVerified(userId);
     if (emailVerified === null) throw new AppError("User not found", 404);
 
-    const [rule, days, monthlyEarned] = await Promise.all([
+    const monthStart = manilaMonthStart(now);
+    const [rule, days, monthlyEarned, hasAttendedBooking] = await Promise.all([
       RewardRepo.findRuleByAction(DAILY_LOGIN_ACTION),
       DailyLoginRepo.listClaimedDays(userId),
-      DailyLoginRepo.sumCoinsSince(userId, manilaMonthStart(now)),
+      DailyLoginRepo.sumCoinsSince(userId, monthStart),
+      DailyLoginRepo.hasPaidAttendanceSince(userId, monthStart),
     ]);
 
     const today = manilaDay(now);
@@ -99,14 +99,12 @@ export default class DailyLoginSvc {
     const base = rule?.active ? rule.coins : 0;
     const streak = streakOf(claimed, today);
     const cycleDay = cycleDayOf(streak, claimedToday);
-    const cycle = cycleAmounts(
-      base,
-      base > 0 ? DAILY_LOGIN_DAY7_BONUS_TOKENS : 0,
-    );
+    const cycle = cycleAmounts(base, base > 0 ? DAILY_LOGIN_STEP_TOKENS : 0);
 
     let reason: DailyLoginStatus["reason"] = null;
     if (base <= 0) reason = "inactive";
     else if (!emailVerified) reason = "email_not_verified";
+    else if (!hasAttendedBooking) reason = "no_attended_booking";
     else if (monthlyEarned >= DAILY_LOGIN_MONTHLY_CAP_TOKENS)
       reason = "cap_reached";
 
