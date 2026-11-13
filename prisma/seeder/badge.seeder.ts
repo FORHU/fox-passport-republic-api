@@ -426,6 +426,25 @@ const badges = [
     path: null,
     criteria: "achievement:reliable:tier_3",
   },
+  // Also inserted by the migration add_first_booking_and_verified_badges.
+  {
+    name: "First Booking",
+    description: "Made your first paid booking",
+    icon: "event_available",
+    color: "#CCFF00",
+    rarity: BadgeRarity.Common,
+    path: UserPath.user,
+    criteria: "first_booking",
+  },
+  {
+    name: "Verified",
+    description: "Your identity was verified",
+    icon: "verified",
+    color: "#4ADE80",
+    rarity: BadgeRarity.Uncommon,
+    path: UserPath.user,
+    criteria: "identity_verified",
+  },
 ];
 
 export async function seedBadges(prisma: PrismaClient) {

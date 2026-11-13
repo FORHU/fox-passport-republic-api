@@ -4,6 +4,14 @@ import { passportCache, PASSPORT_TTL } from "../../utils/cache-namespaces";
 import PassportRepo from "./passport.repository";
 import RewardRepo from "../reward/reward.repository";
 
+/**
+ * Badges the rewards revision hands out for one-time actions. Their rows come
+ * from the migration `add_first_booking_and_verified_badges`, not only the dev
+ * seeder, because an award of a badge that has no row does nothing.
+ */
+export const FIRST_BOOKING_BADGE = "First Booking";
+export const VERIFIED_BADGE = "Verified";
+
 /** What a passport path and a stamp no longer reveal to a client. */
 const RETIRED_PATH_FIELDS = ["level", "currentXP", "totalXP"] as const;
 const RETIRED_STAMP_FIELDS = ["xpEarned"] as const;
@@ -165,6 +173,23 @@ export default class PassportSvc {
     return passportCache.cached(`byUser:${userId}`, PASSPORT_TTL, () =>
       PassportRepo.findByUserId(userId),
     );
+  }
+
+  /**
+   * The "First Booking" badge, once a booking's payment is confirmed. Awarding
+   * is idempotent, so every confirmed booking may call this: only the first
+   * one does anything. The Tokens for a first booking are not paid here; the
+   * booked events milestone pays its first tier, held until attended. Never
+   * throws: a badge must not undo or delay a payment.
+   */
+  static async awardFirstBookingBadge(bookingId: string): Promise<void> {
+    try {
+      const userId = await PassportRepo.findBookingOwnerId(bookingId);
+      if (!userId) return;
+      await PassportSvc.awardBadgeByName(userId, FIRST_BOOKING_BADGE);
+    } catch (e) {
+      console.warn("[PassportSvc] First Booking badge failed:", e);
+    }
   }
 
   // Idempotent badge award — skips silently if badge not found or already earned.

@@ -179,6 +179,13 @@ export default class IdentityVerificationSvc {
       await userCache.invalidateAll();
       // The approved ID earns its one-time reward. Never fails the review.
       await OnboardingSvc.syncDetectedSteps(reviewed.userId).catch(() => {});
+      // The passport's "Verified" badge (the profile field above is display
+      // only). Never fails the review.
+      await import("../passport/passport.service")
+        .then(({ default: PassportSvc, VERIFIED_BADGE }) =>
+          PassportSvc.awardBadgeByName(reviewed.userId, VERIFIED_BADGE),
+        )
+        .catch(() => {});
     }
 
     await NotificationService.create({
