@@ -14,6 +14,15 @@ const db = vi.hoisted(() => ({
   seq: 0,
 }));
 
+/** An action filter as Prisma takes it: a name, or { not: name }. */
+function actionMatches(ev: any, action: any): boolean {
+  if (action === undefined) return true;
+  if (typeof action === "string") return ev.action === action;
+  if (action.not !== undefined) return ev.action !== action.not;
+  if (action.notIn !== undefined) return !action.notIn.includes(ev.action);
+  return true;
+}
+
 /** Grants whose Coins are held: what RewardRepo asks for. */
 function held(where: any) {
   const blocked: string[] = where.lifecycles.none.type.in;
@@ -21,6 +30,7 @@ function held(where: any) {
     (ev) =>
       ev.userId === where.userId &&
       ev.coins > 0 &&
+      actionMatches(ev, where.action) &&
       !db.lifecycles.some(
         (l) => l.grantEventId === ev.id && blocked.includes(l.type),
       ),
@@ -28,8 +38,16 @@ function held(where: any) {
 }
 
 function matches(ev: any, where: any): boolean {
+  if (where.id && ev.id !== where.id) return false;
+  if (where.lifecycles) {
+    const blocked: string[] = where.lifecycles.none.type.in;
+    const done = db.lifecycles.some(
+      (l) => l.grantEventId === ev.id && blocked.includes(l.type),
+    );
+    if (done) return false;
+  }
   if (where.userId && ev.userId !== where.userId) return false;
-  if (where.action && ev.action !== where.action) return false;
+  if (!actionMatches(ev, where.action)) return false;
   if (where.refType && ev.refType !== where.refType) return false;
   if (where.refId && ev.refId !== where.refId) return false;
   if (where.coins?.gt !== undefined && !(ev.coins > where.coins.gt))
@@ -73,6 +91,12 @@ function eventApi() {
         ? held(where)
         : [...db.events.values()].filter((e) => matches(e, where)),
     ),
+    findFirst: vi.fn(async ({ where }: any) => {
+      for (const ev of db.events.values()) {
+        if (matches(ev, where)) return ev;
+      }
+      return null;
+    }),
   };
 }
 
@@ -440,5 +464,87 @@ describe("holding the one-time Coins until a paid booking is attended", () => {
 
       expect(coinsOf()).toBe(0);
     });
+  });
+});
+
+describe("milestone tier grants are held and freed one at a time", () => {
+  beforeEach(() => {
+    db.rules.clear();
+    db.events.clear();
+    db.lifecycles.length = 0;
+    db.passports.clear();
+    db.seq = 0;
+    for (const r of [
+      rule("finish_intro", 50, 20, { onceOnly: true }),
+      rule("attend_event", 100, 40),
+    ]) {
+      db.rules.set(r.action, r);
+    }
+  });
+
+  const tier = (refId: string, tokens: number) =>
+    RewardService.grant({
+      userId: u,
+      action: "milestone_tier",
+      refType: "milestone_tier",
+      refId,
+      idempotencyKey: `milestone:${u}:${refId}`,
+      coinsOverride: tokens,
+      holdUntilAttended: true,
+    });
+
+  it("holds the Tokens as Pending, not in the balance", async () => {
+    const out = await tier("booked_events:1", 10);
+    expect(out.coinsAwarded).toBe(10);
+    expect(coinsOf()).toBe(0);
+    expect(await RewardRepo.getPendingCoins(u)).toBe(10);
+  });
+
+  it("an attended paid booking frees the one-time Coins but not a held tier", async () => {
+    await intro(); // held one-time grant, 20
+    await tier("booked_events:1", 10); // held tier grant, 10
+    await attend("b1", 100); // frees the held one-time grants, and pays 40
+    expect(coinsOf()).toBe(60); // 20 + 40, and not the tier's 10
+    expect(await RewardRepo.getPendingCoins(u)).toBe(10);
+  });
+
+  it("releaseGrant frees that grant only", async () => {
+    await tier("booked_events:1", 10);
+    await tier("booked_events:2", 25);
+    const first = [...db.events.values()].find(
+      (e) => e.refId === "booked_events:1",
+    )!;
+    expect(await RewardRepo.releaseGrant(first.id, u, "attended")).toBe(true);
+    expect(coinsOf()).toBe(10);
+    expect(await RewardRepo.getPendingCoins(u)).toBe(25);
+  });
+
+  it("releaseGrant twice pays once", async () => {
+    await tier("booked_events:1", 10);
+    const ev = [...db.events.values()][0];
+    await RewardRepo.releaseGrant(ev.id, u, "attended");
+    expect(await RewardRepo.releaseGrant(ev.id, u, "attended")).toBe(false);
+    expect(coinsOf()).toBe(10);
+  });
+
+  it("releaseGrant does nothing for a grant that was reversed", async () => {
+    await tier("booked_events:1", 10);
+    await RewardService.reverse({
+      userId: u,
+      action: "milestone_tier",
+      refType: "milestone_tier",
+      refId: "booked_events:1",
+      reason: "cancelled",
+    });
+    const ev = [...db.events.values()][0];
+    expect(await RewardRepo.releaseGrant(ev.id, u, "attended")).toBe(false);
+    expect(coinsOf()).toBe(0);
+  });
+
+  it("listHeldByAction returns only that action's held grants", async () => {
+    await intro();
+    await tier("booked_events:1", 10);
+    const rows = await RewardRepo.listHeldByAction(u, "milestone_tier");
+    expect(rows.map((r) => r.refId)).toEqual(["booked_events:1"]);
   });
 });

@@ -334,6 +334,16 @@ export default class PassportSvc {
       console.warn("[PassportSvc] attend_event reward grant failed:", grantErr);
     }
 
+    // The stamp just written can complete a milestone tier. A failure here must
+    // never undo or block the check-in; the next hook or sweep pays it.
+    try {
+      const { default: MilestoneSvc } =
+        await import("../milestone/milestone.service");
+      await MilestoneSvc.reconcile(booking.userId);
+    } catch (milestoneErr) {
+      console.warn("[PassportSvc] milestone reconcile failed:", milestoneErr);
+    }
+
     // Milestone Badges: Track distinct venue stamps collected
     try {
       const distinctVenues = await PassportRepo.findDistinctStampVenues(
