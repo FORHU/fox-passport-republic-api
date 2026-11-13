@@ -377,6 +377,7 @@ export default class PaymentSvc {
       // The repository retires the cache - the booking page is what the
       // citizen is looking at when this lands.
       await BookingRepo.markConfirmed(bookingId);
+      await this.awardFirstBookingBadge(bookingId);
 
       // Auto-approve all included pending item transactions now that payment is confirmed.
       // Without this, venue/asset/service transactions stay "pending" forever and
@@ -391,6 +392,23 @@ export default class PaymentSvc {
     }
 
     return updated;
+  }
+
+  /**
+   * The "First Booking" badge for a booking whose payment was just confirmed.
+   * Loaded on demand and fenced off completely: a badge must never fail, slow
+   * or undo a payment, so nothing it does can reach the caller.
+   */
+  private static async awardFirstBookingBadge(
+    bookingId: string,
+  ): Promise<void> {
+    try {
+      const { default: PassportSvc } =
+        await import("../passport/passport.service");
+      await PassportSvc.awardFirstBookingBadge(bookingId);
+    } catch (e) {
+      console.warn("[PaymentSvc] First Booking badge failed:", e);
+    }
   }
 
   /**
@@ -643,6 +661,7 @@ export default class PaymentSvc {
         // booking the moment the socket message lands, and a webhook that
         // leaves it reading "unpaid" is how someone pays twice.
         await BookingRepo.markConfirmed(bookingId);
+        await this.awardFirstBookingBadge(bookingId);
 
         // Inside the status check on purpose: Stripe retries deliveries, and
         // a redelivery for an already-confirmed intent has changed nothing
