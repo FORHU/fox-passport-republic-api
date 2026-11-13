@@ -1,7 +1,14 @@
 import fs from "fs";
 import path from "path";
 import { sendEmail } from "./mailer";
-import { LOGO_DATA_URI } from "./emails/base";
+
+/**
+ * The logo in templated emails: a small PNG on the card's own dark colour,
+ * sent inside the email and referenced as `cid:`. A hosted transparent PNG
+ * was shrunk by Gmail until only the ears showed (api#335).
+ */
+export const EMAIL_LOGO_CID = "foxpassport-logo";
+const EMAIL_LOGO_PATH = path.join(process.cwd(), "email-template/fox-logo.png");
 
 /**
  
@@ -24,6 +31,8 @@ export interface EmailAttachment {
   path?: string;
   content?: string | Buffer;
   contentType?: string;
+  /** Content ID: the HTML shows this attachment inline as `cid:<cid>`. */
+  cid?: string;
 }
 
 export interface SendTemplatedEmailParams {
@@ -46,7 +55,15 @@ export const sendTemplatedEmail = async ({
     to: email_data.email,
     subject,
     html,
-    attachments,
+    attachments: [
+      ...attachments,
+      {
+        filename: "foxpassport.png",
+        path: EMAIL_LOGO_PATH,
+        contentType: "image/png",
+        cid: EMAIL_LOGO_CID,
+      },
+    ],
   });
 };
 
@@ -82,13 +99,29 @@ export const getHTMLContents = ({
   let html = fs.readFileSync(filePath, "utf8");
   const data: Record<string, string | number> = {
     ...email_data,
-    LOGO_URL: LOGO_DATA_URI,
+    LOGO_URL: `cid:${EMAIL_LOGO_CID}`,
+    YEAR: new Date().getFullYear(),
   };
   for (const key in data) {
-    html = html.replace(new RegExp(key, "g"), String(data[key]));
+    const value = String(data[key]);
+    // `{{key}}` is the placeholder. A function replacement keeps a `$` in the
+    // value literal.
+    html = html.replace(
+      new RegExp(`\\{\\{${escapeRegExp(key)}\\}\\}`, "g"),
+      () => value,
+    );
+    // Older templates use bare UPPER_CASE keys (EVENT_NAME). Those still work,
+    // but only as whole words, and never lowercase keys: replacing the key
+    // `email` everywhere turned "Verify your email" into the address (api#335).
+    if (/^[A-Z][A-Z0-9_]*$/.test(key)) {
+      html = html.replace(new RegExp(`\\b${key}\\b`, "g"), () => value);
+    }
   }
   return html;
 };
+
+const escapeRegExp = (s: string): string =>
+  s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export const stringBacktickToArray = (input: string = ""): string[] => {
   return input

@@ -12,6 +12,7 @@
     "validate": "node tools/validate-architecture.mjs",
     "validate:rbac": "node tools/validate-rbac-guards.mjs",
     "seed:multirole": "pnpm exec tsx prisma/seeder/multirole-scenario.seeder.ts",
+    "seed:paws": "pnpm exec tsx prisma/seeder/paws-leaderboard.seeder.ts",
     "seed:organizers": "pnpm exec tsx prisma/seeder/organizer-scenario.seeder.ts",
     "seed:reels": "pnpm exec tsx prisma/seeder/reels.seeder.ts",
     "seed:reels:remote": "pnpm exec tsx prisma/seeder/reels-remote.seeder.ts",

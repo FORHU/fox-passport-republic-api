@@ -56,6 +56,11 @@ beforeAll(async () => {
       .send({ email, password: PASSWORD, name });
     expect(res.status).toBe(200);
   }
+  // An unverified email can't sign in (requireEmailVerification).
+  await prisma.user.updateMany({
+    where: { email: { in: [emailA, emailB] } },
+    data: { isEmailVerified: true },
+  });
 });
 
 afterAll(cleanUp);

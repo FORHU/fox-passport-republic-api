@@ -1,3 +1,4 @@
+import fs from "fs";
 import type { Attachment } from "nodemailer/lib/mailer";
 import {
   SendMailOptions,
@@ -33,12 +34,28 @@ export async function sendEmail({
 }): Promise<string> {
   if (resendClient) {
     try {
-      await resendClient.emails.send({
+      // Resend reports a refused email (unverified domain, bad key) in
+      // `error`; it does not throw. Unchecked, every refusal was logged as
+      // sent and the SMTP fallback never ran (api#332).
+      const { error } = await resendClient.emails.send({
         from: FROM_ADDRESS,
         to,
         subject,
         html: html ?? text ?? "",
+        // Resend names nodemailer's `cid` `contentId` and needs the bytes.
+        attachments: attachments?.map((a) => ({
+          filename: typeof a.filename === "string" ? a.filename : undefined,
+          content:
+            typeof a.content === "string" || Buffer.isBuffer(a.content)
+              ? a.content
+              : typeof a.path === "string"
+                ? fs.readFileSync(a.path)
+                : undefined,
+          contentType: a.contentType,
+          contentId: a.cid,
+        })),
       });
+      if (error) throw new Error(`${error.name}: ${error.message}`);
       console.log(`Resend email sent to ${to}: ${subject}`);
       return "Email sent successfully";
     } catch (error) {
