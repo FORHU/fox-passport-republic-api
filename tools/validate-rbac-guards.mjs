@@ -74,6 +74,13 @@ const ALLOW_LIST = new Set([
   "facebook.routes.ts POST /shares",
   "facebook.routes.ts GET /shares/:postId",
 
+  // Daily login (RR-7, api#302). Both routes read or pay only the caller's own
+  // daily login, keyed by the session user and the Manila day; DailyLoginSvc
+  // checks the email is verified. Self-service, so no capability permission
+  // applies.
+  "reward.routes.ts GET /daily-login",
+  "reward.routes.ts POST /daily-login",
+
   // Foxer Score management console: self-service operational metrics for authenticated Foxer.
   "foxer-score.routes.ts GET /me",
   // Achievements engine: self-service personal progress and rewards evaluation for authenticated user.

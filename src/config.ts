@@ -154,6 +154,23 @@ export const LEADERBOARD_TOP_RATED_MIN_BOOKINGS = readCountEnv(
   3,
 );
 
+// Daily login (RR-7, rewards spec section 3): the most Tokens it pays in one
+// Manila month, so it stops there. The amount paid each day lives in the
+// `daily_login` RewardRule. Read from the environment until the admin settings
+// screens exist (RR-8).
+export const DAILY_LOGIN_MONTHLY_CAP_TOKENS = readCountEnv(
+  "DAILY_LOGIN_MONTHLY_CAP_TOKENS",
+  100,
+);
+// Daily login runs in a 7-day cycle: days 1 to 6 pay the rule's amount, and
+// day 7 pays that plus this bonus. 0 pays the same every day, which is the
+// spec's flat amount; the blueprint's +5 a day with +20 on day 7 is a rule of 5
+// and a bonus of 15.
+export const DAILY_LOGIN_DAY7_BONUS_TOKENS = readCountEnv(
+  "DAILY_LOGIN_DAY7_BONUS_TOKENS",
+  0,
+);
+
 export const PLATFORM_FEE_PERCENT = readPercentEnv(
   "PLATFORM_FEE_PERCENT",
   process.env.PLATFORM_FEE_PERCENT,
