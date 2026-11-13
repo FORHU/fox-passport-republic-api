@@ -162,6 +162,47 @@ describe("Leaderboards Engine (Specification §8)", () => {
       expect(res.entries[1].foxerSince).toBe("2026-03-05T00:00:00.000Z");
     });
 
+    it("ranks a Foxer with no Paws (New) after every Foxer who has Paws", async () => {
+      vi.mocked(LeaderboardRepo.getFoxersForRanking).mockResolvedValue(
+        mockFoxers as any,
+      );
+      // foxer-2 is new: four reviews averaging 4.9, so no Paws are shown, yet
+      // their Bayesian score (about 4.68) is higher than foxer-1's (about
+      // 4.44, from eight reviews averaging 4.4).
+      vi.mocked(FoxerScoreService.computeFoxerScore).mockImplementation(
+        async (userId: string) =>
+          ({
+            foxerScore: 50,
+            operationalMetrics:
+              userId === "foxer-1"
+                ? {
+                    starRating: 4.4,
+                    avgRating: 4.4,
+                    rawReviewCount: 8,
+                    completedBookings: 8,
+                    isIdentityVerified: false,
+                  }
+                : {
+                    starRating: 4.9,
+                    avgRating: 4.9,
+                    rawReviewCount: 4,
+                    completedBookings: 4,
+                    isIdentityVerified: false,
+                  },
+          }) as any,
+      );
+
+      const res = await LeaderboardService.getFoxerLeaderboard(
+        null,
+        "top_rated",
+        "venueFoxer",
+      );
+
+      expect(res.entries.map((e) => e.userId)).toEqual(["foxer-1", "foxer-2"]);
+      expect(res.entries[0].paws).toBe(4.4);
+      expect(res.entries[1].paws).toBeNull();
+    });
+
     it("breaks a Paws tie on completed bookings", async () => {
       vi.mocked(LeaderboardRepo.getFoxersForRanking).mockResolvedValue(
         mockFoxers as any,
