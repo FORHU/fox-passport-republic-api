@@ -37,6 +37,25 @@ export class MilestoneRepo {
   }
 
   /**
+   * These milestones with their tiers, active or not. Switching a milestone off
+   * stops it paying anyone new, but must not strand Tokens it already paid or
+   * is holding: releasing and taking back follow the grant, not the switch.
+   */
+  static async listMilestonesByKeys(keys: string[]) {
+    if (keys.length === 0) return [];
+    return prisma.milestone.findMany({
+      where: { key: { in: keys } },
+      include: { tiers: { orderBy: { tier: "asc" } } },
+    });
+  }
+
+  /** These challenges, active or not, for the same reason. */
+  static async listChallengesByKeys(keys: string[]) {
+    if (keys.length === 0) return [];
+    return prisma.challenge.findMany({ where: { key: { in: keys } } });
+  }
+
+  /**
    * Everything a citizen's milestones count. "Attended" is a passport stamp,
    * which is written on check-in. Reading never changes anything.
    *

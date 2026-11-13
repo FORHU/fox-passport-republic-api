@@ -188,8 +188,8 @@ export class MilestoneSvc {
       }
     }
     await this.reconcileChallenges(userId, now, launchAt);
-    await this.reverseLostTiers(userId, milestones, counters);
-    await this.releaseHeldTiers(userId, milestones, paidBookings);
+    await this.reverseLostTiers(userId, counters);
+    await this.releaseHeldTiers(userId, paidBookings);
     await this.releaseHeldChallenges(userId, launchAt);
     return granted;
   }
@@ -259,7 +259,11 @@ export class MilestoneSvc {
       CHALLENGE_PERIOD_ACTION,
     );
     if (held.length === 0) return;
-    const challenges = await MilestoneRepo.listActiveChallenges();
+    // By the grants' own keys, active or not: switching a challenge off must
+    // not leave the Tokens it is holding waiting for ever.
+    const challenges = await MilestoneRepo.listChallengesByKeys([
+      ...new Set(held.map((g) => g.refId.slice(0, g.refId.indexOf(":")))),
+    ]);
     for (const grant of held) {
       const at = grant.refId.indexOf(":");
       const c = challenges.find((x) => x.key === grant.refId.slice(0, at));
@@ -291,7 +295,6 @@ export class MilestoneSvc {
    */
   private static async releaseHeldTiers(
     userId: string,
-    milestones: Awaited<ReturnType<typeof MilestoneRepo.listActiveMilestones>>,
     paidBookings: () => Promise<{ id: string; attended: boolean }[]>,
   ): Promise<void> {
     const held = await RewardRepo.listHeldByAction(
@@ -299,6 +302,11 @@ export class MilestoneSvc {
       MILESTONE_TIER_ACTION,
     );
     if (held.length === 0) return;
+    // By the grants' own keys, active or not: switching a milestone off must
+    // not leave the Tokens it is holding waiting for ever.
+    const milestones = await MilestoneRepo.listMilestonesByKeys([
+      ...new Set(held.map((g) => g.refId.split(":")[0])),
+    ]);
     for (const grant of held) {
       const [key, tierText] = grant.refId.split(":");
       const m = milestones.find((x) => x.key === key);
@@ -325,11 +333,15 @@ export class MilestoneSvc {
    */
   private static async reverseLostTiers(
     userId: string,
-    milestones: Awaited<ReturnType<typeof MilestoneRepo.listActiveMilestones>>,
     counters: MilestoneCounters,
   ): Promise<void> {
     const paid = new Set(await MilestoneRepo.listPaidTierRefs(userId));
     if (paid.size === 0) return;
+    // By the grants' own keys, active or not: a refund must still take back a
+    // tier whose milestone has since been switched off.
+    const milestones = await MilestoneRepo.listMilestonesByKeys([
+      ...new Set([...paid].map((ref) => ref.split(":")[0])),
+    ]);
     for (const m of milestones) {
       const count = counterValue(m.counter, counters);
       for (const t of m.tiers) {

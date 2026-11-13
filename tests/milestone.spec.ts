@@ -23,8 +23,24 @@ const heldRows = vi.spyOn(RewardRepo, "listHeldByAction");
 const releaseGrant = vi.spyOn(RewardRepo, "releaseGrant");
 const challengePaid = vi.spyOn(MilestoneRepo, "listPaidChallengeRefs");
 const inWindow = vi.spyOn(MilestoneRepo, "listBookingsInWindow");
+const milestonesByKeys = vi.spyOn(MilestoneRepo, "listMilestonesByKeys");
+const challengesByKeys = vi.spyOn(MilestoneRepo, "listChallengesByKeys");
 
 function resetPaidMode() {
+  // Release and reversal look milestones and challenges up by the grants' own
+  // keys, active or not. In a unit test the fixtures are the whole world, so
+  // answer from whatever the test gave listActiveMilestones and
+  // listActiveChallenges, and never reach the database.
+  milestonesByKeys.mockReset();
+  milestonesByKeys.mockImplementation((async (keys: string[]) =>
+    ((await repo.listActiveMilestones()) as { key: string }[]).filter((m) =>
+      keys.includes(m.key),
+    )) as never);
+  challengesByKeys.mockReset();
+  challengesByKeys.mockImplementation((async (keys: string[]) =>
+    ((await repo.listActiveChallenges()) as { key: string }[]).filter((c) =>
+      keys.includes(c.key),
+    )) as never);
   repo.listActiveChallenges.mockReset();
   repo.listActiveChallenges.mockResolvedValue([]);
   challengePaid.mockReset();
