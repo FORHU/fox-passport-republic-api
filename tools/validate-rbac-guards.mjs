@@ -81,6 +81,14 @@ const ALLOW_LIST = new Set([
   "reward.routes.ts GET /daily-login",
   "reward.routes.ts POST /daily-login",
 
+  // Referrals (RR-7, api#302). Both routes read or change only the caller's own
+  // code and referrer, keyed by the session user; ReferralSvc checks the rest
+  // (no own code, no second code, no code after a first paid booking). The apply
+  // route is rate limited per account. Self-service, so no capability
+  // permission applies.
+  "referral.routes.ts GET /me",
+  "referral.routes.ts POST /apply",
+
   // Foxer Score management console: self-service operational metrics for authenticated Foxer.
   "foxer-score.routes.ts GET /me",
   // Achievements engine: self-service personal progress and rewards evaluation for authenticated user.

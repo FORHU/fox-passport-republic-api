@@ -112,3 +112,33 @@ model CoinRedemption {
   @@map("coin_redemptions")
 }
 
+
+// Where a referral stands. Only `pending` exists until the payout is built:
+// a code attached at sign-up pays nothing by itself.
+enum ReferralStatus {
+  pending // attached; the friend has not had a first paid booking attended
+  rewarded // both people were paid
+  void // will never pay (a rule was broken); `voidReason` says which
+}
+
+// One citizen brought in by another (RR-7, api#302). A code never pays at
+// sign-up: Tokens go to both people only when the friend's first paid booking
+// is attended.
+model Referral {
+  id         String         @id @default(uuid())
+  referrerId String
+  // One referrer per account, ever.
+  referredId String         @unique
+  // The code the friend entered, kept as typed (normalized) for support.
+  code       String
+  status     ReferralStatus @default(pending)
+  voidReason String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  referrer   User           @relation("ReferralReferrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred   User           @relation("ReferralReferred", fields: [referredId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId, status])
+  @@map("referrals")
+}
