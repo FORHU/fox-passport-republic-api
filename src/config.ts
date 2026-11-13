@@ -170,6 +170,24 @@ export const DAILY_LOGIN_STEP_TOKENS = readCountEnv(
   10,
 );
 
+// Milestones (RR-6): the moment tier Tokens start paying. A tier a citizen had
+// already reached before this instant gives a badge only and never pays Tokens
+// (no back-pay), so every existing citizen starts from where they stand.
+// Unset means milestone Tokens do not pay at all. Set it to the deploy time, as
+// an ISO instant such as 2026-11-20T00:00:00+08:00.
+function readInstantEnv(name: string): Date | null {
+  const value = process.env[name];
+  if (value === undefined || value.trim() === "") return null;
+  const parsed = new Date(value.trim());
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(
+      `${name} is "${value}". Refusing to start: it must be an ISO date and time, for example 2026-11-20T00:00:00+08:00.`,
+    );
+  }
+  return parsed;
+}
+export const MILESTONES_LAUNCH_AT = readInstantEnv("MILESTONES_LAUNCH_AT");
+
 export const PLATFORM_FEE_PERCENT = readPercentEnv(
   "PLATFORM_FEE_PERCENT",
   process.env.PLATFORM_FEE_PERCENT,

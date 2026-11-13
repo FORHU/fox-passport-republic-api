@@ -112,3 +112,78 @@ model CoinRedemption {
   @@map("coin_redemptions")
 }
 
+
+// What a milestone counts. Admin-editable rows, so a change needs no deploy.
+enum MilestoneCounter {
+  booked_events
+  attended_events
+  cities
+  venues
+  reviews
+  spend // pesos paid on attended bookings, net of refunds (Big Spender)
+}
+
+// Whether a booking counts once payment is confirmed or only once attended.
+enum MilestoneCountMode {
+  paid
+  attended
+}
+
+enum ChallengeWindow {
+  day
+  week
+  month // all three in Manila time
+}
+
+// A cumulative milestone: every tier pays its Tokens once as the count grows.
+model Milestone {
+  id          String             @id @default(uuid())
+  key         String             @unique
+  name        String
+  description String?
+  counter     MilestoneCounter
+  counts      MilestoneCountMode @default(attended)
+  active      Boolean            @default(true)
+  sortOrder   Int                @default(0)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  tiers       MilestoneTier[]
+
+  @@map("milestones")
+}
+
+model MilestoneTier {
+  id          String    @id @default(uuid())
+  milestoneId String
+  tier        Int
+  target      Int // a count, or whole pesos for the spend counter
+  tokens      Int       @default(0)
+  badgeName   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  milestone   Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@unique([milestoneId, tier])
+  @@map("milestone_tiers")
+}
+
+// A booking challenge over a day, week or month in Manila time.
+model Challenge {
+  id          String          @id @default(uuid())
+  key         String          @unique
+  name        String
+  description String?
+  period      ChallengeWindow
+  target      Int
+  tokens      Int             @default(0)
+  active      Boolean         @default(true)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@map("challenges")
+}

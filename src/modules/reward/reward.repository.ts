@@ -1,6 +1,19 @@
 import { Prisma, RewardLifecycleType, UserPath } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 
+/**
+ * The action of a milestone tier grant. These can be held, but only for the
+ * bookings behind that tier, so the release-everything path leaves them alone
+ * and MilestoneSvc frees each one with `releaseGrant` when its own bookings
+ * have been attended.
+ */
+export const MILESTONE_TIER_ACTION = "milestone_tier";
+
+/** Same for a booking challenge: one grant per person, challenge and period. */
+export const CHALLENGE_PERIOD_ACTION = "challenge_period";
+
+const SCOPED_RELEASE_ACTIONS = [MILESTONE_TIER_ACTION, CHALLENGE_PERIOD_ACTION];
+
 export default class RewardRepo {
   /**
    * Finds an active reward rule by action name.
@@ -218,10 +231,57 @@ export default class RewardRepo {
     return !!found;
   }
 
+  /** A user's held grants of one action, oldest first. */
+  static async listHeldByAction(userId: string, action: string) {
+    return prisma.rewardEvent.findMany({
+      where: { ...this.pendingWhere(userId), action },
+      select: { id: true, refId: true, coins: true },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  /**
+   * Releases one held grant: an append-only RELEASE record and the Coins added
+   * to the spendable balance, in one transaction. Does nothing if the grant was
+   * already released or reversed, so it is safe to call again.
+   */
+  static async releaseGrant(
+    grantEventId: string,
+    userId: string,
+    reason: string,
+  ): Promise<boolean> {
+    return prisma.$transaction(async (tx) => {
+      const held = await tx.rewardEvent.findFirst({
+        where: { ...this.pendingWhere(userId), id: grantEventId },
+        select: { id: true, coins: true },
+      });
+      if (!held) return false;
+      await tx.rewardLifecycle.create({
+        data: {
+          grantEventId: held.id,
+          userId,
+          type: RewardLifecycleType.RELEASE,
+          coinsDelta: held.coins,
+          reason,
+        },
+      });
+      await tx.passport.upsert({
+        where: { userId },
+        create: { userId, coins: held.coins },
+        update: { coins: { increment: held.coins } },
+      });
+      return true;
+    });
+  }
+
   /**
    * Releases every held grant of a user: one append-only RELEASE record per
    * grant, and the Coins added to the spendable balance, in one transaction.
    * Safe to call again: a released grant is no longer held.
+   *
+   * Milestone tier and challenge grants are left out: each is freed only by its
+   * own bookings being attended (releaseGrant), not by whichever booking is
+   * attended next.
    */
   static async releasePendingGrants(
     userId: string,
@@ -229,7 +289,10 @@ export default class RewardRepo {
   ): Promise<{ released: number; coins: number }> {
     return prisma.$transaction(async (tx) => {
       const held = await tx.rewardEvent.findMany({
-        where: this.pendingWhere(userId),
+        where: {
+          ...this.pendingWhere(userId),
+          action: { notIn: SCOPED_RELEASE_ACTIONS },
+        },
         select: { id: true, coins: true },
       });
       if (held.length === 0) return { released: 0, coins: 0 };
