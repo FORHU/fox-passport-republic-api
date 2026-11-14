@@ -3,7 +3,7 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import { totalPages } from "../../utils/pagination";
 import EventTemplateSvc from "./event-template.service";
-import { EventCategory } from "@prisma/client";
+import { EventCategory, Prisma } from "@prisma/client";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
 import {
   EVENT_DESCRIPTION_MAX,
@@ -13,11 +13,18 @@ import {
   quantityJoi,
 } from "../../utils/limits";
 
+/** Prisma's messages describe the query, not the request: never send them on. */
+const isPrismaError = (e: unknown) =>
+  e instanceof Prisma.PrismaClientKnownRequestError ||
+  e instanceof Prisma.PrismaClientUnknownRequestError ||
+  e instanceof Prisma.PrismaClientValidationError;
+
 export default class EventTemplateCtrl {
   static async createTemplate(req: Request, res: Response) {
     const schema = Joi.object({
       name: nameJoi().required(),
-      description: descriptionJoi(EVENT_DESCRIPTION_MAX).optional(),
+      // Blank is a draft without one yet (spaces trim to "").
+      description: descriptionJoi(EVENT_DESCRIPTION_MAX).allow("").optional(),
       category: Joi.string()
         .valid(...Object.values(EventCategory))
         .required(),
@@ -52,6 +59,7 @@ export default class EventTemplateCtrl {
         .json({ message: "Template created successfully", template });
     } catch (e: unknown) {
       if (e instanceof AppError) return sendAppError(res, e);
+      if (isPrismaError(e)) return sendServerError(res, e);
       const error = e as Error;
       return res.status(400).json({ message: error.message });
     }
@@ -60,7 +68,7 @@ export default class EventTemplateCtrl {
   static async updateTemplate(req: Request, res: Response) {
     const schema = Joi.object({
       name: nameJoi().optional(),
-      description: descriptionJoi(EVENT_DESCRIPTION_MAX).optional(),
+      description: descriptionJoi(EVENT_DESCRIPTION_MAX).allow("").optional(),
       category: Joi.string()
         .valid(...Object.values(EventCategory))
         .optional(),
@@ -96,6 +104,7 @@ export default class EventTemplateCtrl {
         .json({ message: "Template updated successfully", template });
     } catch (e: unknown) {
       if (e instanceof AppError) return sendAppError(res, e);
+      if (isPrismaError(e)) return sendServerError(res, e);
       const error = e as Error;
       const status = error.message.includes("Unauthorized")
         ? 403
