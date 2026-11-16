@@ -119,6 +119,12 @@ jobs:
           MAILER_PASSWORD: ${{ secrets.MAILER_PASSWORD }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          # The Stripe Connect endpoint's own signing secret (api#363). Stripe
+          # sends `account.updated` for Foxers' accounts only to that endpoint;
+          # without it their onboarding never registers and payouts fail.
+          # Since api#363 the API also refuses to start in production without
+          # STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET.
+          STRIPE_CONNECT_WEBHOOK_SECRET: ${{ secrets.STRIPE_CONNECT_WEBHOOK_SECRET }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           FACEBOOK_APP_SECRET: ${{ secrets.FACEBOOK_APP_SECRET }}
           # better-auth, added by the devs after this workflow was written. The API
@@ -166,6 +172,7 @@ jobs:
 
           for k in SECRET_KEY \
                    MAILER_PASSWORD STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET \
+                   STRIPE_CONNECT_WEBHOOK_SECRET \
                    GOOGLE_CLIENT_SECRET FACEBOOK_APP_SECRET \
                    BETTER_AUTH_SECRET BETTER_AUTH_URL VIDEO_CDN_URL \
                    FACEBOOK_TOKEN_ENCRYPTION_KEY FACEBOOK_GRAPH_VERSION \
