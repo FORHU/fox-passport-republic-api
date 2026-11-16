@@ -49,6 +49,7 @@ import bookingEditRequestRoutes from "../modules/booking-edit-request/booking-ed
 import checkoutRoutes from "../modules/checkout/checkout.routes";
 import platformFeeConfigRoutes from "../modules/platform-fee-config/platform-fee-config.routes";
 import rewardSettingsRoutes from "../modules/reward-settings/reward-settings.routes";
+import rewardAdminRoutes from "../modules/reward-admin/reward-admin.routes";
 import promotionRoutes from "../modules/promotion/promotion.routes";
 import promotionOwnRoutes from "../modules/promotion/promotion-own.routes";
 import fxRoutes from "../modules/fx/fx.routes";
@@ -105,6 +106,7 @@ router.use("/v1/bookings", bookingRoutes);
 router.use("/v1/cancellation-policies", cancellationPolicyRoutes);
 router.use("/v1/admin/platform-fee-configs", platformFeeConfigRoutes);
 router.use("/v1/admin/reward-settings", rewardSettingsRoutes);
+router.use("/v1/admin/rewards", rewardAdminRoutes);
 router.use("/v1/admin/promotions", promotionRoutes);
 router.use("/v1/promotions/mine", promotionOwnRoutes);
 router.use("/v1/fx", fxRoutes);
