@@ -56,12 +56,15 @@ describe("readStripeEnv", () => {
 
   it("only warns in development, and stays quiet in tests", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect(readStripeEnv("STRIPE_SECRET_KEY", "", { isDev: true })).toBe("");
-    expect(warn).not.toHaveBeenCalled(); // NODE_ENV is "test" here
-
+    // Set explicitly: vitest defaults NODE_ENV to "test", but CI runs the
+    // suite with NODE_ENV=development (.github/workflows/ci.yml).
     const previous = process.env.NODE_ENV;
-    process.env.NODE_ENV = "development";
     try {
+      process.env.NODE_ENV = "test";
+      expect(readStripeEnv("STRIPE_SECRET_KEY", "", { isDev: true })).toBe("");
+      expect(warn).not.toHaveBeenCalled();
+
+      process.env.NODE_ENV = "development";
       readStripeEnv("STRIPE_SECRET_KEY", "", { isDev: true });
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining("STRIPE_SECRET_KEY is not set"),
