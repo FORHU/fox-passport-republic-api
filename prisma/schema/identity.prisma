@@ -84,6 +84,9 @@ model User {
   // "Verified" badge, never a booking requirement (booking needs only a
   // verified email).
   identityVerifiedAt       DateTime?
+  // Shared with friends to refer them (RR-7). Made the first time it is asked
+  // for, so most accounts never have one.
+  referralCode             String?                      @unique
   identityVerifications    IdentityVerification[]       @relation("IdentityApplicant")
   identityReviews          IdentityVerification[]       @relation("IdentityReviewer")
   payouts                  Payout[]
@@ -122,6 +125,8 @@ model User {
   venueAffiliations        VenueEventFoxerAffiliation[] @relation("VenueAffiliationEventFoxer")
   venueAffiliationReviews  VenueEventFoxerAffiliation[] @relation("VenueAffiliationReviewer")
   rewardEvents             RewardEvent[]
+  referralsMade           Referral[]                   @relation("ReferralReferrer")
+  referredBy               Referral?                    @relation("ReferralReferred")
   rewardLifecycles         RewardLifecycle[]
   onboardings              UserOnboarding[]
   ownedVouchers            Voucher[]                    @relation("UserVouchers")

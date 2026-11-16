@@ -61,6 +61,15 @@ export default class PassportRepo {
     return prisma.badge.findUnique({ where: { name } });
   }
 
+  /** Who made a booking, or null if there is no such booking. */
+  static async findBookingOwnerId(bookingId: string): Promise<string | null> {
+    const row = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { userId: true },
+    });
+    return row?.userId ?? null;
+  }
+
   static async findByUserId(userId: string) {
     return prisma.passport.findUnique({
       where: { userId },
