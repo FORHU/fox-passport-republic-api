@@ -13,7 +13,6 @@ import {
   FoxerCounters,
 } from "./achievement.repository";
 import PassportSvc from "../passport/passport.service";
-import RewardRepo from "../reward/reward.repository";
 
 export class AchievementSvc {
   /**
@@ -47,35 +46,14 @@ export class AchievementSvc {
       Math.round((currentCount / targetCount) * 100),
     );
 
-    // Auto-evaluate unlocked tiers and award rewards idempotently
+    // Unlocked tiers keep their badges, and badges only. Reading used to pay
+    // each tier's Coins here, which double-paid what milestones now pay (RR-6)
+    // and paid Foxers Tokens they cannot earn. Tokens for these actions come
+    // from MilestoneSvc.reconcile, on the event itself, never from a read. A
+    // badge award is an upsert, so repeating it on every read is safe.
     for (const t of def.tiers) {
-      if (currentCount >= t.target) {
-        const idempotencyKey = `grant:${userId}:achievement:${def.key}:tier_${t.tier}`;
-        const alreadyGranted =
-          await RewardRepo.findEventByIdempotencyKey(idempotencyKey);
-
-        if (!alreadyGranted) {
-          // Award Coins if not social-only
-          if (t.coins > 0 && !def.isSocialOnly) {
-            await RewardRepo.recordGrant({
-              userId,
-              path: def.path,
-              action: "achievement",
-              refType: "achievement_tier",
-              refId: `${def.key}:${t.tier}`,
-              xp: 0,
-              coins: t.coins,
-              idempotencyKey,
-            }).catch(() => {});
-          }
-
-          // Award badge if configured for this tier
-          if (t.badgeName) {
-            await PassportSvc.awardBadgeByName(userId, t.badgeName).catch(
-              () => {},
-            );
-          }
-        }
+      if (currentCount >= t.target && t.badgeName) {
+        await PassportSvc.awardBadgeByName(userId, t.badgeName).catch(() => {});
       }
     }
 
@@ -94,7 +72,8 @@ export class AchievementSvc {
         tier: t.tier,
         target: t.target,
         xp: t.xp,
-        coins: t.coins,
+        // Nothing here pays Tokens any more; 0 keeps the apps from promising any.
+        coins: 0,
         badgeName: t.badgeName,
         isUnlocked: currentCount >= t.target,
       })),

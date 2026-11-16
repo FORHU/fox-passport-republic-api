@@ -178,6 +178,13 @@ export default class ReviewSvc {
           refType: "review",
           refId: review.id,
         });
+        // A review on an attended booking can complete a milestone tier. The
+        // nightly sweep pays it if this fails.
+        const { default: MilestoneSvc } =
+          await import("../milestone/milestone.service");
+        await MilestoneSvc.reconcile(String(data.userId)).catch((e) =>
+          console.warn("[ReviewSvc] milestone reconcile failed:", e),
+        );
         const reviewCount = await prisma.review.count({
           where: { userId: String(data.userId) },
         });

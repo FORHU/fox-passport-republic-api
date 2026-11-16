@@ -131,8 +131,9 @@ export default class RewardService {
     // one has, they are paid at once.
     const isPending =
       coinsToAward > 0 &&
-      HELD_ACTIONS.has(params.action) &&
-      !(await RewardRepo.hasPaidAttendance(params.userId));
+      (params.holdUntilAttended === true ||
+        (HELD_ACTIONS.has(params.action) &&
+          !(await RewardRepo.hasPaidAttendance(params.userId))));
 
     // 6. Record Immutable Grant & Lifecycle in Database
     await RewardRepo.recordGrant({
