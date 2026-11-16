@@ -146,8 +146,8 @@ function readCountEnv(name: string, fallback: number): number {
 
 // Foxer leaderboard, Top rated (rewards spec section 7.2). Paws are ranked by
 // the Bayesian average (v x R + p x C) / (v + p); p is the prior. A Foxer needs
-// this many completed bookings to appear. Read from the environment until the
-// admin settings screens exist (RR-8).
+// this many completed bookings to appear. These are the defaults; an admin can
+// override them (reward-settings, RR-8) without a deploy.
 export const LEADERBOARD_PAWS_PRIOR = readCountEnv("LEADERBOARD_PAWS_PRIOR", 5);
 export const LEADERBOARD_TOP_RATED_MIN_BOOKINGS = readCountEnv(
   "LEADERBOARD_TOP_RATED_MIN_BOOKINGS",
@@ -156,8 +156,8 @@ export const LEADERBOARD_TOP_RATED_MIN_BOOKINGS = readCountEnv(
 
 // Daily login (RR-7, rewards spec section 3): the most Tokens it pays in one
 // Manila month, so it stops there. The amount paid each day lives in the
-// `daily_login` RewardRule. Read from the environment until the admin settings
-// screens exist (RR-8).
+// `daily_login` RewardRule. This is the default; an admin can override it
+// (reward-settings, RR-8) without a deploy.
 export const DAILY_LOGIN_MONTHLY_CAP_TOKENS = readCountEnv(
   "DAILY_LOGIN_MONTHLY_CAP_TOKENS",
   100,
