@@ -488,7 +488,7 @@ export default class UsersRepo {
   // READ BY EMAIL
   static async getUserByEmail(email: string) {
     return prisma.user.findUnique({
-      where: { email },
+      where: { email: email.trim().toLowerCase() },
     });
   }
 
@@ -505,6 +505,9 @@ export default class UsersRepo {
       prisma.user.create({
         data: {
           ...data,
+          // Better Auth looks a user up by the lowercased email: one stored
+          // with capitals could never sign in (BUG-22).
+          email: data.email.trim().toLowerCase(),
           passwordHash: data.password, // Dual-write passwordHash during Stage 3
           profile: {
             create: {},
@@ -547,7 +550,9 @@ export default class UsersRepo {
     }>,
   ) {
     const updateData: Prisma.UserUpdateInput = {
-      ...(data.email !== undefined && { email: data.email }),
+      ...(data.email !== undefined && {
+        email: data.email.trim().toLowerCase(),
+      }),
       ...(data.username !== undefined && { username: data.username }),
       ...(data.name !== undefined && { name: data.name }),
       ...(data.systemRole !== undefined && { systemRole: data.systemRole }),
