@@ -48,6 +48,8 @@ function isUniqueViolation(err: unknown): boolean {
 import { toStripeCents } from "../../utils/pricing";
 import RefundSvc from "../refund/refund.service";
 import StripeConnectSvc from "../stripe-connect/stripe-connect.service";
+import PayoutSvc from "../payout/payout.service";
+import PaymentDisputeSvc from "./payment-dispute.service";
 import {
   announceToAdmins,
   announceToUser,
@@ -503,9 +505,13 @@ export default class PaymentSvc {
    * here. Everything below used to sit in the controller with its own `prisma`
    * calls; see `docs/REDIS-PLAN.md` §0b.
    *
-   * Nothing in here throws. A webhook that 500s gets retried by Stripe, and
-   * every one of these paths is either idempotent or already committed, so a
-   * retry storm would achieve nothing but load.
+   * Nothing in here throws, except the events the controller runs inside
+   * `WebhookSvc.processEventWithIdempotency` (`account.updated`,
+   * `charge.dispute.*`): for those a throw leaves the event unprocessed and
+   * the 5xx makes Stripe retry it, which is what they need. For the rest a
+   * webhook that 500s gets retried by Stripe, and every one of these paths is
+   * either idempotent or already committed, so a retry storm would achieve
+   * nothing but load.
    */
   static async handleStripeEvent(event: Stripe.Event): Promise<void> {
     switch (event.type) {
@@ -535,18 +541,35 @@ export default class PaymentSvc {
         break;
       }
 
-      case "account.updated":
+      case "account.updated": {
         // Keeps User.stripeChargesEnabled/stripePayoutsEnabled/stripeOnboardingComplete
         // in sync with the connected account's real state. See
-        // docs/adr/0002-stripe-connect-payouts.md. Deployment note: the Stripe
-        // webhook endpoint must also be subscribed to this event type.
-        try {
-          const account = event.data.object as Stripe.Account;
-          await StripeConnectSvc.handleAccountUpdated(account);
-          console.log(`✅ account.updated synced for ${account.id}`);
-        } catch (error) {
-          console.error("Error syncing account.updated via webhook:", error);
+        // docs/adr/0002-stripe-connect-payouts.md. Deployment note: Stripe
+        // sends this for connected accounts only to a *Connect* webhook
+        // endpoint (STRIPE_CONNECT_WEBHOOK_SECRET).
+        //
+        // Runs inside the controller's idempotency wrapper, so it is allowed
+        // to throw: the event then stays unprocessed, the webhook answers
+        // 5xx, and Stripe retries it, instead of the flags silently staying
+        // stale.
+        const account = event.data.object as Stripe.Account;
+        const userId = await StripeConnectSvc.handleAccountUpdated(account);
+        console.log(`✅ account.updated synced for ${account.id}`);
+        // Onboarding just finished: pay what failed because it hadn't.
+        if (userId && account.payouts_enabled) {
+          await PayoutSvc.retryNotOnboardedForUser(userId);
         }
+        break;
+      }
+
+      case "charge.dispute.created":
+      case "charge.dispute.updated":
+      case "charge.dispute.closed":
+        // A chargeback. Recorded for admins; nothing is reversed
+        // automatically (api#363). Idempotent by Stripe dispute id.
+        await PaymentDisputeSvc.recordFromStripe(
+          event.data.object as Stripe.Dispute,
+        );
         break;
 
       default:

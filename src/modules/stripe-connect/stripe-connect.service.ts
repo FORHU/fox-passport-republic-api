@@ -184,8 +184,15 @@ export default class StripeConnectSvc {
     };
   }
 
-  /** Webhook-driven: keeps PaymentAccount and User flags in sync with the connected account's real state. */
-  static async handleAccountUpdated(account: Stripe.Account): Promise<void> {
+  /**
+   * Webhook-driven: keeps PaymentAccount and User flags in sync with the
+   * connected account's real state. Returns the account's user id, or null
+   * when the account isn't one of ours, so the caller can retry that user's
+   * payouts once payouts are enabled.
+   */
+  static async handleAccountUpdated(
+    account: Stripe.Account,
+  ): Promise<string | null> {
     // Look up by PaymentAccount first, or legacy User
     let userId: string | null = null;
 
@@ -204,7 +211,7 @@ export default class StripeConnectSvc {
       userId = legacyUser?.id ?? null;
     }
 
-    if (!userId) return; // not one of our connected accounts
+    if (!userId) return null; // not one of our connected accounts
 
     await prisma.$transaction(async (tx) => {
       // [MIGRATION-FLAG: Stage 3 Switch] 1. Update PaymentAccount
@@ -236,5 +243,6 @@ export default class StripeConnectSvc {
     });
 
     await userCache.invalidateAll();
+    return userId;
   }
 }

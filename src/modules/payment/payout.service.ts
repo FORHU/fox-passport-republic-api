@@ -16,6 +16,7 @@ export default class PaymentPayoutSvc {
    * payout, not in how they *pay it out*).
    */
   static async allocatePayouts(invoiceId: string) {
+    let paymentReference: string | null = null;
     const payoutIds = await prisma.$transaction(async (tx) => {
       const invoice = await tx.invoice.findUnique({
         where: { id: invoiceId },
@@ -40,6 +41,9 @@ export default class PaymentPayoutSvc {
       const payment = invoice.payments[0];
       if (!payment)
         throw new Error("No successful payment found for paid invoice");
+      // Funds each transfer from this charge (source_transaction), resolved
+      // by fireTransfer after the transaction: no Stripe call holds it open.
+      paymentReference = payment.providerReference;
 
       // In V1, we split the platform fee across the line items proportionally.
       // Business Rule: FoxPassport absorbs promotional discounts by default,
@@ -134,7 +138,7 @@ export default class PaymentPayoutSvc {
     // on the row instead), so a partial failure here doesn't need a retry of
     // allocation itself.
     for (const id of payoutIds) {
-      await PayoutSvc.fireTransfer(id);
+      await PayoutSvc.fireTransfer(id, { paymentReference });
     }
   }
 }

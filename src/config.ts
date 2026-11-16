@@ -1,6 +1,7 @@
 import * as dotenv from "dotenv";
 import { requireSecret } from "./utils/require-secret";
 import { readPercentEnv } from "./utils/percent-env";
+import { readStripeEnv } from "./utils/stripe-env";
 dotenv.config();
 
 export const DATABASE_URL = process.env.DATABASE_URL as string;
@@ -121,9 +122,28 @@ export const AWS_SQS_NOTIFICATION_QUEUE_URL = process.env
   .AWS_SQS_NOTIFICATION_QUEUE_URL as string | undefined;
 export const SQS_ENDPOINT = process.env.SQS_ENDPOINT as string | undefined;
 
-export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY as string;
-export const STRIPE_WEBHOOK_SECRET = process.env
-  .STRIPE_WEBHOOK_SECRET as string;
+// Checked at startup (utils/stripe-env.ts): production refuses to start without
+// them; development and tests only warn.
+export const STRIPE_SECRET_KEY = readStripeEnv(
+  "STRIPE_SECRET_KEY",
+  process.env.STRIPE_SECRET_KEY,
+  { isDev },
+);
+// The platform webhook endpoint's signing secret: payments, refunds, disputes.
+export const STRIPE_WEBHOOK_SECRET = readStripeEnv(
+  "STRIPE_WEBHOOK_SECRET",
+  process.env.STRIPE_WEBHOOK_SECRET,
+  { isDev },
+);
+// The Connect webhook endpoint's signing secret. Stripe sends events about
+// connected (Foxer) accounts, such as `account.updated` when onboarding
+// finishes, only to a Connect endpoint, which has its own secret. Optional:
+// without it, Connect events are refused and onboarding flags never update.
+export const STRIPE_CONNECT_WEBHOOK_SECRET = readStripeEnv(
+  "STRIPE_CONNECT_WEBHOOK_SECRET",
+  process.env.STRIPE_CONNECT_WEBHOOK_SECRET,
+  { isDev, optional: true },
+);
 // Platform's own cut, applied on top of itemsTotal (+ hostMarkup for Event bookings),
 // never carved out of provider/host shares. See docs/adr/0002-stripe-connect-payouts.md.
 // Checked at startup like PROCESSING_FEE_PERCENT: unset or empty still means 5,
