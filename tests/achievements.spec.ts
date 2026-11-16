@@ -65,7 +65,7 @@ describe("Achievements Engine (Specification §6)", () => {
       expect(RewardRepo.recordGrant).not.toHaveBeenCalled();
     });
 
-    it("evaluates tier 1 and triggers rewards upon hitting target 1", async () => {
+    it("evaluates tier 1 and pays no Tokens for it (milestones pay them, on the event)", async () => {
       const result = await AchievementSvc.evaluateAchievement(
         userId,
         regularDef,
@@ -75,15 +75,16 @@ describe("Achievements Engine (Specification §6)", () => {
       expect(result.currentTier).toBe(1);
       expect(result.nextTier).toBe(2);
       expect(result.targetCount).toBe(10);
-      // XP is retired: the tier pays its Coins only
       expect(PassportSvc.awardXP).not.toHaveBeenCalled();
-      expect(RewardRepo.recordGrant).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId,
-          action: "achievement",
-          coins: regularDef.tiers[0].coins,
-        }),
-      );
+      // Reading never pays: no grant, and the tiers advertise no Tokens
+      expect(RewardRepo.recordGrant).not.toHaveBeenCalled();
+      expect(result.tiers.every((t) => t.coins === 0)).toBe(true);
+    });
+
+    it("reading twice still pays nothing", async () => {
+      await AchievementSvc.evaluateAchievement(userId, regularDef, 50);
+      await AchievementSvc.evaluateAchievement(userId, regularDef, 50);
+      expect(RewardRepo.recordGrant).not.toHaveBeenCalled();
     });
 
     it("evaluates tier 3 completion (100% progress, nextTier null)", async () => {

@@ -47,7 +47,10 @@ const ROOT_DIR = path.resolve(__dirname, "../src/modules");
 const REPORT_ONLY = process.argv.includes("--report");
 // Existing ownership-guarded routes are tracked separately while the route
 // audit is completed. New unguarded routes must not increase this number.
-const MAX_UNGUARDED_ROUTES = 178;
+// 179: GET /milestones/me (RR-6), a read of the caller's own progress scoped by
+// the session user id, like achievements/me and rewards/me. Approved by the
+// task owner on 2026-11-12.
+const MAX_UNGUARDED_ROUTES = 179;
 
 /**
  * Routes that are `authenticate`d but deliberately have no `requirePermission`
