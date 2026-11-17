@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import EventRequestSvc from "./event-request.service";
+import { sendFailure } from "../../utils/errors";
 import Joi from "joi";
 import {
   VALIDATE_ALL,
@@ -71,8 +72,7 @@ export default class EventRequestCtrl {
       }
       return res.status(201).json({ success: true, data: { id: request.id } });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(400).json({ success: false, message: error.message });
+      return sendFailure(res, e, 400, { success: true });
     }
   }
 
@@ -81,8 +81,7 @@ export default class EventRequestCtrl {
       const events = await EventRequestSvc.findAllApproved();
       return res.status(200).json({ success: true, data: events });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendFailure(res, e, 500, { success: true });
     }
   }
 
@@ -96,8 +95,7 @@ export default class EventRequestCtrl {
       const requests = await EventRequestSvc.getMyRequests(clientId);
       return res.status(200).json({ success: true, data: requests });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(500).json({ success: false, message: error.message });
+      return sendFailure(res, e, 500, { success: true });
     }
   }
 
@@ -107,8 +105,7 @@ export default class EventRequestCtrl {
       const request = await EventRequestSvc.getRequestById(id, req.user);
       return res.status(200).json({ success: true, data: request });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(404).json({ success: false, message: error.message });
+      return sendFailure(res, e, 404, { success: true });
     }
   }
 }
