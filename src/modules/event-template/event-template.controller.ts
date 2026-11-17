@@ -1,4 +1,5 @@
 import { AppError, sendAppError, sendServerError } from "../../utils/errors";
+import { maxPriceFilter } from "../../utils/price-filter";
 import { Request, Response } from "express";
 import Joi from "joi";
 import { totalPages } from "../../utils/pagination";
@@ -165,7 +166,7 @@ export default class EventTemplateCtrl {
         category: category as string | undefined,
         targetCity: targetCity as string | undefined,
         city: city as string | undefined,
-        maxPrice: maxPrice ? Number(maxPrice) : undefined,
+        maxPrice: maxPriceFilter(maxPrice),
         isPublic:
           isPublic === "false" ? false : isPublic === "true" ? true : undefined,
         q: typeof q === "string" && q.trim() ? q.trim() : undefined,

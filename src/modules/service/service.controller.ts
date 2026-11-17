@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { maxPriceFilter } from "../../utils/price-filter";
 import Joi from "joi";
 import { totalPages } from "../../utils/pagination";
 import ServiceSvc from "./service.service";
@@ -144,7 +145,7 @@ export default class ServiceCtrl {
 
       const { services, total } = await ServiceSvc.browseServices({
         ...(city && { ownerCity: String(city) }),
-        ...(maxPrice && { maxPrice: Number(maxPrice) }),
+        maxPrice: maxPriceFilter(maxPrice),
         ...(typeof q === "string" && q.trim() && { q: q.trim() }),
         page: parsedPage,
         limit: parsedLimit,

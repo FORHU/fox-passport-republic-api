@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { maxPriceFilter } from "../../utils/price-filter";
 import Joi from "joi";
 import { RoleType } from "@prisma/client";
 import UsersSvc from "./users.service";
@@ -83,9 +84,7 @@ export default class UsersCtrl {
       const specialization = (req.query.specialty ??
         req.query.specialization) as string | undefined;
       const city = req.query.city as string | undefined;
-      const maxPrice = req.query.maxPrice
-        ? Number(req.query.maxPrice)
-        : undefined;
+      const maxPrice = maxPriceFilter(req.query.maxPrice);
       const search = req.query.q as string | undefined;
       const result = await UsersSvc.getFoxers(
         limit,
