@@ -80,6 +80,7 @@ export default class ServiceSvc {
     ownerCity?: string;
     maxPrice?: number;
     q?: string;
+    category?: ServiceCategory;
     page?: number;
     limit: number;
   }) {

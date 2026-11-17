@@ -71,6 +71,7 @@ export default class AssetRepo {
     ownerCity?: string;
     maxPrice?: number;
     q?: string;
+    category?: AssetCategory;
     page?: number;
     limit: number;
   }) {
@@ -84,6 +85,7 @@ export default class AssetRepo {
     const where = {
       status: AssetStatus.available,
       deletedAt: null,
+      ...(filters.category && { category: filters.category }),
       ...(filters.maxPrice !== undefined && {
         price: { lte: filters.maxPrice },
       }),
