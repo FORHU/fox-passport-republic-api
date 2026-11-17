@@ -70,6 +70,7 @@ export default class ServiceRepo {
     ownerCity?: string;
     maxPrice?: number;
     q?: string;
+    category?: ServiceCategory;
     page?: number;
     limit: number;
   }) {
@@ -83,6 +84,7 @@ export default class ServiceRepo {
     const where = {
       status: ServiceStatus.available,
       deletedAt: null,
+      ...(filters.category && { category: filters.category }),
       ...(filters.maxPrice !== undefined && {
         price: { lte: filters.maxPrice },
       }),

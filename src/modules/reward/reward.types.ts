@@ -9,6 +9,12 @@ export interface GrantRewardParams {
   coinsOverride?: number;
   idempotencyKey?: string;
   bookingFeeAmount?: number; // When action is booking-tied, the platform fee collected
+  /**
+   * Hold this grant's Coins as Pending instead of paying them at once. Only the
+   * caller knows when to free them, and does so with RewardRepo.releaseGrant:
+   * the release-everything path never frees a grant held this way.
+   */
+  holdUntilAttended?: boolean;
 }
 
 export interface GrantRewardResult {

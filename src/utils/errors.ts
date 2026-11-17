@@ -119,3 +119,25 @@ export function sendServerError(
     code: "INTERNAL",
   });
 }
+
+/**
+ * The tail of a catch block in a controller whose service still throws plain
+ * Errors with a message meant for the person ("Request not found"). An
+ * AppError, or a Prisma error `fromPrisma` recognises, is answered with its
+ * safe message and status, never Prisma's own text; a plain Error keeps its
+ * message and the `status` the route gave it (a function picks one from the
+ * message).
+ */
+export function sendFailure(
+  res: Response,
+  err: unknown,
+  status: number | ((message: string) => number),
+  opts: { success?: boolean } = {},
+) {
+  const safe = err instanceof AppError ? err : fromPrisma(err);
+  if (safe) return sendAppError(res, safe, opts);
+  const message = (err as Error)?.message ?? "Something went wrong";
+  return res
+    .status(typeof status === "function" ? status(message) : status)
+    .json({ ...(opts.success ? { success: false } : {}), message });
+}

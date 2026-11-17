@@ -7,6 +7,7 @@ import EventTemplateSvc from "../event-template/event-template.service";
 import PricingSvc from "../pricing/pricing.service";
 import { breakdownTotals } from "../pricing/event-breakdown";
 import { can } from "../../types/permissions";
+import { notFound } from "../../utils/errors";
 import { sendApprovedEmail } from "../../utils/emails/approved";
 import { sendRejectedEmail } from "../../utils/emails/rejected";
 import AppointmentAccess from "../appointment/appointment.access";
@@ -61,7 +62,7 @@ export default class EventRequestSvc {
   ) {
     // 1. Fetch Template
     const template = await EventTemplateRepo.findTemplateById(data.templateId);
-    if (!template) throw new Error("Template not found");
+    if (!template) throw notFound("Event template");
 
     // Priced by the server from the template's Foxers (#264 T9.1), never
     // from data.totalAmount: a client used to set the price of a request

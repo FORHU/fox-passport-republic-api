@@ -1,6 +1,7 @@
 import express from "express";
 import AdminCtrl from "./admin.controller";
 import BookingCtrl from "../booking/booking.controller";
+import PayoutCtrl from "../payout/payout.controller";
 import {
   authenticate,
   requirePermission,
@@ -209,6 +210,26 @@ router.get(
   authenticate,
   requirePermission("refunds:manage"),
   AdminCtrl.getAllRefunds,
+);
+// Payouts that didn't reach their recipient (api#363): list, and retry one.
+router.get(
+  "/payouts",
+  authenticate,
+  requirePermission("payments:read:all"),
+  PayoutCtrl.listForAdmin,
+);
+router.post(
+  "/payouts/:id/retry",
+  authenticate,
+  requirePermission("payments:manage"),
+  PayoutCtrl.retry,
+);
+// Stripe chargebacks (charge.dispute.*), recorded by the webhook.
+router.get(
+  "/payment-disputes",
+  authenticate,
+  requirePermission("disputes:resolve"),
+  PayoutCtrl.listPaymentDisputes,
 );
 router.post(
   "/refunds/manual",

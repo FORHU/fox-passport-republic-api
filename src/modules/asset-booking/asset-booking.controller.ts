@@ -3,6 +3,17 @@ import Joi from "joi";
 import { can } from "../../types/permissions";
 import AssetBookingSvc from "./asset-booking.service";
 
+/** The most units one booking can ask for (mobile#382). The app caps its field at the same number. */
+export const BOOKING_QUANTITY_MAX = 999;
+
+/**
+ * How many units to book: a whole number from 1 up to the maximum. A decimal, a
+ * negative number or zero, text, or more than the maximum is refused here,
+ * whatever the app lets a person type.
+ */
+export const bookingQuantity = () =>
+  Joi.number().integer().min(1).max(BOOKING_QUANTITY_MAX).required();
+
 export default class AssetBookingCtrl {
   // POST /asset/bookings
   static async create(req: Request, res: Response) {
@@ -10,7 +21,7 @@ export default class AssetBookingCtrl {
       assetId: Joi.string().required(),
       startDate: Joi.string().isoDate().required(),
       endDate: Joi.string().isoDate().required(),
-      quantity: Joi.number().integer().min(1).required(),
+      quantity: bookingQuantity(),
       fulfillmentType: Joi.string().valid("delivery", "pickup").required(),
       deliveryAddress: Joi.string().when("fulfillmentType", {
         is: "delivery",
@@ -42,7 +53,7 @@ export default class AssetBookingCtrl {
       assetId: Joi.string().required(),
       startDate: Joi.string().isoDate().required(),
       endDate: Joi.string().isoDate().required(),
-      quantity: Joi.number().integer().min(1).required(),
+      quantity: bookingQuantity(),
       voucherCode: Joi.string().trim().uppercase().allow("").optional(),
     });
     const { error, value } = schema.validate(req.query);

@@ -789,4 +789,24 @@ describe("Organizer requests", () => {
     expect(card).not.toHaveProperty("level");
     expect(card).not.toHaveProperty("totalXP");
   });
+
+  it("matches the search word against specialties as well as name and city", async () => {
+    m.user.findMany.mockResolvedValue([]);
+    await AppointmentService.searchOrganizers(
+      { userId: "juan", systemRole: "user", roleType: ["eventFoxer"] },
+      { q: "wedding" },
+    );
+    const { where } = m.user.findMany.mock.calls.at(-1)![0];
+    expect(where.OR).toContainEqual({
+      foxerSpecializations: {
+        some: {
+          roleType: "organizer",
+          category: { contains: "wedding", mode: "insensitive" },
+        },
+      },
+    });
+    expect(where.OR).toContainEqual({
+      name: { contains: "wedding", mode: "insensitive" },
+    });
+  });
 });

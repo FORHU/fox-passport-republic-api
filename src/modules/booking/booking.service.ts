@@ -1231,7 +1231,7 @@ export default class BookingSvc {
       status === ItemBookingStatus.cancelled ||
       status === "cancelled"
     ) {
-      import("../reward/reward.service")
+      await import("../reward/reward.service")
         .then(({ default: RewardService }) => {
           return RewardService.reverse({
             refType: "booking",

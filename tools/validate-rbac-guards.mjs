@@ -47,7 +47,10 @@ const ROOT_DIR = path.resolve(__dirname, "../src/modules");
 const REPORT_ONLY = process.argv.includes("--report");
 // Existing ownership-guarded routes are tracked separately while the route
 // audit is completed. New unguarded routes must not increase this number.
-const MAX_UNGUARDED_ROUTES = 178;
+// 179: GET /milestones/me (RR-6), a read of the caller's own progress scoped by
+// the session user id, like achievements/me and rewards/me. Approved by the
+// task owner on 2026-11-12.
+const MAX_UNGUARDED_ROUTES = 179;
 
 /**
  * Routes that are `authenticate`d but deliberately have no `requirePermission`
@@ -80,6 +83,14 @@ const ALLOW_LIST = new Set([
   // applies.
   "reward.routes.ts GET /daily-login",
   "reward.routes.ts POST /daily-login",
+
+  // Referrals (RR-7, api#302). Both routes read or change only the caller's own
+  // code and referrer, keyed by the session user; ReferralSvc checks the rest
+  // (no own code, no second code, no code after a first paid booking). The apply
+  // route is rate limited per account. Self-service, so no capability
+  // permission applies.
+  "referral.routes.ts GET /me",
+  "referral.routes.ts POST /apply",
 
   // Foxer Score management console: self-service operational metrics for authenticated Foxer.
   "foxer-score.routes.ts GET /me",

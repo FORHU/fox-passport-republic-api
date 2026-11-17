@@ -5,6 +5,7 @@ import { PaymentStatus, Prisma } from "@prisma/client";
 import PaymentSvc from "./payment.service";
 import WebhookSvc from "./webhook.service";
 import Stripe from "stripe";
+import { constructStripeEvent } from "../../utils/stripe-webhook";
 
 /**
  * The statuses a hand-written payment record may carry, read from the enum.
@@ -233,9 +234,15 @@ export default class PaymentController {
   // HANDLE STRIPE WEBHOOK
   static async handleWebhook(req: Request, res: Response) {
     const sig = req.headers["stripe-signature"];
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    // Read per request, not from config at import: tests set them at runtime.
+    // The platform endpoint's secret, then the Connect endpoint's (events on
+    // Foxers' connected accounts, such as account.updated). Either may sign.
+    const webhookSecrets = [
+      process.env.STRIPE_WEBHOOK_SECRET,
+      process.env.STRIPE_CONNECT_WEBHOOK_SECRET,
+    ];
 
-    if (!sig || !webhookSecret) {
+    if (!sig || !webhookSecrets.some((s) => s?.trim())) {
       console.warn(
         "⚠️ Webhook Warning: Missing stripe-signature or webhook secret",
       );
@@ -248,7 +255,12 @@ export default class PaymentController {
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
         apiVersion: "2025-08-27.basil",
       });
-      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+      event = constructStripeEvent(
+        stripe.webhooks,
+        req.body,
+        sig,
+        webhookSecrets,
+      );
     } catch (e: unknown) {
       const err = e as Error;
       console.error(`❌ Webhook signature verification failed: ${err.message}`);
@@ -300,10 +312,19 @@ export default class PaymentController {
           await WebhookSvc.handleCheckoutExpired(session.id);
         },
       );
-    } else if (event.type === "payment_intent.succeeded") {
-      // The legacy booking-payment flow. Wrapped like the events above so a
-      // redelivery is skipped once handled, and a failure that leaves it
-      // unprocessed is answered 5xx (the route's asyncHandler) so Stripe retries.
+    } else if (
+      event.type === "payment_intent.succeeded" ||
+      // A Foxer's Connect account changed (onboarding finished): it can
+      // retry their payouts, so it must run once per event.
+      event.type === "account.updated" ||
+      // Chargebacks, recorded for admins (api#363).
+      event.type === "charge.dispute.created" ||
+      event.type === "charge.dispute.updated" ||
+      event.type === "charge.dispute.closed"
+    ) {
+      // Wrapped like the events above so a redelivery is skipped once
+      // handled, and a failure that leaves it unprocessed is answered 5xx
+      // (the route's asyncHandler) so Stripe retries.
       await WebhookSvc.processEventWithIdempotency(
         "stripe",
         event.id,

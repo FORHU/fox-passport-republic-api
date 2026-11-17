@@ -7,10 +7,8 @@ import {
 import LeaderboardRepo from "./leaderboard.repository";
 import FoxerScoreService from "../foxer-score/foxer-score.service";
 import FoxerScoreRepo from "../foxer-score/foxer-score.repository";
-import {
-  LEADERBOARD_PAWS_PRIOR,
-  LEADERBOARD_TOP_RATED_MIN_BOOKINGS,
-} from "../../config";
+import { LEADERBOARD_PAWS_PRIOR } from "../../config";
+import RewardSettingsService from "../reward-settings/reward-settings.service";
 
 const LEADERBOARD_CACHE_TTL = 300; // 5 minutes cache
 
@@ -48,10 +46,13 @@ export class LeaderboardService {
     const cacheKey = `leaderboard:foxers:${tab}:${role || "all"}:${city || "all"}:${specialty || "all"}`;
 
     const entries = await cached(cacheKey, LEADERBOARD_CACHE_TTL, async () => {
-      const [candidates, platformAvg] = await Promise.all([
-        LeaderboardRepo.getFoxersForRanking(role, city, specialty),
-        FoxerScoreRepo.getPlatformAvgRating(),
-      ]);
+      const [candidates, platformAvg, pawsPrior, minBookings] =
+        await Promise.all([
+          LeaderboardRepo.getFoxersForRanking(role, city, specialty),
+          FoxerScoreRepo.getPlatformAvgRating(),
+          RewardSettingsService.get("leaderboard.pawsPrior"),
+          RewardSettingsService.get("leaderboard.topRatedMinBookings"),
+        ]);
 
       const scored = await Promise.all(
         candidates.map(async (f) => {
@@ -76,6 +77,7 @@ export class LeaderboardService {
               m.rawReviewCount,
               m.avgRating,
               platformAvg,
+              pawsPrior,
             ),
             foxerScore: scoreResult.foxerScore,
             createdAt: f.createdAt,
@@ -92,9 +94,7 @@ export class LeaderboardService {
         // them: their score is pulled toward the platform average, so on score
         // alone they could rank above someone whose Paws are on show.
         filtered = scored
-          .filter(
-            (f) => f.completedBookings >= LEADERBOARD_TOP_RATED_MIN_BOOKINGS,
-          )
+          .filter((f) => f.completedBookings >= minBookings)
           .sort(
             (a, b) =>
               Number(b.paws !== null) - Number(a.paws !== null) ||

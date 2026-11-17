@@ -1,6 +1,7 @@
 import * as dotenv from "dotenv";
 import { requireSecret } from "./utils/require-secret";
 import { readPercentEnv } from "./utils/percent-env";
+import { readStripeEnv } from "./utils/stripe-env";
 dotenv.config();
 
 export const DATABASE_URL = process.env.DATABASE_URL as string;
@@ -121,9 +122,28 @@ export const AWS_SQS_NOTIFICATION_QUEUE_URL = process.env
   .AWS_SQS_NOTIFICATION_QUEUE_URL as string | undefined;
 export const SQS_ENDPOINT = process.env.SQS_ENDPOINT as string | undefined;
 
-export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY as string;
-export const STRIPE_WEBHOOK_SECRET = process.env
-  .STRIPE_WEBHOOK_SECRET as string;
+// Checked at startup (utils/stripe-env.ts): production refuses to start without
+// them; development and tests only warn.
+export const STRIPE_SECRET_KEY = readStripeEnv(
+  "STRIPE_SECRET_KEY",
+  process.env.STRIPE_SECRET_KEY,
+  { isDev },
+);
+// The platform webhook endpoint's signing secret: payments, refunds, disputes.
+export const STRIPE_WEBHOOK_SECRET = readStripeEnv(
+  "STRIPE_WEBHOOK_SECRET",
+  process.env.STRIPE_WEBHOOK_SECRET,
+  { isDev },
+);
+// The Connect webhook endpoint's signing secret. Stripe sends events about
+// connected (Foxer) accounts, such as `account.updated` when onboarding
+// finishes, only to a Connect endpoint, which has its own secret. Optional:
+// without it, Connect events are refused and onboarding flags never update.
+export const STRIPE_CONNECT_WEBHOOK_SECRET = readStripeEnv(
+  "STRIPE_CONNECT_WEBHOOK_SECRET",
+  process.env.STRIPE_CONNECT_WEBHOOK_SECRET,
+  { isDev, optional: true },
+);
 // Platform's own cut, applied on top of itemsTotal (+ hostMarkup for Event bookings),
 // never carved out of provider/host shares. See docs/adr/0002-stripe-connect-payouts.md.
 // Checked at startup like PROCESSING_FEE_PERCENT: unset or empty still means 5,
@@ -146,8 +166,8 @@ function readCountEnv(name: string, fallback: number): number {
 
 // Foxer leaderboard, Top rated (rewards spec section 7.2). Paws are ranked by
 // the Bayesian average (v x R + p x C) / (v + p); p is the prior. A Foxer needs
-// this many completed bookings to appear. Read from the environment until the
-// admin settings screens exist (RR-8).
+// this many completed bookings to appear. These are the defaults; an admin can
+// override them (reward-settings, RR-8) without a deploy.
 export const LEADERBOARD_PAWS_PRIOR = readCountEnv("LEADERBOARD_PAWS_PRIOR", 5);
 export const LEADERBOARD_TOP_RATED_MIN_BOOKINGS = readCountEnv(
   "LEADERBOARD_TOP_RATED_MIN_BOOKINGS",
@@ -156,8 +176,8 @@ export const LEADERBOARD_TOP_RATED_MIN_BOOKINGS = readCountEnv(
 
 // Daily login (RR-7, rewards spec section 3): the most Tokens it pays in one
 // Manila month, so it stops there. The amount paid each day lives in the
-// `daily_login` RewardRule. Read from the environment until the admin settings
-// screens exist (RR-8).
+// `daily_login` RewardRule. This is the default; an admin can override it
+// (reward-settings, RR-8) without a deploy.
 export const DAILY_LOGIN_MONTHLY_CAP_TOKENS = readCountEnv(
   "DAILY_LOGIN_MONTHLY_CAP_TOKENS",
   100,
@@ -169,6 +189,24 @@ export const DAILY_LOGIN_STEP_TOKENS = readCountEnv(
   "DAILY_LOGIN_STEP_TOKENS",
   10,
 );
+
+// Milestones (RR-6): the moment tier Tokens start paying. A tier a citizen had
+// already reached before this instant gives a badge only and never pays Tokens
+// (no back-pay), so every existing citizen starts from where they stand.
+// Unset means milestone Tokens do not pay at all. Set it to the deploy time, as
+// an ISO instant such as 2026-11-20T00:00:00+08:00.
+function readInstantEnv(name: string): Date | null {
+  const value = process.env[name];
+  if (value === undefined || value.trim() === "") return null;
+  const parsed = new Date(value.trim());
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(
+      `${name} is "${value}". Refusing to start: it must be an ISO date and time, for example 2026-11-20T00:00:00+08:00.`,
+    );
+  }
+  return parsed;
+}
+export const MILESTONES_LAUNCH_AT = readInstantEnv("MILESTONES_LAUNCH_AT");
 
 export const PLATFORM_FEE_PERCENT = readPercentEnv(
   "PLATFORM_FEE_PERCENT",

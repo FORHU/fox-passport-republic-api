@@ -98,7 +98,10 @@ const suites: [string, string, Write[]][] = [
     "UsersRepo",
     "user",
     [
-      ["createUser", () => UsersRepo.createUser({} as never)],
+      [
+        "createUser",
+        () => UsersRepo.createUser({ email: "someone@example.com" } as never),
+      ],
       ["updateUser", () => UsersRepo.updateUser("u1", {})],
       ["addRoleType", () => UsersRepo.addRoleType("u1", "eventFoxer" as never)],
       ["deleteUser", () => UsersRepo.deleteUser("u1")],

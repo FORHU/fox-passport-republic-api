@@ -76,7 +76,7 @@ export default class EventTemplateSvc {
   static async createTemplate(data: {
     ownerId: string;
     name: string;
-    description: string;
+    description?: string;
     category: EventCategory;
     isPublic?: boolean;
     imgIds?: string[];
@@ -87,7 +87,12 @@ export default class EventTemplateSvc {
     lng?: number;
     maxAttendees?: number;
   }) {
-    const template = await EventTemplateRepo.createTemplate(data);
+    // A draft may be saved before it has a description (the Studio only
+    // recommends one), but the column is required: store it empty.
+    const template = await EventTemplateRepo.createTemplate({
+      ...data,
+      description: data.description ?? "",
+    });
     return this.withBreakdownForDisplay(template);
   }
 

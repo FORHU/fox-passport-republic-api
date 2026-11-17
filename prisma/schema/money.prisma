@@ -279,6 +279,7 @@ model Payment {
   assetBooking    AssetBooking?    @relation(fields: [assetBookingId], references: [id])
   serviceBooking  ServiceBooking?  @relation(fields: [serviceBookingId], references: [id])
   refunds         Refund[]
+  disputes        PaymentDispute[]
 
   @@index([assetBookingId])
   @@index([serviceBookingId])
@@ -301,6 +302,21 @@ model Payout {
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
+  // The client's Stripe charge this payout is funded from, sent as the
+  // transfer's `source_transaction` so it waits for that charge's funds to
+  // settle instead of failing on the platform's available balance. Null when
+  // it couldn't be resolved: the transfer then draws on the balance as before.
+  sourceChargeId   String?
+  // Why the last transfer attempt failed (null unless status is `failed`).
+  // `not_onboarded` payouts are retried when the recipient's Connect account
+  // can receive payouts (StripeConnectSvc.handleAccountUpdated).
+  failureReason    PayoutFailureReason?
+  failureMessage   String?
+  // Incremented before each transfers.create; part of its idempotency key,
+  // so a retry after a real failure is a new Stripe request, while a resent
+  // request for the same attempt can never create a second transfer.
+  transferAttempts Int                  @default(0)
+
   providerUser User @relation(fields: [providerId], references: [id])
 
   // Idempotency guard: a retried webhook or a defensively-repeated
@@ -308,7 +324,43 @@ model Payout {
   // second Stripe transfer) for the same provider's cut of the same source
   // row. `PayoutSvc.createPayoutRecord` upserts against this.
   @@unique([sourceType, sourceId, providerId])
+  @@index([status])
   @@map("payouts")
+}
+
+enum PayoutFailureReason {
+  // The recipient's Connect account can't receive payouts yet; retried
+  // automatically when it can.
+  not_onboarded
+  // Stripe refused the transfer; an admin can retry.
+  stripe_error
+  // The source line was cancelled or refunded before anything was sent
+  // (PayoutSvc.reversePayoutForSource). Never retried.
+  source_refunded
+}
+
+/// A Stripe chargeback (`charge.dispute.*`) against a client's payment.
+/// Recorded for admins; nothing is reversed automatically.
+model PaymentDispute {
+  id              String    @id @default(uuid())
+  stripeDisputeId String    @unique
+  stripeChargeId  String
+  paymentIntentId String?
+  // The Payment row whose providerReference is this PaymentIntent, when found.
+  paymentId       String?
+  amount          Decimal   @db.Decimal(12, 2)
+  currency        String
+  reason          String
+  status          String // Stripe's dispute status, e.g. needs_response, won, lost
+  evidenceDueBy   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId])
+  @@index([status])
+  @@map("payment_disputes")
 }
 
 model Refund {

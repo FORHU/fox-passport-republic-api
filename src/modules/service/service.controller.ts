@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
+import { maxPriceFilter } from "../../utils/price-filter";
 import Joi from "joi";
 import { totalPages } from "../../utils/pagination";
+import { searchQuery } from "../../utils/search-terms";
 import ServiceSvc from "./service.service";
 import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 import { toEnum } from "../../utils/enums";
@@ -8,6 +10,7 @@ import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidat
 import { can, isPerformerServiceCategory } from "../../types/permissions";
 import { MAX_LISTING_IMAGES } from "../../utils/listing-images";
 import { descriptionJoi, nameJoi, priceJoi } from "../../utils/limits";
+import { AppError, fromPrisma, sendAppError } from "../../utils/errors";
 
 /**
  * The route-level gate (`requirePermissionAny(["service:manage",
@@ -27,6 +30,29 @@ function assertCanManageCategory(
     return "You must be an approved Provider to manage this category";
   }
   return null;
+}
+
+/**
+ * Answers a failed request. An AppError, or a Prisma error (an unknown image
+ * id, a value out of range), gets its safe message, never Prisma's own text
+ * with the model and columns in it. A plain Error comes from the service layer
+ * ("Service not found") and keeps its message and the status the route gave it.
+ */
+function fail(
+  res: Response,
+  e: unknown,
+  status: number | ((message: string) => number),
+  opts: { success?: boolean } = {},
+) {
+  const safe = e instanceof AppError ? e : fromPrisma(e);
+  if (safe) return sendAppError(res, safe, opts);
+  const message = (e as Error)?.message ?? "Something went wrong";
+  return res
+    .status(typeof status === "function" ? status(message) : status)
+    .json({
+      ...(opts.success ? { success: false } : {}),
+      message,
+    });
 }
 
 interface CreateServicePayload {
@@ -105,8 +131,7 @@ export default class ServiceCtrl {
         .status(201)
         .json({ message: "Service created successfully", service });
     } catch (e: unknown) {
-      const err = e as Error;
-      return res.status(400).json({ message: err.message || err });
+      return fail(res, e, 400);
     }
   }
 
@@ -129,8 +154,7 @@ export default class ServiceCtrl {
 
       return res.status(200).json({ services, total });
     } catch (e: unknown) {
-      const err = e as Error;
-      return res.status(500).json({ message: err.message || err });
+      return fail(res, e, 500);
     }
   }
 
@@ -138,14 +162,18 @@ export default class ServiceCtrl {
   // owner's city, price filters the item itself; only Provider-owned services).
   static async browseServices(req: Request, res: Response) {
     try {
-      const { city, maxPrice, page, limit, q } = req.query;
+      const { city, maxPrice, page, limit, q, category } = req.query;
       const parsedLimit = limit ? Math.min(Number(limit), 50) : 10;
       const parsedPage = page ? Number(page) : 1;
+      const term = searchQuery(q);
+      // An unrecognised category drops the filter instead of reaching Prisma.
+      const categoryFilter = toEnum(ServiceCategory, category);
 
       const { services, total } = await ServiceSvc.browseServices({
         ...(city && { ownerCity: String(city) }),
-        ...(maxPrice && { maxPrice: Number(maxPrice) }),
-        ...(typeof q === "string" && q.trim() && { q: q.trim() }),
+        maxPrice: maxPriceFilter(maxPrice),
+        ...(term && { q: term }),
+        ...(categoryFilter && { category: categoryFilter }),
         page: parsedPage,
         limit: parsedLimit,
       });
@@ -161,8 +189,7 @@ export default class ServiceCtrl {
         },
       });
     } catch (e: unknown) {
-      const err = e as Error;
-      return res.status(500).json({ success: false, message: err.message });
+      return fail(res, e, 500, { success: true });
     }
   }
 
@@ -176,8 +203,7 @@ export default class ServiceCtrl {
       const service = await ServiceSvc.getServiceById(String(id));
       return res.status(200).json({ service });
     } catch (e: unknown) {
-      const err = e as Error;
-      return res.status(404).json({ message: err.message || err });
+      return fail(res, e, 404);
     }
   }
 
@@ -245,9 +271,7 @@ export default class ServiceCtrl {
         .status(200)
         .json({ message: "Service updated successfully", service });
     } catch (e: unknown) {
-      const err = e as Error;
-      const status = err.message.includes("Unauthorized") ? 403 : 400;
-      return res.status(status).json({ message: err.message || err });
+      return fail(res, e, (m) => (m.includes("Unauthorized") ? 403 : 400));
     }
   }
 
@@ -267,9 +291,7 @@ export default class ServiceCtrl {
       announceAdminQueueChanged();
       return res.status(200).json(result);
     } catch (e: unknown) {
-      const err = e as Error;
-      const status = err.message.includes("authorized") ? 403 : 400;
-      return res.status(status).json({ message: err.message || err });
+      return fail(res, e, (m) => (m.includes("authorized") ? 403 : 400));
     }
   }
 }

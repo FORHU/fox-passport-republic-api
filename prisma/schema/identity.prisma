@@ -84,6 +84,9 @@ model User {
   // "Verified" badge, never a booking requirement (booking needs only a
   // verified email).
   identityVerifiedAt       DateTime?
+  // Shared with friends to refer them (RR-7). Made the first time it is asked
+  // for, so most accounts never have one.
+  referralCode             String?                      @unique
   identityVerifications    IdentityVerification[]       @relation("IdentityApplicant")
   identityReviews          IdentityVerification[]       @relation("IdentityReviewer")
   payouts                  Payout[]
@@ -122,6 +125,8 @@ model User {
   venueAffiliations        VenueEventFoxerAffiliation[] @relation("VenueAffiliationEventFoxer")
   venueAffiliationReviews  VenueEventFoxerAffiliation[] @relation("VenueAffiliationReviewer")
   rewardEvents             RewardEvent[]
+  referralsMade           Referral[]                   @relation("ReferralReferrer")
+  referredBy               Referral?                    @relation("ReferralReferred")
   rewardLifecycles         RewardLifecycle[]
   onboardings              UserOnboarding[]
   ownedVouchers            Voucher[]                    @relation("UserVouchers")
@@ -241,6 +246,9 @@ model VenueFoxerApplication {
   contactNumber   String
   address         String
   tinNumber       String
+  // ISO alpha-2 country whose formats the TIN was checked against
+  // (src/utils/tax-id-formats.ts). Null on rows from before it existed: PH.
+  tinCountry      String?
   description     String?
   specializations String[]
   validId1FileId  String?
@@ -271,6 +279,8 @@ model ProviderFoxerApplication {
   experience           Int?
   nbiClearanceIdNumber String?
   tinNumber            String?
+  // See VenueFoxerApplication.tinCountry.
+  tinCountry           String?
   validId1FileId       String?
   nbiFileId            String?
   tinIdFileId          String?

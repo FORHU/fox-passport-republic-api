@@ -1,6 +1,6 @@
 # Payments — how money moves through FoxPassport Republic
 
-**Written 15 Sep 2026**, from a full trace of the current code (not just the docs it started from); §1, §2 and §5 updated 11 Nov 2026 for the Event payment breakdown (#264). Companion to `docs/adr/0009-event-commission-and-category-fees.md` (which replaces `docs/adr/0001-host-markup-and-server-computed-event-total.md`) and `docs/adr/0002-stripe-connect-payouts.md` — those record _why_ the original decisions were made; this records _what the system actually does today_, including where it has drifted from those decisions. See the **Summary of gaps** at the end for the drift.
+**Written 15 Sep 2026**, from a full trace of the current code (not just the docs it started from); §1, §2 and §5 updated 11 Nov 2026 for the Event payment breakdown (#264); §2, §3 and §6 updated 16 Nov 2026 for Stripe payout setup (api#363). Companion to `docs/adr/0009-event-commission-and-category-fees.md` (which replaces `docs/adr/0001-host-markup-and-server-computed-event-total.md`) and `docs/adr/0002-stripe-connect-payouts.md` — those record _why_ the original decisions were made; this records _what the system actually does today_, including where it has drifted from those decisions. See the **Summary of gaps** at the end for the drift.
 
 There are **two parallel checkout systems** in this codebase today, sharing one Stripe account and one `Payment`/`Payout`/`Refund` ledger:
 
@@ -76,7 +76,21 @@ subtotal → (voucher discount, if any) → discountedSubtotal → (+ platformFe
 
 **Onboarding.** Every supply-side role — Venue, Gear, Service, Performer, Event Foxer — holds `payouts:onboard` (`src/types/permissions.ts`) and onboards identically: `StripeConnectSvc.createExpressAccount` creates a Stripe Express account, `createOnboardingLink` returns Stripe's hosted onboarding URL. The `account.updated` webhook keeps `User.stripeChargesEnabled`/`stripePayoutsEnabled`/`stripeOnboardingComplete` current.
 
-**Mechanism.** Separate Charges and Transfers: the citizen's payment always lands in the platform's own Stripe balance first. Money moves out later, per recipient, via `stripe.transfers.create({ destination: ... })` — one shared function, `PayoutSvc.fireTransfer` (`src/modules/payout/payout.service.ts:54-103`), used by both checkout systems. No `stripeAccountId`/`stripePayoutsEnabled` → the `Payout` is marked `failed`, no transfer attempted. Idempotent by `@@unique([sourceType, sourceId, providerId])` on `Payout` — a retried webhook can't double-pay.
+**Mechanism.** Separate Charges and Transfers: the citizen's payment always lands in the platform's own Stripe balance first. Money moves out later, per recipient, via `stripe.transfers.create({ destination: ... })` — one shared function, `PayoutSvc.fireTransfer` (`src/modules/payout/payout.service.ts`), used by both checkout systems. Idempotent by `@@unique([sourceType, sourceId, providerId])` on `Payout` — a retried webhook can't double-pay.
+
+**Sending a transfer (api#363, Nov 2026).**
+
+- **Funded from the client's charge.** Each payout creator passes the payment it is paid from (the line's paid invoice `Payment.providerReference`, else the booking's `stripePaymentId`). `fireTransfer` resolves it to the charge (`PaymentIntent.latest_charge`) once, stores it as `Payout.sourceChargeId`, and sends it as `source_transaction`, so the transfer waits for the charge's funds to settle instead of failing on the platform's available balance. If Stripe says that charge can't fund it (`param: "source_transaction"`), the same attempt falls back to the balance, as every transfer did before.
+- **Paid once.** Each attempt is claimed by bumping `Payout.transferAttempts` (only one caller wins an attempt number), and the transfer carries `metadata.payoutId` and the idempotency key `payout:<id>:<attempt>`. From the second attempt on, `fireTransfer` first lists the payout's `transfer_group` for a transfer with its `payoutId` and marks the payout paid with it instead of sending another. A database error after a successful transfer leaves the payout `pending`, never `failed`.
+- **Failures say why** (`Payout.failureReason`, `failureMessage`):
+
+  | `failureReason`   | Meaning                                                                                | Retried by                                                                                   |
+  | ----------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+  | `not_onboarded`   | No Connect account, or it can't receive payouts yet                                    | `account.updated` with `payouts_enabled` (`PayoutSvc.retryNotOnboardedForUser`), or an admin |
+  | `stripe_error`    | Stripe refused the transfer                                                            | An admin: `POST /v1/admin/payouts/:id/retry` (`payments:manage`)                             |
+  | `source_refunded` | The line was cancelled or refunded before anything was sent (`reversePayoutForSource`) | Never                                                                                        |
+
+  Admins list them with `GET /v1/admin/payouts?status=failed&failureReason=` (`payments:read:all`). A retry is audited (`payout.retry`).
 
 **Timing, as it is on `staging` (Nov 2026):**
 
@@ -111,7 +125,20 @@ All in `prisma/schema/money.prisma`, spread across `src/modules/payment/` and `s
 
 Key services: `InvoiceSvc` (`invoice.service.ts`), `CheckoutSvc` + `StripeAdapter` (Stripe Checkout Session creation), `EventCheckoutSvc` (builds invoice items from an Event's accepted transactions, uses a Postgres advisory lock to serialize concurrent checkout creation for the same event), `PartnershipCheckoutSvc` (same pattern for sponsorships), `WebhookSvc` (idempotent webhook processing → marks paid → redeems voucher → `allocatePayouts`).
 
-**One Stripe webhook endpoint** handles both systems: `POST /v1/payments/webhook` → `PaymentController.handleWebhook` branches by event type. `checkout.session.completed`/`.expired` → `WebhookSvc` (Central Payment). Everything else (`payment_intent.succeeded`, `charge.refunded`, `refund.updated`, `account.updated`) → the original `PaymentSvc.handleStripeEvent`.
+**One Stripe webhook route** handles both systems: `POST /v1/payments/webhook` → `PaymentController.handleWebhook` branches by event type. `checkout.session.completed`/`.expired` → `WebhookSvc` (Central Payment). Everything else (`payment_intent.succeeded`, `charge.refunded`, `refund.updated`, `account.updated`, `charge.dispute.*`) → the original `PaymentSvc.handleStripeEvent`. `payment_intent.succeeded`, `account.updated` and `charge.dispute.*` run inside `WebhookSvc.processEventWithIdempotency`: a redelivery is skipped, and a failure answers 5xx so Stripe retries.
+
+**Two signing secrets (api#363).** Stripe sends events about connected (Foxer) accounts, such as `account.updated` when onboarding finishes, only to a **Connect** endpoint, and every endpoint has its own signing secret. A request is accepted if it verifies against `STRIPE_WEBHOOK_SECRET` (platform endpoint) or `STRIPE_CONNECT_WEBHOOK_SECRET` (Connect endpoint) — `src/utils/stripe-webhook.ts`. Before, only the first was checked, so Connect events were refused and Foxers' onboarding never registered.
+
+### Stripe dashboard setup
+
+Both endpoints point at the same URL, `https://<api host>/api/v1/payments/webhook`.
+
+| Endpoint | Listens to                   | Events                                                                                                                                                                                                                                  | Its secret goes in              |
+| -------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| Platform | Events on your account       | `checkout.session.completed`, `checkout.session.expired`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`, `refund.updated`, `charge.dispute.created`, `charge.dispute.updated`, `charge.dispute.closed` | `STRIPE_WEBHOOK_SECRET`         |
+| Connect  | Events on connected accounts | `account.updated`                                                                                                                                                                                                                       | `STRIPE_CONNECT_WEBHOOK_SECRET` |
+
+In production the API refuses to start without `STRIPE_SECRET_KEY` (`sk_…`/`rk_…`) and `STRIPE_WEBHOOK_SECRET` (`whsec_…`); development and tests only warn (`src/utils/stripe-env.ts`). Locally, `stripe listen --events payment_intent.succeeded,payment_intent.payment_failed,charge.refunded,refund.updated,account.updated,charge.dispute.created,charge.dispute.updated,charge.dispute.closed --forward-to localhost:6002/api/v1/payments/webhook --forward-connect-to localhost:6002/api/v1/payments/webhook` forwards both kinds with one secret (recent CLI versions require `--events`).
 
 ---
 
@@ -164,6 +191,8 @@ Two mechanisms, not equivalent:
 1. **Booking-level dispute** — the booker reports a dispute (`AssetBookingSvc.dispute`/`ServiceBookingSvc.dispute`), moving status to `disputed`. This is what actually blocks a payout: it keeps the booking from ever reaching `completed`, which is the trigger `PayoutSvc` waits for.
 2. **Refund dispute queue** — `AdminSvc.getDisputes` reads disputed `Refund` rows; an admin approves (retries the refund) or rejects.
 
+3. **Chargebacks** (api#363) — the client's bank takes the money back. Stripe pulls the disputed amount and its fee from the platform balance at once, whoever was already paid out. `charge.dispute.created`/`.updated`/`.closed` → `PaymentDisputeSvc.recordFromStripe` keeps one `PaymentDispute` row per Stripe dispute (linked to the `Payment` by PaymentIntent, with the evidence deadline). Admins list them with `GET /v1/admin/payment-disputes` (`disputes:resolve`) and respond in the Stripe dashboard. Nothing is clawed back automatically.
+
 **Resolution (Oct 2026):** `AdminSvc.resolveAssetBookingDispute` and `AdminSvc.resolveServiceBookingDispute` now explicitly invoke `PayoutSvc.createPayoutsForAssetBooking` / `PayoutSvc.createPayoutsForServiceBooking` when the admin resolves the dispute with status `completed` (in the provider's favor), guaranteeing payouts are unblocked and created.
 
 ---
@@ -185,5 +214,8 @@ Validated and priced by `PricingSvc.validateAndCalculateVoucher` — active wind
 5. **The `lockedAt`/`releasedAt`/`stripeTransferId` escrow fields on `Event*Transaction` are dead code.** Don't design against them; `Payout.status` is the real state machine. (§2)
 6. **Admin dispute resolution can silently skip the payout trigger** — _(Resolved Oct 2026)_ Admin dispute resolution services now invoke `PayoutSvc` directly on `completed` resolutions. (§6)
 7. **A matched (`approved`) venue row is never charged at Event checkout** (it only invoices `pending` venue rows) but is still paid out at `completed`. Predates #264; open question. (§1c, §2)
+8. **Payouts that could never arrive** — _(Resolved Nov 2026, api#363)_ Connect events were refused (one webhook secret), transfers drew on the available balance, and a `failed` payout was never retried. See "Sending a transfer" (§2) and "Two signing secrets" (§3).
+9. **A Foxer can be put on an Event before setting up Stripe.** Their payout then waits as `not_onboarded` until they do. Whether to require onboarding first is an owner decision. (§2)
+10. **Platform country and cross-border payouts are unverified.** Express accounts are created with no `country`, and transfers are in `php`. If the platform account isn't in the Philippines, Philippine Foxers may need Stripe's cross-border "recipient" service agreement. Pending. (§2)
 
 See `PRICING-ADMINISTRATION-PRODUCT.md` for the product-management position on gaps 1 and 3 above (platform fee and voucher/promotion configuration) — it treats "the schema supports it" and "an administrator can operate it" as two different completion states, and sets Platform Fee Administration as Priority 1 for closing the gap.
