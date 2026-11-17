@@ -246,6 +246,9 @@ model VenueFoxerApplication {
   contactNumber   String
   address         String
   tinNumber       String
+  // ISO alpha-2 country whose formats the TIN was checked against
+  // (src/utils/tax-id-formats.ts). Null on rows from before it existed: PH.
+  tinCountry      String?
   description     String?
   specializations String[]
   validId1FileId  String?
@@ -276,6 +279,8 @@ model ProviderFoxerApplication {
   experience           Int?
   nbiClearanceIdNumber String?
   tinNumber            String?
+  // See VenueFoxerApplication.tinCountry.
+  tinCountry           String?
   validId1FileId       String?
   nbiFileId            String?
   tinIdFileId          String?
