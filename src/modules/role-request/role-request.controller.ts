@@ -4,6 +4,12 @@ import FileSvc from "../file/file.service";
 import ProviderSpecialtySvc from "../users/provider-specialty.service";
 import { signPrivateFiles } from "../../utils/private-files";
 import {
+  compactTin,
+  DEFAULT_TIN_COUNTRY,
+  validateTin,
+} from "../../utils/tax-id-formats";
+import { normalizePhone } from "../../utils/phone";
+import {
   EventCategory,
   RequestStatus,
   RoleType,
@@ -71,6 +77,59 @@ export function validateOrganizerApplication(
   return null;
 }
 
+/**
+ * Checks a Venue or Provider Foxer's TIN against its tax country's formats
+ * (utils/tax-id-formats) and rewrites it compact (separators removed) for
+ * storage. Returns the message to show, or null. An application without
+ * `tinCountry` — the mobile app, older web builds — is checked as Philippine.
+ */
+export function checkTin(data: Record<string, unknown>): string | null {
+  if (data.tinCountry === "" || data.tinCountry === null) {
+    delete data.tinCountry;
+  }
+  if (data.tinCountry !== undefined) {
+    if (
+      typeof data.tinCountry !== "string" ||
+      !/^[A-Za-z]{2}$/.test(data.tinCountry)
+    ) {
+      return "Tax country must be a 2-letter country code";
+    }
+    data.tinCountry = data.tinCountry.toUpperCase();
+  }
+  const tin = data.tinNumber;
+  if (tin === undefined || tin === null || tin === "") return null;
+  if (typeof tin !== "string") return "TIN Number must be text";
+
+  const country =
+    (data.tinCountry as string | undefined) ?? DEFAULT_TIN_COUNTRY;
+  const error = validateTin(country, tin);
+  if (error) return error;
+  data.tinNumber = compactTin(country, tin);
+  data.tinCountry = country;
+  return null;
+}
+
+/**
+ * Checks a Venue Foxer's contact number with the same rule as the profile
+ * phone (utils/phone) and rewrites it as E.164 for storage. A number without
+ * its `+code` is read as Philippine — what the mobile app sends. Returns the
+ * message to show, or null.
+ */
+export function checkContactNumber(
+  data: Record<string, unknown>,
+): string | null {
+  const raw = data.contactNumber;
+  if (typeof raw !== "string" || raw.trim() === "") {
+    return "Contact number is required";
+  }
+  const e164 = normalizePhone(raw.trim());
+  if (!e164) {
+    return "Enter a valid contact number with its country code, like +63 917 123 4567.";
+  }
+  data.contactNumber = e164;
+  return null;
+}
+
 export default class RoleRequestController {
   /**
    * Submit an application for a role
@@ -120,6 +179,20 @@ export default class RoleRequestController {
             .json({ success: false, message: specialties.message });
         }
         data.specializations = specialties.slugs;
+      }
+
+      // Also before any document is stored.
+      if ([RoleType.venueFoxer, RoleType.providerFoxer].includes(roleType)) {
+        const tinError = checkTin(data);
+        if (tinError) {
+          return res.status(400).json({ success: false, message: tinError });
+        }
+      }
+      if (roleType === RoleType.venueFoxer) {
+        const phoneError = checkContactNumber(data);
+        if (phoneError) {
+          return res.status(400).json({ success: false, message: phoneError });
+        }
       }
 
       // Store each uploaded document
@@ -183,18 +256,6 @@ export default class RoleRequestController {
             message: "NBI Clearance ID must be 1-18 digits",
           });
         }
-      }
-
-      if (
-        [RoleType.venueFoxer, RoleType.providerFoxer].includes(roleType) &&
-        typeof data.tinNumber === "string" &&
-        data.tinNumber.length > 0 &&
-        !/^\d{1,9}$/.test(data.tinNumber)
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "TIN Number must be 1-9 digits",
-        });
       }
 
       if (roleType === RoleType.organizer) {

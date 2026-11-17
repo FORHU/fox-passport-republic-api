@@ -120,6 +120,8 @@ describe("Provider application specialties", () => {
 describe("Venue and Event applications keep their limit of 3", () => {
   it("refuses four specializations from a Venue Foxer", async () => {
     const res = await apply("venueFoxer", {
+      // A Venue Foxer's contact number is checked too (checkContactNumber).
+      contactNumber: "+639171234567",
       specializations: ["indoor", "outdoor", "hotel", "garden"],
     });
     expect(res.statusCode).toBe(400);
@@ -128,6 +130,8 @@ describe("Venue and Event applications keep their limit of 3", () => {
 
   it("accepts three", async () => {
     const res = await apply("venueFoxer", {
+      // A Venue Foxer's contact number is checked too (checkContactNumber).
+      contactNumber: "+639171234567",
       specializations: ["indoor", "outdoor", "hotel"],
     });
     expect(res.statusCode).toBe(201);
