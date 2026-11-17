@@ -7,6 +7,7 @@ import { totalPages } from "../../utils/pagination";
 import { usernameJoi } from "../../utils/username";
 import { passwordJoi } from "../../utils/password-policy";
 import { nameJoi } from "../../utils/limits";
+import { searchQuery } from "../../utils/search-terms";
 
 export default class UsersCtrl {
   // CREATE
@@ -85,7 +86,7 @@ export default class UsersCtrl {
         req.query.specialization) as string | undefined;
       const city = req.query.city as string | undefined;
       const maxPrice = maxPriceFilter(req.query.maxPrice);
-      const search = req.query.q as string | undefined;
+      const search = searchQuery(req.query.q);
       const result = await UsersSvc.getFoxers(
         limit,
         page,

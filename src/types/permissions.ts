@@ -57,6 +57,8 @@ export const PERMISSIONS = [
   "fees:manage",
   /** May create, edit, deactivate promotions and generate voucher codes. */
   "promotions:manage",
+  /** May read and change reward settings (Token caps, leaderboard rules) and read their history. */
+  "rewards:manage",
   /**
    * May create, edit, deactivate a voucher/promo code scoped to one of the
    * caller's own listings, and fund its discount out of their own payout.
@@ -270,6 +272,7 @@ const GRANTS: Record<SystemRole, readonly Permission[]> = {
     "event:manage-organizers",
     "fees:manage",
     "promotions:manage",
+    "rewards:manage",
     "content:moderate",
     "feed:post-for-anyone",
     "investments:manage",

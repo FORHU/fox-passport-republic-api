@@ -1,4 +1,16 @@
 import { EventCategory, RoleType } from "@prisma/client";
+import { SEARCH_QUERY_MAX } from "./limits";
+
+/**
+ * A free-text `q` as the search endpoints use it: trimmed and cut to
+ * SEARCH_QUERY_MAX characters, the same limit the search box has. Blank or
+ * non-string values (e.g. an array from `?q=a&q=b`) are no search at all.
+ */
+export function searchQuery(q: unknown): string | undefined {
+  if (typeof q !== "string") return undefined;
+  const term = q.trim().slice(0, SEARCH_QUERY_MAX).trim();
+  return term.length > 0 ? term : undefined;
+}
 
 /**
  * The part of a city name worth matching on, for `contains` filters.

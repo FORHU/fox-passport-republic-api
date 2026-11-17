@@ -217,3 +217,17 @@ model Challenge {
 
   @@map("challenges")
 }
+
+// An admin's override of a reward setting that otherwise comes from the
+// environment (RR-8, api#303). One row per setting key; no row means the
+// built-in default applies. `updatedBy` is a plain id, not a relation, so the
+// row survives the admin's account being deleted. Every change is also in the
+// audit log with the before and after values.
+model RewardSetting {
+  key       String   @id
+  value     Json
+  updatedBy String
+  updatedAt DateTime @updatedAt
+
+  @@map("reward_settings")
+}

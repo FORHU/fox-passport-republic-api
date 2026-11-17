@@ -1,10 +1,7 @@
 import { AppError } from "../../utils/errors";
-import {
-  DAILY_LOGIN_STEP_TOKENS,
-  DAILY_LOGIN_MONTHLY_CAP_TOKENS,
-} from "../../config";
 import RewardRepo from "../reward/reward.repository";
 import RewardService from "../reward/reward.service";
+import RewardSettingsService from "../reward-settings/reward-settings.service";
 import DailyLoginRepo, { DAILY_LOGIN_ACTION } from "./daily-login.repository";
 import { DailyLoginClaim, DailyLoginStatus } from "./daily-login.types";
 
@@ -86,11 +83,20 @@ export default class DailyLoginSvc {
     if (emailVerified === null) throw new AppError("User not found", 404);
 
     const monthStart = manilaMonthStart(now);
-    const [rule, days, monthlyEarned, hasAttendedBooking] = await Promise.all([
+    const [
+      rule,
+      days,
+      monthlyEarned,
+      hasAttendedBooking,
+      stepTokens,
+      monthlyCap,
+    ] = await Promise.all([
       RewardRepo.findRuleByAction(DAILY_LOGIN_ACTION),
       DailyLoginRepo.listClaimedDays(userId),
       DailyLoginRepo.sumCoinsSince(userId, monthStart),
       DailyLoginRepo.hasPaidAttendanceSince(userId, monthStart),
+      RewardSettingsService.get("dailyLogin.stepTokens"),
+      RewardSettingsService.get("dailyLogin.monthlyCapTokens"),
     ]);
 
     const today = manilaDay(now);
@@ -99,14 +105,13 @@ export default class DailyLoginSvc {
     const base = rule?.active ? rule.coins : 0;
     const streak = streakOf(claimed, today);
     const cycleDay = cycleDayOf(streak, claimedToday);
-    const cycle = cycleAmounts(base, base > 0 ? DAILY_LOGIN_STEP_TOKENS : 0);
+    const cycle = cycleAmounts(base, base > 0 ? stepTokens : 0);
 
     let reason: DailyLoginStatus["reason"] = null;
     if (base <= 0) reason = "inactive";
     else if (!emailVerified) reason = "email_not_verified";
     else if (!hasAttendedBooking) reason = "no_attended_booking";
-    else if (monthlyEarned >= DAILY_LOGIN_MONTHLY_CAP_TOKENS)
-      reason = "cap_reached";
+    else if (monthlyEarned >= monthlyCap) reason = "cap_reached";
 
     return {
       claimedToday,
@@ -117,7 +122,7 @@ export default class DailyLoginSvc {
       streak,
       cycleDay,
       cycle,
-      monthlyCap: DAILY_LOGIN_MONTHLY_CAP_TOKENS,
+      monthlyCap,
       monthlyEarned,
       nextClaimAt: nextManilaMidnight(now).toISOString(),
     };

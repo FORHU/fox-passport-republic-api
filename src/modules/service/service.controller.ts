@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { maxPriceFilter } from "../../utils/price-filter";
 import Joi from "joi";
 import { totalPages } from "../../utils/pagination";
+import { searchQuery } from "../../utils/search-terms";
 import ServiceSvc from "./service.service";
 import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 import { toEnum } from "../../utils/enums";
@@ -142,11 +143,12 @@ export default class ServiceCtrl {
       const { city, maxPrice, page, limit, q } = req.query;
       const parsedLimit = limit ? Math.min(Number(limit), 50) : 10;
       const parsedPage = page ? Number(page) : 1;
+      const term = searchQuery(q);
 
       const { services, total } = await ServiceSvc.browseServices({
         ...(city && { ownerCity: String(city) }),
         maxPrice: maxPriceFilter(maxPrice),
-        ...(typeof q === "string" && q.trim() && { q: q.trim() }),
+        ...(term && { q: term }),
         page: parsedPage,
         limit: parsedLimit,
       });

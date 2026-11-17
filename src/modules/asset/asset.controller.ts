@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { maxPriceFilter } from "../../utils/price-filter";
 import Joi from "joi";
 import { totalPages } from "../../utils/pagination";
+import { searchQuery } from "../../utils/search-terms";
 import AssetSvc from "./asset.service";
 import {
   AssetCondition,
@@ -134,11 +135,12 @@ export default class AssetCtrl {
       const { city, maxPrice, page, limit, q } = req.query;
       const parsedLimit = limit ? Math.min(Number(limit), 50) : 10;
       const parsedPage = page ? Number(page) : 1;
+      const term = searchQuery(q);
 
       const { assets, total } = await AssetSvc.browseAssets({
         ...(city && { ownerCity: String(city) }),
         maxPrice: maxPriceFilter(maxPrice),
-        ...(typeof q === "string" && q.trim() && { q: q.trim() }),
+        ...(term && { q: term }),
         page: parsedPage,
         limit: parsedLimit,
       });
