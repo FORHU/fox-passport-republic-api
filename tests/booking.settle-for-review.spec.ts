@@ -49,6 +49,9 @@ vi.mock("../src/modules/notifications/user-notification.service", () => ({
 const audit = vi.hoisted(() => ({ recordChangeBy: vi.fn(async () => {}) }));
 vi.mock("../src/modules/audit/audit.service", () => audit);
 
+const rewards = vi.hoisted(() => ({ reverse: vi.fn(async () => ({})) }));
+vi.mock("../src/modules/reward/reward.service", () => ({ default: rewards }));
+
 vi.mock("../src/modules/payment/payment.service", () => ({
   default: class {},
 }));
@@ -119,6 +122,11 @@ describe("BookingSvc.settleForReview", () => {
     expect(notifications.create).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "guest", type: "BOOKING_NO_SHOW" }),
     );
+    expect(rewards.reverse).toHaveBeenCalledWith({
+      refType: "booking",
+      refId: "b1",
+      reason: "Booking cancelled",
+    });
   });
 
   it("runs nothing a second time once the booking is settled", async () => {
