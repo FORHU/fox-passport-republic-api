@@ -1,15 +1,38 @@
 import { sendServerError } from "../../utils/errors";
 import { Request, Response } from "express";
 import FavoriteSvc from "./favorite.service";
+import {
+  FAVORITE_INPUT_ERROR,
+  FavoriteType,
+  isFavoriteType,
+} from "./favorite.constants";
+
+/** `{ targetId, type }` from a body or query, or null when either is invalid. */
+function favoriteInput(
+  source: unknown,
+): { targetId: string; type: FavoriteType } | null {
+  const { targetId, type } = (source ?? {}) as {
+    targetId?: unknown;
+    type?: unknown;
+  };
+  if (typeof targetId !== "string" || !targetId || !isFavoriteType(type)) {
+    return null;
+  }
+  return { targetId, type };
+}
+
+const badInput = (res: Response) =>
+  res.status(400).json({ success: false, message: FAVORITE_INPUT_ERROR });
 
 export default class FavoriteCtrl {
   static async toggleFavorite(req: Request, res: Response) {
+    const input = favoriteInput(req.body);
+    if (!input) return badInput(res);
     try {
-      const { targetId, type } = req.body; // type: 'venue' or 'event'
       const result = await FavoriteSvc.toggleFavorite(
         req.user!.userId,
-        targetId,
-        type,
+        input.targetId,
+        input.type,
       );
       return res.status(200).json({ success: true, data: result });
     } catch (e: unknown) {
@@ -28,21 +51,13 @@ export default class FavoriteCtrl {
   }
 
   static async checkFavorite(req: Request, res: Response) {
+    const input = favoriteInput(req.query);
+    if (!input) return badInput(res);
     try {
-      const { targetId, type } = req.query as {
-        targetId?: string;
-        type?: "venue" | "event";
-      };
-      if (!targetId || (type !== "venue" && type !== "event")) {
-        return res.status(400).json({
-          success: false,
-          message: "targetId and type ('venue' | 'event') are required",
-        });
-      }
       const isFavorite = await FavoriteSvc.checkFavorite(
         req.user!.userId,
-        targetId,
-        type,
+        input.targetId,
+        input.type,
       );
       return res.status(200).json({ success: true, data: { isFavorite } });
     } catch (e: unknown) {
@@ -51,12 +66,13 @@ export default class FavoriteCtrl {
   }
 
   static async addFavorite(req: Request, res: Response) {
+    const input = favoriteInput(req.body);
+    if (!input) return badInput(res);
     try {
-      const { targetId, type } = req.body;
       const result = await FavoriteSvc.addFavorite(
         req.user!.userId,
-        targetId,
-        type,
+        input.targetId,
+        input.type,
       );
       return res.status(201).json({ success: true, data: result });
     } catch (e: unknown) {
@@ -79,12 +95,13 @@ export default class FavoriteCtrl {
   }
 
   static async removeFavoriteByListing(req: Request, res: Response) {
+    const input = favoriteInput(req.body);
+    if (!input) return badInput(res);
     try {
-      const { targetId, type } = req.body;
       await FavoriteSvc.removeFavoriteByListing(
         req.user!.userId,
-        targetId,
-        type,
+        input.targetId,
+        input.type,
       );
       return res
         .status(200)

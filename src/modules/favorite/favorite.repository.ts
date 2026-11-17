@@ -26,11 +26,34 @@ export default class FavoriteRepo {
     }
   }
 
+  // ADD (idempotent): the existing row when there is one, else a new one.
+  static async addFavorite(userId: string, targetId: string, type: string) {
+    const where = {
+      userId: String(userId),
+      entityId: String(targetId),
+      entityType: String(type),
+    };
+
+    const existing = await prisma.favorite.findFirst({ where });
+    if (existing) return { added: true };
+
+    await prisma.favorite.create({ data: where });
+    return { added: true };
+  }
+
+  static async userExists(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: String(userId) },
+      select: { id: true },
+    });
+    return !!user;
+  }
+
   // LIST USER FAVORITES
   //
   // `entityId`/`entityType` are a polymorphic reference (a favorite can point
-  // at a Venue or an EventTemplate), not a Prisma relation — `include` can't
-  // join across that, so the previous `include: {}` here never returned
+  // at a Venue, an EventTemplate or a Foxer's User), not a Prisma relation —
+  // `include` can't join across that, so the previous `include: {}` here never returned
   // anything for `venue`/`event`. The target listings are batch-fetched by
   // id below and merged back in, and the Prisma field names are mapped to
   // `targetId`/`type` to match what every frontend consumer of this
@@ -49,8 +72,11 @@ export default class FavoriteRepo {
     const eventIds = favorites
       .filter((f) => f.entityType === "event")
       .map((f) => f.entityId);
+    const foxerIds = favorites
+      .filter((f) => f.entityType === "foxer")
+      .map((f) => f.entityId);
 
-    const [venues, templates] = await Promise.all([
+    const [venues, templates, foxers] = await Promise.all([
       venueIds.length
         ? prisma.venue.findMany({
             where: { id: { in: venueIds } },
@@ -66,10 +92,25 @@ export default class FavoriteRepo {
             },
           })
         : Promise.resolve([]),
+      // Public card fields only: a favourite never exposes a Foxer's email.
+      foxerIds.length
+        ? prisma.user.findMany({
+            where: { id: { in: foxerIds } },
+            select: {
+              id: true,
+              name: true,
+              imgId: true,
+              city: true,
+              state: true,
+              roleType: true,
+            },
+          })
+        : Promise.resolve([]),
     ]);
 
     const venueById = new Map(venues.map((v) => [v.id, v]));
     const templateById = new Map(templates.map((t) => [t.id, t]));
+    const foxerById = new Map(foxers.map((u) => [u.id, u]));
 
     return favorites.map((f) => {
       const base = {
@@ -112,6 +153,10 @@ export default class FavoriteRepo {
               }
             : undefined,
         };
+      }
+
+      if (f.entityType === "foxer") {
+        return { ...base, foxer: foxerById.get(f.entityId) };
       }
 
       return base;
