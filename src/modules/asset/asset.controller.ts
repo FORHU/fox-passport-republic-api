@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { maxPriceFilter } from "../../utils/price-filter";
 import Joi from "joi";
 import { totalPages } from "../../utils/pagination";
 import { searchQuery } from "../../utils/search-terms";
@@ -138,7 +139,7 @@ export default class AssetCtrl {
 
       const { assets, total } = await AssetSvc.browseAssets({
         ...(city && { ownerCity: String(city) }),
-        ...(maxPrice && { maxPrice: Number(maxPrice) }),
+        maxPrice: maxPriceFilter(maxPrice),
         ...(term && { q: term }),
         page: parsedPage,
         limit: parsedLimit,
