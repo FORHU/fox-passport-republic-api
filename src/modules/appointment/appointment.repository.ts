@@ -113,6 +113,14 @@ export default class AppointmentRepo {
           OR: [
             { name: { contains: q, mode: "insensitive" } },
             { city: { contains: q, mode: "insensitive" } },
+            {
+              foxerSpecializations: {
+                some: {
+                  roleType: "organizer",
+                  category: { contains: q, mode: "insensitive" },
+                },
+              },
+            },
           ],
         }),
         ...(filter.specialization && {
