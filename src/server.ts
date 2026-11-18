@@ -7,6 +7,7 @@ import { scheduleBookingReminders } from "./jobs/booking-reminders.job";
 import { scheduleConfirmationDeadlineSweep } from "./jobs/confirmation-deadline-sweep.job";
 import { scheduleUnattendedEventsSweep } from "./jobs/unattended-events.job";
 import { scheduleVoucherReturn } from "./jobs/voucher-return.job";
+import { schedulePerkReturn } from "./jobs/perk-return.job";
 import { scheduleMilestoneSweep } from "./jobs/milestone-sweep.job";
 import { scheduleFeedResurfacingPrune } from "./jobs/feed-resurfacing-prune.job";
 
@@ -21,6 +22,7 @@ scheduleBookingReminders();
 scheduleConfirmationDeadlineSweep();
 scheduleUnattendedEventsSweep();
 scheduleVoucherReturn();
+schedulePerkReturn();
 scheduleMilestoneSweep();
 scheduleFeedResurfacingPrune();
 

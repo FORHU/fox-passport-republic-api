@@ -283,6 +283,10 @@ export default class FeedRepo {
               where: { userId: viewerId },
               select: { userId: true, type: true },
             },
+            shares: {
+              where: { userId: viewerId },
+              select: { userId: true },
+            },
           }
         : {}),
     } satisfies Prisma.PostInclude;
@@ -294,6 +298,7 @@ export default class FeedRepo {
       id: string;
       authorId: string;
       likes?: { type: ReactionType }[];
+      shares?: { userId: string }[];
     },
   >(posts: T[], viewerId: string | undefined, followingIds: Set<string>) {
     const reactionCounts = await FeedRepo.findReactionCounts(
@@ -301,10 +306,11 @@ export default class FeedRepo {
     );
     return posts.map((p) => {
       const myReaction = viewerId ? p.likes?.[0] : undefined;
-      const { likes: _likes, ...rest } = p;
+      const { likes: _likes, shares, ...rest } = p;
       return {
         ...rest,
         isLikedByMe: !!myReaction,
+        isSharedByMe: (shares?.length ?? 0) > 0,
         myReaction: myReaction?.type ?? null,
         isFollowingAuthor: viewerId ? followingIds.has(p.authorId) : false,
         reactionCounts: reactionCounts.get(p.id) ?? [],
@@ -538,6 +544,10 @@ export default class FeedRepo {
                 where: { userId: viewerId },
                 select: { userId: true, type: true },
               },
+              shares: {
+                where: { userId: viewerId },
+                select: { userId: true },
+              },
             }
           : {}),
       },
@@ -559,11 +569,12 @@ export default class FeedRepo {
           })
           .then((f) => !!f)
       : false;
-    const { likes: _likes, ...rest } = post;
+    const { likes: _likes, shares, ...rest } = post;
     const reactionCounts = await FeedRepo.findReactionCounts([post.id]);
     return {
       ...rest,
       isLikedByMe: !!myReaction,
+      isSharedByMe: (shares?.length ?? 0) > 0,
       myReaction: myReaction?.type ?? null,
       reactionCounts: reactionCounts.get(post.id) ?? [],
       isFollowingAuthor,
@@ -733,11 +744,96 @@ export default class FeedRepo {
     });
   }
 
-  static async incrementShares(id: string) {
+  /**
+   * Records that `userId` shared `postId` outside the feed (copy link,
+   * Facebook, event page). Counted once per (post, user): the
+   * feed_post_shares primary key turns a repeat, or a concurrent duplicate,
+   * into a no-op, and sharesCount only moves when a row was inserted. One
+   * statement, so the two can't drift. Returns whether this call counted and
+   * the post's count afterwards.
+   */
+  static async recordShare(
+    postId: string,
+    userId: string,
+  ): Promise<{ counted: boolean; sharesCount: number }> {
+    const [inserted] = await prisma.$queryRaw<{ sharesCount: number }[]>`
+      WITH ins AS (
+        INSERT INTO "feed_post_shares" ("postId", "userId")
+        VALUES (${postId}, ${userId})
+        ON CONFLICT DO NOTHING
+        RETURNING "postId"
+      )
+      UPDATE "feed_posts" fp
+      SET "sharesCount" = fp."sharesCount" + 1
+      FROM ins
+      WHERE fp."id" = ins."postId"
+      RETURNING fp."sharesCount"
+    `;
+    if (inserted) return { counted: true, sharesCount: inserted.sharesCount };
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { sharesCount: true },
+    });
+    return { counted: false, sharesCount: post?.sharesCount ?? 0 };
+  }
+
+  static async incrementSends(id: string) {
     return prisma.post.update({
       where: { id },
-      data: { sharesCount: { increment: 1 } },
+      data: { sendsCount: { increment: 1 } },
     });
+  }
+
+  static async incrementReposts(id: string) {
+    return prisma.post.update({
+      where: { id },
+      data: { repostsCount: { increment: 1 } },
+    });
+  }
+
+  /**
+   * Records that `viewerId` saw each of `postIds`, at most once per
+   * (post, viewer), and bumps viewsCount only for rows actually inserted.
+   * Posts the viewer wrote, archived posts, and posts the viewer isn't
+   * allowed to see (same rule as canView) are skipped silently. One
+   * statement, so the insert and the counter bump are atomic. Raw SQL so a
+   * view doesn't touch Post.updatedAt. Returns the ids that were counted.
+   */
+  static async recordViews(
+    viewerId: string,
+    postIds: string[],
+  ): Promise<string[]> {
+    if (postIds.length === 0) return [];
+    const rows = await prisma.$queryRaw<{ id: string }[]>`
+      WITH ins AS (
+        INSERT INTO "feed_post_views" ("postId", "userId")
+        SELECT p."id", ${viewerId}
+        FROM "feed_posts" p
+        WHERE p."id" IN (${Prisma.join(postIds)})
+          AND p."isArchived" = false
+          AND p."authorId" <> ${viewerId}
+          AND (
+            p."visibility" = 'public'
+            OR (
+              p."visibility" = 'followers'
+              AND EXISTS (
+                SELECT 1 FROM "follows" f
+                WHERE f."followerId" = ${viewerId}
+                  AND f."followingId" = p."authorId"
+                  AND f."status" = 'accepted'
+              )
+            )
+          )
+        ON CONFLICT DO NOTHING
+        RETURNING "postId"
+      )
+      UPDATE "feed_posts" fp
+      SET "viewsCount" = fp."viewsCount" + 1
+      FROM ins
+      WHERE fp."id" = ins."postId"
+      RETURNING fp."id"
+    `;
+    return rows.map((r) => r.id);
   }
 
   static async deletePost(id: string) {
@@ -860,6 +956,7 @@ export default class FeedRepo {
               where: { userId },
               select: { userId: true, type: true },
             },
+            shares: { where: { userId }, select: { userId: true } },
           },
         },
       },
@@ -871,11 +968,12 @@ export default class FeedRepo {
       items.map(({ post }) => post.id),
     );
     const posts = items.map(({ post }) => {
-      const { likes, ...rest } = post;
+      const { likes, shares, ...rest } = post;
       const myReaction = likes[0];
       return {
         ...rest,
         isLikedByMe: !!myReaction,
+        isSharedByMe: (shares?.length ?? 0) > 0,
         myReaction: myReaction?.type ?? null,
         reactionCounts: reactionCounts.get(post.id) ?? [],
       };

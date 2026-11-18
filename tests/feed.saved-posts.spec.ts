@@ -56,6 +56,7 @@ describe("FeedRepo.findSavedPosts", () => {
         commentsCount: 1,
         isLikedByMe: true,
         myReaction: "love",
+        isSharedByMe: false,
         reactionCounts: [],
       },
       {
@@ -64,6 +65,7 @@ describe("FeedRepo.findSavedPosts", () => {
         commentsCount: 1,
         isLikedByMe: false,
         myReaction: null,
+        isSharedByMe: false,
         reactionCounts: [],
       },
     ]);
