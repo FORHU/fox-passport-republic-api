@@ -112,11 +112,32 @@ model Post {
   mediaTags PostMediaTag[]
   poll      Poll?
   facebookShares FacebookShare[]
+  resurfacings   PostResurfacing[]
 
   @@index([tab, createdAt(sort: Desc)])
   @@index([authorId, createdAt(sort: Desc)])
+  // The For you fresh pool and Recent on the "All" tab order every post by
+  // `createdAt` with no `tab` filter, which the composite index above can't serve.
+  @@index([createdAt(sort: Desc)])
   @@index([type])
   @@map("feed_posts")
+}
+
+// One row each time the For you feed serves a post from its older pool
+// (app#308). A post's resurfacing boost counts the days since its latest row,
+// read as of the feed session's anchor time, so writes made while someone is
+// scrolling never reshuffle the pages they still have to load. Shared across
+// viewers for now; a `viewerId` column makes it per viewer once view tracking
+// lands (app#303).
+model PostResurfacing {
+  id      String   @id @default(uuid())
+  postId  String
+  shownAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, shownAt(sort: Desc)])
+  @@map("post_resurfacings")
 }
 
 // One-to-one with a `type: poll` Post — the poll's question is just that

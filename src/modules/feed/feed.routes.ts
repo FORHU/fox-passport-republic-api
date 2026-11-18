@@ -8,6 +8,7 @@ const router = Router();
 // Publicly readable feed with optional authentication (to detect isLikedByMe)
 router.get("/", optionalAuth, FeedController.getFeed);
 // Static sub-paths before the "/:id" catch-all so they aren't swallowed by it.
+router.get("/new-count", optionalAuth, FeedController.getNewPostsCount);
 router.get("/saved", authenticate, FeedController.getSavedPosts);
 router.get("/mentions/search", authenticate, FeedController.searchMentions);
 router.get("/:id", optionalAuth, FeedController.getPostById);

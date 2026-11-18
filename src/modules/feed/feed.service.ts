@@ -6,13 +6,46 @@ import {
   PostVisibility,
   ReactionType,
 } from "@prisma/client";
-import FeedRepo, { QueryFeedOptions } from "./feed.repository";
+import FeedRepo, { FeedFilters, QueryFeedOptions } from "./feed.repository";
+import {
+  FRESH_POOL_SIZE,
+  OLDER_POOL_SIZE,
+  RESURFACE_RETENTION_DAYS,
+  composeFeed,
+  decodeForYouCursor,
+  encodeForYouCursor,
+  freshWeight,
+  newSeed,
+  olderWeight,
+  pickFeatured,
+  weightedOrder,
+} from "../../utils/feed-ranking";
 import PassportSvc from "../passport/passport.service";
 import NotificationService from "../notifications/user-notification.service";
 import { prisma } from "../../utils/prisma";
 import { AuthenticatedUser } from "../../types/auth";
 import { can } from "../../types/permissions";
-import { announcePostCommentsCount } from "../../infrastructure/socket/invalidate";
+import {
+  announceNewPost,
+  announcePostCommentsCount,
+} from "../../infrastructure/socket/invalidate";
+
+/**
+ * - `foryou`: the ranked mix (app#308).
+ * - `recent`: strictly newest first.
+ * - `legacy`: newest first with pinned posts on top, for requests that send
+ *   no mode (older mobile builds).
+ */
+export type FeedMode = "foryou" | "recent" | "legacy";
+
+export interface GetFeedInput extends QueryFeedOptions {
+  mode: FeedMode;
+}
+
+/** Tells open feeds a public post exists. Best-effort, like the comment count. */
+function broadcastNewPost(post: { visibility: PostVisibility; tab: FeedTab }) {
+  if (post.visibility === PostVisibility.public) announceNewPost(post.tab);
+}
 
 export interface MediaTagInput {
   mediaUrl: string;
@@ -159,8 +192,125 @@ function broadcastCommentsCount(postId: string): void {
 }
 
 export default class FeedService {
-  static async getFeed(options: QueryFeedOptions) {
-    return FeedRepo.findPosts(options);
+  static async getFeed({ mode, ...options }: GetFeedInput) {
+    if (mode === "foryou") return FeedService.getForYouFeed(options);
+    return FeedRepo.findPosts({ ...options, pinnedFirst: mode === "legacy" });
+  }
+
+  /**
+   * The For you feed (app#308). The first page draws a session (a random seed
+   * and an anchor time); later pages carry it in the cursor, so every page
+   * ranks the identical list and slices it at its offset. See
+   * src/utils/feed-ranking.ts for the rules.
+   */
+  static async getForYouFeed(options: QueryFeedOptions) {
+    const { limit = 20, cursor, viewerId } = options;
+
+    let seed: string;
+    let anchor: Date;
+    let offset: number;
+    if (cursor) {
+      const decoded = decodeForYouCursor(cursor);
+      if (!decoded) {
+        throw new AppError(
+          "This feed page has expired. Refresh to load the feed again.",
+          400,
+        );
+      }
+      ({ seed, anchor, offset } = decoded);
+    } else {
+      seed = newSeed();
+      anchor = new Date();
+      offset = 0;
+    }
+
+    const filters: FeedFilters = {
+      tab: options.tab,
+      type: options.type,
+      authorId: options.authorId,
+      search: options.search,
+      viewerId,
+    };
+    const followingIds: Set<string> = viewerId
+      ? await FeedRepo.getFollowingIds(viewerId)
+      : new Set();
+
+    const { fresh, older, pinned } = await FeedRepo.findRankingCandidates(
+      filters,
+      followingIds,
+      anchor,
+      FRESH_POOL_SIZE,
+    );
+
+    const featured = pickFeatured(pinned, seed);
+    const notFeatured = (p: { id: string }) => p.id !== featured?.id;
+    const hasAffinity = (authorId: string) =>
+      authorId === viewerId || followingIds.has(authorId);
+
+    const ranked = composeFeed({
+      featured,
+      fresh: weightedOrder(
+        fresh.filter(notFeatured),
+        (p) => freshWeight(p, anchor, hasAffinity(p.authorId)),
+        seed,
+        "fresh",
+      ),
+      older: weightedOrder(
+        older.filter(notFeatured),
+        (p) => olderWeight(p, p.lastShownAt, anchor),
+        seed,
+        "older",
+      ).slice(0, OLDER_POOL_SIZE),
+    });
+
+    const page = ranked.slice(offset, offset + limit);
+    const flags = new Map(page.map((e) => [e.post.id, e]));
+    const posts = await FeedRepo.findPostsByIds(
+      page.map((e) => e.post.id),
+      filters,
+      followingIds,
+    );
+
+    // Resets the boost of the older posts this page shows. Their rows are
+    // newer than this session's anchor, so the session's later pages ignore
+    // them. Best-effort: the page is already built.
+    FeedRepo.recordResurfacings(
+      page.filter((e) => e.resurfaced).map((e) => e.post.id),
+    ).catch(() => {});
+
+    return {
+      posts: posts.map((p) => ({
+        ...p,
+        resurfaced: flags.get(p.id)?.resurfaced ?? false,
+        isFeatured: flags.get(p.id)?.featured ?? false,
+      })),
+      nextCursor:
+        offset + limit < ranked.length
+          ? encodeForYouCursor({ seed, anchor, offset: offset + limit })
+          : null,
+      // Posts after this moment aren't in the session; clients ask
+      // `new-count?since=<anchor>` for them. Server time, so client clock
+      // skew can't hide or double-count a post.
+      anchor: anchor.toISOString(),
+    };
+  }
+
+  /**
+   * Deletes resurfacing rows past the boost cap, keeping each post's latest
+   * (the only one a boost reads). Run daily by the prune job.
+   */
+  static async pruneResurfacings(now: Date = new Date()) {
+    return FeedRepo.pruneResurfacings(
+      new Date(now.getTime() - RESURFACE_RETENTION_DAYS * 24 * 60 * 60 * 1000),
+    );
+  }
+
+  /** How many posts newer than `since` the viewer may see, for the "New posts" pill. */
+  static async countNewPosts(filters: FeedFilters, since: Date) {
+    const followingIds: Set<string> = filters.viewerId
+      ? await FeedRepo.getFollowingIds(filters.viewerId)
+      : new Set();
+    return FeedRepo.countPostsSince(filters, followingIds, since);
   }
 
   static async getPostById(id: string, viewerId?: string) {
@@ -413,6 +563,7 @@ export default class FeedService {
     });
 
     notifyMentions(content, user.userId, { postId: post.id }).catch(() => {});
+    broadcastNewPost(post);
     if (mediaTags && mediaTags.length > 0) {
       notifyMediaTags(mediaTags, user.userId, post.id).catch(() => {});
     }
@@ -553,6 +704,7 @@ export default class FeedService {
     });
 
     await FeedRepo.incrementReposts(postId);
+    broadcastNewPost(post);
 
     if (original.authorId !== user.userId) {
       NotificationService.create({
