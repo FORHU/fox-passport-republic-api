@@ -265,6 +265,37 @@ describe("event payment lifecycle (database)", () => {
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   });
 
+  it("charges an approved venue, and is blocked by one awaiting its Mayor", async () => {
+    const { eventId } = await bookEvent(70);
+    const venueRow = await prisma.eventVenueTransaction.findFirstOrThrow({
+      where: { eventId },
+    });
+
+    // A matched venue is booked `approved`; it is still charged.
+    await prisma.eventVenueTransaction.update({
+      where: { id: venueRow.id },
+      data: { status: "approved" },
+    });
+    const summary = await EventCheckoutSvc.getPaymentSummary(
+      eventId,
+      ids.client,
+    );
+    expect(summary.items).toHaveLength(2);
+
+    // A venue waiting for its Mayor's answer blocks checkout, as an asset
+    // or service waiting for its Provider does.
+    await prisma.eventVenueTransaction.update({
+      where: { id: venueRow.id },
+      data: {
+        status: "pending_provider_confirmation",
+        confirmationDeadline: new Date(Date.now() + 86_400_000),
+      },
+    });
+    await expect(
+      EventCheckoutSvc.getPaymentSummary(eventId, ids.client),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
   it("prices every line with the Event's stored rate, even if the EventFoxer changes it mid-booking", async () => {
     /** Each line uses `rate`, and the Event's commission is their sum. */
     const expectRate = async (eventId: string, rate: number) => {
