@@ -1,5 +1,7 @@
 import Stripe from "stripe";
 import { STRIPE_SECRET_KEY } from "../../../config";
+import { toStripeCents } from "../../../utils/pricing";
+import { constructStripeEvent } from "../../../utils/stripe-webhook";
 import {
   CheckoutSessionData,
   PaymentProvider,
@@ -29,8 +31,10 @@ export class StripeAdapter implements PaymentProvider {
             product_data: {
               name: `Invoice ${invoiceId}`,
             },
-            // Stripe expects amount in smallest currency unit (e.g., cents for PHP/USD)
-            unit_amount: Math.round(amount * 100),
+            // Stripe expects amount in smallest currency unit (e.g., cents for PHP/USD).
+            // For an Event this is the invoice's grossAmount: the breakdown
+            // total the client was shown (#264 T12.3).
+            unit_amount: toStripeCents(amount),
           },
           quantity: 1,
         },
@@ -122,8 +126,11 @@ export class StripeAdapter implements PaymentProvider {
     };
   }
 
+  /** Platform or Connect endpoint secret, as `PaymentController.handleWebhook`. */
   verifyWebhook(payload: string | Buffer, signature: string): Stripe.Event {
-    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
-    return stripe.webhooks.constructEvent(payload, signature, endpointSecret);
+    return constructStripeEvent(stripe.webhooks, payload, signature, [
+      process.env.STRIPE_WEBHOOK_SECRET,
+      process.env.STRIPE_CONNECT_WEBHOOK_SECRET,
+    ]);
   }
 }

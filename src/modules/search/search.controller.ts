@@ -10,6 +10,8 @@ export default class SearchCtrl {
   static async search(req: Request, res: Response) {
     try {
       const location = req.query.location as string | undefined;
+      // A Provider is found under each specialty they declared, on its own.
+      const specialty = req.query.specialty as string | undefined;
       const category = req.query.category as string | undefined;
       const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
       const limit = Math.min(
@@ -22,6 +24,7 @@ export default class SearchCtrl {
         category,
         page,
         limit,
+        specialty,
       );
 
       return res.status(200).json({
@@ -29,6 +32,7 @@ export default class SearchCtrl {
         data: {
           location: location ?? null,
           category: category ?? null,
+          specialty: specialty ?? null,
           page,
           limit,
           totalEventTemplates: result.totalEventTemplates,

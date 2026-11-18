@@ -6,7 +6,6 @@ import EventRepo from "../event/event.repository";
 import EventRequestRepo from "../event-request/event-request.repository";
 import EventRequestSvc from "../event-request/event-request.service";
 import AppointmentAccess from "../appointment/appointment.access";
-import OrganizerXpService from "../appointment/organizer-xp.service";
 import EventTemplateSvc from "../event-template/event-template.service";
 import PaymentSvc from "../payment/payment.service";
 import PaymentRepo from "../payment/payment.repository";
@@ -1208,29 +1207,20 @@ export default class BookingSvc {
       } catch (err) {
         console.error(`Passport stamp failed for booking ${id}`, err);
       }
-      // Award venueBooked XP to the venue owner + check VenueFoxer specialization
-      import("../passport/passport.service")
-        .then(async ({ default: PassportSvc, XP_REWARDS, UserPath }) => {
+      // Check VenueFoxer specialization for the venue owner
+      import("../users/specialization.service")
+        .then(async ({ default: SpecializationSvc }) => {
           const venueTx = await prisma.eventVenueTransaction.findFirst({
             where: {
               eventId: booking.event?.id ?? booking.eventId,
             },
             select: { providerId: true, venueId: true },
           });
-          if (venueTx?.providerId) {
-            await PassportSvc.awardXP(
+          if (venueTx?.providerId && venueTx.venueId) {
+            SpecializationSvc.checkVenueFoxer(
+              venueTx.venueId,
               venueTx.providerId,
-              UserPath.venueFoxer,
-              XP_REWARDS.venueBooked,
-            );
-            if (venueTx.venueId) {
-              const { default: SpecializationSvc } =
-                await import("../users/specialization.service");
-              SpecializationSvc.checkVenueFoxer(
-                venueTx.venueId,
-                venueTx.providerId,
-              ).catch(() => {});
-            }
+            ).catch(() => {});
           }
         })
         .catch(() => {});
@@ -1249,7 +1239,7 @@ export default class BookingSvc {
       status === ItemBookingStatus.cancelled ||
       status === "cancelled"
     ) {
-      import("../reward/reward.service")
+      await import("../reward/reward.service")
         .then(({ default: RewardService }) => {
           return RewardService.reverse({
             refType: "booking",
@@ -1372,11 +1362,6 @@ export default class BookingSvc {
       booking.event?.templateId,
       { bookingId: id },
     );
-    // An Organizer earns on their path for guests they check in (ADR 0005).
-    // The guard above means a guest can only ever count once.
-    if (booking.event) {
-      void OrganizerXpService.onGuestCheckedIn(booking.event.id, hostId);
-    }
 
     return { booking: await BookingRepo.findById(id), payoutTriggered: true };
   }
@@ -2389,12 +2374,6 @@ export default class BookingSvc {
     }
 
     const updated = await BookingRepo.markAttendeeCheckedIn(attendee.id);
-    if (attendee.booking.event) {
-      void OrganizerXpService.onGuestCheckedIn(
-        attendee.booking.event.id,
-        hostId,
-      );
-    }
 
     // The host's door list and the guest's own booking both show this. No admin
     // emit: the admin Bookings tab lists bookings, not attendees.

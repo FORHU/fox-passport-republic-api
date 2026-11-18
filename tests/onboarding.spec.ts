@@ -40,12 +40,7 @@ vi.mock("../src/modules/onboarding/onboarding.repository", () => ({
 
 vi.mock("../src/modules/reward/reward.service", () => ({
   default: {
-    grant: vi.fn(async () => ({
-      xpAwarded: 50,
-      coinsAwarded: 20,
-      newLevel: 2,
-      newRank: "Newcomer",
-    })),
+    grant: vi.fn(async () => ({ coinsAwarded: 20 })),
   },
 }));
 
@@ -68,7 +63,7 @@ describe("OnboardingSvc", () => {
       step: "intro",
       completed: true,
       alreadyCompleted: false,
-      reward: { xpAwarded: 50, coinsAwarded: 20 },
+      reward: { coinsAwarded: 20 },
     });
     expect(RewardService.grant).toHaveBeenCalledWith({
       userId: "u1",
@@ -87,7 +82,7 @@ describe("OnboardingSvc", () => {
     const again = await OnboardingSvc.complete("u1", "intro");
 
     expect(again.alreadyCompleted).toBe(true);
-    expect(again.reward).toEqual({ xpAwarded: 0, coinsAwarded: 0 });
+    expect(again.reward).toEqual({ coinsAwarded: 0 });
     expect(RewardService.grant).not.toHaveBeenCalled();
     expect(OnboardingRepo.markCompleted).not.toHaveBeenCalled();
   });
@@ -95,7 +90,7 @@ describe("OnboardingSvc", () => {
   it("records the Foxer tour without paying", async () => {
     const res = await OnboardingSvc.complete("u1", "foxer_tour");
 
-    expect(res.reward).toEqual({ xpAwarded: 0, coinsAwarded: 0 });
+    expect(res.reward).toEqual({ coinsAwarded: 0 });
     expect(RewardService.grant).not.toHaveBeenCalled();
     expect(OnboardingRepo.markCompleted).toHaveBeenCalledWith(
       "u1",

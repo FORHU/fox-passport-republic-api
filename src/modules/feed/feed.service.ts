@@ -12,6 +12,7 @@ import NotificationService from "../notifications/user-notification.service";
 import { prisma } from "../../utils/prisma";
 import { AuthenticatedUser } from "../../types/auth";
 import { can } from "../../types/permissions";
+import { announcePostCommentsCount } from "../../infrastructure/socket/invalidate";
 
 export interface MediaTagInput {
   mediaUrl: string;
@@ -137,6 +138,24 @@ async function notifyMediaTags(
       ),
     ),
   );
+}
+
+/**
+ * Tells every open feed the post's comment count, read back from the stored
+ * counter so concurrent comments cannot leave a client on a stale number.
+ * Public posts only: the event goes to every connected socket, so a
+ * followers-only or only-me post's activity would reach people who cannot
+ * see the post. Those posts' counts refresh on the commenter's own reload.
+ * Best-effort: the comment is already saved.
+ */
+function broadcastCommentsCount(postId: string): void {
+  FeedRepo.findCommentsCount(postId)
+    .then((post) => {
+      if (post?.visibility === PostVisibility.public) {
+        announcePostCommentsCount(postId, post.commentsCount);
+      }
+    })
+    .catch(() => {});
 }
 
 export default class FeedService {
@@ -398,7 +417,8 @@ export default class FeedService {
       notifyMediaTags(mediaTags, user.userId, post.id).catch(() => {});
     }
 
-    // 3. Award XP & Coins via RewardService (with daily anti-spam cap and idempotency)
+    // 3. Award Tokens via RewardService (with daily anti-spam cap and idempotency).
+    // Foxer posts paid XP only, which is retired, so they pay nothing.
     try {
       const { default: RewardService } =
         await import("../reward/reward.service");
@@ -418,37 +438,12 @@ export default class FeedService {
           refType: "post",
           refId: post.id,
         });
-      } else {
-        let targetPath: UserPath = UserPath.user;
-        if (type === PostType.venue_spotlight) targetPath = UserPath.venueFoxer;
-        else if (
-          type === PostType.gear_offering ||
-          type === PostType.service_offering
-        ) {
-          // A Provider earns on their own path; a Partner spotlighting supply
-          // earns on theirs.
-          targetPath = user.roleType.includes("providerFoxer")
-            ? UserPath.providerFoxer
-            : user.roleType.includes("investor")
-              ? UserPath.investor
-              : UserPath.user;
-        } else if (type === PostType.event_announcement)
-          targetPath = UserPath.eventFoxer;
-        else if (type === PostType.partner_announcement)
-          targetPath = UserPath.investor;
-
-        await RewardService.grant({
-          userId: user.userId,
-          path: targetPath,
-          action: "post_feed",
-          refType: "post",
-          refId: post.id,
-          xpOverride: 25,
-          coinsOverride: 0,
-        });
       }
-    } catch (xpError) {
-      console.warn("[FeedService] Best-effort XP award failed:", xpError);
+    } catch (rewardError) {
+      console.warn(
+        "[FeedService] Best-effort reward grant failed:",
+        rewardError,
+      );
     }
 
     // 4. Milestone badge: active community posting
@@ -693,6 +688,8 @@ export default class FeedService {
       parentId,
     );
 
+    broadcastCommentsCount(postId);
+
     notifyMentions(trimmed, user.userId, {
       postId,
       commentId: comment.id,
@@ -783,7 +780,9 @@ export default class FeedService {
       throw new AppError("Unauthorized to delete this comment", 403);
     }
 
-    return FeedRepo.deleteComment(commentId);
+    const deleted = await FeedRepo.deleteComment(commentId);
+    broadcastCommentsCount(deleted.postId);
+    return deleted;
   }
 
   static async toggleCommentLike(commentId: string, user: AuthenticatedUser) {

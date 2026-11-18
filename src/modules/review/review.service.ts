@@ -178,6 +178,13 @@ export default class ReviewSvc {
           refType: "review",
           refId: review.id,
         });
+        // A review on an attended booking can complete a milestone tier. The
+        // nightly sweep pays it if this fails.
+        const { default: MilestoneSvc } =
+          await import("../milestone/milestone.service");
+        await MilestoneSvc.reconcile(String(data.userId)).catch((e) =>
+          console.warn("[ReviewSvc] milestone reconcile failed:", e),
+        );
         const reviewCount = await prisma.review.count({
           where: { userId: String(data.userId) },
         });
@@ -487,39 +494,15 @@ export default class ReviewSvc {
       return {
         helpful: false,
         helpfulCount: Math.max(0, updated.helpfulCount),
-        xpAwarded: 0,
       };
     }
 
     const updated = await ReviewRepo.addHelpfulVote(reviewId, voterId);
     await reviewCache.invalidateAll();
 
-    let xpAwarded = 0;
-    try {
-      const { default: RewardService } =
-        await import("../reward/reward.service");
-      const { UserPath } = await import("../passport/passport.service");
-      const grantResult = await RewardService.grant({
-        userId: review.userId,
-        path: UserPath.user,
-        action: "review_helpful",
-        refType: "review_helpful",
-        refId: `${reviewId}:${voterId}`,
-        idempotencyKey: `grant:${review.userId}:review_helpful:${reviewId}:${voterId}`,
-        xpOverride: 2,
-        coinsOverride: 0,
-      });
-      if (!grantResult.isIdempotentReplay) {
-        xpAwarded = grantResult.xpAwarded;
-      }
-    } catch {
-      // Non-blocking if reward grant fails
-    }
-
     return {
       helpful: true,
       helpfulCount: updated.helpfulCount,
-      xpAwarded,
     };
   }
 }

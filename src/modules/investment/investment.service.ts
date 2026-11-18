@@ -2,7 +2,6 @@ import {
   InvestmentType,
   InventoryCategory,
   TransportPolicy,
-  UserPath,
 } from "@prisma/client";
 import InvestmentRepo from "./investment.repository";
 import { investmentCache, INVESTMENT_TTL } from "../../utils/cache-namespaces";
@@ -10,7 +9,6 @@ import { fingerprint } from "../../utils/cache.util";
 import UsersRepo from "../users/users.repository";
 import { can } from "../../types/permissions";
 import FeedRepo from "../feed/feed.repository";
-import PassportSvc from "../passport/passport.service";
 import VenueRepo from "../venue/venue.repository";
 import { badRequest, forbidden, notFound } from "../../utils/errors";
 
@@ -90,13 +88,6 @@ export default class InvestmentSvc {
         ? { targetEvent: { connect: { id: targetEventId } } }
         : {}),
     });
-
-    // Award Partner XP for deploying capital / inventory into the Republic
-    try {
-      await PassportSvc.awardXP(partnerId, UserPath.investor, 50);
-    } catch {
-      // Non-fatal if passport progression error
-    }
 
     // Optionally broadcast announcement card to the Republic Foxer Partners Feed
     if (broadcastToFeed) {

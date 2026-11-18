@@ -772,7 +772,6 @@ describe("Organizer requests", () => {
         imgId: null,
         city: "Davao",
         foxerSpecializations: [{ category: "wedding" }],
-        passport: { paths: [{ level: 3, totalXP: 2500 }] },
       },
     ]);
     const [card] = await AppointmentService.searchOrganizers(
@@ -785,9 +784,29 @@ describe("Organizer requests", () => {
       imgId: null,
       city: "Davao",
       specializations: ["wedding"],
-      level: 3,
-      totalXP: 2500,
     });
     expect(card).not.toHaveProperty("email");
+    expect(card).not.toHaveProperty("level");
+    expect(card).not.toHaveProperty("totalXP");
+  });
+
+  it("matches the search word against specialties as well as name and city", async () => {
+    m.user.findMany.mockResolvedValue([]);
+    await AppointmentService.searchOrganizers(
+      { userId: "juan", systemRole: "user", roleType: ["eventFoxer"] },
+      { q: "wedding" },
+    );
+    const { where } = m.user.findMany.mock.calls.at(-1)![0];
+    expect(where.OR).toContainEqual({
+      foxerSpecializations: {
+        some: {
+          roleType: "organizer",
+          category: { contains: "wedding", mode: "insensitive" },
+        },
+      },
+    });
+    expect(where.OR).toContainEqual({
+      name: { contains: "wedding", mode: "insensitive" },
+    });
   });
 });

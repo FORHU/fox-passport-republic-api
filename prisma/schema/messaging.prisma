@@ -100,6 +100,9 @@ model ConversationParticipant {
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([conversationId, userId])
+  // The primary key leads with conversationId, so it can't answer "which
+  // groups is this user in?" — the inbox's `participants: { some: { userId } }`.
+  @@index([userId])
   @@map("conversation_participants")
 }
 
@@ -187,6 +190,14 @@ model Message {
   replies        Message[]         @relation("MessageReplies")
   reactions      MessageReaction[]
 
+  // A thread's messages, newest first: opening a chat, the inbox's
+  // last-message preview and unread count, and in-chat search.
+  @@index([conversationId, createdAt(sort: Desc)])
+  // Looked up when a user is deleted (cascade) and when a replied-to message
+  // or a shared post is deleted (SetNull).
+  @@index([senderId])
+  @@index([replyToId])
+  @@index([sharedPostId])
   @@map("messages")
 }
 

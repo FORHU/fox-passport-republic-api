@@ -1,6 +1,7 @@
 import * as dotenv from "dotenv";
 import { requireSecret } from "./utils/require-secret";
 import { readPercentEnv } from "./utils/percent-env";
+import { readStripeEnv } from "./utils/stripe-env";
 dotenv.config();
 
 export const DATABASE_URL = process.env.DATABASE_URL as string;
@@ -121,13 +122,92 @@ export const AWS_SQS_NOTIFICATION_QUEUE_URL = process.env
   .AWS_SQS_NOTIFICATION_QUEUE_URL as string | undefined;
 export const SQS_ENDPOINT = process.env.SQS_ENDPOINT as string | undefined;
 
-export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY as string;
-export const STRIPE_WEBHOOK_SECRET = process.env
-  .STRIPE_WEBHOOK_SECRET as string;
+// Checked at startup (utils/stripe-env.ts): production refuses to start without
+// them; development and tests only warn.
+export const STRIPE_SECRET_KEY = readStripeEnv(
+  "STRIPE_SECRET_KEY",
+  process.env.STRIPE_SECRET_KEY,
+  { isDev },
+);
+// The platform webhook endpoint's signing secret: payments, refunds, disputes.
+export const STRIPE_WEBHOOK_SECRET = readStripeEnv(
+  "STRIPE_WEBHOOK_SECRET",
+  process.env.STRIPE_WEBHOOK_SECRET,
+  { isDev },
+);
+// The Connect webhook endpoint's signing secret. Stripe sends events about
+// connected (Foxer) accounts, such as `account.updated` when onboarding
+// finishes, only to a Connect endpoint, which has its own secret. Optional:
+// without it, Connect events are refused and onboarding flags never update.
+export const STRIPE_CONNECT_WEBHOOK_SECRET = readStripeEnv(
+  "STRIPE_CONNECT_WEBHOOK_SECRET",
+  process.env.STRIPE_CONNECT_WEBHOOK_SECRET,
+  { isDev, optional: true },
+);
 // Platform's own cut, applied on top of itemsTotal (+ hostMarkup for Event bookings),
 // never carved out of provider/host shares. See docs/adr/0002-stripe-connect-payouts.md.
 // Checked at startup like PROCESSING_FEE_PERCENT: unset or empty still means 5,
 // but "5%" or 300 now stops the API instead of charging NaN or 300%.
+/**
+ * A whole number setting read from the environment: unset or empty means the
+ * fallback; anything else must be a whole number from 0 up, or the API stops.
+ */
+function readCountEnv(name: string, fallback: number): number {
+  const value = process.env[name];
+  if (value === undefined || value.trim() === "") return fallback;
+  const parsed = Number(value.trim());
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(
+      `${name} is "${value}". Refusing to start: it must be a whole number from 0 up.`,
+    );
+  }
+  return parsed;
+}
+
+// Foxer leaderboard, Top rated (rewards spec section 7.2). Paws are ranked by
+// the Bayesian average (v x R + p x C) / (v + p); p is the prior. A Foxer needs
+// this many completed bookings to appear. These are the defaults; an admin can
+// override them (reward-settings, RR-8) without a deploy.
+export const LEADERBOARD_PAWS_PRIOR = readCountEnv("LEADERBOARD_PAWS_PRIOR", 5);
+export const LEADERBOARD_TOP_RATED_MIN_BOOKINGS = readCountEnv(
+  "LEADERBOARD_TOP_RATED_MIN_BOOKINGS",
+  3,
+);
+
+// Daily login (RR-7, rewards spec section 3): the most Tokens it pays in one
+// Manila month, so it stops there. The amount paid each day lives in the
+// `daily_login` RewardRule. This is the default; an admin can override it
+// (reward-settings, RR-8) without a deploy.
+export const DAILY_LOGIN_MONTHLY_CAP_TOKENS = readCountEnv(
+  "DAILY_LOGIN_MONTHLY_CAP_TOKENS",
+  100,
+);
+// Daily login runs in a 7-day cycle: day 1 pays the rule's amount, and each
+// later day pays this many Tokens more than the day before (15, 25, ... 75 with
+// a rule of 15). 0 pays the same every day.
+export const DAILY_LOGIN_STEP_TOKENS = readCountEnv(
+  "DAILY_LOGIN_STEP_TOKENS",
+  10,
+);
+
+// Milestones (RR-6): the moment tier Tokens start paying. A tier a citizen had
+// already reached before this instant gives a badge only and never pays Tokens
+// (no back-pay), so every existing citizen starts from where they stand.
+// Unset means milestone Tokens do not pay at all. Set it to the deploy time, as
+// an ISO instant such as 2026-11-20T00:00:00+08:00.
+function readInstantEnv(name: string): Date | null {
+  const value = process.env[name];
+  if (value === undefined || value.trim() === "") return null;
+  const parsed = new Date(value.trim());
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(
+      `${name} is "${value}". Refusing to start: it must be an ISO date and time, for example 2026-11-20T00:00:00+08:00.`,
+    );
+  }
+  return parsed;
+}
+export const MILESTONES_LAUNCH_AT = readInstantEnv("MILESTONES_LAUNCH_AT");
+
 export const PLATFORM_FEE_PERCENT = readPercentEnv(
   "PLATFORM_FEE_PERCENT",
   process.env.PLATFORM_FEE_PERCENT,
@@ -189,3 +269,47 @@ if (Boolean(facebookAppId) !== Boolean(facebookAppSecret)) {
 
 export const FACEBOOK_APP_ID = facebookAppId;
 export const FACEBOOK_APP_SECRET = facebookAppSecret;
+
+// Sharing posts to Facebook Pages. Separate from sign-in: Better Auth never
+// sees these tokens. A Meta app built for "Sign in with Facebook" can't always
+// be given the Pages use case, so sharing may use a Meta app of its own:
+// FACEBOOK_PAGES_APP_ID / _SECRET, both or neither. Unset, it uses the sign-in
+// app above.
+const facebookPagesAppId =
+  process.env.FACEBOOK_PAGES_APP_ID?.trim() || undefined;
+const facebookPagesAppSecret =
+  process.env.FACEBOOK_PAGES_APP_SECRET?.trim() || undefined;
+if (Boolean(facebookPagesAppId) !== Boolean(facebookPagesAppSecret)) {
+  throw new Error(
+    "FACEBOOK_PAGES_APP_ID and FACEBOOK_PAGES_APP_SECRET must be provided together.",
+  );
+}
+export const FACEBOOK_PAGES_APP_ID = facebookPagesAppId;
+export const FACEBOOK_PAGES_APP_SECRET = facebookPagesAppSecret;
+// Sharing is on only when an app and this key are both set. The key encrypts
+// the stored Page and user tokens (AES-256-GCM): 32 random bytes, base64
+// (`openssl rand -base64 32`). A key that is set but not 32 bytes stops the
+// API at boot instead of failing the first time someone connects.
+const facebookTokenKeyRaw =
+  process.env.FACEBOOK_TOKEN_ENCRYPTION_KEY?.trim() || undefined;
+if (
+  facebookTokenKeyRaw &&
+  Buffer.from(facebookTokenKeyRaw, "base64").length !== 32
+) {
+  throw new Error(
+    "FACEBOOK_TOKEN_ENCRYPTION_KEY must be 32 bytes, base64-encoded (openssl rand -base64 32).",
+  );
+}
+export const FACEBOOK_TOKEN_ENCRYPTION_KEY = facebookTokenKeyRaw;
+// The Graph API version every call is pinned to.
+export const FACEBOOK_GRAPH_VERSION =
+  process.env.FACEBOOK_GRAPH_VERSION?.trim() || "v26.0";
+// Set when the Meta app is a Business app using Facebook Login for Business:
+// the login dialog then takes this configuration instead of a scope list.
+export const FACEBOOK_LOGIN_CONFIG_ID =
+  process.env.FACEBOOK_LOGIN_CONFIG_ID?.trim() || undefined;
+// Where Meta sends the browser back after the Page permission dialog. It must
+// be listed under the Meta app's Valid OAuth Redirect URIs.
+export const FACEBOOK_PAGES_REDIRECT_URI =
+  process.env.FACEBOOK_PAGES_REDIRECT_URI?.trim() ||
+  `${BETTER_AUTH_URL.replace(/\/+$/, "")}/api/v1/integrations/facebook/callback`;

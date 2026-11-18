@@ -33,7 +33,7 @@ describe("Passport rank (Supertest)", () => {
     await prisma.user.delete({ where: { id: userId } });
   });
 
-  it("puts a rank on each path of the signed-in passport", async () => {
+  it("sends no level, rank or XP on any path of the signed-in passport", async () => {
     const first = await request(app)
       .get("/api/v1/passport/me")
       .set("Authorization", `Bearer ${token}`);
@@ -53,21 +53,12 @@ describe("Passport rank (Supertest)", () => {
       .set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(200);
 
-    const byPath = Object.fromEntries(
-      res.body.data.paths.map(
-        (p: { path: string; level: number; rank: unknown }) => [p.path, p],
-      ),
-    );
-    expect(byPath.user.level).toBe(20);
-    expect(byPath.user.rank).toMatchObject({
-      number: 6,
-      name: "Adventurer",
-      rarity: "Rare",
-      next: { name: "Pioneer", minLevel: 30, levelsToGo: 10 },
-    });
-    expect(byPath.venueFoxer.rank).toMatchObject({
-      number: 2,
-      name: "Regular",
-    });
+    for (const p of res.body.data.paths as Record<string, unknown>[]) {
+      expect(p).not.toHaveProperty("level");
+      expect(p).not.toHaveProperty("rank");
+      expect(p).not.toHaveProperty("totalXP");
+      expect(p).not.toHaveProperty("currentXP");
+    }
+    expect(res.body.data.paths).toHaveLength(2);
   });
 });

@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { Resend } from "resend";
 import { RESEND_API_KEY } from "../config";
+import { sendEmail as sendViaMailer } from "./mailer";
 
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 const FROM_ADDRESS = "FoxPassport <onboarding@foxpassport.com>";
@@ -26,15 +27,23 @@ export async function sendResendEmail({
   }
 
   try {
-    await resend.emails.send({
+    // Resend reports a refusal in `error` instead of throwing (api#332).
+    const { error } = await resend.emails.send({
       from: FROM_ADDRESS,
       to,
       subject,
       html,
     });
+    if (error) throw new Error(`${error.name}: ${error.message}`);
     console.log(`Resend email sent to ${to}: ${subject}`);
   } catch (error) {
-    console.error(`Resend email failed to ${to}:`, error);
+    console.error(`Resend email failed to ${to}, trying SMTP:`, error);
+    try {
+      await sendViaMailer({ to, subject, html });
+      console.log(`Email sent via SMTP fallback to ${to}: ${subject}`);
+    } catch (smtpError) {
+      console.error(`SMTP fallback email failed to ${to}:`, smtpError);
+    }
   }
 }
 

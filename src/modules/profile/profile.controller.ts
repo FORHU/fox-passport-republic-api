@@ -87,6 +87,10 @@ export default class ProfileCtrl {
         preferredCurrency: Joi.string()
           .valid(...SUPPORTED_CURRENCIES)
           .optional(),
+        // A Provider's catalog specialties; replaces the ones stored. Checked by
+        // the service (at least one, each in the catalog, none with bookings
+        // ahead removed).
+        specialties: Joi.array().items(Joi.string()).max(50).optional(),
       });
 
       const { error, value } = schema.validate(req.body);
@@ -111,6 +115,10 @@ export default class ProfileCtrl {
         success: false,
         message: error.message || "Failed to update profile",
         ...(error.message === USERNAME_TAKEN && { field: "username" }),
+        // An error can name the field it is about (a refused specialty edit).
+        ...(typeof (e as { field?: unknown }).field === "string" && {
+          field: (e as { field: string }).field,
+        }),
       });
     }
   }

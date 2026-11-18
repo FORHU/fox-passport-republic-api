@@ -47,7 +47,10 @@ const ROOT_DIR = path.resolve(__dirname, "../src/modules");
 const REPORT_ONLY = process.argv.includes("--report");
 // Existing ownership-guarded routes are tracked separately while the route
 // audit is completed. New unguarded routes must not increase this number.
-const MAX_UNGUARDED_ROUTES = 178;
+// 179: GET /milestones/me (RR-6), a read of the caller's own progress scoped by
+// the session user id, like achievements/me and rewards/me. Approved by the
+// task owner on 2026-11-12.
+const MAX_UNGUARDED_ROUTES = 179;
 
 /**
  * Routes that are `authenticate`d but deliberately have no `requirePermission`
@@ -62,6 +65,32 @@ const MAX_UNGUARDED_ROUTES = 178;
  */
 const ALLOW_LIST = new Set([
   // "users.routes.ts GET /:id/profile — self-service, no separate permission needed",
+
+  // Facebook Page sharing (api#320). Each route acts only on the caller's own
+  // connection; sharing also checks in FacebookService that the caller wrote
+  // the post. Self-service, so no capability permission applies.
+  "facebook.routes.ts GET /",
+  "facebook.routes.ts DELETE /",
+  "facebook.routes.ts GET /connect-url",
+  "facebook.routes.ts GET /pages",
+  "facebook.routes.ts PUT /page",
+  "facebook.routes.ts POST /shares",
+  "facebook.routes.ts GET /shares/:postId",
+
+  // Daily login (RR-7, api#302). Both routes read or pay only the caller's own
+  // daily login, keyed by the session user and the Manila day; DailyLoginSvc
+  // checks the email is verified. Self-service, so no capability permission
+  // applies.
+  "reward.routes.ts GET /daily-login",
+  "reward.routes.ts POST /daily-login",
+
+  // Referrals (RR-7, api#302). Both routes read or change only the caller's own
+  // code and referrer, keyed by the session user; ReferralSvc checks the rest
+  // (no own code, no second code, no code after a first paid booking). The apply
+  // route is rate limited per account. Self-service, so no capability
+  // permission applies.
+  "referral.routes.ts GET /me",
+  "referral.routes.ts POST /apply",
 
   // Foxer Score management console: self-service operational metrics for authenticated Foxer.
   "foxer-score.routes.ts GET /me",

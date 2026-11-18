@@ -1,28 +1,11 @@
-import fs from "fs";
-import path from "path";
 import { Resend } from "resend";
 import { RESEND_API_KEY, FRONTEND_URL } from "../../config";
 import { sendEmail as sendViaMailer } from "../mailer";
 
-export const LOGO_DATA_URI = (() => {
-  const logoPath = path.join(
-    process.cwd(),
-    "..",
-    "fox-passport-republic-app",
-    "public",
-    "logofox.png",
-  );
-  try {
-    if (fs.existsSync(logoPath)) {
-      const ext = path.extname(logoPath).slice(1);
-      const data = fs.readFileSync(logoPath);
-      return `data:image/${ext};base64,${data.toString("base64")}`;
-    }
-  } catch {
-    // fall through to URL fallback
-  }
-  return `${FRONTEND_URL}/logofox.png`;
-})();
+// The logo every email shows: the web app's public `foxonlylogo.png`. Always a
+// URL, never an inline data URI, because Gmail blocks data-URI images
+// (api#335). The name is kept for the existing imports.
+export const LOGO_DATA_URI = `${FRONTEND_URL}/foxonlylogo.png`;
 
 export const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 export const FROM_ADDRESS =
@@ -136,16 +119,25 @@ export async function sendResendEmail({
   }
 
   try {
-    await resend.emails.send({
+    // Resend reports a refusal in `error` instead of throwing (api#332).
+    const { error } = await resend.emails.send({
       from: FROM_ADDRESS,
       to,
       subject,
       html,
     });
+    if (error) throw new Error(`${error.name}: ${error.message}`);
     console.log(`Resend email sent to ${to}: ${subject}`);
     return true;
   } catch (error) {
-    console.error(`Resend email failed to ${to}:`, error);
-    return false;
+    console.error(`Resend email failed to ${to}, trying SMTP:`, error);
+    try {
+      await sendViaMailer({ to, subject, html });
+      console.log(`Email sent via SMTP fallback to ${to}: ${subject}`);
+      return true;
+    } catch (smtpError) {
+      console.error(`SMTP fallback email failed to ${to}:`, smtpError);
+      return false;
+    }
   }
 }

@@ -8,7 +8,7 @@ export default class PassportCtrl {
       const passport = await PassportSvc.getOrCreate(req.user!.userId);
       return res
         .status(200)
-        .json({ success: true, data: PassportSvc.withRanks(passport) });
+        .json({ success: true, data: PassportSvc.withoutXp(passport) });
     } catch (e: unknown) {
       return sendServerError(res, e, { success: true });
     }
@@ -23,7 +23,7 @@ export default class PassportCtrl {
           .json({ success: false, message: "Passport not found" });
       return res
         .status(200)
-        .json({ success: true, data: PassportSvc.withRanks(passport) });
+        .json({ success: true, data: PassportSvc.withoutXp(passport) });
     } catch (e: unknown) {
       return sendServerError(res, e, { success: true });
     }
@@ -33,16 +33,6 @@ export default class PassportCtrl {
     try {
       const badges = await PassportSvc.getAllBadges();
       return res.status(200).json({ success: true, data: badges });
-    } catch (e: unknown) {
-      return sendServerError(res, e, { success: true });
-    }
-  }
-
-  static async getLeaderboard(req: Request, res: Response) {
-    try {
-      const limit = Math.min(Number(req.query.limit) || 20, 50);
-      const data = await PassportSvc.getLeaderboard(limit);
-      return res.status(200).json({ success: true, data });
     } catch (e: unknown) {
       return sendServerError(res, e, { success: true });
     }

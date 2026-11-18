@@ -77,6 +77,21 @@ export default class CategoryController {
     }
   }
 
+  // GET PROVIDER SPECIALTIES (public: the options for the apply form, the
+  // profile settings and the search and leaderboard filters)
+  static async getProviderSpecialties(_req: Request, res: Response) {
+    try {
+      const specialties = await CategorySvc.getProviderSpecialties();
+      return res.status(200).json({
+        success: true,
+        count: specialties.length,
+        data: specialties,
+      });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: false });
+    }
+  }
+
   // GET CATEGORY BY ID
   static async getCategoryById(req: Request, res: Response) {
     try {

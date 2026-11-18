@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import LocationsSvc, { GeoDirectory } from "./locations.service";
 import { phBarangays } from "./ph-geo";
+import { tinFormatsResponse } from "../../utils/tax-id-formats";
 
 // Reference data that changes only with a dataset upgrade.
 const ONE_DAY = "public, max-age=86400";
@@ -67,6 +68,17 @@ export default class LocationsCtrl {
         req.params.countryCode.toUpperCase() === "PH" && state && city
           ? phBarangays(state, city)
           : [],
+    });
+  }
+
+  // GET /locations/countries/:countryCode/tin-formats — the masks and
+  // patterns the application forms check a TIN with. A country not in the
+  // table gets one unmasked fallback format: 4-20 letters or digits.
+  static tinFormats(req: Request, res: Response) {
+    res.set("Cache-Control", ONE_DAY);
+    return res.status(200).json({
+      status: "success",
+      data: tinFormatsResponse(req.params.countryCode),
     });
   }
 

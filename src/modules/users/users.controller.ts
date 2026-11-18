@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { maxPriceFilter } from "../../utils/price-filter";
 import Joi from "joi";
 import { RoleType } from "@prisma/client";
 import UsersSvc from "./users.service";
@@ -6,6 +7,7 @@ import { totalPages } from "../../utils/pagination";
 import { usernameJoi } from "../../utils/username";
 import { passwordJoi } from "../../utils/password-policy";
 import { nameJoi } from "../../utils/limits";
+import { searchQuery } from "../../utils/search-terms";
 
 export default class UsersCtrl {
   // CREATE
@@ -79,12 +81,12 @@ export default class UsersCtrl {
       const limit = Math.min(Number(req.query.limit) || 9, 30);
       const page = Math.max(Number(req.query.page) || 1, 1);
       const roleType = req.query.roleType as string | undefined;
-      const specialization = req.query.specialization as string | undefined;
+      // `specialty` is the name clients use now; `specialization` still works.
+      const specialization = (req.query.specialty ??
+        req.query.specialization) as string | undefined;
       const city = req.query.city as string | undefined;
-      const maxPrice = req.query.maxPrice
-        ? Number(req.query.maxPrice)
-        : undefined;
-      const search = req.query.q as string | undefined;
+      const maxPrice = maxPriceFilter(req.query.maxPrice);
+      const search = searchQuery(req.query.q);
       const result = await UsersSvc.getFoxers(
         limit,
         page,

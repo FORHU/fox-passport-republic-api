@@ -1,122 +1,63 @@
 import { cached } from "../../utils/cache.util";
-import { UserPath } from "@prisma/client";
 import {
-  CitizenLeaderboardTab,
-  CitizenLeaderboardResponse,
-  CitizenLeaderboardEntry,
   FoxerLeaderboardTab,
   FoxerLeaderboardResponse,
   FoxerLeaderboardEntry,
 } from "./leaderboard.types";
 import LeaderboardRepo from "./leaderboard.repository";
-import RewardService from "../reward/reward.service";
 import FoxerScoreService from "../foxer-score/foxer-score.service";
+import FoxerScoreRepo from "../foxer-score/foxer-score.repository";
+import { LEADERBOARD_PAWS_PRIOR } from "../../config";
+import RewardSettingsService from "../reward-settings/reward-settings.service";
 
 const LEADERBOARD_CACHE_TTL = 300; // 5 minutes cache
 
-interface RawCitizenEntry {
-  userId: string;
-  name: string;
-  avatarUrl: string | null;
-  level: number;
-  city: string | null;
+/** Fewer reviews than this shows "New" instead of Paws. */
+const PAWS_MIN_REVIEWS = 5;
+
+/**
+ * Bayesian average used to rank Top rated (rewards spec section 7.2), so one
+ * 5-star review can't beat 80 good ones: (v x R + p x C) / (v + p), where R is
+ * the Foxer's average, v their review count, C the platform average and p the
+ * prior.
+ */
+export function pawsRankingScore(
+  v: number,
+  R: number,
+  C: number,
+  p: number = LEADERBOARD_PAWS_PRIOR,
+): number {
+  if (v + p === 0) return C;
+  return (v * R + p * C) / (v + p);
 }
 
 export class LeaderboardService {
   /**
-   * Retrieves the Citizen Leaderboard partitioned by this month, all-time, or city.
-   * XP amounts remain private (§8.1) — returns position, avatar, name, rank badge and level.
-   */
-  static async getCitizenLeaderboard(
-    userId: string | null,
-    tab: CitizenLeaderboardTab = "this_month",
-    city?: string,
-  ): Promise<CitizenLeaderboardResponse> {
-    const now = new Date();
-    const season = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    const cacheKey = `leaderboard:citizens:${tab}:${season}:${city || "global"}`;
-
-    const rawEntries = await cached(
-      cacheKey,
-      LEADERBOARD_CACHE_TTL,
-      async () => {
-        if (tab === "all_time") {
-          return LeaderboardRepo.getCitizenAllTime(city, 50);
-        }
-        return LeaderboardRepo.getCitizenSeasonal(startOfMonth, city, 50);
-      },
-    );
-
-    const entries: CitizenLeaderboardEntry[] = (
-      rawEntries as RawCitizenEntry[]
-    ).map((item, idx) => ({
-      position: idx + 1,
-      userId: item.userId,
-      name: item.name,
-      avatarUrl: item.avatarUrl,
-      level: item.level,
-      rankTitle: RewardService.calculateRank(item.level, UserPath.user),
-      city: item.city,
-    }));
-
-    let userPosition: CitizenLeaderboardEntry | null = null;
-    if (userId) {
-      const match = entries.find((e) => e.userId === userId);
-      if (match) {
-        userPosition = match;
-      } else {
-        const userStanding =
-          await LeaderboardRepo.getUserCitizenStanding(userId);
-        if (userStanding) {
-          userPosition = {
-            position: entries.length + 1,
-            userId: userStanding.userId,
-            name: userStanding.name,
-            avatarUrl: userStanding.avatarUrl,
-            level: userStanding.level,
-            rankTitle: RewardService.calculateRank(
-              userStanding.level,
-              UserPath.user,
-            ),
-            city: userStanding.city,
-          };
-        }
-      }
-    }
-
-    return {
-      entries,
-      userPosition,
-      tab,
-      season,
-    };
-  }
-
-  /**
-   * Retrieves the Foxer Leaderboard partitioned by top rated (Foxer Score),
-   * most booked (monthly completed bookings), or rising (30-day delta).
+   * Retrieves the Foxer Leaderboard: top rated (Paws, Bayesian), most booked
+   * (completed bookings), or rising (Foxers under 6 months, by Foxer Score).
    */
   static async getFoxerLeaderboard(
     userId: string | null,
     tab: FoxerLeaderboardTab = "top_rated",
     role?: string,
     city?: string,
+    specialty?: string,
   ): Promise<FoxerLeaderboardResponse> {
-    const cacheKey = `leaderboard:foxers:${tab}:${role || "all"}:${city || "all"}`;
+    const cacheKey = `leaderboard:foxers:${tab}:${role || "all"}:${city || "all"}:${specialty || "all"}`;
 
     const entries = await cached(cacheKey, LEADERBOARD_CACHE_TTL, async () => {
-      const candidates = await LeaderboardRepo.getFoxersForRanking(role, city);
+      const [candidates, platformAvg, pawsPrior, minBookings] =
+        await Promise.all([
+          LeaderboardRepo.getFoxersForRanking(role, city, specialty),
+          FoxerScoreRepo.getPlatformAvgRating(),
+          RewardSettingsService.get("leaderboard.pawsPrior"),
+          RewardSettingsService.get("leaderboard.topRatedMinBookings"),
+        ]);
 
       const scored = await Promise.all(
         candidates.map(async (f) => {
           const scoreResult = await FoxerScoreService.computeFoxerScore(f.id);
-          const highestPath = f.passport?.paths.sort(
-            (a, b) => b.level - a.level,
-          )[0];
-          const foxerLevel = highestPath?.level ?? 1;
-          const foxerPath = highestPath?.path ?? UserPath.providerFoxer;
+          const m = scoreResult.operationalMetrics;
 
           return {
             userId: f.id,
@@ -124,10 +65,20 @@ export class LeaderboardService {
             avatarUrl: f.image,
             role: role || (f.roleType[0] ?? "Foxer"),
             city: f.city,
-            rankTitle: RewardService.calculateRank(foxerLevel, foxerPath),
-            starRating: scoreResult.operationalMetrics.starRating,
-            reviewCount: scoreResult.operationalMetrics.rawReviewCount,
-            completedBookings: scoreResult.operationalMetrics.completedBookings,
+            paws: m.rawReviewCount < PAWS_MIN_REVIEWS ? null : m.starRating,
+            starRating: m.starRating,
+            reviewCount: m.rawReviewCount,
+            completedBookings: m.completedBookings,
+            foxerSince: (
+              f.roleRequests[0]?.reviewedAt ?? f.createdAt
+            ).toISOString(),
+            isVerified: m.isIdentityVerified,
+            pawsScore: pawsRankingScore(
+              m.rawReviewCount,
+              m.avgRating,
+              platformAvg,
+              pawsPrior,
+            ),
             foxerScore: scoreResult.foxerScore,
             createdAt: f.createdAt,
           };
@@ -137,10 +88,19 @@ export class LeaderboardService {
       let filtered = scored;
 
       if (tab === "top_rated") {
-        // §8.2: Minimum 3 completed bookings to qualify for Top Rated
+        // Ranked by Paws (Bayesian), ties on completed bookings; a minimum of
+        // completed bookings to appear (rewards spec section 7.2). A Foxer with
+        // too few reviews to show Paws ("New") comes after every Foxer who has
+        // them: their score is pulled toward the platform average, so on score
+        // alone they could rank above someone whose Paws are on show.
         filtered = scored
-          .filter((f) => f.completedBookings >= 3)
-          .sort((a, b) => b.foxerScore - a.foxerScore);
+          .filter((f) => f.completedBookings >= minBookings)
+          .sort(
+            (a, b) =>
+              Number(b.paws !== null) - Number(a.paws !== null) ||
+              b.pawsScore - a.pawsScore ||
+              b.completedBookings - a.completedBookings,
+          );
       } else if (tab === "most_booked") {
         filtered = scored.sort(
           (a, b) => b.completedBookings - a.completedBookings,
@@ -161,10 +121,12 @@ export class LeaderboardService {
         avatarUrl: f.avatarUrl,
         role: f.role,
         city: f.city,
-        rankTitle: f.rankTitle,
+        paws: f.paws,
         starRating: f.starRating,
         reviewCount: f.reviewCount,
         completedBookings: f.completedBookings,
+        foxerSince: f.foxerSince,
+        isVerified: f.isVerified,
       }));
     });
 
@@ -184,6 +146,7 @@ export class LeaderboardService {
       tab,
       role,
       city,
+      specialty,
     };
   }
 }

@@ -113,6 +113,14 @@ export default class AppointmentRepo {
           OR: [
             { name: { contains: q, mode: "insensitive" } },
             { city: { contains: q, mode: "insensitive" } },
+            {
+              foxerSpecializations: {
+                some: {
+                  roleType: "organizer",
+                  category: { contains: q, mode: "insensitive" },
+                },
+              },
+            },
           ],
         }),
         ...(filter.specialization && {
@@ -129,14 +137,6 @@ export default class AppointmentRepo {
         foxerSpecializations: {
           where: { roleType: "organizer" },
           select: { category: true },
-        },
-        passport: {
-          select: {
-            paths: {
-              where: { path: "organizer" },
-              select: { level: true, totalXP: true },
-            },
-          },
         },
       },
       orderBy: { name: "asc" },

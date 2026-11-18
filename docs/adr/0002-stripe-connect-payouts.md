@@ -71,3 +71,29 @@ an investor's `revenueSharePercent` — is factored into one shared, pure functi
 both call: `PayoutSvc.resolveInvestorSplit`. If a third payout-computing path is
 ever added, put its investor-split logic through that same function rather than
 copying the loop again.
+
+## Addendum (Nov 2026, api#363): making the transfers reliable
+
+The decisions above stand. Four things this ADR assumed but the code didn't do:
+
+- **Connect events need their own webhook secret.** `account.updated` for
+  Express accounts is only sent to a Connect endpoint, which Stripe signs with a
+  different secret. The webhook now accepts either `STRIPE_WEBHOOK_SECRET` or
+  `STRIPE_CONNECT_WEBHOOK_SECRET`; before, onboarding never registered and every
+  payout failed as "not onboarded".
+- **Transfers are funded from the charge.** Paying at `completed` means the
+  platform balance may not hold the client's funds yet. Each transfer now names
+  the client's charge as `source_transaction` (`Payout.sourceChargeId`), falling
+  back to the balance only when Stripe says that charge can't fund it.
+- **Failures are retried, never twice.** `Payout.failureReason` says why a
+  payout failed; `not_onboarded` is retried when the recipient's account can
+  receive payouts, `stripe_error` by an admin, and `source_refunded` never.
+  Every attempt is claimed (`transferAttempts`), carries `metadata.payoutId` and
+  the idempotency key `payout:<id>:<attempt>`, and a later attempt first looks
+  for a transfer an earlier one already sent.
+- **Chargebacks are recorded, not automated.** `charge.dispute.*` creates a
+  `PaymentDispute` for admins. Clawing back a payout stays a human decision,
+  since a dispute can still be won.
+
+Details: `docs/PAYMENTS.md` §2 ("Sending a transfer"), §3 ("Two signing
+secrets", "Stripe dashboard setup"), §6.

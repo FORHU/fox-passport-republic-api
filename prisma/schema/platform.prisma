@@ -91,5 +91,8 @@ model Notification {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // A user's notification list (newest first) and their unread badge count.
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, isRead])
   @@map("notifications")
 }

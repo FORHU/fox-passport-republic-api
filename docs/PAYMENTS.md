@@ -1,6 +1,6 @@
 # Payments — how money moves through FoxPassport Republic
 
-**Written 15 Sep 2026**, from a full trace of the current code (not just the docs it started from). Companion to `docs/adr/0001-host-markup-and-server-computed-event-total.md` and `docs/adr/0002-stripe-connect-payouts.md` — those record *why* the original decisions were made; this records *what the system actually does today*, including two places where it has drifted from those decisions. See §7 for the drift.
+**Written 15 Sep 2026**, from a full trace of the current code (not just the docs it started from); §1, §2 and §5 updated 11 Nov 2026 for the Event payment breakdown (#264); §2, §3 and §6 updated 16 Nov 2026 for Stripe payout setup (api#363). Companion to `docs/adr/0009-event-commission-and-category-fees.md` (which replaces `docs/adr/0001-host-markup-and-server-computed-event-total.md`) and `docs/adr/0002-stripe-connect-payouts.md` — those record _why_ the original decisions were made; this records _what the system actually does today_, including where it has drifted from those decisions. See the **Summary of gaps** at the end for the drift.
 
 There are **two parallel checkout systems** in this codebase today, sharing one Stripe account and one `Payment`/`Payout`/`Refund` ledger:
 
@@ -13,18 +13,32 @@ Neither replaces the other. Know which one a given screen is using before you to
 
 ## 1. The money model
 
-### 1a. Event-from-template pricing (Host Markup + Platform Fee)
+### 1a. Event pricing: the per-line breakdown (#264, Nov 2026)
+
+Every Foxer line on an Event (venue, gear, service) is priced on its own, then summed. Decided in ADR 0009, which replaces ADR 0001.
 
 ```
-itemsTotal         = sum of included EventTemplateAsset/Service/Venue.agreedPrice
-hostMarkupAmount   = itemsTotal * (template.hostMarkupPct / 100)
-platformFeeAmount  = (itemsTotal + hostMarkupAmount) * (PLATFORM_FEE_PERCENT / 100)
-totalAmount        = itemsTotal + hostMarkupAmount + platformFeeAmount
+per line:
+  price          = the Foxer's own listing price (× quantity for gear);
+                   an approved venue affiliation's agreed price counts as the Mayor's own
+  commission     = price × EventFoxer's commissionPct / 100     → paid to the EventFoxer
+  platformFee    = price × fee rule % / 100                    → kept by FoxPassport
+  processingFee  = price × PROCESSING_FEE_PERCENT / 100 (3%)   → kept by FoxPassport
+  lineTotal      = price + commission + platformFee + processingFee
+each amount rounded half-up to 2 decimals per line; Event totals are sums of the rounded lines
 ```
 
-`EventTemplateSvc.calculateTotalsBreakdown` (`src/modules/event-template/event-template.service.ts:347-375`), called from `BookingSvc.bookFromTemplate` (`src/modules/booking/booking.service.ts:776-836`). The citizen only ever supplies `templateId` + dates + exclusions — never a price. All four numbers land on `Event` (`totalAmount`, `itemsTotal`, `hostMarkupAmount`, `platformFeeAmount`).
+- **Commission:** one rate per EventFoxer (`users.commissionPct`, 0–100), set with `GET`/`PUT /v1/profile/commission`. It applies to every Event they run. An Event copies the rate when it is created (`events.commissionPct`), so a later change never moves a booked Event's price.
+- **FoxPassport fee:** set by the admin per category, through `PlatformFeeConfig` rules with `transactionType = "event_item"` (`category` = item type, `subcategory` = listing category). The most specific rule wins. A default rule (5%, migration `20261109130000_add_default_event_item_fee_rule`) covers everything else. The fee is charged on the Foxer price only, never on the commission.
+- **Processing fee:** `PROCESSING_FEE_PERCENT` (default 3%), checked at startup.
+- **Code:** the pure maths is `buildEventBreakdown` in `src/modules/pricing/event-breakdown.ts`; `PricingSvc.calculateEventBreakdown` adds the fee rules. It prices Events in `BookingSvc.bookFromTemplate` and `EventRequestSvc.spawnRequestFromTemplate`, their lines in `EventTransactionSvc.createTransactionsFromTemplate`, an item added after booking in `BookingSvc.addAdHocItem`, and the template's displayed price in `EventTemplateSvc.getTemplateById`. Event checkout uses `calculateEventBreakdownForLines` for a line with no stored snapshot. On these paths the client never supplies a price. `EventRequestSvc.createDirectEvent` doesn't use it: a direct Event has no Foxers, so it stores `totalAmount: 0` and no rate, and ignores a client-sent total. Matching a Foxer (`matchItem`/`respondToMatch`) prices nothing.
+- **Stored:** the Event stores `commissionPct`, `itemsTotal`, `hostMarkupAmount` (= the commission total), `platformFeeAmount`, `processingFeeAmount` and `totalAmount`. Each transaction row stores its line's snapshot: `category`, `commissionPct`, `commissionAmount`, `platformFeePct`, `platformFeeAmount`, `processingFeeAmount`.
+- **Older Events** (`commissionPct` null) keep the old Host Markup pricing and checkout.
+- **Vouchers** aren't offered on these Events yet (`VOUCHERS_NOT_OFFERED_ON_EVENTS`).
 
-**Resolution (Oct 2026):** `EventTemplateSvc.calculateTotalsBreakdown` now resolves `template.platformFeePct` (falling back to `PLATFORM_FEE_PERCENT`, default 5%) and computes dynamic breakdown accordingly. Direct single-provider bookings and booking edit requests also resolve rules dynamically via `PricingSvc.resolvePricingRule` with `PLATFORM_FEE_PERCENT` fallback.
+Worked example (10% commission): venue 10,000 (5% default fee) + catering 5,000 (6% catering rule) = 15,000 + 1,500 commission + 800 fees + 450 processing = **17,750**.
+
+Direct single-provider bookings and booking edit requests resolve their fee via `PricingSvc.resolvePricingRule` with the `PLATFORM_FEE_PERCENT` fallback (§1b).
 
 ### 1b. Direct single-provider bookings (Asset / Service / Venue) — no Host Markup
 
@@ -54,7 +68,7 @@ subtotal → (voucher discount, if any) → discountedSubtotal → (+ platformFe
 
 `PricingSvc.calculatePrice` (`src/modules/pricing/pricing.service.ts:171-239`). Platform fee here comes from an admin-configurable `PlatformFeeConfig` table matched by transaction type/category, resolved by specificity (`resolvePricingRule`, same file, lines 37-79) — a completely separate mechanism from the flat `PLATFORM_FEE_PERCENT` env constant used in §1a/§1b.
 
-**Gap:** `PricingSvc` has no concept of Host Markup at all. An Event's Central Payment invoice sums only the `agreedPrice` of each accepted venue/asset/service transaction — Host Markup is never charged through this path. Confirm with the team whether that's intentional (Host Markup only applies at original booking time) or a real gap.
+**Event checkout (#264, Nov 2026):** an Event priced with the breakdown (§1a) doesn't use this formula. `EventCheckoutSvc` charges each payable line's stored snapshot: price, commission, FoxPassport fee and processing fee. A line with no snapshot yet (an item added after booking) is priced at checkout with the Event's own rate, and its snapshot is stored then. The invoice's `platformFeeSnapshot` records every line (`kind: "event_breakdown"`; written and read only through `src/modules/payment/event-breakdown-snapshot.ts`). Refunds and payouts read the amounts from there. Older Events still go through `calculatePrice`.
 
 ---
 
@@ -62,17 +76,32 @@ subtotal → (voucher discount, if any) → discountedSubtotal → (+ platformFe
 
 **Onboarding.** Every supply-side role — Venue, Gear, Service, Performer, Event Foxer — holds `payouts:onboard` (`src/types/permissions.ts`) and onboards identically: `StripeConnectSvc.createExpressAccount` creates a Stripe Express account, `createOnboardingLink` returns Stripe's hosted onboarding URL. The `account.updated` webhook keeps `User.stripeChargesEnabled`/`stripePayoutsEnabled`/`stripeOnboardingComplete` current.
 
-**Mechanism.** Separate Charges and Transfers: the citizen's payment always lands in the platform's own Stripe balance first. Money moves out later, per recipient, via `stripe.transfers.create({ destination: ... })` — one shared function, `PayoutSvc.fireTransfer` (`src/modules/payout/payout.service.ts:54-103`), used by both checkout systems. No `stripeAccountId`/`stripePayoutsEnabled` → the `Payout` is marked `failed`, no transfer attempted. Idempotent by `@@unique([sourceType, sourceId, providerId])` on `Payout` — a retried webhook can't double-pay.
+**Mechanism.** Separate Charges and Transfers: the citizen's payment always lands in the platform's own Stripe balance first. Money moves out later, per recipient, via `stripe.transfers.create({ destination: ... })` — one shared function, `PayoutSvc.fireTransfer` (`src/modules/payout/payout.service.ts`), used by both checkout systems. Idempotent by `@@unique([sourceType, sourceId, providerId])` on `Payout` — a retried webhook can't double-pay.
 
-**Timing — the two systems disagree, and this matters:**
+**Sending a transfer (api#363, Nov 2026).**
 
-| | Direct booking | Central Payment |
-|---|---|---|
-| Payout fires | Only when booking status reaches `completed` | Immediately when the Stripe webhook confirms payment |
-| Gate | Check-in / confirmed arrival; a `dispute` blocks it | None — no wait for completion, check-in, or a dispute window |
-| Provider receives | Full `agreedPrice`, no deduction (Event fan-out) | `agreedPrice` minus proportional platform fee **and** a mocked gateway fee (`itemAmount * 0.029 + 15 * itemRatio`) |
+- **Funded from the client's charge.** Each payout creator passes the payment it is paid from (the line's paid invoice `Payment.providerReference`, else the booking's `stripePaymentId`). `fireTransfer` resolves it to the charge (`PaymentIntent.latest_charge`) once, stores it as `Payout.sourceChargeId`, and sends it as `source_transaction`, so the transfer waits for the charge's funds to settle instead of failing on the platform's available balance. If Stripe says that charge can't fund it (`param: "source_transaction"`), the same attempt falls back to the balance, as every transfer did before.
+- **Paid once.** Each attempt is claimed by bumping `Payout.transferAttempts` (only one caller wins an attempt number), and the transfer carries `metadata.payoutId` and the idempotency key `payout:<id>:<attempt>`. From the second attempt on, `fireTransfer` first lists the payout's `transfer_group` for a transfer with its `payoutId` and marks the payout paid with it instead of sending another. A database error after a successful transfer leaves the payout `pending`, never `failed`.
+- **Failures say why** (`Payout.failureReason`, `failureMessage`):
 
-Direct-booking timing matches ADR-0002's stated rationale ("trade a payout delay for materially lower clawback risk"). Central Payment does not — it pays out on payment success with none of that protection. Flag this to whoever owns product risk here; it may be an intentional V1 simplification, but it's a real divergence from the documented design.
+  | `failureReason`   | Meaning                                                                                | Retried by                                                                                   |
+  | ----------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+  | `not_onboarded`   | No Connect account, or it can't receive payouts yet                                    | `account.updated` with `payouts_enabled` (`PayoutSvc.retryNotOnboardedForUser`), or an admin |
+  | `stripe_error`    | Stripe refused the transfer                                                            | An admin: `POST /v1/admin/payouts/:id/retry` (`payments:manage`)                             |
+  | `source_refunded` | The line was cancelled or refunded before anything was sent (`reversePayoutForSource`) | Never                                                                                        |
+
+  Admins list them with `GET /v1/admin/payouts?status=failed&failureReason=` (`payments:read:all`). A retry is audited (`payout.retry`).
+
+**Timing, as it is on `staging` (Nov 2026):**
+
+|                | Event lines (direct booking or Central Payment)                                                                                                                                                                                                | Sponsorships (Central Payment)                                                                                   |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Payout fires   | Only when the booking reaches `completed` (`PayoutSvc.createPayoutsForEventBooking`)                                                                                                                                                           | Immediately when the Stripe webhook confirms payment (`allocatePayouts`)                                         |
+| Gate           | Check-in / confirmed arrival; a `dispute` blocks it                                                                                                                                                                                            | None                                                                                                             |
+| Paid out       | Each Foxer: their line's stored price. The EventFoxer: the commission the paid invoice charged, on lines not rejected or cancelled (an older Event: its `hostMarkupAmount`). Investors with a revenue share take their cut out of the owner's. | Proposal amount minus proportional platform fee and a mocked gateway fee (`itemAmount * 0.029 + 15 * itemRatio`) |
+| Never paid out | The FoxPassport fee and the processing fee                                                                                                                                                                                                     | The platform fee                                                                                                 |
+
+Event lines follow ADR-0002 ("trade a payout delay for materially lower clawback risk"). `allocatePayouts` deliberately skips event transactions, so they aren't paid twice. Sponsorships still pay on payment success, pending a product decision (#264 Q8).
 
 **The escrow-sounding fields are dead.** `EventAssetTransaction`/`EventServiceTransaction`/`EventVenueTransaction` have `lockedAt`/`releasedAt`/`stripeTransferId`/`disputeReason`/`disputeAt` columns (`prisma/schema/event.prisma`). Nothing in `src/` reads or writes them. There is no "locked in escrow, awaiting release" state actually modeled anywhere — treat `Payout.status` (`pending`/`paid`/`failed`) as the real, current state machine. Dispute state for a booking lives on the `Booking`/`AssetBooking`/`ServiceBooking` row itself (`ItemBookingStatus.disputed`), not on these transaction rows.
 
@@ -82,21 +111,34 @@ Direct-booking timing matches ADR-0002's stated rationale ("trade a payout delay
 
 All in `prisma/schema/money.prisma`, spread across `src/modules/payment/` and `src/modules/checkout/` (there is no `central-payment` module despite the name):
 
-| Model | Purpose |
-|---|---|
-| `Invoice` | What's owed, by whom — subtotal/discount/platform fee/gross, `status` |
-| `InvoiceItem` | Line items, each pointing at a `sourceType`/`sourceId` (booking, an event transaction, a sponsorship, ...) |
-| `Checkout` | One Stripe Checkout Session attempt against an Invoice |
-| `Payment` | One payment attempt/result — **shared with the direct-booking flow**, now invoice-scoped |
-| `Payout` | One transfer to one provider for one source — also shared |
-| `Refund` | One refund against a `Payment` |
-| `Voucher` / `Promotion` / `VoucherRedemption` | Discount codes (§6) |
-| `PlatformFeeConfig` | Admin-configurable fee rules |
-| `PaymentProviderEvent` | Webhook idempotency log |
+| Model                                         | Purpose                                                                                                    |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `Invoice`                                     | What's owed, by whom — subtotal/discount/platform fee/gross, `status`                                      |
+| `InvoiceItem`                                 | Line items, each pointing at a `sourceType`/`sourceId` (booking, an event transaction, a sponsorship, ...) |
+| `Checkout`                                    | One Stripe Checkout Session attempt against an Invoice                                                     |
+| `Payment`                                     | One payment attempt/result — **shared with the direct-booking flow**, now invoice-scoped                   |
+| `Payout`                                      | One transfer to one provider for one source — also shared                                                  |
+| `Refund`                                      | One refund against a `Payment`                                                                             |
+| `Voucher` / `Promotion` / `VoucherRedemption` | Discount codes (§6)                                                                                        |
+| `PlatformFeeConfig`                           | Admin-configurable fee rules                                                                               |
+| `PaymentProviderEvent`                        | Webhook idempotency log                                                                                    |
 
 Key services: `InvoiceSvc` (`invoice.service.ts`), `CheckoutSvc` + `StripeAdapter` (Stripe Checkout Session creation), `EventCheckoutSvc` (builds invoice items from an Event's accepted transactions, uses a Postgres advisory lock to serialize concurrent checkout creation for the same event), `PartnershipCheckoutSvc` (same pattern for sponsorships), `WebhookSvc` (idempotent webhook processing → marks paid → redeems voucher → `allocatePayouts`).
 
-**One Stripe webhook endpoint** handles both systems: `POST /v1/payments/webhook` → `PaymentController.handleWebhook` branches by event type. `checkout.session.completed`/`.expired` → `WebhookSvc` (Central Payment). Everything else (`payment_intent.succeeded`, `charge.refunded`, `refund.updated`, `account.updated`) → the original `PaymentSvc.handleStripeEvent`.
+**One Stripe webhook route** handles both systems: `POST /v1/payments/webhook` → `PaymentController.handleWebhook` branches by event type. `checkout.session.completed`/`.expired` → `WebhookSvc` (Central Payment). Everything else (`payment_intent.succeeded`, `charge.refunded`, `refund.updated`, `account.updated`, `charge.dispute.*`) → the original `PaymentSvc.handleStripeEvent`. `payment_intent.succeeded`, `account.updated` and `charge.dispute.*` run inside `WebhookSvc.processEventWithIdempotency`: a redelivery is skipped, and a failure answers 5xx so Stripe retries.
+
+**Two signing secrets (api#363).** Stripe sends events about connected (Foxer) accounts, such as `account.updated` when onboarding finishes, only to a **Connect** endpoint, and every endpoint has its own signing secret. A request is accepted if it verifies against `STRIPE_WEBHOOK_SECRET` (platform endpoint) or `STRIPE_CONNECT_WEBHOOK_SECRET` (Connect endpoint) — `src/utils/stripe-webhook.ts`. Before, only the first was checked, so Connect events were refused and Foxers' onboarding never registered.
+
+### Stripe dashboard setup
+
+Both endpoints point at the same URL, `https://<api host>/api/v1/payments/webhook`.
+
+| Endpoint | Listens to                   | Events                                                                                                                                                                                                                                  | Its secret goes in              |
+| -------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| Platform | Events on your account       | `checkout.session.completed`, `checkout.session.expired`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`, `refund.updated`, `charge.dispute.created`, `charge.dispute.updated`, `charge.dispute.closed` | `STRIPE_WEBHOOK_SECRET`         |
+| Connect  | Events on connected accounts | `account.updated`                                                                                                                                                                                                                       | `STRIPE_CONNECT_WEBHOOK_SECRET` |
+
+In production the API refuses to start without `STRIPE_SECRET_KEY` (`sk_…`/`rk_…`) and `STRIPE_WEBHOOK_SECRET` (`whsec_…`); development and tests only warn (`src/utils/stripe-env.ts`). Locally, `stripe listen --events payment_intent.succeeded,payment_intent.payment_failed,charge.refunded,refund.updated,account.updated,charge.dispute.created,charge.dispute.updated,charge.dispute.closed --forward-to localhost:6002/api/v1/payments/webhook --forward-connect-to localhost:6002/api/v1/payments/webhook` forwards both kinds with one secret (recent CLI versions require `--events`).
 
 ---
 
@@ -128,6 +170,16 @@ Sponsorship checkout is the identical pattern via `ProposalActions.tsx` → `POS
 
 `RefundSvc` (`src/modules/refund/refund.service.ts`). Triggered by citizen-initiated cancellation (`BookingSvc.cancelWithRefunds`), which resolves the applicable `CancellationPolicy` (template's, else the booked venue's, else the booked service's), computes the refund percent from `CancellationRule`s sorted by `hoursBeforeEvent`, cancels any still-pending Stripe `PaymentIntent`, and creates a `Refund` for anything already paid. `checkEligibility` is the read-only "what would I get back" preview.
 
+**Event cancellation (Central Payment, #264).** `EventCheckoutSvc.cancelEvent` refunds each line separately, at its own Foxer's policy %.
+
+- The % applies to the **whole line**: price + commission + FoxPassport fee + processing fee. A 100% policy returns everything the client paid for it.
+- A line never refunds more than what's left on it after earlier refunds, such as an admin's.
+- Only the Foxer's share (the price's share of the refund) is clawed back from their payout. The reversal names the Foxer, so an investor's payout on the same line is never the one reversed.
+- Stripe keeps its own fee on a refund; FoxPassport absorbs it.
+- Refunds that come back `pending` (wallets such as GCash) count toward the total.
+
+`AdminSvc.createItemizedRefund` caps a refund at the line's total on the paid invoice, minus every earlier refund on that line, including the cancellation's. It claws back the Foxer's price share and the EventFoxer's commission share.
+
 Failure handling: `getFailedRefunds`, `getFailureReason` (polls Stripe for the real reason), `retryRefund`, `resolveManual` (admin marks resolved without a real Stripe retry). `refund.updated` webhooks (`failed`/`succeeded`) route through the **old** flow's dispatcher — both systems share one Stripe account, so a Central-Payment-originated refund still needs to arrive as this same event type.
 
 ---
@@ -138,6 +190,8 @@ Two mechanisms, not equivalent:
 
 1. **Booking-level dispute** — the booker reports a dispute (`AssetBookingSvc.dispute`/`ServiceBookingSvc.dispute`), moving status to `disputed`. This is what actually blocks a payout: it keeps the booking from ever reaching `completed`, which is the trigger `PayoutSvc` waits for.
 2. **Refund dispute queue** — `AdminSvc.getDisputes` reads disputed `Refund` rows; an admin approves (retries the refund) or rejects.
+
+3. **Chargebacks** (api#363) — the client's bank takes the money back. Stripe pulls the disputed amount and its fee from the platform balance at once, whoever was already paid out. `charge.dispute.created`/`.updated`/`.closed` → `PaymentDisputeSvc.recordFromStripe` keeps one `PaymentDispute` row per Stripe dispute (linked to the `Payment` by PaymentIntent, with the evidence deadline). Admins list them with `GET /v1/admin/payment-disputes` (`disputes:resolve`) and respond in the Stripe dashboard. Nothing is clawed back automatically.
 
 **Resolution (Oct 2026):** `AdminSvc.resolveAssetBookingDispute` and `AdminSvc.resolveServiceBookingDispute` now explicitly invoke `PayoutSvc.createPayoutsForAssetBooking` / `PayoutSvc.createPayoutsForServiceBooking` when the admin resolves the dispute with status `completed` (in the provider's favor), guaranteeing payouts are unblocked and created.
 
@@ -153,11 +207,15 @@ Validated and priced by `PricingSvc.validateAndCalculateVoucher` — active wind
 
 ## Summary of gaps worth someone's attention
 
-1. **`EventTemplate.platformFeePct` is write-only** — *(Resolved Oct 2026)* Now honored in `calculateTotalsBreakdown` with fallback to `PLATFORM_FEE_PERCENT`. (§1a)
+1. **`EventTemplate.platformFeePct` is write-only** — _(Superseded Nov 2026)_ Event fees now come from `event_item` fee rules per category (§1a); the template column is deprecated.
 2. **Client-suppliable `totalAmount` on direct venue bookings** — the one place in the system where "never trust the client's price" isn't enforced. (§1b)
-3. **Central Payment never charges Host Markup.** Confirm whether that's intentional. (§1c)
-4. **Central Payment pays out immediately on payment success, with no completion/dispute gate** — a real divergence from ADR-0002's rationale, not just an implementation detail. (§2)
+3. **Central Payment never charges Host Markup.** _(Resolved Nov 2026, #264)_ Event checkout charges every line's commission. (§1c)
+4. **Central Payment pays out immediately on payment success** — _(Resolved for Events)_ Event lines are paid at `completed`; only sponsorships still pay on payment success (#264 Q8). (§2)
 5. **The `lockedAt`/`releasedAt`/`stripeTransferId` escrow fields on `Event*Transaction` are dead code.** Don't design against them; `Payout.status` is the real state machine. (§2)
-6. **Admin dispute resolution can silently skip the payout trigger** — *(Resolved Oct 2026)* Admin dispute resolution services now invoke `PayoutSvc` directly on `completed` resolutions. (§6)
+6. **Admin dispute resolution can silently skip the payout trigger** — _(Resolved Oct 2026)_ Admin dispute resolution services now invoke `PayoutSvc` directly on `completed` resolutions. (§6)
+7. **A matched (`approved`) venue row is never charged at Event checkout** (it only invoices `pending` venue rows) but is still paid out at `completed`. Predates #264; open question. (§1c, §2)
+8. **Payouts that could never arrive** — _(Resolved Nov 2026, api#363)_ Connect events were refused (one webhook secret), transfers drew on the available balance, and a `failed` payout was never retried. See "Sending a transfer" (§2) and "Two signing secrets" (§3).
+9. **A Foxer can be put on an Event before setting up Stripe.** Their payout then waits as `not_onboarded` until they do. Whether to require onboarding first is an owner decision. (§2)
+10. **Platform country and cross-border payouts are unverified.** Express accounts are created with no `country`, and transfers are in `php`. If the platform account isn't in the Philippines, Philippine Foxers may need Stripe's cross-border "recipient" service agreement. Pending. (§2)
 
 See `PRICING-ADMINISTRATION-PRODUCT.md` for the product-management position on gaps 1 and 3 above (platform fee and voucher/promotion configuration) — it treats "the schema supports it" and "an administrator can operate it" as two different completion states, and sets Platform Fee Administration as Priority 1 for closing the gap.

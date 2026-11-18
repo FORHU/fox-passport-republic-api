@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { prisma } from "../src/utils/prisma";
+import { only } from "./helpers/cleanup";
 
 /**
  * #264 switch-over (T6–T9, T12.1) against a real database, with the plan's
@@ -140,29 +141,29 @@ describe("event payment switch-over (database)", () => {
     ).id;
   });
 
+  // Every filter is a list of ids this run created; see `only`.
   afterAll(async () => {
-    const eventId = ids.event;
-    if (eventId) {
-      await prisma.checkout.deleteMany({
-        where: { invoice: { payerId: ids.client } },
-      });
-      await prisma.invoice.deleteMany({ where: { payerId: ids.client } });
-      await prisma.eventServiceTransaction.deleteMany({ where: { eventId } });
-      await prisma.eventVenueTransaction.deleteMany({ where: { eventId } });
-      await prisma.booking.deleteMany({ where: { eventId } });
-      await prisma.event.deleteMany({ where: { id: eventId } });
-    }
-    await prisma.eventTemplate.deleteMany({ where: { id: ids.template } });
+    const payerId = only(ids.client);
+    await prisma.checkout.deleteMany({ where: { invoice: { payerId } } });
+    await prisma.invoice.deleteMany({ where: { payerId } });
+    const eventId = only(ids.event);
+    await prisma.eventServiceTransaction.deleteMany({ where: { eventId } });
+    await prisma.eventVenueTransaction.deleteMany({ where: { eventId } });
+    await prisma.booking.deleteMany({ where: { eventId } });
+    await prisma.event.deleteMany({ where: { id: eventId } });
+    await prisma.eventTemplate.deleteMany({
+      where: { id: only(ids.template) },
+    });
     await prisma.platformFeeConfig.deleteMany({
-      where: { id: ids.cateringRule },
+      where: { id: only(ids.cateringRule) },
     });
     await prisma.service.deleteMany({
-      where: { id: { in: [ids.catering, ids.djService] } },
+      where: { id: only(ids.catering, ids.djService) },
     });
-    await prisma.venue.deleteMany({ where: { id: ids.venue } });
+    await prisma.venue.deleteMany({ where: { id: only(ids.venue) } });
     await prisma.user.deleteMany({
       where: {
-        id: { in: [ids.foxer, ids.client, ids.mayor, ids.caterer, ids.dj] },
+        id: only(ids.foxer, ids.client, ids.mayor, ids.caterer, ids.dj),
       },
     });
   });

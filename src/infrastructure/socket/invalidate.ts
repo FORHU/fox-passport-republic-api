@@ -1,5 +1,10 @@
 import { io } from "./socket.server";
-import { emitInvalidateToAdmins, emitInvalidateToUser } from "./socket.utils";
+import { SOCKET_EVENTS } from "./socket.constants";
+import {
+  emitInvalidateToAdmins,
+  emitInvalidateToUser,
+  emitToAll,
+} from "./socket.utils";
 import type { InvalidateTopic } from "./socket.types";
 
 /**
@@ -40,6 +45,21 @@ export function announceToUser(
   if (!userId) return;
   try {
     emitInvalidateToUser(io, userId, topic);
+  } catch {
+    // As above.
+  }
+}
+
+/**
+ * A post's comment count is now [commentsCount]. Goes to everyone connected:
+ * the feed is public, so anyone may have the post on screen.
+ */
+export function announcePostCommentsCount(
+  postId: string,
+  commentsCount: number,
+): void {
+  try {
+    emitToAll(io, SOCKET_EVENTS.POST_COMMENTS_COUNT, { postId, commentsCount });
   } catch {
     // As above.
   }

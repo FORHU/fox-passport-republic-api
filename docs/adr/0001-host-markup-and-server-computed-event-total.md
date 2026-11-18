@@ -1,5 +1,10 @@
 # Host markup is a per-template percentage, and Event totalAmount is server-computed
 
+> **Superseded (Nov 2026)** by [ADR 0009](0009-event-commission-and-category-fees.md):
+> the markup is now one commission rate per EventFoxer, and fees are per category.
+> The server-computed total still stands. Events priced before #264 keep this
+> pricing.
+
 Before this decision, a Host had no modeled way to earn anything for assembling an
 Event Template — Mayor and Foxer were paid per item via `EventTransaction`, but
 `Event.totalAmount` was taken directly from the client request in `bookFromTemplate`

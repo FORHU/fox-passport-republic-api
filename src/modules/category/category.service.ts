@@ -123,4 +123,13 @@ export default class CategorySvc {
   static async getTopLevelCategories() {
     return CategoryRepo.getTopLevelCategories();
   }
+
+  /**
+   * Every specialty a Provider can declare ({ slug, name }), the same list the
+   * API checks applications and profile edits against (RR-3), so forms never
+   * offer a value the API would refuse.
+   */
+  static async getProviderSpecialties() {
+    return CategoryRepo.getProviderSpecialties();
+  }
 }

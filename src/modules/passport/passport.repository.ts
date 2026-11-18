@@ -61,6 +61,15 @@ export default class PassportRepo {
     return prisma.badge.findUnique({ where: { name } });
   }
 
+  /** Who made a booking, or null if there is no such booking. */
+  static async findBookingOwnerId(bookingId: string): Promise<string | null> {
+    const row = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { userId: true },
+    });
+    return row?.userId ?? null;
+  }
+
   static async findByUserId(userId: string) {
     return prisma.passport.findUnique({
       where: { userId },
@@ -89,16 +98,6 @@ export default class PassportRepo {
     return prisma.passport.findMany({
       where: { userId: { in: userIds } },
       select: { userId: true, perks: true },
-    });
-  }
-
-  /** Every passport with its paths, for the leaderboard. */
-  static async findAllWithPaths() {
-    return prisma.passport.findMany({
-      include: {
-        paths: true,
-        user: { select: { id: true, name: true, imgId: true, roleType: true } },
-      },
     });
   }
 

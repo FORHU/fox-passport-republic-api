@@ -102,6 +102,7 @@ model Post {
   messages  Message[]
   mediaTags PostMediaTag[]
   poll      Poll?
+  facebookShares FacebookShare[]
 
   @@index([tab, createdAt(sort: Desc)])
   @@index([authorId, createdAt(sort: Desc)])

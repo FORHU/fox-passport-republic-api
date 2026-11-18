@@ -14,7 +14,7 @@ is the source of truth for the app's copy at `fox-passport-republic-app/CONTEXT.
 ## Language
 
 **Citizen**:
-A user with no approved RoleType yet (`roleType: []`). The default state for every signed-up user. Once a user is granted a RoleType, they hold that role *in addition to* being a citizen — RoleType is additive (an array), not a replacement of citizen status.
+A user with no approved RoleType yet (`roleType: []`). The default state for every signed-up user. Once a user is granted a RoleType, they hold that role _in addition to_ being a citizen — RoleType is additive (an array), not a replacement of citizen status.
 _Avoid_: Regular user, plain user
 
 **RoleType**:
@@ -67,13 +67,17 @@ _Avoid_: Organizer inbox, personal thread (for these conversations)
 Anyone an Event depends on to happen: the Mayor of its booked Venue, and the Foxers booked to supply its Talent or Gear, or bidding to. An Event's Organizers talk to its Suppliers through its Shared Inbox, but only the Event Owner agrees prices with them.
 _Avoid_: Vendor, provider (in conversation; `providerId` in code)
 
-**Host Markup**:
-The percentage a Host adds on top of the sum of an Event Template's attached items (Venue/Assets/Services agreed prices) — this is how a Host earns. Set by the Host per template, not by the platform.
-_Avoid_: Host fee, commission (implies platform-set, not Host-set)
+**Host Markup** (Commission):
+How an EventFoxer earns on an Event. One percentage per EventFoxer, which they set for all their Events, charged on each Foxer's price and paid to the EventFoxer after the Event. An Event keeps the rate it was created with. In code it's `commissionPct`/`commissionAmount`, and the Event's total is still stored as `hostMarkupAmount`. Older Events used a markup per template instead (ADR 0001, replaced by ADR 0009). "Commission" was on the avoid list before #264; it is now the preferred word for this rate in conversation and in the UI.
+_Avoid_: Host fee
 
-**Platform Fee**:
-The percentage the business itself takes on every transaction, added on top of what the citizen already sees (itemsTotal + Host Markup) — it's an extra line item, not carved out of any role's earnings. Distinct from Host Markup, which is Host-set and goes to the Host, not the business.
+**Platform Fee** (FoxPassport fee):
+The percentage FoxPassport itself takes. On an Event, the admin sets it per category (`event_item` fee rules), and it's charged on each Foxer's price only, never on the commission. It is added on top of the price as its own line, not carved out of anyone's earnings, and never paid out. Distinct from the **Processing Fee**.
+
+**Processing Fee**:
+A percentage added to each Event line to cover card-processing costs: `PROCESSING_FEE_PERCENT`, 3% by default, charged on the Foxer's price only. Like the **Platform Fee**, it is shown to the client as its own line and never paid out to anyone.
+_Avoid_: Stripe fee, card fee, service charge
 
 **Specialization**:
-A category tag on a foxer's profile and listings showing what type of work they focus on. Comes in two forms with distinct visual treatment: a *Claimed* tag (declared at role-application time, admin-backed, capped at 3 per role) and an *Earned* badge (auto-granted by the system after 3 completed bookings in that category with a 4.0+ average rating, unlimited count, never revoked). Each role type uses its own category vocabulary: EventFoxer → EventCategory, Provider → ServiceCategory and AssetCategory (performer categories are split by value, not a separate enum — see `PERFORMER_SERVICE_CATEGORIES` in `src/types/permissions.ts`), VenueFoxer → VenueCategory. Visible on both the foxer's public profile and on their listing cards.
+A category tag on a foxer's profile and listings showing what type of work they focus on. Comes in two forms with distinct visual treatment: a _Claimed_ tag (declared at role-application time, admin-backed, capped at 3 per role) and an _Earned_ badge (auto-granted by the system after 3 completed bookings in that category with a 4.0+ average rating, unlimited count, never revoked). Each role type uses its own category vocabulary: EventFoxer → EventCategory, Provider → ServiceCategory and AssetCategory (performer categories are split by value, not a separate enum — see `PERFORMER_SERVICE_CATEGORIES` in `src/types/permissions.ts`), VenueFoxer → VenueCategory. Visible on both the foxer's public profile and on their listing cards.
 _Avoid_: Specialty, skill tag, expertise

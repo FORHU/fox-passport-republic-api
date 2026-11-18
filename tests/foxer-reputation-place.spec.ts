@@ -22,8 +22,14 @@ vi.mock("../src/modules/foxer-score/foxer-score.repository", () => ({
       totalRecent: 20,
       cancelledCount: 0,
     })),
-    getTrustFactors: vi.fn(async () => ({ isVerified: true, foxerLevel: 12 })),
+    getTrustFactors: vi.fn(async () => ({ isVerified: true })),
     getUserPlace: vi.fn(async () => state.place),
+  },
+}));
+
+vi.mock("../src/modules/leaderboard/leaderboard.repository", () => ({
+  default: {
+    getFoxerSince: vi.fn(async () => new Date("2026-02-01T00:00:00Z")),
   },
 }));
 

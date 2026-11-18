@@ -4,7 +4,6 @@ import LeaderboardCtrl from "./leaderboard.controller";
 
 const router = Router();
 
-router.get("/citizens", optionalAuth, LeaderboardCtrl.getCitizens);
 router.get("/foxers", optionalAuth, LeaderboardCtrl.getFoxers);
 
 export default router;

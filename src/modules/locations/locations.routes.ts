@@ -11,6 +11,8 @@ router.get("/countries", LocationsCtrl.countries);
 router.get("/countries/:countryCode/states", LocationsCtrl.states);
 router.get("/countries/:countryCode/cities", LocationsCtrl.cities);
 router.get("/countries/:countryCode/barangays", LocationsCtrl.barangays);
+// The country's TIN formats, for the Foxer application forms.
+router.get("/countries/:countryCode/tin-formats", LocationsCtrl.tinFormats);
 router.get("/nearest", LocationsCtrl.nearest);
 
 export default router;

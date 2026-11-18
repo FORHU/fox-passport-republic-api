@@ -119,6 +119,12 @@ jobs:
           MAILER_PASSWORD: ${{ secrets.MAILER_PASSWORD }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          # The Stripe Connect endpoint's own signing secret (api#363). Stripe
+          # sends `account.updated` for Foxers' accounts only to that endpoint;
+          # without it their onboarding never registers and payouts fail.
+          # Since api#363 the API also refuses to start in production without
+          # STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET.
+          STRIPE_CONNECT_WEBHOOK_SECRET: ${{ secrets.STRIPE_CONNECT_WEBHOOK_SECRET }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           FACEBOOK_APP_SECRET: ${{ secrets.FACEBOOK_APP_SECRET }}
           # better-auth, added by the devs after this workflow was written. The API
@@ -127,6 +133,26 @@ jobs:
           # than degrading. BETTER_AUTH_URL is the origin it issues cookies for.
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           BETTER_AUTH_URL: ${{ vars.BETTER_AUTH_URL || secrets.BETTER_AUTH_URL }}
+          # CDN in front of the video bucket. getVideoUrl (src/utils/s3.ts) stores
+          # each new video's link at upload time; without this, links point at the
+          # private bucket and answer 403.
+          VIDEO_CDN_URL: ${{ vars.VIDEO_CDN_URL }}
+          # Sharing posts to Facebook Pages (api#320). Off until the key is set:
+          # it encrypts the stored Page and user tokens. The rest are optional
+          # (src/config.ts has the defaults).
+          FACEBOOK_TOKEN_ENCRYPTION_KEY: ${{ secrets.FACEBOOK_TOKEN_ENCRYPTION_KEY }}
+          # A Meta app of its own for Page sharing; unset, the sign-in app shares.
+          FACEBOOK_PAGES_APP_ID: ${{ vars.FACEBOOK_PAGES_APP_ID }}
+          FACEBOOK_PAGES_APP_SECRET: ${{ secrets.FACEBOOK_PAGES_APP_SECRET }}
+          FACEBOOK_GRAPH_VERSION: ${{ vars.FACEBOOK_GRAPH_VERSION }}
+          FACEBOOK_LOGIN_CONFIG_ID: ${{ vars.FACEBOOK_LOGIN_CONFIG_ID }}
+          FACEBOOK_PAGES_REDIRECT_URI: ${{ vars.FACEBOOK_PAGES_REDIRECT_URI }}
+          # SMTP server for MAILER_EMAIL (src/utils/mailer.ts). Without a host,
+          # nodemailer falls back to localhost and no email leaves the server
+          # (api#332). Gmail: smtp.gmail.com, 587, false.
+          MAILER_TRANSPORT_HOST: ${{ vars.MAILER_TRANSPORT_HOST }}
+          MAILER_TRANSPORT_PORT: ${{ vars.MAILER_TRANSPORT_PORT }}
+          MAILER_TRANSPORT_SECURE: ${{ vars.MAILER_TRANSPORT_SECURE }}
         run: |
           set -euo pipefail
           umask 077
@@ -146,8 +172,14 @@ jobs:
 
           for k in SECRET_KEY \
                    MAILER_PASSWORD STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET \
+                   STRIPE_CONNECT_WEBHOOK_SECRET \
                    GOOGLE_CLIENT_SECRET FACEBOOK_APP_SECRET \
-                   BETTER_AUTH_SECRET BETTER_AUTH_URL; do
+                   BETTER_AUTH_SECRET BETTER_AUTH_URL VIDEO_CDN_URL \
+                   FACEBOOK_TOKEN_ENCRYPTION_KEY FACEBOOK_GRAPH_VERSION \
+                   FACEBOOK_PAGES_APP_ID FACEBOOK_PAGES_APP_SECRET \
+                   FACEBOOK_LOGIN_CONFIG_ID FACEBOOK_PAGES_REDIRECT_URI \
+                   MAILER_TRANSPORT_HOST MAILER_TRANSPORT_PORT \
+                   MAILER_TRANSPORT_SECURE; do
             v="${!k:-}"
             [ -n "$v" ] && printf '%s=%s\n' "$k" "$v" >> env.tmp
           done

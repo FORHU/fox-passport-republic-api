@@ -83,6 +83,7 @@ export default class AssetSvc {
     ownerCity?: string;
     maxPrice?: number;
     q?: string;
+    category?: AssetCategory;
     page?: number;
     limit: number;
   }) {

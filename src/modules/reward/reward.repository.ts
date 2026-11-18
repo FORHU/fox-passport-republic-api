@@ -1,6 +1,19 @@
 import { Prisma, RewardLifecycleType, UserPath } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 
+/**
+ * The action of a milestone tier grant. These can be held, but only for the
+ * bookings behind that tier, so the release-everything path leaves them alone
+ * and MilestoneSvc frees each one with `releaseGrant` when its own bookings
+ * have been attended.
+ */
+export const MILESTONE_TIER_ACTION = "milestone_tier";
+
+/** Same for a booking challenge: one grant per person, challenge and period. */
+export const CHALLENGE_PERIOD_ACTION = "challenge_period";
+
+const SCOPED_RELEASE_ACTIONS = [MILESTONE_TIER_ACTION, CHALLENGE_PERIOD_ACTION];
+
 export default class RewardRepo {
   /**
    * Finds an active reward rule by action name.
@@ -218,10 +231,57 @@ export default class RewardRepo {
     return !!found;
   }
 
+  /** A user's held grants of one action, oldest first. */
+  static async listHeldByAction(userId: string, action: string) {
+    return prisma.rewardEvent.findMany({
+      where: { ...this.pendingWhere(userId), action },
+      select: { id: true, refId: true, coins: true },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  /**
+   * Releases one held grant: an append-only RELEASE record and the Coins added
+   * to the spendable balance, in one transaction. Does nothing if the grant was
+   * already released or reversed, so it is safe to call again.
+   */
+  static async releaseGrant(
+    grantEventId: string,
+    userId: string,
+    reason: string,
+  ): Promise<boolean> {
+    return prisma.$transaction(async (tx) => {
+      const held = await tx.rewardEvent.findFirst({
+        where: { ...this.pendingWhere(userId), id: grantEventId },
+        select: { id: true, coins: true },
+      });
+      if (!held) return false;
+      await tx.rewardLifecycle.create({
+        data: {
+          grantEventId: held.id,
+          userId,
+          type: RewardLifecycleType.RELEASE,
+          coinsDelta: held.coins,
+          reason,
+        },
+      });
+      await tx.passport.upsert({
+        where: { userId },
+        create: { userId, coins: held.coins },
+        update: { coins: { increment: held.coins } },
+      });
+      return true;
+    });
+  }
+
   /**
    * Releases every held grant of a user: one append-only RELEASE record per
    * grant, and the Coins added to the spendable balance, in one transaction.
    * Safe to call again: a released grant is no longer held.
+   *
+   * Milestone tier and challenge grants are left out: each is freed only by its
+   * own bookings being attended (releaseGrant), not by whichever booking is
+   * attended next.
    */
   static async releasePendingGrants(
     userId: string,
@@ -229,7 +289,10 @@ export default class RewardRepo {
   ): Promise<{ released: number; coins: number }> {
     return prisma.$transaction(async (tx) => {
       const held = await tx.rewardEvent.findMany({
-        where: this.pendingWhere(userId),
+        where: {
+          ...this.pendingWhere(userId),
+          action: { notIn: SCOPED_RELEASE_ACTIONS },
+        },
         select: { id: true, coins: true },
       });
       if (held.length === 0) return { released: 0, coins: 0 };
@@ -358,9 +421,98 @@ export default class RewardRepo {
         where: { userId },
         orderBy: { createdAt: "desc" },
         take: 50,
+        include: {
+          grantEvent: { select: { refType: true, refId: true } },
+        },
       }),
     ]);
     return { events, lifecycles };
+  }
+
+  /**
+   * Token vouchers past their expiry that were never used and whose Tokens
+   * have not been returned yet. A voucher counts as used while it has a
+   * VoucherRedemption row; cancelling the booking deletes that row and frees
+   * the voucher again.
+   */
+  static async findExpiredUnusedRedemptions(now: Date, take = 500) {
+    return prisma.coinRedemption.findMany({
+      where: {
+        status: "completed",
+        expiresAt: { lt: now },
+        voucherId: { not: null },
+        voucher: { redemptions: { none: {} } },
+      },
+      select: {
+        id: true,
+        userId: true,
+        coinsSpent: true,
+        voucher: { select: { code: true } },
+      },
+      orderBy: { expiresAt: "asc" },
+      take,
+    });
+  }
+
+  /**
+   * Returns an expired, unused voucher's full Token price, once. Claiming the
+   * redemption (status completed -> returned) and writing the VOUCHER_RETURN
+   * row happen in one transaction, so a re-run or a parallel run pays nothing
+   * more. The original REDEMPTION row is never changed; the return points to
+   * it through `reversalOf`.
+   */
+  static async recordVoucherReturn(data: {
+    redemptionId: string;
+    userId: string;
+    coins: number;
+    voucherCode: string;
+  }): Promise<boolean> {
+    return prisma.$transaction(async (tx) => {
+      const claimed = await tx.coinRedemption.updateMany({
+        where: { id: data.redemptionId, status: "completed" },
+        data: { status: "returned" },
+      });
+      if (claimed.count === 0) return false;
+
+      const redemptionRow = await tx.rewardLifecycle.findFirst({
+        where: {
+          userId: data.userId,
+          type: RewardLifecycleType.REDEMPTION,
+          reason: { endsWith: `(${data.voucherCode})` },
+        },
+        select: { id: true, grantEventId: true },
+      });
+      const grantEventId =
+        redemptionRow?.grantEventId ??
+        (
+          await tx.rewardEvent.findFirst({
+            where: { userId: data.userId },
+            orderBy: { createdAt: "desc" },
+            select: { id: true },
+          })
+        )?.id;
+      if (!grantEventId) {
+        throw new Error(
+          `No ledger entry to attach the voucher return to (redemption ${data.redemptionId})`,
+        );
+      }
+
+      await tx.rewardLifecycle.create({
+        data: {
+          grantEventId,
+          userId: data.userId,
+          type: RewardLifecycleType.VOUCHER_RETURN,
+          coinsDelta: data.coins,
+          reversalOf: redemptionRow?.id ?? null,
+          reason: `VOUCHER_EXPIRED: Tokens returned for unused voucher ${data.voucherCode}`,
+        },
+      });
+      await tx.passport.update({
+        where: { userId: data.userId },
+        data: { coins: { increment: data.coins } },
+      });
+      return true;
+    });
   }
 
   /**

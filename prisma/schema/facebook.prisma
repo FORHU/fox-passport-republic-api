@@ -1,0 +1,72 @@
+// Sharing FoxPassport video posts to a Facebook Page the Foxer manages.
+// Separate from "Sign in with Facebook" (Better Auth's `accounts` row): this is
+// permission to publish, its tokens are stored encrypted, and disconnecting it
+// never touches how the Foxer signs in.
+
+enum FacebookConnectionStatus {
+  active
+  // Meta refused a stored token (revoked, password changed, permission
+  // removed). The Foxer must connect again before sharing.
+  needs_reconnect
+}
+
+enum FacebookShareStatus {
+  // The video is being sent to Facebook.
+  publishing
+  // Facebook has the video and is processing it.
+  processing
+  // Live on the Page.
+  published
+  // Did not reach the Page; `errorCode` says why. May be retried.
+  failed
+}
+
+model FacebookConnection {
+  id                 String                   @id @default(uuid())
+  userId             String                   @unique
+  facebookUserId     String
+  facebookUserName   String?
+  // Long-lived user token (about 60 days), encrypted. Only used to list the
+  // Foxer's Pages; publishing uses the Page token.
+  userAccessTokenEnc String                   @db.Text
+  userTokenExpiresAt DateTime?
+  grantedScopes      String[]                 @default([])
+  // The Page videos are shared to, once the Foxer has chosen one.
+  pageId             String?
+  pageName           String?
+  // Page token derived from the long-lived user token (no expiry), encrypted.
+  pageAccessTokenEnc String?                  @db.Text
+  status             FacebookConnectionStatus @default(active)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("facebook_connections")
+}
+
+// One row per post and Page: the unique key is what stops a repeated click
+// from publishing the same video twice. Kept after the Foxer disconnects.
+model FacebookShare {
+  id              String              @id @default(uuid())
+  postId          String
+  userId          String
+  pageId          String
+  pageName        String?
+  status          FacebookShareStatus @default(publishing)
+  facebookVideoId String?
+  permalinkUrl    String?
+  errorCode       String?
+  errorMessage    String?
+  attempts        Int                 @default(1)
+  publishedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, pageId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("facebook_shares")
+}

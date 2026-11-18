@@ -2,6 +2,10 @@ import { AppError, notFound } from "../../utils/errors";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
 import PricingSvc, { PricingContext } from "../pricing/pricing.service";
 import { Prisma, InvoiceSourceType } from "@prisma/client";
+import {
+  eventBreakdownSnapshot,
+  type EventCharges,
+} from "./event-breakdown-snapshot";
 type Decimal = Prisma.Decimal;
 
 export interface CreateInvoiceParams {
@@ -33,24 +37,7 @@ export interface CreateInvoiceParams {
   eventCharges?: EventCharges;
 }
 
-/** What an Event checkout charges, from its lines' stored snapshots. */
-export interface EventCharges {
-  itemsTotal: number;
-  commissionTotal: number;
-  platformFee: number;
-  processingFee: number;
-  total: number;
-  lines: {
-    sourceId: string;
-    price: number;
-    commissionPct: number;
-    commission: number;
-    platformFeePct: number;
-    platformFee: number;
-    processingFee: number;
-    lineTotal: number;
-  }[];
-}
+export type { EventCharges };
 
 export default class InvoiceSvc {
   /**
@@ -128,14 +115,7 @@ export default class InvoiceSvc {
             discountSnapshot: Prisma.JsonNull,
             discountedSubtotal: subtotalNum,
             platformFeeAmount: charges.platformFee,
-            platformFeeSnapshot: {
-              kind: "event_breakdown",
-              commissionTotal: charges.commissionTotal,
-              platformFee: charges.platformFee,
-              processingFee: charges.processingFee,
-              total: charges.total,
-              lines: charges.lines,
-            },
+            platformFeeSnapshot: eventBreakdownSnapshot(charges),
             grossAmount: charges.total,
             dueDate: data.dueDate,
             items: {

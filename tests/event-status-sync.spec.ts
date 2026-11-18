@@ -50,10 +50,9 @@ describe("syncStatusFromBookings", () => {
       ["draft", "pending", "ongoing"],
       "completed",
     );
-    expect(organizerXp.onEventCompleted).toHaveBeenCalledWith("e1");
-    await vi.waitFor(() =>
-      expect(passport.awardXP).toHaveBeenCalledWith("foxer", "eventFoxer", 200),
-    );
+    // XP is retired: neither the Organizer nor the Event Foxer earns any
+    expect(organizerXp.onEventCompleted).not.toHaveBeenCalled();
+    expect(passport.awardXP).not.toHaveBeenCalled();
   });
 
   it("completes when every booking is completed or cancelled", async () => {

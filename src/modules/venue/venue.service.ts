@@ -243,17 +243,6 @@ export default class VenueSvc {
       }),
     });
 
-    // Award uploadVenue XP to the venueFoxer who created the listing
-    import("../passport/passport.service")
-      .then(({ default: P, XP_REWARDS, UserPath }) => {
-        return P.awardXP(
-          data.mayorId,
-          UserPath.venueFoxer,
-          XP_REWARDS.uploadVenue,
-        );
-      })
-      .catch(() => {});
-
     return venue;
   }
 

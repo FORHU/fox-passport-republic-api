@@ -215,7 +215,7 @@ describe("Review Sub-Ratings, Helpful Votes & Reviewer XP (§9.3)", () => {
       expect(mockGrant).not.toHaveBeenCalled();
     });
 
-    it("adds a helpful vote, increments helpfulCount, and grants +2 XP (0 Coins) to the review author", async () => {
+    it("adds a helpful vote and increments helpfulCount, paying nothing (XP is retired)", async () => {
       mockFindUniqueReview.mockResolvedValue({
         id: "rev-1",
         userId: "author-1",
@@ -228,37 +228,19 @@ describe("Review Sub-Ratings, Helpful Votes & Reviewer XP (§9.3)", () => {
         userId: "author-1",
         helpfulCount: 3,
       });
-      mockGrant.mockResolvedValue({
-        xpAwarded: 2,
-        coinsAwarded: 0,
-        newLevel: 1,
-        newRank: "Newcomer",
-        isIdempotentReplay: false,
-      });
-
       const res = await ReviewSvc.toggleHelpfulVote("rev-1", "voter-99");
 
       expect(res).toEqual({
         helpful: true,
         helpfulCount: 3,
-        xpAwarded: 2,
       });
       expect(mockCreateVote).toHaveBeenCalledWith({
         data: { reviewId: "rev-1", userId: "voter-99" },
       });
-      expect(mockGrant).toHaveBeenCalledWith({
-        userId: "author-1",
-        path: "user",
-        action: "review_helpful",
-        refType: "review_helpful",
-        refId: "rev-1:voter-99",
-        idempotencyKey: "grant:author-1:review_helpful:rev-1:voter-99",
-        xpOverride: 2,
-        coinsOverride: 0,
-      });
+      expect(mockGrant).not.toHaveBeenCalled();
     });
 
-    it("removes an existing helpful vote on toggle off without granting XP", async () => {
+    it("removes an existing helpful vote on toggle off", async () => {
       mockFindUniqueReview.mockResolvedValue({
         id: "rev-1",
         userId: "author-1",
@@ -281,46 +263,9 @@ describe("Review Sub-Ratings, Helpful Votes & Reviewer XP (§9.3)", () => {
       expect(res).toEqual({
         helpful: false,
         helpfulCount: 2,
-        xpAwarded: 0,
       });
       expect(mockDeleteVote).toHaveBeenCalled();
       expect(mockGrant).not.toHaveBeenCalled();
-    });
-
-    it("does not farm extra XP when a voter unvotes and re-votes (idempotent replay) or when daily cap is reached", async () => {
-      mockFindUniqueReview.mockResolvedValue({
-        id: "rev-1",
-        userId: "author-1",
-        helpfulCount: 2,
-      });
-      mockFindUniqueVote.mockResolvedValue(null);
-      mockCreateVote.mockResolvedValue({ id: "vote-2" });
-      mockUpdateReview.mockResolvedValue({
-        id: "rev-1",
-        userId: "author-1",
-        helpfulCount: 3,
-      });
-      mockGrant.mockResolvedValue({
-        xpAwarded: 2,
-        coinsAwarded: 0,
-        newLevel: 1,
-        newRank: "Newcomer",
-        isIdempotentReplay: true,
-      });
-
-      const replayRes = await ReviewSvc.toggleHelpfulVote("rev-1", "voter-99");
-      expect(replayRes.xpAwarded).toBe(0);
-
-      mockGrant.mockResolvedValue({
-        xpAwarded: 0,
-        coinsAwarded: 0,
-        newLevel: 1,
-        newRank: "Newcomer",
-        isIdempotentReplay: false,
-      });
-
-      const cappedRes = await ReviewSvc.toggleHelpfulVote("rev-1", "voter-100");
-      expect(cappedRes.xpAwarded).toBe(0);
     });
   });
 
