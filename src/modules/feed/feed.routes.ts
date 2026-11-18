@@ -1,6 +1,7 @@
 import { Router } from "express";
 import FeedController from "./feed.controller";
 import { authenticate, optionalAuth } from "../../middleware/auth.middleware";
+import { recordViewsLimiter, shareTrackLimiter } from "./feed.rateLimit";
 
 const router = Router();
 
@@ -13,10 +14,22 @@ router.get("/:id", optionalAuth, FeedController.getPostById);
 
 // Post interactions requiring authentication
 router.post("/", authenticate, FeedController.createPost);
+// Static path, registered before the "/:id" POST routes below.
+router.post(
+  "/views",
+  authenticate,
+  recordViewsLimiter,
+  FeedController.recordViews,
+);
 router.patch("/:id", authenticate, FeedController.editPost);
 router.delete("/:id", authenticate, FeedController.deletePost);
 router.post("/:id/repost", authenticate, FeedController.repost);
-router.post("/:id/share", optionalAuth, FeedController.trackShare);
+router.post(
+  "/:id/share",
+  optionalAuth,
+  shareTrackLimiter,
+  FeedController.trackShare,
+);
 router.post("/:id/reaction", authenticate, FeedController.setReaction);
 router.get("/:id/reactions", FeedController.getReactionBreakdown);
 router.post("/:id/save", authenticate, FeedController.toggleSave);

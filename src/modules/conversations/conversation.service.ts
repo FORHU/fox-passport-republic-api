@@ -969,7 +969,7 @@ export default class ConversationService {
       prisma.post
         .update({
           where: { id: sharedPostId },
-          data: { sharesCount: { increment: 1 } },
+          data: { sendsCount: { increment: 1 } },
         })
         .catch(() => {});
     }

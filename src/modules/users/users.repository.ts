@@ -855,6 +855,9 @@ export default class UsersRepo {
             likesCount: true,
             commentsCount: true,
             sharesCount: true,
+            sendsCount: true,
+            repostsCount: true,
+            viewsCount: true,
             venue: {
               select: {
                 id: true,

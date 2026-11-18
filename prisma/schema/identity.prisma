@@ -110,6 +110,8 @@ model User {
   commentLikes             CommentLike[]
   savedPosts               SavedPost[]
   hiddenPosts              HiddenPost[]
+  postViews                PostView[]
+  postShares               PostShare[]
   postMediaTags            PostMediaTag[]
   pollVotes                PollVote[]
   reportsFiled             Report[]

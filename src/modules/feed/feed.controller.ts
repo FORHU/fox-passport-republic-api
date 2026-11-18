@@ -172,8 +172,32 @@ export default class FeedController {
   static async trackShare(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const result = await FeedService.trackShare(id);
+      const result = await FeedService.trackShare(id, req.user?.userId);
       return res.status(200).json({ success: true, data: result });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res
+        .status(statusForError(err))
+        .json({ success: false, message: err.message });
+    }
+  }
+
+  static async recordViews(req: Request, res: Response) {
+    const schema = Joi.object({
+      postIds: Joi.array()
+        .items(Joi.string().uuid())
+        .min(1)
+        .max(FeedService.MAX_VIEW_BATCH)
+        .required(),
+    });
+    const { error, value } = schema.validate(req.body, VALIDATE_ALL);
+    if (error) return sendValidationError(res, error, { success: true });
+    try {
+      const recorded = await FeedService.recordViews(
+        req.user!.userId,
+        value.postIds,
+      );
+      return res.status(200).json({ success: true, data: { recorded } });
     } catch (e: unknown) {
       const err = e as Error;
       return res
