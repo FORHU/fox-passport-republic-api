@@ -1,7 +1,8 @@
 # An Event Foxer declines a booking they cannot attend
 
-**Status: proposed (draft).** Everything under "Open decisions" is a proposal,
-not agreed. Nothing here is built. It is the other half of
+**Status: accepted (2026-11-18), with the proposed answers below.** The host
+decline is built (api#402, mobile#469); checking the host's own calendar at
+booking (decision 2's first half) is not built yet. It is the other half of
 [0010](./0010-event-booking-supplier-decline-and-edits.md): 0010 covers a
 *Supplier* (a Provider or Mayor) leaving a booked event; this covers the
 *Event Foxer*, the host who owns the event, leaving a booking.
@@ -50,9 +51,9 @@ need and a bigger effect: the event itself is gone, not one item of it.
   its cause, so an admin can see a host who declines often. No penalty is
   proposed here.
 
-## Open decisions
+## Decisions
 
-These need the product owner's answer before anything is built.
+Accepted as proposed.
 
 1. **Is a host decline allowed at all once a citizen has booked?** *Proposed:*
    yes, before payment only. The alternative is no decline: the host must
