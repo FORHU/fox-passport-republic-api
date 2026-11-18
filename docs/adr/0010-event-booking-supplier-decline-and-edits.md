@@ -1,7 +1,10 @@
 # Suppliers declining a booked event, and Event Foxers editing it
 
-**Status: proposed (draft).** The five decisions under "Open decisions" are
-proposals, not agreed. Nothing here is built. Epic:
+**Status: accepted (2026-11-18), with the proposed answers below.** Built so
+far: the Supplier decline with a "busy" cause and conflict alerts with a
+booked-event read (api#397, #399, #401). Not built yet: auto-booking only
+matched Suppliers, editing a booked event, and the replacement deadline and
+refund. Epic:
 [#371](https://github.com/FORHU/fox-passport-republic-api/issues/371); this
 API's sub-issue is [#372](https://github.com/FORHU/fox-passport-republic-api/issues/372).
 It is the "needs its own design" that [0003](./0003-booking-edit-requests.md)
@@ -69,10 +72,9 @@ asset or service is attached. Today:
   as 0003: a higher price needs the citizen to pay the difference before the
   change applies; a lower one refunds the difference; no change applies at once.
 
-## Open decisions
+## Decisions
 
-These are the epic's, with the answer proposed here. They need the product
-owner's decision before anything past item 1 is built.
+These are the epic's, accepted as proposed.
 
 1. **Until when can a matched Supplier decline?** *Proposed:* until the booking
    is paid. After payment only through the cancellation and refund policy, so a
