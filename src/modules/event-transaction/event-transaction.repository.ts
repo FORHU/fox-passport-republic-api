@@ -7,6 +7,8 @@ export default class EventTransactionRepo {
     return prisma.eventAssetTransaction.findMany({
       where: { providerId },
       include: {
+        // Whether the booking is paid decides if the Supplier can still decline.
+        booking: { select: { status: true } },
         event: {
           select: {
             name: true,
@@ -43,6 +45,8 @@ export default class EventTransactionRepo {
     return prisma.eventServiceTransaction.findMany({
       where: { providerId },
       include: {
+        // Whether the booking is paid decides if the Supplier can still decline.
+        booking: { select: { status: true } },
         event: {
           select: {
             name: true,
@@ -79,6 +83,8 @@ export default class EventTransactionRepo {
     return prisma.eventVenueTransaction.findMany({
       where: { providerId },
       include: {
+        // Whether the booking is paid decides if the Supplier can still decline.
+        booking: { select: { status: true } },
         event: {
           select: {
             name: true,

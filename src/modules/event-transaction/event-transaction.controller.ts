@@ -46,7 +46,9 @@ export default class EventTransactionCtrl {
     // gap where any TransactionStatus enum value was accepted directly.
     const schema = Joi.object({
       type: Joi.string().valid("asset", "service", "venue").required(),
-      action: Joi.string().valid("confirm", "reject", "cancel").required(),
+      action: Joi.string()
+        .valid("confirm", "reject", "cancel", "decline")
+        .required(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -62,9 +64,15 @@ export default class EventTransactionCtrl {
         value.action,
         actorId,
       );
+      const done = {
+        confirm: "confirmed",
+        reject: "rejected",
+        cancel: "cancelled",
+        decline: "declined",
+      }[value.action as string];
       return res
         .status(200)
-        .json({ message: `Item ${value.action}ed successfully`, updated });
+        .json({ message: `Item ${done} successfully`, updated });
     } catch (e: unknown) {
       if (e instanceof AppError) {
         return res.status(e.status).json({ message: e.message, code: e.code });

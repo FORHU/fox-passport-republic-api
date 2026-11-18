@@ -7,6 +7,7 @@ import { TransactionStatus } from "@prisma/client";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
 import AvailabilitySvc from "../availability/availability.service";
 import TransactionStatusSvc from "../transaction-status/transaction-status.service";
+import NotificationSvc from "../notifications/user-notification.service";
 import {
   TransactionKind,
   TransactionAction,
@@ -195,8 +196,93 @@ export default class EventTransactionSvc {
     action: TransactionAction,
     actorId: string,
   ) {
-    return prisma.$transaction((tx) =>
+    const updated = await prisma.$transaction((tx) =>
       TransactionStatusSvc.transition(tx, { id, kind: type, action, actorId }),
     );
+    if (action === "decline") {
+      await this.notifyDeclined(type, updated).catch((err) =>
+        console.error(`Decline notification failed for ${type} ${id}`, err),
+      );
+    }
+    return updated;
+  }
+
+  /**
+   * Tells the Event Foxer which event lost which Supplier (so they can find a
+   * replacement) and tells the citizen their booking is affected. The decline
+   * has already committed, so this is best-effort and never fails the request.
+   */
+  private static async notifyDeclined(
+    kind: TransactionKind,
+    row: {
+      id: string;
+      eventId: string;
+      bookingId: string | null;
+      providerId: string;
+    },
+  ) {
+    const [event, supplier, itemName, booking] = await Promise.all([
+      prisma.event.findUnique({
+        where: { id: row.eventId },
+        select: { name: true, organizerId: true, clientId: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: row.providerId },
+        select: { name: true },
+      }),
+      this.itemNameOf(kind, row.id),
+      row.bookingId
+        ? prisma.booking.findUnique({
+            where: { id: row.bookingId },
+            select: { userId: true },
+          })
+        : null,
+    ]);
+    if (!event) return;
+    const metadata = { eventId: row.eventId, transactionId: row.id, kind };
+
+    await NotificationSvc.create({
+      userId: event.organizerId,
+      type: "SUPPLIER_DECLINED",
+      title: "A Supplier declined your event",
+      message: `${supplier?.name ?? "A Supplier"} declined ${itemName} for ${event.name}. Pick a replacement.`,
+      metadata,
+    });
+
+    const citizenId = booking?.userId ?? event.clientId;
+    if (citizenId && citizenId !== event.organizerId) {
+      await NotificationSvc.create({
+        userId: citizenId,
+        type: "SUPPLIER_DECLINED",
+        title: "Part of your booking changed",
+        message: `${itemName} for ${event.name} was declined by its Supplier. The event host has been asked to replace it.`,
+        metadata,
+      });
+    }
+  }
+
+  private static async itemNameOf(kind: TransactionKind, id: string) {
+    const name =
+      kind === "asset"
+        ? (
+            await prisma.eventAssetTransaction.findUnique({
+              where: { id },
+              select: { asset: { select: { name: true } } },
+            })
+          )?.asset?.name
+        : kind === "service"
+          ? (
+              await prisma.eventServiceTransaction.findUnique({
+                where: { id },
+                select: { service: { select: { name: true } } },
+              })
+            )?.service?.name
+          : (
+              await prisma.eventVenueTransaction.findUnique({
+                where: { id },
+                select: { venue: { select: { name: true } } },
+              })
+            )?.venue?.name;
+    return name ?? "an item";
   }
 }
