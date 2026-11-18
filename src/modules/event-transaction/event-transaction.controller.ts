@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import EventTransactionSvc from "./event-transaction.service";
+import EventConflictSvc from "./event-conflict.service";
 import Joi from "joi";
 import { AppError } from "../../utils/errors";
 
@@ -11,6 +12,45 @@ export default class EventTransactionCtrl {
       const data = await EventTransactionSvc.getProviderDashboard(providerId);
       return res.status(200).json(data);
     } catch (e: unknown) {
+      const error = e as Error;
+      return res.status(500).json({ message: error.message });
+    }
+  }
+
+  /**
+   * GET /event-transactions/needs-attention: the Event Foxer's upcoming
+   * events that lost a Supplier (declined, a blocked day, a listing taken
+   * down), and which Supplier. Always about the signed-in person's own events.
+   */
+  static async needsAttention(req: Request, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const data = await EventConflictSvc.needsAttention(userId);
+      return res.status(200).json({ success: true, data });
+    } catch (e: unknown) {
+      const error = e as Error;
+      return res.status(500).json({ message: error.message });
+    }
+  }
+
+  /**
+   * GET /event-transactions/event/:eventId: one of the Event Foxer's own
+   * events with every Supplier on it. Anyone else's event is "not found".
+   */
+  static async bookedEvent(req: Request, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const data = await EventConflictSvc.eventDetail(
+        userId,
+        req.params.eventId,
+      );
+      return res.status(200).json({ success: true, data });
+    } catch (e: unknown) {
+      if (e instanceof AppError) {
+        return res.status(e.status).json({ message: e.message, code: e.code });
+      }
       const error = e as Error;
       return res.status(500).json({ message: error.message });
     }

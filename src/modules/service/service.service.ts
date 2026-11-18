@@ -141,7 +141,25 @@ export default class ServiceSvc {
       );
     }
 
-    return ServiceRepo.updateService(id, data);
+    const updated = await ServiceRepo.updateService(id, data);
+    // Taking a booked service off the market is allowed; the Event Foxers it
+    // is booked for are told so they can replace it.
+    if (
+      data.status &&
+      data.status !== existing.status &&
+      ["draft", "pending", "paused", "archived", "rejected"].includes(
+        data.status,
+      )
+    ) {
+      await import("../event-transaction/event-conflict.service")
+        .then(({ default: ConflictSvc }) =>
+          ConflictSvc.notifyListingGone("service", id),
+        )
+        .catch((err) =>
+          console.error(`Conflict alert failed for service ${id}`, err),
+        );
+    }
+    return updated;
   }
 
   static async deleteService(id: string, requesterId: string) {
@@ -154,6 +172,13 @@ export default class ServiceSvc {
     }
 
     await ServiceRepo.deleteService(id);
+    await import("../event-transaction/event-conflict.service")
+      .then(({ default: ConflictSvc }) =>
+        ConflictSvc.notifyListingGone("service", id),
+      )
+      .catch((err) =>
+        console.error(`Conflict alert failed for service ${id}`, err),
+      );
     return { message: "Service deleted successfully" };
   }
 

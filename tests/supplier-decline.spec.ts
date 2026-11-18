@@ -32,9 +32,12 @@ vi.mock("../src/modules/notifications/user-notification.service", () => ({
 }));
 
 // The other modules the service imports are not touched by reviewItem.
-vi.mock("../src/modules/event-transaction/event-transaction.repository", () => ({
-  default: {},
-}));
+vi.mock(
+  "../src/modules/event-transaction/event-transaction.repository",
+  () => ({
+    default: {},
+  }),
+);
 vi.mock("../src/modules/event-request/event-request.repository", () => ({
   default: {},
 }));
@@ -84,7 +87,12 @@ describe("EventTransactionSvc.reviewItem with a decline", () => {
     expect(host).toMatchObject({
       userId: "host1",
       type: "SUPPLIER_DECLINED",
-      metadata: { eventId: "e1", transactionId: "tx1", kind: "asset" },
+      metadata: {
+        eventId: "e1",
+        transactionId: "tx1",
+        kind: "asset",
+        link: "/creator-dashboard/events?eventId=e1",
+      },
     });
     expect(host.message).toContain("Maria Provider");
     expect(host.message).toContain("Sound system");
@@ -92,6 +100,8 @@ describe("EventTransactionSvc.reviewItem with a decline", () => {
     expect(citizen).toMatchObject({
       userId: "citizen1",
       type: "SUPPLIER_DECLINED",
+      // The citizen goes to their booking, not the host's event page.
+      metadata: { link: "/bookings/b1" },
     });
   });
 

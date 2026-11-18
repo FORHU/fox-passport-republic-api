@@ -139,7 +139,21 @@ export default class AssetSvc {
       );
     }
 
-    return AssetRepo.updateAsset(id, data);
+    const updated = await AssetRepo.updateAsset(id, data);
+    if (
+      data.status &&
+      data.status !== existing.status &&
+      ["draft", "pending", "archived", "rejected"].includes(data.status)
+    ) {
+      await import("../event-transaction/event-conflict.service")
+        .then(({ default: ConflictSvc }) =>
+          ConflictSvc.notifyListingGone("asset", id),
+        )
+        .catch((err) =>
+          console.error(`Conflict alert failed for asset ${id}`, err),
+        );
+    }
+    return updated;
   }
 
   static async deleteAsset(id: string, requesterId: string) {
@@ -155,6 +169,13 @@ export default class AssetSvc {
     }
 
     await AssetRepo.deleteAsset(id);
+    await import("../event-transaction/event-conflict.service")
+      .then(({ default: ConflictSvc }) =>
+        ConflictSvc.notifyListingGone("asset", id),
+      )
+      .catch((err) =>
+        console.error(`Conflict alert failed for asset ${id}`, err),
+      );
     return { message: "Asset deleted successfully" };
   }
 
