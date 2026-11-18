@@ -148,6 +148,9 @@ const HOST_PERKS: PerkSpec[] = [
   },
 ];
 
+/** The ids written this run, so stale seed rows can be cleared after. */
+const written = new Set<string>();
+
 async function upsertPerk(
   spec: PerkSpec,
   owner: {
@@ -159,6 +162,7 @@ async function upsertPerk(
   scope: string,
 ) {
   const id = `${ID_PREFIX}${scope}-${spec.slug}`;
+  written.add(id);
   const data = {
     issuerType: owner.issuerType,
     issuerUserId: owner.userId,
@@ -226,7 +230,7 @@ async function main() {
           venueId: v.id,
           templateId: null,
         },
-        `venue-${v.id.slice(0, 8)}`,
+        `venue-${v.id}`,
       );
       made += 1;
       const note = !d.active
@@ -248,12 +252,25 @@ async function main() {
           venueId: null,
           templateId: t.id,
         },
-        `pkg-${t.id.slice(0, 8)}`,
+        `pkg-${t.id}`,
       );
       made += 1;
       console.log(`   ${d.title}: ${d.tokenCost} Tokens, ${d.remaining} left`);
     }
   }
+
+  // Rows from an earlier run that this run no longer writes (a venue that is no
+  // longer in the first three, or an older id scheme). Ones somebody already
+  // bought are kept: they hold a person's Tokens and code.
+  const cleared = await prisma.perk.deleteMany({
+    where: {
+      id: { startsWith: ID_PREFIX, notIn: [...written] },
+      redemptions: { none: {} },
+    },
+  });
+  if (cleared.count > 0)
+    console.log(`
+🧹 Removed ${cleared.count} stale seed perk(s).`);
 
   const email = process.env.SEED_PERKS_EMAIL;
   if (email) {
