@@ -48,7 +48,7 @@ const perk = (over: Record<string, unknown> = {}) => ({
   id: "p1",
   issuerType: "venue",
   venueId: "v1",
-  eventId: null,
+  templateId: null,
   title: "Free welcome drink",
   description: "One drink",
   worthPhp: 100,

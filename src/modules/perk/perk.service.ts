@@ -26,7 +26,7 @@ function toPerkDto(perk: PerkRow, balance: number) {
     id: perk.id,
     issuerType: perk.issuerType,
     venueId: perk.venueId,
-    eventId: perk.eventId,
+    templateId: perk.templateId,
     title: perk.title,
     description: perk.description,
     worthPhp: Number(perk.worthPhp),

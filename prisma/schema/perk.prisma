@@ -9,9 +9,10 @@ model Perk {
   // "venue" | "host" | "platform". Who provides it, and so who pays for it.
   issuerType   String
   issuerUserId String?
-  // A venue perk is for bookings at this venue; a host perk for this event.
+  // A venue perk is for bookings at this venue; a host perk for bookings of
+  // this event package (EventTemplate).
   venueId      String?
-  eventId      String?
+  templateId   String?
   title        String
   description  String?
   // What it is worth in pesos, and the Token price set from it (5 Tokens = ₱1).
@@ -29,7 +30,7 @@ model Perk {
   redemptions PerkRedemption[]
 
   @@index([venueId])
-  @@index([eventId])
+  @@index([templateId])
   @@index([active, issuerType])
   @@map("perks")
 }

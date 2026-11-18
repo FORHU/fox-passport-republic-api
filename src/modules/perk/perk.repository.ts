@@ -160,11 +160,13 @@ export default class PerkRepo {
 
   /**
    * The person's bookings a perk can be used on: still ahead of them (not
-   * cancelled or over), and at the perk's venue or event.
+   * cancelled or over), and at the perk's venue, or booked from the perk's
+   * event package (each booking of a package is its own Event row, so the
+   * package is what ties them together).
    */
   static async findEligibleBookings(
     userId: string,
-    perk: { venueId: string | null; eventId: string | null },
+    perk: { venueId: string | null; templateId: string | null },
     now: Date,
   ) {
     return prisma.booking.findMany({
@@ -172,19 +174,19 @@ export default class PerkRepo {
         userId,
         status: { in: [...USABLE_BOOKING_STATUSES] },
         endAt: { gt: now },
-        ...(perk.eventId ? { eventId: perk.eventId } : {}),
-        ...(perk.venueId
-          ? {
-              event: {
+        event: {
+          ...(perk.templateId ? { templateId: perk.templateId } : {}),
+          ...(perk.venueId
+            ? {
                 venueTransactions: {
                   some: {
                     venueId: perk.venueId,
                     status: { notIn: ["rejected", "cancelled"] },
                   },
                 },
-              },
-            }
-          : {}),
+              }
+            : {}),
+        },
       },
       select: {
         id: true,

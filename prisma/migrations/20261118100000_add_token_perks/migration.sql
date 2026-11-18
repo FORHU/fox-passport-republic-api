@@ -8,7 +8,7 @@ CREATE TABLE "perks" (
     "issuerType" TEXT NOT NULL,
     "issuerUserId" TEXT,
     "venueId" TEXT,
-    "eventId" TEXT,
+    "templateId" TEXT,
     "title" TEXT NOT NULL,
     "description" TEXT,
     "worthPhp" DECIMAL(12,2) NOT NULL,
@@ -45,7 +45,7 @@ CREATE TABLE "perk_redemptions" (
 CREATE INDEX "perks_venueId_idx" ON "perks"("venueId");
 
 -- CreateIndex
-CREATE INDEX "perks_eventId_idx" ON "perks"("eventId");
+CREATE INDEX "perks_templateId_idx" ON "perks"("templateId");
 
 -- CreateIndex
 CREATE INDEX "perks_active_issuerType_idx" ON "perks"("active", "issuerType");
