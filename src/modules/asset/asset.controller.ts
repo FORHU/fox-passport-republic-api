@@ -50,7 +50,8 @@ export default class AssetCtrl {
         .valid(...Object.values(AssetCategory))
         .required(),
       name: nameJoi().required(),
-      description: descriptionJoi().required(),
+      // Empty is fine for a draft; the service requires one past draft.
+      description: descriptionJoi().allow("").optional(),
       quantity: quantityJoi().optional(),
       condition: Joi.string()
         .valid(...Object.values(AssetCondition))

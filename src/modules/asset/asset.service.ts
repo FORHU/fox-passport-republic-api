@@ -8,7 +8,10 @@ import AssetRepo from "./asset.repository";
 import { assetCache } from "../../utils/cache-namespaces";
 import { fingerprint } from "../../utils/cache.util";
 import { v4 as uuidv4 } from "uuid";
-import { assertListingImages } from "../../utils/listing-images";
+import {
+  assertListingDescription,
+  assertListingImages,
+} from "../../utils/listing-images";
 
 /** Five minutes, matching venues: listings are browsed far more than edited. */
 const ASSET_TTL = 300;
@@ -19,7 +22,7 @@ export default class AssetSvc {
     ownerId: string;
     category: AssetCategory;
     name: string;
-    description: string;
+    description?: string;
     quantity?: number;
     condition?: AssetCondition;
     price: number;
@@ -31,6 +34,8 @@ export default class AssetSvc {
     const normalized = {
       ...data,
       id: data.id ?? uuidv4(),
+      // The column is required; a draft may leave the description empty.
+      description: data.description ?? "",
       quantity: data.quantity ?? 1,
       condition: data.condition ?? AssetCondition.good,
       currency: data.currency ?? "USD",
@@ -40,6 +45,7 @@ export default class AssetSvc {
 
     const imgIds = data.imgIds ?? [];
     assertListingImages(normalized.status, imgIds.length);
+    assertListingDescription(normalized.status, normalized.description);
 
     const assetData = {
       ...normalized,
@@ -136,6 +142,10 @@ export default class AssetSvc {
       assertListingImages(
         data.status,
         data.imgIds?.length ?? existing.images.length,
+      );
+      assertListingDescription(
+        data.status,
+        data.description ?? existing.description,
       );
     }
 
