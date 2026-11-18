@@ -64,3 +64,15 @@ export function announcePostCommentsCount(
     // As above.
   }
 }
+
+/**
+ * A public post was just created on [tab]. Goes to everyone connected, so it
+ * carries no post id or content; callers send it for public posts only.
+ */
+export function announceNewPost(tab: string): void {
+  try {
+    emitToAll(io, SOCKET_EVENTS.FEED_NEW, { tab });
+  } catch {
+    // As above.
+  }
+}

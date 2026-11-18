@@ -8,6 +8,7 @@ import { scheduleConfirmationDeadlineSweep } from "./jobs/confirmation-deadline-
 import { scheduleUnattendedEventsSweep } from "./jobs/unattended-events.job";
 import { scheduleVoucherReturn } from "./jobs/voucher-return.job";
 import { scheduleMilestoneSweep } from "./jobs/milestone-sweep.job";
+import { scheduleFeedResurfacingPrune } from "./jobs/feed-resurfacing-prune.job";
 
 const httpServer = createServer(app);
 
@@ -21,6 +22,7 @@ scheduleConfirmationDeadlineSweep();
 scheduleUnattendedEventsSweep();
 scheduleVoucherReturn();
 scheduleMilestoneSweep();
+scheduleFeedResurfacingPrune();
 
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
