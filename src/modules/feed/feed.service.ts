@@ -552,7 +552,7 @@ export default class FeedService {
       originalPostId: postId,
     });
 
-    await FeedRepo.incrementShares(postId);
+    await FeedRepo.incrementReposts(postId);
 
     if (original.authorId !== user.userId) {
       NotificationService.create({
@@ -567,13 +567,30 @@ export default class FeedService {
     return post;
   }
 
-  static async trackShare(postId: string) {
-    const post = await FeedRepo.findPostById(postId);
+  // Matches the client's flush size; the controller rejects larger batches.
+  static readonly MAX_VIEW_BATCH = 50;
+
+  // Once per (post, viewer); authors' own views, and posts the viewer can't
+  // see, are skipped in the repository query. Returns the ids counted.
+  static async recordViews(viewerId: string, postIds: string[]) {
+    const unique = [...new Set(postIds)].slice(0, FeedService.MAX_VIEW_BATCH);
+    return FeedRepo.recordViews(viewerId, unique);
+  }
+
+  // One share per signed-in user per post (enforced by the database, see
+  // FeedRepo.recordShare). Guests can still copy a link; they just aren't
+  // counted, since there is no one to hold to "once". A post the viewer
+  // can't see is a 404, as on getPostById.
+  static async trackShare(postId: string, viewerId?: string) {
+    const post = await FeedRepo.findPostById(postId, viewerId);
     if (!post) {
       throw notFound("Post");
     }
-    await FeedRepo.incrementShares(postId);
-    return { success: true };
+    if (!viewerId) {
+      return { success: true, counted: false, sharesCount: post.sharesCount };
+    }
+    const result = await FeedRepo.recordShare(postId, viewerId);
+    return { success: true, ...result };
   }
 
   static async setReaction(

@@ -183,6 +183,10 @@ const ALLOW_LIST = new Set([
   // Review helpful votes (§9.3): any signed-in citizen can toggle their own
   // helpful vote on a review; ReviewSvc.toggleHelpfulVote blocks self-voting.
   "review.routes.ts POST /:id/helpful",
+  // Post views (app#303): the signed-in user records only their own views,
+  // keyed by the session user id. FeedRepo.recordViews skips the caller's own
+  // posts and posts they can't see; rate limited per account.
+  "feed.routes.ts POST /views",
 ]);
 
 const BANNED_GUARDS = ["requireRole", "requireAdmin", "requireHost"];

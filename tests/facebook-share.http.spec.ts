@@ -429,6 +429,11 @@ describe("Facebook Page sharing API", () => {
       contentType: "video/mp4",
       description: `Sunset at the venue #${runId}`,
     });
+    // app#303: a share that reached Facebook counts on the post.
+    expect(
+      (await prisma.post.findUniqueOrThrow({ where: { id: videoPostId } }))
+        .sharesCount,
+    ).toBe(1);
 
     graph.getVideoStatus.mockResolvedValueOnce({ videoStatus: "processing" });
     const still = await request(app)
@@ -463,6 +468,11 @@ describe("Facebook Page sharing API", () => {
     expect(again.body.code).toBe("ALREADY_SHARED");
     expect(again.body.data.permalinkUrl).toContain("vid-1");
     expect(graph.uploadPageVideo).not.toHaveBeenCalled();
+    // Pressing Share again isn't another share.
+    expect(
+      (await prisma.post.findUniqueOrThrow({ where: { id: videoPostId } }))
+        .sharesCount,
+    ).toBe(1);
   });
 
   it("sends a video once when the button is clicked twice at the same time", async () => {
@@ -506,6 +516,11 @@ describe("Facebook Page sharing API", () => {
       canRetry: true,
       attempts: 1,
     });
+    const sharesOf = async () =>
+      (await prisma.post.findUniqueOrThrow({ where: { id: post.id } }))
+        .sharesCount;
+    // A failed attempt doesn't count as a share; the successful retry does.
+    expect(await sharesOf()).toBe(0);
 
     graph.uploadPageVideo.mockResolvedValueOnce({ videoId: "vid-retry" });
     const retried = await request(app)
@@ -517,6 +532,7 @@ describe("Facebook Page sharing API", () => {
       attempts: 2,
       errorCode: null,
     });
+    expect(await sharesOf()).toBe(1);
   });
 
   it("records a video Facebook rejects, and leaves the FoxPassport post alone", async () => {
