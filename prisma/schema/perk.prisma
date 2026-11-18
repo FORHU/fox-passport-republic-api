@@ -1,0 +1,62 @@
+// Token perks (api#389): something real a citizen buys with Tokens, such as a
+// free welcome drink, offered by a venue, an event host or FoxPassport. Not a
+// discount: it has an issuer, a stock and a one-shot code that venue staff
+// check at the door. Separate from `CoinReward`, which is the admin's discount
+// catalogue. Design: "Token Perks Design" (Claude artifact), boards 1 to 9.
+
+model Perk {
+  id           String   @id @default(uuid())
+  // "venue" | "host" | "platform". Who provides it, and so who pays for it.
+  issuerType   String
+  issuerUserId String?
+  // A venue perk is for bookings at this venue; a host perk for this event.
+  venueId      String?
+  eventId      String?
+  title        String
+  description  String?
+  // What it is worth in pesos, and the Token price set from it (5 Tokens = ₱1).
+  worthPhp     Decimal  @db.Decimal(12, 2)
+  tokenCost    Int
+  // Null: no limit. `remaining` is what is still on offer.
+  quantity     Int?
+  remaining    Int?
+  // Days a bought perk can be used before the Tokens come back.
+  validDays    Int      @default(30)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  redemptions PerkRedemption[]
+
+  @@index([venueId])
+  @@index([eventId])
+  @@index([active, issuerType])
+  @@map("perks")
+}
+
+model PerkRedemption {
+  id           String    @id @default(uuid())
+  userId       String
+  perkId       String
+  // The booking the perk is for.
+  bookingId    String
+  tokensSpent  Int
+  // The text code staff can also type: FP-XXXX-XXXX.
+  code         String    @unique
+  // Derives the live code that changes every 30 seconds. Never sent out.
+  codeSecret   String
+  // "ready" | "used" | "returned" (expired unused, or the booking was cancelled)
+  status       String    @default("ready")
+  expiresAt    DateTime
+  usedAt       DateTime?
+  usedByUserId String?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  perk Perk @relation(fields: [perkId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([bookingId])
+  @@index([status, expiresAt])
+  @@map("perk_redemptions")
+}

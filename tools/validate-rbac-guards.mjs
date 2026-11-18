@@ -177,6 +177,14 @@ const ALLOW_LIST = new Set([
   "reward.routes.ts GET /me",
   "reward.routes.ts GET /catalog",
   "reward.routes.ts POST /redeem",
+  // Token perks (api#389): the signed-in person lists perks, redeems one for
+  // their own booking, reads their own redemptions and live code. Scoped to the
+  // caller in the service.
+  "perk.routes.ts GET /",
+  "perk.routes.ts GET /mine",
+  "perk.routes.ts GET /redemptions/:id/code",
+  "perk.routes.ts GET /:id",
+  "perk.routes.ts POST /:id/redeem",
   // Onboarding: the signed-in user records and reads their own tour steps.
   "onboarding.routes.ts GET /",
   "onboarding.routes.ts POST /:step",
