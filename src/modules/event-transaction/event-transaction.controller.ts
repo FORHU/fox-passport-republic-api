@@ -89,6 +89,8 @@ export default class EventTransactionCtrl {
       action: Joi.string()
         .valid("confirm", "reject", "cancel", "decline")
         .required(),
+      // Why a Supplier declined; a fixed set, only read for "decline".
+      cause: Joi.string().valid("busy", "other").optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -103,6 +105,7 @@ export default class EventTransactionCtrl {
         value.type,
         value.action,
         actorId,
+        value.cause,
       );
       const done = {
         confirm: "confirmed",

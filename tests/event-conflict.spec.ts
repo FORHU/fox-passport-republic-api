@@ -162,8 +162,29 @@ describe("EventConflictSvc.needsAttention", () => {
         supplierName: "Maria Provider",
         itemName: "Sound system",
         reason: "declined",
+        cause: null,
       },
     ]);
+  });
+
+  it("says when the Supplier declined because it is busy with another booking", async () => {
+    db.events.mockResolvedValue([
+      event({
+        assetTransactions: [
+          assetTx({
+            status: "rejected",
+            rejectionReason: "supplier_declined_busy",
+          }),
+        ],
+      }),
+    ]);
+
+    const out = await EventConflictSvc.needsAttention("host1", NOW);
+
+    expect(out[0].issues[0]).toMatchObject({
+      reason: "declined",
+      cause: "busy",
+    });
   });
 
   it("does not flag a request a Provider simply turned down", async () => {

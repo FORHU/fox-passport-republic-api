@@ -29,6 +29,8 @@ export interface ConflictIssue {
   supplierName: string;
   itemName: string;
   reason: ConflictReason;
+  /** "busy" when a declining Supplier has another booking then. */
+  cause: "busy" | null;
 }
 
 export interface EventNeedingAttention {
@@ -47,6 +49,8 @@ export interface BookedSupplierRow {
   status: string;
   /** Set when this Supplier needs replacing. */
   reason: ConflictReason | null;
+  /** "busy" when a declining Supplier has another booking then. */
+  cause: "busy" | null;
 }
 
 export interface BookedEventDetail {
@@ -141,7 +145,12 @@ type EventRow = {
 
 const isLive = (status: string) => (LIVE as readonly string[]).includes(status);
 const isDeclined = (t: { status: string; rejectionReason: string | null }) =>
-  t.status === "rejected" && t.rejectionReason === "supplier_declined";
+  t.status === "rejected" &&
+  (t.rejectionReason === "supplier_declined" ||
+    t.rejectionReason === "supplier_declined_busy");
+/** Set when the Supplier said it has another booking at that time. */
+const declineCause = (t: { rejectionReason: string | null }): "busy" | null =>
+  t.rejectionReason === "supplier_declined_busy" ? "busy" : null;
 
 /** Every Supplier of an event, each with why it needs replacing, if it does. */
 function supplierRows(e: EventRow): BookedSupplierRow[] {
@@ -154,6 +163,7 @@ function supplierRows(e: EventRow): BookedSupplierRow[] {
       supplierName: t.provider.name,
       itemName: t.asset.name,
       status: t.status,
+      cause: isDeclined(t) ? declineCause(t) : null,
       reason: isDeclined(t)
         ? "declined"
         : isLive(t.status) &&
@@ -169,6 +179,7 @@ function supplierRows(e: EventRow): BookedSupplierRow[] {
       supplierName: t.provider.name,
       itemName: t.service.name,
       status: t.status,
+      cause: isDeclined(t) ? declineCause(t) : null,
       reason: isDeclined(t)
         ? "declined"
         : isLive(t.status) &&
@@ -184,6 +195,7 @@ function supplierRows(e: EventRow): BookedSupplierRow[] {
       supplierName: t.provider.name,
       itemName: t.venue.name,
       status: t.status,
+      cause: isDeclined(t) ? declineCause(t) : null,
       reason: isDeclined(t)
         ? "declined"
         : isLive(t.status) && blockedDayHitsEvent(t.venue.blockedDates, e)
@@ -228,6 +240,7 @@ export default class EventConflictSvc {
             supplierName: r.supplierName,
             itemName: r.itemName,
             reason: r.reason,
+            cause: r.cause,
           });
         }
       }

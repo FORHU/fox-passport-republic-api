@@ -388,6 +388,23 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
       expect((result as any).rejectionReason).toBe("supplier_declined");
     });
 
+    it("records that the Supplier was busy, when it says so", async () => {
+      const row = await makeAdHocRow({
+        status: "approved",
+        confirmationDeadline: null,
+      });
+      const result = await prisma.$transaction((tx) =>
+        TransactionStatusSvc.transition(tx, {
+          id: row.id,
+          kind: "asset",
+          action: "decline",
+          actorId: providerId,
+          cause: "busy",
+        }),
+      );
+      expect((result as any).rejectionReason).toBe("supplier_declined_busy");
+    });
+
     it("lets the provider decline an item already approved, while unpaid", async () => {
       const row = await makeAdHocRow({
         status: "approved",

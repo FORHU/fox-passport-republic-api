@@ -74,10 +74,33 @@ const REJECTION_REASON: Partial<Record<TransactionAction, string>> = {
   decline: "supplier_declined",
 };
 
+/**
+ * Why a Supplier declined. A fixed set, never free text: each value maps to
+ * one server-side reason below.
+ */
+export type DeclineCause = "busy" | "other";
+
+const DECLINE_REASON: Record<DeclineCause, string> = {
+  other: "supplier_declined",
+  // The Supplier has another booking at that time.
+  busy: "supplier_declined_busy",
+};
+
+const rejectionReasonFor = (
+  action: TransactionAction,
+  cause: DeclineCause | undefined,
+  current: string | null,
+): string | null =>
+  action === "decline"
+    ? DECLINE_REASON[cause ?? "other"]
+    : (REJECTION_REASON[action] ?? current);
+
 interface TransitionArgs {
   id: string;
   kind: TransactionKind;
   action: TransactionAction;
+  /** Only read for `decline`; defaults to "other". */
+  cause?: DeclineCause;
   actorId?: string; // omitted only for the system-driven "expire" action
 }
 
@@ -118,7 +141,7 @@ export default class TransactionStatusSvc {
 
   private static async transitionAsset(
     tx: AppTransactionClient,
-    { id, action, actorId }: TransitionArgs,
+    { id, action, actorId, cause }: TransitionArgs,
   ) {
     await tx.$executeRaw`SELECT id FROM event_asset_transactions WHERE id = ${id} FOR UPDATE`;
 
@@ -168,14 +191,14 @@ export default class TransactionStatusSvc {
       where: { id, status: row.status }, // optimistic re-check, defense in depth alongside the FOR UPDATE lock
       data: {
         status: toStatus,
-        rejectionReason: REJECTION_REASON[action] ?? row.rejectionReason,
+        rejectionReason: rejectionReasonFor(action, cause, row.rejectionReason),
       },
     });
   }
 
   private static async transitionService(
     tx: AppTransactionClient,
-    { id, action, actorId }: TransitionArgs,
+    { id, action, actorId, cause }: TransitionArgs,
   ) {
     await tx.$executeRaw`SELECT id FROM event_service_transactions WHERE id = ${id} FOR UPDATE`;
 
@@ -222,14 +245,14 @@ export default class TransactionStatusSvc {
       where: { id, status: row.status },
       data: {
         status: toStatus,
-        rejectionReason: REJECTION_REASON[action] ?? row.rejectionReason,
+        rejectionReason: rejectionReasonFor(action, cause, row.rejectionReason),
       },
     });
   }
 
   private static async transitionVenue(
     tx: AppTransactionClient,
-    { id, action, actorId }: TransitionArgs,
+    { id, action, actorId, cause }: TransitionArgs,
   ) {
     await tx.$executeRaw`SELECT id FROM event_venue_transactions WHERE id = ${id} FOR UPDATE`;
 
@@ -281,7 +304,7 @@ export default class TransactionStatusSvc {
       where: { id, status: row.status },
       data: {
         status: toStatus,
-        rejectionReason: REJECTION_REASON[action] ?? row.rejectionReason,
+        rejectionReason: rejectionReasonFor(action, cause, row.rejectionReason),
       },
     });
   }
