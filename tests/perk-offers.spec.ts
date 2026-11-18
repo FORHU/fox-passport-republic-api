@@ -3,7 +3,7 @@ import { liveCode } from "../src/modules/perk/perk.code";
 
 const repo = vi.hoisted(() => ({
   listOffered: vi.fn(),
-  findEventForOffer: vi.fn(),
+  findTemplateForOffer: vi.fn(),
   findVenueForOffer: vi.fn(),
   createPerk: vi.fn(),
   listIssued: vi.fn(),
@@ -37,8 +37,6 @@ vi.mock("../src/modules/reward/reward.repository", () => ({
 
 vi.mock("../src/modules/appointment/appointment.access", () => ({
   default: access,
-  isEventOwner: (e: { organizerId: string } | null, u: string) =>
-    !!e && e.organizerId === u,
   isVenueMayor: (v: { mayorId: string } | null, u: string) =>
     !!v && v.mayorId === u,
 }));
@@ -54,7 +52,7 @@ const perkRow = (over: Record<string, unknown> = {}) => ({
   issuerType: "host",
   issuerUserId: "host1",
   venueId: null,
-  eventId: "e1",
+  templateId: "t1",
   title: "Free welcome drink",
   description: null,
   worthPhp: 100,
@@ -73,7 +71,7 @@ beforeEach(() => {
 
 describe("PerkSvc.create", () => {
   const input = {
-    eventId: "e1",
+    templateId: "t1",
     title: "  Free welcome drink ",
     description: "One drink",
     worthPhp: 100,
@@ -81,24 +79,23 @@ describe("PerkSvc.create", () => {
   };
 
   beforeEach(() => {
-    repo.findEventForOffer.mockResolvedValue({
-      id: "e1",
+    repo.findTemplateForOffer.mockResolvedValue({
+      id: "t1",
       name: "Garden wedding",
-      organizerId: "host1",
-      endAt: new Date(NOW.getTime() + 86_400_000),
+      ownerId: "host1",
     });
     repo.createPerk.mockImplementation(async (d) => perkRow(d));
   });
 
   it("prices a host's perk from its peso value at 5 Tokens to the peso", async () => {
-    const out = await PerkSvc.create("host1", input, NOW);
+    const out = await PerkSvc.create("host1", input);
 
     expect(out.tokenCost).toBe(500);
     expect(repo.createPerk).toHaveBeenCalledWith(
       expect.objectContaining({
         issuerType: "host",
         issuerUserId: "host1",
-        eventId: "e1",
+        templateId: "t1",
         venueId: null,
         title: "Free welcome drink",
         quantity: 10,
@@ -117,21 +114,20 @@ describe("PerkSvc.create", () => {
     await PerkSvc.create(
       "mayor1",
       { venueId: "v1", title: "Starter", worthPhp: 160, quantity: 5 },
-      NOW,
     );
 
     expect(repo.createPerk).toHaveBeenCalledWith(
       expect.objectContaining({
         issuerType: "venue",
         venueId: "v1",
-        eventId: null,
+        templateId: null,
         tokenCost: 800,
       }),
     );
   });
 
   it("is a 404 for an event that is not theirs", async () => {
-    await expect(PerkSvc.create("someone", input, NOW)).rejects.toMatchObject({
+    await expect(PerkSvc.create("someone", input)).rejects.toMatchObject({
       status: 404,
     });
     expect(repo.createPerk).not.toHaveBeenCalled();
@@ -148,28 +144,13 @@ describe("PerkSvc.create", () => {
       PerkSvc.create(
         "other",
         { venueId: "v1", title: "x", worthPhp: 10, quantity: 1 },
-        NOW,
       ),
     ).rejects.toMatchObject({ status: 404 });
   });
 
-  it("refuses an event that is over", async () => {
-    repo.findEventForOffer.mockResolvedValue({
-      id: "e1",
-      name: "Old",
-      organizerId: "host1",
-      endAt: new Date(NOW.getTime() - 1000),
-    });
-
-    await expect(PerkSvc.create("host1", input, NOW)).rejects.toMatchObject({
-      status: 400,
-      code: "EVENT_OVER",
-    });
-  });
-
   it.each([
-    ["both an event and a venue", { eventId: "e1", venueId: "v1" }],
-    ["neither", { eventId: undefined }],
+    ["both a package and a venue", { templateId: "t1", venueId: "v1" }],
+    ["neither", { templateId: undefined }],
     ["an empty title", { title: "  " }],
     ["a title over 80 characters", { title: "x".repeat(81) }],
     ["a zero worth", { worthPhp: 0 }],
@@ -179,19 +160,19 @@ describe("PerkSvc.create", () => {
     ["a fractional quantity", { quantity: 1.5 }],
   ])("refuses %s", async (_name, over) => {
     await expect(
-      PerkSvc.create("host1", { ...input, ...over }, NOW),
+      PerkSvc.create("host1", { ...input, ...over }),
     ).rejects.toMatchObject({ status: 400 });
     expect(repo.createPerk).not.toHaveBeenCalled();
   });
 });
 
-describe("PerkSvc.list with an event", () => {
+describe("PerkSvc.list with an event package", () => {
   it("passes the event through to the query", async () => {
     repo.listOffered.mockResolvedValue([]);
 
-    await PerkSvc.list("u1", "e1");
+    await PerkSvc.list("u1", "t1");
 
-    expect(repo.listOffered).toHaveBeenCalledWith("e1");
+    expect(repo.listOffered).toHaveBeenCalledWith("t1");
   });
 });
 

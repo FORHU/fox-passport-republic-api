@@ -2,7 +2,6 @@ import { AppError, notFound } from "../../utils/errors";
 import RewardRepo from "../reward/reward.repository";
 import PerkRepo, { PerkRedeemError } from "./perk.repository";
 import AppointmentAccess, {
-  isEventOwner,
   isVenueMayor,
 } from "../appointment/appointment.access";
 import {
@@ -40,11 +39,11 @@ function toPerkDto(perk: PerkRow, balance: number) {
 export default class PerkSvc {
   /**
    * Perks on offer, with what the person can spend and what is held back;
-   * only the ones for `eventId` when it is given.
+   * only the ones for the event package `templateId` when it is given.
    */
-  static async list(userId: string, eventId?: string) {
+  static async list(userId: string, templateId?: string) {
     const [perks, balance, held] = await Promise.all([
-      PerkRepo.listOffered(eventId),
+      PerkRepo.listOffered(templateId),
       RewardRepo.getCoinsBalance(userId),
       RewardRepo.getPendingCoins(userId),
     ]);
@@ -200,27 +199,28 @@ export default class PerkSvc {
   }
 
   /**
-   * An Event Foxer offers a perk on their own event, or a Mayor on their own
-   * venue: what it is, what it is worth in pesos, how many. The Token price
-   * is set from the peso value (5 Tokens = 1 peso), so it is fair at every
-   * event. The offerer provides it, so it costs them, not the platform.
+   * An Event Foxer offers a perk on their own event package, or a Mayor on
+   * their own venue: what it is, what it is worth in pesos, how many. The
+   * Token price is set from the peso value (5 Tokens = 1 peso), so it is fair
+   * at every event. The offerer provides it, so it costs them, not the
+   * platform. A package-wide perk covers every booking of that package.
    */
   static async create(
     userId: string,
     input: {
-      eventId?: unknown;
+      templateId?: unknown;
       venueId?: unknown;
       title?: unknown;
       description?: unknown;
       worthPhp?: unknown;
       quantity?: unknown;
     },
-    now = new Date(),
   ) {
-    const eventId = typeof input.eventId === "string" ? input.eventId : null;
+    const templateId =
+      typeof input.templateId === "string" ? input.templateId : null;
     const venueId = typeof input.venueId === "string" ? input.venueId : null;
-    if ((eventId === null) === (venueId === null)) {
-      throw new AppError("Give an eventId or a venueId, not both.", 400);
+    if ((templateId === null) === (venueId === null)) {
+      throw new AppError("Give a templateId or a venueId, not both.", 400);
     }
     const title = typeof input.title === "string" ? input.title.trim() : "";
     if (title.length < 1 || title.length > 80) {
@@ -243,21 +243,18 @@ export default class PerkSvc {
     }
     const tokenCost = Math.max(1, Math.round(worth * TOKENS_PER_PESO));
 
-    if (eventId !== null) {
-      const event = await PerkRepo.findEventForOffer(eventId);
-      if (!event || !isEventOwner(event, userId)) throw notFound("Event");
-      if (event.endAt <= now) {
-        throw new AppError("That event is over.", 400, "EVENT_OVER");
-      }
+    if (templateId !== null) {
+      const template = await PerkRepo.findTemplateForOffer(templateId);
+      if (!template || template.ownerId !== userId) throw notFound("Event");
     } else {
       const venue = await PerkRepo.findVenueForOffer(venueId as string);
       if (!venue || !isVenueMayor(venue, userId)) throw notFound("Venue");
     }
 
     const perk = await PerkRepo.createPerk({
-      issuerType: eventId !== null ? PerkIssuer.host : PerkIssuer.venue,
+      issuerType: templateId !== null ? PerkIssuer.host : PerkIssuer.venue,
       issuerUserId: userId,
-      eventId,
+      templateId,
       venueId,
       title,
       description,

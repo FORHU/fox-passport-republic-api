@@ -4,16 +4,16 @@ import PerkSvc from "./perk.service";
 
 export default class PerkCtrl {
   /**
-   * GET /api/v1/perks: perks on offer, with the person's balance. `?eventId=`
-   * narrows it to one event's perks.
+   * GET /api/v1/perks: perks on offer, with the person's balance. `?templateId=`
+   * narrows it to one event package's perks.
    */
   static async list(req: Request, res: Response) {
     try {
-      const eventId =
-        typeof req.query.eventId === "string" && req.query.eventId !== ""
-          ? req.query.eventId
+      const templateId =
+        typeof req.query.templateId === "string" && req.query.templateId !== ""
+          ? req.query.templateId
           : undefined;
-      const data = await PerkSvc.list(req.user!.userId, eventId);
+      const data = await PerkSvc.list(req.user!.userId, templateId);
       return res.status(200).json({ success: true, data });
     } catch (e: unknown) {
       return sendServerError(res, e, { success: false });

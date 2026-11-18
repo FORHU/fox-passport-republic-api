@@ -26,25 +26,25 @@ const RETURN_REASON = {
 export default class PerkRepo {
   /**
    * What a citizen can buy: venue and host perks that are on and in stock,
-   * optionally only the ones for one event.
+   * optionally only the ones for one event package.
    */
-  static async listOffered(eventId?: string) {
+  static async listOffered(templateId?: string) {
     return prisma.perk.findMany({
       where: {
         active: true,
         issuerType: { in: [PerkIssuer.venue, PerkIssuer.host] },
         OR: [{ remaining: null }, { remaining: { gt: 0 } }],
-        ...(eventId ? { eventId } : {}),
+        ...(templateId ? { templateId } : {}),
       },
       orderBy: [{ tokenCost: "asc" }, { createdAt: "desc" }],
     });
   }
 
-  /** The event a host would offer a perk on. */
-  static async findEventForOffer(eventId: string) {
-    return prisma.event.findUnique({
-      where: { id: eventId },
-      select: { id: true, name: true, organizerId: true, endAt: true },
+  /** The event package a host would offer a perk on. */
+  static async findTemplateForOffer(templateId: string) {
+    return prisma.eventTemplate.findUnique({
+      where: { id: templateId },
+      select: { id: true, name: true, ownerId: true },
     });
   }
 
@@ -60,7 +60,7 @@ export default class PerkRepo {
     issuerType: string;
     issuerUserId: string;
     venueId: string | null;
-    eventId: string | null;
+    templateId: string | null;
     title: string;
     description: string | null;
     worthPhp: number;
