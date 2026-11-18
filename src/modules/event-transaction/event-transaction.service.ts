@@ -9,6 +9,7 @@ import AvailabilitySvc from "../availability/availability.service";
 import TransactionStatusSvc from "../transaction-status/transaction-status.service";
 import NotificationSvc from "../notifications/user-notification.service";
 import { eventLink } from "./event-conflict.service";
+import type { DeclineCause } from "../transaction-status/transaction-status.service";
 import {
   TransactionKind,
   TransactionAction,
@@ -196,12 +197,19 @@ export default class EventTransactionSvc {
     type: TransactionKind,
     action: TransactionAction,
     actorId: string,
+    cause?: DeclineCause,
   ) {
     const updated = await prisma.$transaction((tx) =>
-      TransactionStatusSvc.transition(tx, { id, kind: type, action, actorId }),
+      TransactionStatusSvc.transition(tx, {
+        id,
+        kind: type,
+        action,
+        actorId,
+        cause,
+      }),
     );
     if (action === "decline") {
-      await this.notifyDeclined(type, updated).catch((err) =>
+      await this.notifyDeclined(type, updated, cause).catch((err) =>
         console.error(`Decline notification failed for ${type} ${id}`, err),
       );
     }
@@ -221,6 +229,7 @@ export default class EventTransactionSvc {
       bookingId: string | null;
       providerId: string;
     },
+    cause?: DeclineCause,
   ) {
     const [event, supplier, itemName, booking] = await Promise.all([
       prisma.event.findUnique({
@@ -246,7 +255,7 @@ export default class EventTransactionSvc {
       userId: event.organizerId,
       type: "SUPPLIER_DECLINED",
       title: "A Supplier declined your event",
-      message: `${supplier?.name ?? "A Supplier"} declined ${itemName} for ${event.name}. Pick a replacement.`,
+      message: `${supplier?.name ?? "A Supplier"} ${cause === "busy" ? "is busy with another booking and declined" : "declined"} ${itemName} for ${event.name}. Pick a replacement.`,
       metadata: { ...metadata, link: eventLink(row.eventId) },
     });
 

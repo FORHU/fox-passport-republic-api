@@ -105,6 +105,23 @@ describe("EventTransactionSvc.reviewItem with a decline", () => {
     });
   });
 
+  it("says the Supplier is busy with another booking, and passes that on", async () => {
+    await EventTransactionSvc.reviewItem(
+      "tx1",
+      "asset",
+      "decline",
+      "prov1",
+      "busy",
+    );
+
+    expect(db.transition).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "decline", cause: "busy" }),
+    );
+    const host = db.notify.mock.calls[0][0];
+    expect(host.message).toContain("busy with another booking");
+  });
+
   it("names a service and a venue by their own names", async () => {
     await EventTransactionSvc.reviewItem("tx1", "service", "decline", "prov1");
     await EventTransactionSvc.reviewItem("tx1", "venue", "decline", "prov1");
