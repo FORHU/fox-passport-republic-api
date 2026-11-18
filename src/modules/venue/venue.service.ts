@@ -714,6 +714,15 @@ export default class VenueSvc {
     await this.assertCanBlockCalendar(venueId, requesterId);
     const venue = await VenueRepo.addBlockedDate(venueId, date);
     if (!venue) throw notFound("Venue");
+    // A block is allowed even over a booked day (a Mayor refused a day off is
+    // worse than an event that needs a swap); the Event Foxer is told instead.
+    await import("../event-transaction/event-conflict.service")
+      .then(({ default: ConflictSvc }) =>
+        ConflictSvc.notifyDayBlocked(venueId, date),
+      )
+      .catch((err) =>
+        console.error(`Conflict alert failed for venue ${venueId}`, err),
+      );
     return venue;
   }
 
