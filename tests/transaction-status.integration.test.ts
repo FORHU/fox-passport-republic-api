@@ -5,6 +5,7 @@ import {
   InvalidTransitionError,
   TransactionActorUnauthorizedError,
   DeadlinePassedError,
+  DeclineAfterPaymentError,
 } from "../src/modules/transaction-status/transaction-status.types";
 
 describe("TransactionStatusSvc — centralized transitions, authorization, deadlines", () => {
@@ -362,6 +363,121 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
           }),
         ),
       ).rejects.toThrow();
+    });
+  });
+
+  describe("a Supplier declining a booked event (decline)", () => {
+    const decline = (id: string, actor: string) =>
+      prisma.$transaction((tx) =>
+        TransactionStatusSvc.transition(tx, {
+          id,
+          kind: "asset",
+          action: "decline",
+          actorId: actor,
+        }),
+      );
+
+    it("lets the provider decline an item still pending, with its own reason", async () => {
+      const row = await makeAdHocRow({
+        status: "pending",
+        confirmationDeadline: null,
+      });
+      const result = await decline(row.id, providerId);
+      expect((result as any).status).toBe("rejected");
+      // Not "provider_declined": that means turning down a request.
+      expect((result as any).rejectionReason).toBe("supplier_declined");
+    });
+
+    it("records that the Supplier was busy, when it says so", async () => {
+      const row = await makeAdHocRow({
+        status: "approved",
+        confirmationDeadline: null,
+      });
+      const result = await prisma.$transaction((tx) =>
+        TransactionStatusSvc.transition(tx, {
+          id: row.id,
+          kind: "asset",
+          action: "decline",
+          actorId: providerId,
+          cause: "busy",
+        }),
+      );
+      expect((result as any).rejectionReason).toBe("supplier_declined_busy");
+    });
+
+    it("lets the provider decline an item already approved, while unpaid", async () => {
+      const row = await makeAdHocRow({
+        status: "approved",
+        confirmationDeadline: null,
+      });
+      const result = await decline(row.id, providerId);
+      expect((result as any).status).toBe("rejected");
+    });
+
+    it("refuses a decline from someone who is not the item's provider", async () => {
+      const row = await makeAdHocRow({
+        status: "pending",
+        confirmationDeadline: null,
+      });
+      await expect(decline(row.id, otherProviderId)).rejects.toThrow(
+        TransactionActorUnauthorizedError,
+      );
+      await expect(decline(row.id, customerId)).rejects.toThrow(
+        TransactionActorUnauthorizedError,
+      );
+    });
+
+    it("refuses a decline once the booking is paid", async () => {
+      const row = await makeAdHocRow({
+        status: "approved",
+        confirmationDeadline: null,
+      });
+      await prisma.booking.update({
+        where: { id: bookingId },
+        data: { status: "confirmed" },
+      });
+      try {
+        await expect(decline(row.id, providerId)).rejects.toThrow(
+          DeclineAfterPaymentError,
+        );
+        const after = await prisma.eventAssetTransaction.findUnique({
+          where: { id: row.id },
+        });
+        expect(after?.status).toBe("approved");
+      } finally {
+        await prisma.booking.update({
+          where: { id: bookingId },
+          data: { status: "pending" },
+        });
+      }
+    });
+
+    it("refuses to decline an item that is already rejected or cancelled", async () => {
+      const rejected = await makeAdHocRow({
+        status: "rejected",
+        confirmationDeadline: null,
+      });
+      await expect(decline(rejected.id, providerId)).rejects.toThrow(
+        InvalidTransitionError,
+      );
+      const cancelled = await makeAdHocRow({
+        status: "cancelled",
+        confirmationDeadline: null,
+      });
+      await expect(decline(cancelled.id, providerId)).rejects.toThrow(
+        InvalidTransitionError,
+      );
+    });
+
+    it("refuses a second decline of the same item", async () => {
+      const row = await makeAdHocRow({
+        status: "pending",
+        confirmationDeadline: null,
+      });
+      await decline(row.id, providerId);
+      await expect(decline(row.id, providerId)).rejects.toThrow(
+        InvalidTransitionError,
+      );
     });
   });
 });

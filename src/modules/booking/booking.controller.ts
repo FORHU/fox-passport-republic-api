@@ -2,6 +2,7 @@ import { sendServerError } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
 import BookingSvc from "./booking.service";
+import BookingHostDeclineSvc from "./booking-host-decline.service";
 import { AppError } from "../../utils/errors";
 import RefundSvc from "../refund/refund.service";
 import { totalPages } from "../../utils/pagination";
@@ -256,6 +257,31 @@ export default class BookingCtrl {
     } catch (e: unknown) {
       const error = e as Error;
       return res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  // DECLINE — the event's host leaves an unpaid booking they cannot attend
+  static async hostDecline(req: Request, res: Response) {
+    const schema = Joi.object({
+      cause: Joi.string().valid("busy", "other").optional(),
+    });
+    const { error, value } = schema.validate(req.body ?? {});
+    if (error) return res.status(400).json({ message: error.message });
+    try {
+      const result = await BookingHostDeclineSvc.decline(
+        req.params.id as string,
+        req.user!.userId,
+        value.cause,
+      );
+      return res.status(200).json({ success: true, data: result });
+    } catch (e: unknown) {
+      if (e instanceof AppError) {
+        return res
+          .status(e.status)
+          .json({ success: false, message: e.message, code: e.code });
+      }
+      const err = e as Error;
+      return res.status(400).json({ success: false, message: err.message });
     }
   }
 

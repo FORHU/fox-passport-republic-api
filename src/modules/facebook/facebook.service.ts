@@ -14,6 +14,7 @@ import {
   videoKeyFromUrl,
 } from "../../utils/s3";
 import FacebookRepository from "./facebook.repository";
+import FeedRepo from "../feed/feed.repository";
 import FacebookGraphService, {
   FACEBOOK_PAGE_SCOPES,
   FacebookGraphError,
@@ -387,6 +388,11 @@ export default class FacebookService {
         status: "processing",
         facebookVideoId: videoId,
       });
+      // Counted once the video is on Facebook, as this author's one share of
+      // the post (a copy link by them as well doesn't count again). A failed
+      // attempt never gets here. The share itself has succeeded, so a counter
+      // error mustn't fail it.
+      await FeedRepo.recordShare(post.id, userId).catch(() => {});
       return toShareView(updated);
     } catch (err) {
       const appErr =

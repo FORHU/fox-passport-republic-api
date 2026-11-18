@@ -110,6 +110,8 @@ model User {
   commentLikes             CommentLike[]
   savedPosts               SavedPost[]
   hiddenPosts              HiddenPost[]
+  postViews                PostView[]
+  postShares               PostShare[]
   postMediaTags            PostMediaTag[]
   pollVotes                PollVote[]
   reportsFiled             Report[]
@@ -131,6 +133,7 @@ model User {
   onboardings              UserOnboarding[]
   ownedVouchers            Voucher[]                    @relation("UserVouchers")
   coinRedemptions          CoinRedemption[]
+  perkRedemptions          PerkRedemption[]
   facebookConnection       FacebookConnection?
   facebookShares           FacebookShare[]
 

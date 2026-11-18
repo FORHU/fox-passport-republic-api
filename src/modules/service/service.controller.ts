@@ -83,7 +83,8 @@ export default class ServiceCtrl {
         .valid(...Object.values(ServiceCategory))
         .required(),
       name: nameJoi().required(),
-      description: descriptionJoi().required(),
+      // Empty is fine for a draft; the service requires one past draft.
+      description: descriptionJoi().allow("").optional(),
       city: Joi.string().required(),
       state: Joi.string().optional(),
       country: Joi.string().required(),

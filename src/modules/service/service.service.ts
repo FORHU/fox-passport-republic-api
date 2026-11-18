@@ -3,7 +3,10 @@ import { serviceCache } from "../../utils/cache-namespaces";
 import { fingerprint } from "../../utils/cache.util";
 import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
-import { assertListingImages } from "../../utils/listing-images";
+import {
+  assertListingDescription,
+  assertListingImages,
+} from "../../utils/listing-images";
 
 /** Five minutes, matching the other two listing types. */
 const SERVICE_TTL = 300;
@@ -14,7 +17,7 @@ export default class ServiceSvc {
     ownerId: string;
     category: ServiceCategory;
     name: string;
-    description: string;
+    description?: string;
     city: string;
     state?: string;
     country: string;
@@ -29,6 +32,8 @@ export default class ServiceSvc {
     const normalized = {
       ...data,
       id: data.id ?? uuidv4(),
+      // The column is required; a draft may leave the description empty.
+      description: data.description ?? "",
       isWillingToTravel: data.isWillingToTravel ?? false,
       tags: data.tags ?? [],
       currency: data.currency ?? "USD",
@@ -38,6 +43,7 @@ export default class ServiceSvc {
 
     const imgIds = data.imgIds ?? [];
     assertListingImages(normalized.status, imgIds.length);
+    assertListingDescription(normalized.status, normalized.description);
 
     const serviceData = {
       ...normalized,
@@ -139,9 +145,31 @@ export default class ServiceSvc {
         data.status,
         data.imgIds?.length ?? existing.images.length,
       );
+      assertListingDescription(
+        data.status,
+        data.description ?? existing.description,
+      );
     }
 
-    return ServiceRepo.updateService(id, data);
+    const updated = await ServiceRepo.updateService(id, data);
+    // Taking a booked service off the market is allowed; the Event Foxers it
+    // is booked for are told so they can replace it.
+    if (
+      data.status &&
+      data.status !== existing.status &&
+      ["draft", "pending", "paused", "archived", "rejected"].includes(
+        data.status,
+      )
+    ) {
+      await import("../event-transaction/event-conflict.service")
+        .then(({ default: ConflictSvc }) =>
+          ConflictSvc.notifyListingGone("service", id),
+        )
+        .catch((err) =>
+          console.error(`Conflict alert failed for service ${id}`, err),
+        );
+    }
+    return updated;
   }
 
   static async deleteService(id: string, requesterId: string) {
@@ -154,6 +182,13 @@ export default class ServiceSvc {
     }
 
     await ServiceRepo.deleteService(id);
+    await import("../event-transaction/event-conflict.service")
+      .then(({ default: ConflictSvc }) =>
+        ConflictSvc.notifyListingGone("service", id),
+      )
+      .catch((err) =>
+        console.error(`Conflict alert failed for service ${id}`, err),
+      );
     return { message: "Service deleted successfully" };
   }
 

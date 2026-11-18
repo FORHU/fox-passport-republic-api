@@ -137,8 +137,11 @@ export default class EventCheckoutSvc {
         bookings: { select: { id: true }, take: 1 },
         // `included: true`: an item the client left out of the package
         // (`included: false`) is never charged (#264 review).
+        // A venue is payable like any other line: `pending`, or `approved`
+        // (a matched venue, and one whose Mayor confirmed it). Only
+        // `pending` was charged before, so an approved venue was left off.
         venueTransactions: {
-          where: { status: "pending", included: true },
+          where: { status: { in: [...PAYABLE_STATUSES] }, included: true },
           include: {
             venue: { select: { name: true, category: true } },
             provider: { select: { name: true } },
@@ -167,27 +170,37 @@ export default class EventCheckoutSvc {
     // entirely, cleanly, rather than being silently dropped from the
     // invoice — a citizen who picked an item should see why it isn't
     // charged, not have it quietly disappear.
-    const [blockingAssets, blockingServices] = await Promise.all([
-      tx.eventAssetTransaction.findMany({
-        where: {
-          eventId,
-          status: "pending_provider_confirmation",
-          included: true,
-        },
-        select: { id: true },
-      }),
-      tx.eventServiceTransaction.findMany({
-        where: {
-          eventId,
-          status: "pending_provider_confirmation",
-          included: true,
-        },
-        select: { id: true },
-      }),
-    ]);
+    const [blockingAssets, blockingServices, blockingVenues] =
+      await Promise.all([
+        tx.eventAssetTransaction.findMany({
+          where: {
+            eventId,
+            status: "pending_provider_confirmation",
+            included: true,
+          },
+          select: { id: true },
+        }),
+        tx.eventServiceTransaction.findMany({
+          where: {
+            eventId,
+            status: "pending_provider_confirmation",
+            included: true,
+          },
+          select: { id: true },
+        }),
+        tx.eventVenueTransaction.findMany({
+          where: {
+            eventId,
+            status: "pending_provider_confirmation",
+            included: true,
+          },
+          select: { id: true },
+        }),
+      ]);
     const blockingIds = [
       ...blockingAssets.map((a) => a.id),
       ...blockingServices.map((s) => s.id),
+      ...blockingVenues.map((v) => v.id),
     ];
     if (blockingIds.length > 0) {
       throw new BlockingItemsError(blockingIds);
