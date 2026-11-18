@@ -17,13 +17,12 @@ import { PrismaPg } from "@prisma/adapter-pg";
  *
  *   pnpm seed:perks
  *
- * Optional: give one account enough Tokens to buy most of them.
+ * Optional: give one account what it needs to try them. It is raised to 2000
+ * Tokens and given a confirmed, upcoming booking at each of those venues and
+ * of each of those event packages, since a perk can only be bought for a
+ * booking at its venue or of its event package.
  *
  *   SEED_PERKS_EMAIL=you@example.com pnpm seed:perks
- *
- * A perk can only be bought for a confirmed, upcoming booking at its venue, or
- * of its event package, so also book one of those venues or packages as that
- * account to see the perk detail and redeem it.
  */
 
 const ID_PREFIX = "seed-perk-";
@@ -185,6 +184,111 @@ async function upsertPerk(
   return data;
 }
 
+const DAY = 24 * 60 * 60 * 1000;
+const HOUR = 60 * 60 * 1000;
+
+/**
+ * A confirmed booking, a week or more ahead, for this person at each venue and
+ * of each event package, so every seeded perk has a booking it works for. Each
+ * is its own Event row, as a real booking is. Rewritten on each run.
+ */
+async function seedDemoBookings(
+  userId: string,
+  venues: { id: string; name: string; mayorId: string }[],
+  templates: { id: string; name: string; ownerId: string }[],
+) {
+  const now = Date.now();
+  let n = 0;
+  const make = async (args: {
+    key: string;
+    name: string;
+    organizerId: string;
+    templateId: string | null;
+    venueId: string | null;
+  }) => {
+    n += 1;
+    const startAt = new Date(now + (6 + n) * DAY);
+    const endAt = new Date(startAt.getTime() + 5 * HOUR);
+    const eventId = `${ID_PREFIX}evt-${args.key}`;
+    const fields = {
+      name: `${args.name} (perk demo)`,
+      description: "Sample booking so the seeded perks can be tried.",
+      clientId: userId,
+      organizerId: args.organizerId,
+      templateId: args.templateId,
+      eventCategory: "social" as const,
+      startAt,
+      endAt,
+      eventStatus: "pending" as const,
+      requestStatus: "approved" as const,
+      guestCount: 2,
+      totalAmount: 2000,
+    };
+    await prisma.event.upsert({
+      where: { id: eventId },
+      create: { id: eventId, ...fields },
+      update: fields,
+    });
+    const ticketCode = `PERKDEMO-${args.key}`.slice(0, 40);
+    const booking = await prisma.booking.upsert({
+      where: { ticketCode },
+      create: {
+        eventId,
+        userId,
+        guestCount: 2,
+        totalAmount: 2000,
+        status: "confirmed",
+        startAt,
+        endAt,
+        ticketCode,
+      },
+      update: {
+        eventId,
+        userId,
+        status: "confirmed",
+        startAt,
+        endAt,
+        checkedIn: false,
+      },
+    });
+    if (args.venueId) {
+      const txId = `${ID_PREFIX}vtx-${args.key}`;
+      const tx = {
+        eventId,
+        bookingId: booking.id,
+        venueId: args.venueId,
+        providerId: args.organizerId,
+        status: "approved" as const,
+        agreedPrice: 2000,
+      };
+      await prisma.eventVenueTransaction.upsert({
+        where: { id: txId },
+        create: { id: txId, ...tx },
+        update: tx,
+      });
+    }
+    console.log(`   🗓  ${args.name}, ${startAt.toISOString().slice(0, 10)}`);
+  };
+  for (const v of venues) {
+    await make({
+      key: `v-${v.id}`,
+      name: v.name,
+      organizerId: v.mayorId,
+      templateId: null,
+      venueId: v.id,
+    });
+  }
+  for (const t of templates) {
+    await make({
+      key: `p-${t.id}`,
+      name: t.name,
+      organizerId: t.ownerId,
+      templateId: t.id,
+      venueId: null,
+    });
+  }
+}
+
 async function main() {
   // A missing table is the one thing worth saying plainly.
   const { rows } = await pool.query<{ t: string | null }>(
@@ -281,6 +385,9 @@ async function main() {
     if (!user) {
       console.warn(`\n⚠️  No account for ${email}; Tokens not topped up.`);
     } else {
+      console.log(`
+📅 Bookings for ${email}:`);
+      await seedDemoBookings(user.id, venues, templates);
       const raised = await prisma.passport.updateMany({
         where: { userId: user.id, coins: { lt: TOP_UP_TO } },
         data: { coins: TOP_UP_TO },
@@ -296,8 +403,9 @@ async function main() {
   console.log(
     `\n✅ ${made} perks across ${venues.length} venue(s) and ` +
       `${templates.length} event package(s).\n` +
-      "   Open Rewards > Perks. To redeem one, book that venue or package " +
-      "with a confirmed, upcoming booking.\n",
+      "   Open Rewards > Perks. A perk works only for a confirmed, upcoming " +
+      "booking at its venue or of its package: pass SEED_PERKS_EMAIL=<account " +
+      "email> to give that account one of each.\n",
   );
 }
 
