@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 /**
- * Gear and Talent listings may be saved as drafts with no image, so an owner
- * can keep their progress; publishing (any status past draft) needs one. The
- * same rule holds on create and on update, for assets and services alike.
+ * Gear and Talent listings may be saved as drafts with no image or
+ * description, so an owner can keep their progress; publishing (any status
+ * past draft) needs both. The same rule holds on create and on update, for
+ * assets and services alike.
  */
 
 const assetRepo = vi.hoisted(() => ({
@@ -31,7 +32,9 @@ vi.mock("../src/utils/cache-namespaces", () => ({
 import AssetSvc from "../src/modules/asset/asset.service";
 import ServiceSvc from "../src/modules/service/service.service";
 import {
+  assertListingDescription,
   assertListingImages,
+  PUBLISH_NEEDS_DESCRIPTION,
   PUBLISH_NEEDS_IMAGE,
 } from "../src/utils/listing-images";
 
@@ -39,14 +42,12 @@ const asset = {
   ownerId: "u1",
   category: "sound_system" as never,
   name: "Speaker",
-  description: " ",
   price: 1,
 };
 const service = {
   ownerId: "u1",
   category: "other" as never,
   name: "Photography",
-  description: " ",
   city: "N/A",
   country: "PH",
   price: 1,
@@ -71,6 +72,28 @@ describe("assertListingImages", () => {
   });
 });
 
+describe("assertListingDescription", () => {
+  it("lets a draft have no description", () => {
+    expect(() => assertListingDescription("draft", "")).not.toThrow();
+    expect(() => assertListingDescription("draft", undefined)).not.toThrow();
+  });
+
+  it("needs a description for anything past draft", () => {
+    expect(() => assertListingDescription("pending", "")).toThrow(
+      PUBLISH_NEEDS_DESCRIPTION,
+    );
+    expect(() => assertListingDescription("pending", "   ")).toThrow(
+      PUBLISH_NEEDS_DESCRIPTION,
+    );
+    expect(() => assertListingDescription("pending", null)).toThrow(
+      PUBLISH_NEEDS_DESCRIPTION,
+    );
+    expect(() =>
+      assertListingDescription("available", "A loud speaker"),
+    ).not.toThrow();
+  });
+});
+
 describe.each([
   ["asset", () => AssetSvc.createAsset(asset), assetRepo.createAsset],
   [
@@ -83,6 +106,49 @@ describe.each([
     await createDraft();
     expect(repoCreate).toHaveBeenCalledWith(
       expect.objectContaining({ status: "draft", imgIds: [] }),
+    );
+  });
+
+  it("saves a draft with only a title, its description empty", async () => {
+    await createDraft();
+    expect(repoCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ name: expect.any(String), description: "" }),
+    );
+  });
+});
+
+describe("creating past draft without a description", () => {
+  it("is refused for an asset", async () => {
+    await expect(
+      AssetSvc.createAsset({
+        ...asset,
+        status: "pending" as never,
+        imgIds: ["f1"],
+      }),
+    ).rejects.toThrow(PUBLISH_NEEDS_DESCRIPTION);
+    expect(assetRepo.createAsset).not.toHaveBeenCalled();
+  });
+
+  it("is refused for a service", async () => {
+    await expect(
+      ServiceSvc.createService({
+        ...service,
+        status: "pending" as never,
+        imgIds: ["f1"],
+      }),
+    ).rejects.toThrow(PUBLISH_NEEDS_DESCRIPTION);
+    expect(serviceRepo.createService).not.toHaveBeenCalled();
+  });
+
+  it("is allowed once a description is given", async () => {
+    await ServiceSvc.createService({
+      ...service,
+      description: "Event photos",
+      status: "pending" as never,
+      imgIds: ["f1"],
+    });
+    expect(serviceRepo.createService).toHaveBeenCalledWith(
+      expect.objectContaining({ description: "Event photos" }),
     );
   });
 });
@@ -117,7 +183,14 @@ describe.each([
     (data: object) => ServiceSvc.updateService("a1", "u1", data),
   ],
 ])("updating a %s", (_name, find, repoUpdate, update) => {
-  const draft = { id: "a1", ownerId: "u1", status: "draft", images: [] };
+  const draft = {
+    id: "a1",
+    ownerId: "u1",
+    status: "draft",
+    description: "A loud speaker",
+    images: [],
+  };
+  const titleOnly = { ...draft, description: "", images: [{ id: "f1" }] };
 
   it("refuses to publish a draft that has no image", async () => {
     find.mockResolvedValue(draft);
@@ -139,6 +212,32 @@ describe.each([
   it("publishes a draft that already has an image", async () => {
     find.mockResolvedValue({ ...draft, images: [{ id: "f1" }] });
     await update({ status: "pending" });
+    expect(repoUpdate).toHaveBeenCalled();
+  });
+
+  it("refuses to publish a draft that has no description", async () => {
+    find.mockResolvedValue(titleOnly);
+    await expect(update({ status: "pending" })).rejects.toThrow(
+      PUBLISH_NEEDS_DESCRIPTION,
+    );
+    expect(repoUpdate).not.toHaveBeenCalled();
+  });
+
+  it("publishes a draft when the description comes with it", async () => {
+    find.mockResolvedValue(titleOnly);
+    await update({ status: "pending", description: "A loud speaker" });
+    expect(repoUpdate).toHaveBeenCalled();
+  });
+
+  it("keeps editing a draft without a description", async () => {
+    find.mockResolvedValue(titleOnly);
+    await update({ name: "Renamed", status: "draft" });
+    expect(repoUpdate).toHaveBeenCalled();
+  });
+
+  it("still edits an older live listing with a blank description", async () => {
+    find.mockResolvedValue({ ...titleOnly, status: "available" });
+    await update({ name: "Renamed", status: "available" });
     expect(repoUpdate).toHaveBeenCalled();
   });
 
