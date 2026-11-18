@@ -185,6 +185,14 @@ const ALLOW_LIST = new Set([
   "perk.routes.ts GET /redemptions/:id/code",
   "perk.routes.ts GET /:id",
   "perk.routes.ts POST /:id/redeem",
+  // Token perks, host and venue side (api#392): ownership of the event or
+  // venue, and the same check-in rights as a ticket scan, are checked in the
+  // service.
+  "perk.routes.ts POST /",
+  "perk.routes.ts GET /offered",
+  "perk.routes.ts POST /check",
+  "perk.routes.ts POST /redemptions/:id/use",
+  "perk.routes.ts POST /:id/take-down",
   // Onboarding: the signed-in user records and reads their own tour steps.
   "onboarding.routes.ts GET /",
   "onboarding.routes.ts POST /:step",

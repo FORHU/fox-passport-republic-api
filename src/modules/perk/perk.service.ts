@@ -1,13 +1,22 @@
 import { AppError, notFound } from "../../utils/errors";
 import RewardRepo from "../reward/reward.repository";
 import PerkRepo, { PerkRedeemError } from "./perk.repository";
+import AppointmentAccess, {
+  isEventOwner,
+  isVenueMayor,
+} from "../appointment/appointment.access";
 import {
   newPerkCode,
   newPerkSecret,
   liveCode,
   secondsLeftInWindow,
+  verifyLiveCode,
 } from "./perk.code";
-import { PerkRedemptionStatus } from "./perk.constants";
+import {
+  PerkIssuer,
+  PerkRedemptionStatus,
+  TOKENS_PER_PESO,
+} from "./perk.constants";
 
 type PerkRow = NonNullable<Awaited<ReturnType<typeof PerkRepo.findPerk>>>;
 
@@ -29,10 +38,13 @@ function toPerkDto(perk: PerkRow, balance: number) {
 }
 
 export default class PerkSvc {
-  /** Perks on offer, with what the person can spend and what is held back. */
-  static async list(userId: string) {
+  /**
+   * Perks on offer, with what the person can spend and what is held back;
+   * only the ones for `eventId` when it is given.
+   */
+  static async list(userId: string, eventId?: string) {
     const [perks, balance, held] = await Promise.all([
-      PerkRepo.listOffered(),
+      PerkRepo.listOffered(eventId),
       RewardRepo.getCoinsBalance(userId),
       RewardRepo.getPendingCoins(userId),
     ]);
@@ -185,6 +197,236 @@ export default class PerkSvc {
       title: r.perk.title,
       expiresAt: r.expiresAt,
     };
+  }
+
+  /**
+   * An Event Foxer offers a perk on their own event, or a Mayor on their own
+   * venue: what it is, what it is worth in pesos, how many. The Token price
+   * is set from the peso value (5 Tokens = 1 peso), so it is fair at every
+   * event. The offerer provides it, so it costs them, not the platform.
+   */
+  static async create(
+    userId: string,
+    input: {
+      eventId?: unknown;
+      venueId?: unknown;
+      title?: unknown;
+      description?: unknown;
+      worthPhp?: unknown;
+      quantity?: unknown;
+    },
+    now = new Date(),
+  ) {
+    const eventId = typeof input.eventId === "string" ? input.eventId : null;
+    const venueId = typeof input.venueId === "string" ? input.venueId : null;
+    if ((eventId === null) === (venueId === null)) {
+      throw new AppError("Give an eventId or a venueId, not both.", 400);
+    }
+    const title = typeof input.title === "string" ? input.title.trim() : "";
+    if (title.length < 1 || title.length > 80) {
+      throw new AppError("The title must be 1 to 80 characters.", 400);
+    }
+    const description =
+      typeof input.description === "string" && input.description.trim() !== ""
+        ? input.description.trim()
+        : null;
+    if (description !== null && description.length > 280) {
+      throw new AppError("The description is at most 280 characters.", 400);
+    }
+    const worth = Number(input.worthPhp);
+    if (!Number.isFinite(worth) || worth <= 0 || worth > 100_000) {
+      throw new AppError("The worth must be above 0 and at most 100000.", 400);
+    }
+    const quantity = Number(input.quantity);
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10_000) {
+      throw new AppError("How many must be a whole number, 1 to 10000.", 400);
+    }
+    const tokenCost = Math.max(1, Math.round(worth * TOKENS_PER_PESO));
+
+    if (eventId !== null) {
+      const event = await PerkRepo.findEventForOffer(eventId);
+      if (!event || !isEventOwner(event, userId)) throw notFound("Event");
+      if (event.endAt <= now) {
+        throw new AppError("That event is over.", 400, "EVENT_OVER");
+      }
+    } else {
+      const venue = await PerkRepo.findVenueForOffer(venueId as string);
+      if (!venue || !isVenueMayor(venue, userId)) throw notFound("Venue");
+    }
+
+    const perk = await PerkRepo.createPerk({
+      issuerType: eventId !== null ? PerkIssuer.host : PerkIssuer.venue,
+      issuerUserId: userId,
+      eventId,
+      venueId,
+      title,
+      description,
+      worthPhp: worth,
+      tokenCost,
+      quantity,
+    });
+    return toPerkDto(perk, 0);
+  }
+
+  /** The perks a person offers, with how many were bought and what is left. */
+  static async listIssued(userId: string) {
+    const perks = await PerkRepo.listIssued(userId);
+    return perks.map((p) => ({
+      ...toPerkDto(p, 0),
+      active: p.active,
+      quantity: p.quantity,
+      redeemed: p._count.redemptions,
+    }));
+  }
+
+  /**
+   * The offerer takes a perk down: the offer stops, and everyone still
+   * holding it unused gets their Tokens back. Safe to repeat: a second call
+   * returns whatever the first one did not reach.
+   */
+  static async takeDown(userId: string, perkId: string) {
+    const perk = await PerkRepo.findPerk(perkId);
+    if (!perk || perk.issuerUserId !== userId) throw notFound("Perk");
+    await PerkRepo.deactivate(perk.id);
+
+    const holders = await PerkRepo.findReadyForPerk(perk.id);
+    let returned = 0;
+    let tokens = 0;
+    for (const h of holders) {
+      const done = await PerkRepo.returnRedemption({
+        redemptionId: h.id,
+        userId: h.userId,
+        tokens: h.tokensSpent,
+        code: h.code,
+        why: "perk_removed",
+      });
+      if (done) {
+        returned += 1;
+        tokens += h.tokensSpent;
+      }
+    }
+    return { perkId: perk.id, returned, tokens };
+  }
+
+  /**
+   * May this person check and use a perk? The people who may check the
+   * booking in: the event's owner, its check-in helpers and (on the day) the
+   * venue's staff, or, for a venue's own perk, that venue's Mayor and staff.
+   */
+  private static async canScan(
+    scannerId: string,
+    perk: { venueId: string | null },
+    eventId: string | null,
+  ): Promise<boolean> {
+    if (
+      await AppointmentAccess.canOnEvent(eventId, scannerId, "booking:check-in")
+    ) {
+      return true;
+    }
+    return perk.venueId
+      ? AppointmentAccess.canOnVenue(
+          perk.venueId,
+          scannerId,
+          "booking:check-in",
+        )
+      : false;
+  }
+
+  /**
+   * Venue staff check a perk code at the door: a scanned live code (which
+   * must be from the last minute, so a screenshot fails) or a typed code.
+   * Says whether it is valid, already used (when and where) or expired.
+   */
+  static async check(
+    scannerId: string,
+    input: { code?: unknown; live?: unknown },
+    now = new Date(),
+  ) {
+    const raw =
+      typeof input.live === "string" && input.live !== ""
+        ? input.live.trim()
+        : typeof input.code === "string"
+          ? input.code.trim()
+          : "";
+    if (raw === "") throw new AppError("A code is required.", 400);
+    const code = raw.split(".")[0].toUpperCase();
+    const redemption = await PerkRepo.findByCode(code);
+    if (!redemption) {
+      throw new AppError("No perk matches that code.", 404, "PERK_NOT_FOUND");
+    }
+    const booking = await PerkRepo.findBookingForCheck(redemption.bookingId);
+    if (
+      !(await this.canScan(
+        scannerId,
+        redemption.perk,
+        booking?.eventId ?? null,
+      ))
+    ) {
+      throw new AppError("You cannot check this perk.", 403);
+    }
+    // A scanned code carries a signature; a typed one does not.
+    if (
+      raw.includes(".") &&
+      !verifyLiveCode(redemption.codeSecret, redemption.code, raw, now)
+    ) {
+      throw new AppError(
+        "That code has expired. Ask the guest to refresh it.",
+        409,
+        "PERK_CODE_STALE",
+      );
+    }
+
+    const result =
+      redemption.status === PerkRedemptionStatus.used
+        ? ("used" as const)
+        : redemption.status === PerkRedemptionStatus.returned ||
+            redemption.expiresAt <= now
+          ? ("expired" as const)
+          : ("valid" as const);
+    return {
+      result,
+      redemptionId: redemption.id,
+      perk: { title: redemption.perk.title },
+      guestFirstName: redemption.user.name.trim().split(/\s+/)[0] ?? "",
+      booking: booking
+        ? { name: booking.event.name, startAt: booking.startAt }
+        : null,
+      validUntil: redemption.expiresAt,
+      usedAt: redemption.usedAt,
+      venueName: redemption.perk.venueId
+        ? await PerkRepo.findVenueName(redemption.perk.venueId)
+        : null,
+    };
+  }
+
+  /** Staff mark a checked perk used, once; a second try is refused. */
+  static async markUsed(
+    scannerId: string,
+    redemptionId: string,
+    now = new Date(),
+  ) {
+    const redemption = await PerkRepo.findRedemption(redemptionId);
+    if (!redemption) throw notFound("Perk");
+    const booking = await PerkRepo.findBookingForCheck(redemption.bookingId);
+    if (
+      !(await this.canScan(
+        scannerId,
+        redemption.perk,
+        booking?.eventId ?? null,
+      ))
+    ) {
+      throw new AppError("You cannot use this perk.", 403);
+    }
+    const done = await PerkRepo.markUsed(redemption.id, scannerId, now);
+    if (!done) {
+      const used = redemption.status === PerkRedemptionStatus.used;
+      throw new AppError(
+        used ? "Already used." : "This perk can no longer be used.",
+        409,
+        used ? "PERK_ALREADY_USED" : "PERK_NOT_READY",
+      );
+    }
+    return { redemptionId: redemption.id, usedAt: now };
   }
 
   /**
