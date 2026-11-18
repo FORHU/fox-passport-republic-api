@@ -133,6 +133,7 @@ model User {
   onboardings              UserOnboarding[]
   ownedVouchers            Voucher[]                    @relation("UserVouchers")
   coinRedemptions          CoinRedemption[]
+  perkRedemptions          PerkRedemption[]
   facebookConnection       FacebookConnection?
   facebookShares           FacebookShare[]
 
