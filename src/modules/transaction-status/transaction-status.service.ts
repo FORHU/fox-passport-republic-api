@@ -7,6 +7,7 @@ import {
   InvalidTransitionError,
   TransactionActorUnauthorizedError,
   DeadlinePassedError,
+  DeclineAfterPaymentError,
 } from "./transaction-status.types";
 
 /**
@@ -32,12 +33,18 @@ const ALLOWED_TRANSITIONS: Record<string, TransactionStatus> = {
   "asset:pending_provider_confirmation:expire": TransactionStatus.rejected,
   "asset:pending_provider_confirmation:cancel": TransactionStatus.cancelled,
   "asset:approved:cancel": TransactionStatus.cancelled,
+  // A Supplier steps out of a booked event (decline, not reject: reject answers
+  // a request, decline leaves one already taken). Only while it is not paid.
+  "asset:pending:decline": TransactionStatus.rejected,
+  "asset:approved:decline": TransactionStatus.rejected,
 
   "service:pending_provider_confirmation:confirm": TransactionStatus.approved,
   "service:pending_provider_confirmation:reject": TransactionStatus.rejected,
   "service:pending_provider_confirmation:expire": TransactionStatus.rejected,
   "service:pending_provider_confirmation:cancel": TransactionStatus.cancelled,
   "service:approved:cancel": TransactionStatus.cancelled,
+  "service:pending:decline": TransactionStatus.rejected,
+  "service:approved:decline": TransactionStatus.rejected,
 
   // Ordinary venue bookings never enter pending_provider_confirmation
   // (Phase A's affiliation gate is the venue's one-time consent to being
@@ -49,6 +56,8 @@ const ALLOWED_TRANSITIONS: Record<string, TransactionStatus> = {
   // real feasibility question the affiliation approval never answered.
   "venue:pending:cancel": TransactionStatus.cancelled,
   "venue:approved:cancel": TransactionStatus.cancelled,
+  "venue:pending:decline": TransactionStatus.rejected,
+  "venue:approved:decline": TransactionStatus.rejected,
   "venue:pending_provider_confirmation:confirm": TransactionStatus.approved,
   "venue:pending_provider_confirmation:reject": TransactionStatus.rejected,
   "venue:pending_provider_confirmation:expire": TransactionStatus.rejected,
@@ -60,6 +69,9 @@ const ALLOWED_TRANSITIONS: Record<string, TransactionStatus> = {
 const REJECTION_REASON: Partial<Record<TransactionAction, string>> = {
   reject: "provider_declined",
   expire: "deadline_expired",
+  // Its own reason, not `provider_declined` (which means "turned down a
+  // request"): this one marks a booked event as needing a replacement.
+  decline: "supplier_declined",
 };
 
 interface TransitionArgs {
@@ -86,6 +98,13 @@ export default class TransactionStatusSvc {
     return rows[0].now;
   }
 
+  /** A booking not yet paid is `pending`; anything else is past that. */
+  private static assertNotPaid(bookingStatus: string | undefined) {
+    if (bookingStatus && bookingStatus !== "pending") {
+      throw new DeclineAfterPaymentError();
+    }
+  }
+
   private static resolveTransition(
     kind: TransactionKind,
     fromStatus: TransactionStatus,
@@ -105,13 +124,13 @@ export default class TransactionStatusSvc {
 
     const row = await tx.eventAssetTransaction.findUniqueOrThrow({
       where: { id },
-      include: { booking: { select: { userId: true } } },
+      include: { booking: { select: { userId: true, status: true } } },
     });
 
-    if (action === "confirm" || action === "reject") {
+    if (action === "confirm" || action === "reject" || action === "decline") {
       if (!actorId || row.providerId !== actorId) {
         throw new TransactionActorUnauthorizedError(
-          "Unauthorized: only the provider for this item can confirm or reject it",
+          "Unauthorized: only the provider for this item can confirm, reject or decline it",
         );
       }
     } else if (action === "cancel") {
@@ -125,6 +144,8 @@ export default class TransactionStatusSvc {
       }
     }
     // action === "expire": system-driven, no actor check.
+
+    if (action === "decline") this.assertNotPaid(row.booking?.status);
 
     const toStatus = this.resolveTransition("asset", row.status, action);
 
@@ -160,13 +181,13 @@ export default class TransactionStatusSvc {
 
     const row = await tx.eventServiceTransaction.findUniqueOrThrow({
       where: { id },
-      include: { booking: { select: { userId: true } } },
+      include: { booking: { select: { userId: true, status: true } } },
     });
 
-    if (action === "confirm" || action === "reject") {
+    if (action === "confirm" || action === "reject" || action === "decline") {
       if (!actorId || row.providerId !== actorId) {
         throw new TransactionActorUnauthorizedError(
-          "Unauthorized: only the provider for this item can confirm or reject it",
+          "Unauthorized: only the provider for this item can confirm, reject or decline it",
         );
       }
     } else if (action === "cancel") {
@@ -179,6 +200,8 @@ export default class TransactionStatusSvc {
         );
       }
     }
+
+    if (action === "decline") this.assertNotPaid(row.booking?.status);
 
     const toStatus = this.resolveTransition("service", row.status, action);
 
@@ -212,15 +235,17 @@ export default class TransactionStatusSvc {
 
     const row = await tx.eventVenueTransaction.findUniqueOrThrow({
       where: { id },
-      include: { booking: { select: { userId: true } } },
+      include: { booking: { select: { userId: true, status: true } } },
     });
 
-    if (action === "confirm" || action === "reject") {
+    if (action === "confirm" || action === "reject" || action === "decline") {
+      // confirm and reject only ever reach this for a capacity-overage Request
+      // (see the ALLOWED_TRANSITIONS comment); decline is any booked event.
       // Only a capacity-overage Request ever reaches this branch — see the
       // ALLOWED_TRANSITIONS comment. providerId is the venue's mayor.
       if (!actorId || row.providerId !== actorId) {
         throw new TransactionActorUnauthorizedError(
-          "Unauthorized: only the venue's mayor can confirm or reject this request",
+          "Unauthorized: only the venue's mayor can confirm, reject or decline this",
         );
       }
     } else if (action === "cancel") {
@@ -234,6 +259,8 @@ export default class TransactionStatusSvc {
       }
     }
     // action === "expire": system-driven, no actor check.
+
+    if (action === "decline") this.assertNotPaid(row.booking?.status);
 
     const toStatus = this.resolveTransition("venue", row.status, action);
 
