@@ -27,6 +27,8 @@ router.post("/:id/items", authenticate, BookingCtrl.addAdHocItem);
 // ========== CANCELLATION & REFUND ROUTES ==========
 router.post("/:id/cancel/check", authenticate, BookingCtrl.cancelCheck);
 router.post("/:id/cancel", authenticate, BookingCtrl.cancelBooking);
+// The event's host leaves an unpaid booking they cannot attend (ADR 0011).
+router.post("/:id/decline", authenticate, BookingCtrl.hostDecline);
 
 // ========== GUEST MANAGEMENT ROUTES ==========
 router.post("/:id/finalize", authenticate, BookingCtrl.finalizeGuests);

@@ -176,6 +176,9 @@ const ALLOW_LIST = new Set([
   // Foxer's own events, filtered by organizerId in the service.
   "event-transaction.routes.ts GET /needs-attention",
   "event-transaction.routes.ts GET /event/:eventId",
+  // The host leaves an unpaid booking (ADR 0011): the service allows only the
+  // event's own organizer.
+  "booking.routes.ts POST /:id/decline",
   // Rewards & Wallet (Phase 2): self-service wallet overview, catalog browsing,
   // and coin redemption scoped to caller's own balance and passport
   "reward.routes.ts GET /me",

@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const db = vi.hoisted(() => ({
   events: vi.fn(),
   eventOne: vi.fn(),
+  unpaid: vi.fn(),
   venueTx: vi.fn(),
   assetTx: vi.fn(),
   serviceTx: vi.fn(),
@@ -12,6 +13,7 @@ const db = vi.hoisted(() => ({
 vi.mock("../src/utils/prisma", () => ({
   prisma: {
     event: { findMany: db.events, findFirst: db.eventOne },
+    booking: { findFirst: db.unpaid },
     eventVenueTransaction: { findMany: db.venueTx },
     eventAssetTransaction: { findMany: db.assetTx },
     eventServiceTransaction: { findMany: db.serviceTx },
@@ -69,6 +71,7 @@ const venueTx = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   Object.values(db).forEach((f) => f.mockReset());
   db.notify.mockResolvedValue({});
+  db.unpaid.mockResolvedValue(null);
 });
 
 describe("blockedDayHitsEvent", () => {
@@ -500,6 +503,23 @@ describe("EventConflictSvc.notifyListingGone", () => {
 });
 
 describe("EventConflictSvc.eventDetail", () => {
+  it("offers the unpaid booking for the host to decline, and none once paid", async () => {
+    db.eventOne.mockResolvedValue(event());
+    db.unpaid.mockResolvedValue({ id: "b9" });
+    expect(
+      (await EventConflictSvc.eventDetail("host1", "e1")).declinableBookingId,
+    ).toBe("b9");
+    expect(db.unpaid.mock.calls[0][0].where).toEqual({
+      eventId: "e1",
+      status: "pending",
+    });
+
+    db.unpaid.mockResolvedValue(null);
+    expect(
+      (await EventConflictSvc.eventDetail("host1", "e1")).declinableBookingId,
+    ).toBeNull();
+  });
+
   it("asks for the event only if the person is its host", async () => {
     db.eventOne.mockResolvedValue(event());
 

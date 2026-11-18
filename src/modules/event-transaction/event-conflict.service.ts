@@ -60,6 +60,11 @@ export interface BookedEventDetail {
   endAt: Date;
   eventStatus: string;
   suppliers: BookedSupplierRow[];
+  /**
+   * The event's booking that is not paid yet, which the host may still
+   * decline (ADR 0011); null once it is paid or when there is none.
+   */
+  declinableBookingId: string | null;
 }
 
 /** A booked item still counts only while it is waiting or approved. */
@@ -270,7 +275,12 @@ export default class EventConflictSvc {
       select: EVENT_WITH_SUPPLIERS,
     });
     if (!e) throw notFound("Event");
+    const unpaid = await prisma.booking.findFirst({
+      where: { eventId: e.id, status: "pending" },
+      select: { id: true },
+    });
     return {
+      declinableBookingId: unpaid?.id ?? null,
       eventId: e.id,
       eventName: e.name,
       startAt: e.startAt,
