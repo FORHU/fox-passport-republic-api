@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const repo = vi.hoisted(() => ({
   createPost: vi.fn(),
   findPostById: vi.fn(),
-  incrementShares: vi.fn(),
+  incrementReposts: vi.fn(),
   countUserPosts: vi.fn(),
 }));
 vi.mock("../src/modules/feed/feed.repository", () => ({ default: repo }));
@@ -39,7 +39,7 @@ const user = {
 beforeEach(() => {
   vi.clearAllMocks();
   repo.countUserPosts.mockResolvedValue(0);
-  repo.incrementShares.mockResolvedValue(undefined);
+  repo.incrementReposts.mockResolvedValue(undefined);
 });
 
 describe("feed:new broadcast", () => {
