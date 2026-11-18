@@ -4,6 +4,7 @@ import {
   AvailabilityConflictError,
   RESERVING_TRANSACTION_STATUSES,
 } from "./availability.types";
+import { blockedDayHitsRange } from "./blocked-days";
 import {
   bufferedWindow,
   findProviderEngagements,
@@ -236,9 +237,8 @@ export default class AvailabilitySvc {
 
     const { start, end } = item.dateRange;
 
-    const blockedConflict = venue.blockedDates.some(
-      (d) => d >= start && d < end,
-    );
+    // By calendar day, not by timestamp: see blocked-days.ts.
+    const blockedConflict = blockedDayHitsRange(venue.blockedDates, start, end);
     if (blockedConflict) {
       throw new AvailabilityConflictError(
         `Venue ${item.itemId} has a manually blocked date within the requested range`,

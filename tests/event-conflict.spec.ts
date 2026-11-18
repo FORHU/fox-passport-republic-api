@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const db = vi.hoisted(() => ({
   events: vi.fn(),
+  eventOne: vi.fn(),
   venueTx: vi.fn(),
   assetTx: vi.fn(),
   serviceTx: vi.fn(),
@@ -10,7 +11,7 @@ const db = vi.hoisted(() => ({
 
 vi.mock("../src/utils/prisma", () => ({
   prisma: {
-    event: { findMany: db.events },
+    event: { findMany: db.events, findFirst: db.eventOne },
     eventVenueTransaction: { findMany: db.venueTx },
     eventAssetTransaction: { findMany: db.assetTx },
     eventServiceTransaction: { findMany: db.serviceTx },
@@ -357,7 +358,12 @@ describe("EventConflictSvc.notifyDayBlocked", () => {
     expect(sent.map((s) => s.userId)).toEqual(["host1", "host2"]);
     expect(sent[0]).toMatchObject({
       type: "EVENT_CONFLICT",
-      metadata: { eventId: "e1", reason: "date_blocked" },
+      metadata: {
+        eventId: "e1",
+        reason: "date_blocked",
+        // A valid page on the web, and the booked-event screen on mobile.
+        link: "/creator-dashboard/events?eventId=e1",
+      },
     });
     expect(sent[0].message).toContain("Sky Hall");
     expect(sent[0].message).toContain("2026-12-05");
@@ -434,7 +440,11 @@ describe("EventConflictSvc.notifyListingGone", () => {
     expect(sent.map((s) => s.userId)).toEqual(["host1", "host2"]);
     expect(sent[0]).toMatchObject({
       type: "EVENT_CONFLICT",
-      metadata: { eventId: "e1", reason: "unavailable" },
+      metadata: {
+        eventId: "e1",
+        reason: "unavailable",
+        link: "/creator-dashboard/events?eventId=e1",
+      },
     });
     expect(sent[0].message).toContain("Sound system");
     expect(db.assetTx.mock.calls[0][0].where.assetId).toBe("asset1");
@@ -465,5 +475,90 @@ describe("EventConflictSvc.notifyListingGone", () => {
     );
     expect(where.status.in).not.toContain("rejected");
     expect(where.event.endAt).toEqual({ gt: NOW });
+  });
+});
+
+describe("EventConflictSvc.eventDetail", () => {
+  it("asks for the event only if the person is its host", async () => {
+    db.eventOne.mockResolvedValue(event());
+
+    await EventConflictSvc.eventDetail("host1", "e1");
+
+    expect(db.eventOne.mock.calls[0][0].where).toEqual({
+      id: "e1",
+      organizerId: "host1",
+    });
+  });
+
+  it("is not found for another host's event or one that does not exist", async () => {
+    db.eventOne.mockResolvedValue(null);
+
+    await expect(
+      EventConflictSvc.eventDetail("stranger", "e1"),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("lists every Supplier, marking the ones to replace and why", async () => {
+    db.eventOne.mockResolvedValue(
+      event({
+        eventStatus: "pending",
+        assetTransactions: [
+          assetTx({ status: "rejected", rejectionReason: "supplier_declined" }),
+        ],
+        serviceTransactions: [serviceTx()],
+        venueTransactions: [
+          venueTx({
+            venue: {
+              name: "Sky Hall",
+              blockedDates: [at("2026-12-05T00:00:00.000Z")],
+            },
+          }),
+        ],
+      }),
+    );
+
+    const out = await EventConflictSvc.eventDetail("host1", "e1");
+
+    expect(out).toMatchObject({
+      eventId: "e1",
+      eventName: "Garden wedding",
+      eventStatus: "pending",
+    });
+    expect(
+      out.suppliers.map((s) => [s.kind, s.itemName, s.status, s.reason]),
+    ).toEqual([
+      ["asset", "Sound system", "rejected", "declined"],
+      ["service", "Photographer", "approved", null],
+      ["venue", "Sky Hall", "approved", "date_blocked"],
+    ]);
+  });
+
+  it("leaves out a cancelled line but keeps one a Provider turned down", async () => {
+    db.eventOne.mockResolvedValue(
+      event({
+        assetTransactions: [assetTx({ id: "gone", status: "cancelled" })],
+        serviceTransactions: [
+          serviceTx({
+            id: "no",
+            status: "rejected",
+            rejectionReason: "provider_declined",
+          }),
+        ],
+      }),
+    );
+
+    const out = await EventConflictSvc.eventDetail("host1", "e1");
+
+    expect(out.suppliers.map((s) => s.transactionId)).toEqual(["no"]);
+    // Turned down is not a Supplier leaving a booked event.
+    expect(out.suppliers[0].reason).toBeNull();
+  });
+
+  it("shows an event with no Suppliers as an empty list", async () => {
+    db.eventOne.mockResolvedValue(event());
+
+    const out = await EventConflictSvc.eventDetail("host1", "e1");
+
+    expect(out.suppliers).toEqual([]);
   });
 });

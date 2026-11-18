@@ -34,6 +34,28 @@ export default class EventTransactionCtrl {
     }
   }
 
+  /**
+   * GET /event-transactions/event/:eventId: one of the Event Foxer's own
+   * events with every Supplier on it. Anyone else's event is "not found".
+   */
+  static async bookedEvent(req: Request, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const data = await EventConflictSvc.eventDetail(
+        userId,
+        req.params.eventId,
+      );
+      return res.status(200).json({ success: true, data });
+    } catch (e: unknown) {
+      if (e instanceof AppError) {
+        return res.status(e.status).json({ message: e.message, code: e.code });
+      }
+      const error = e as Error;
+      return res.status(500).json({ message: error.message });
+    }
+  }
+
   static async createTransactions(req: Request, res: Response) {
     const schema = Joi.object({
       eventId: Joi.string().required(),

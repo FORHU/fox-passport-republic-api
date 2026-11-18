@@ -10,6 +10,7 @@ router.get(
   authenticate,
   EventTransactionCtrl.needsAttention,
 );
+router.get("/event/:eventId", authenticate, EventTransactionCtrl.bookedEvent);
 router.post("/", authenticate, EventTransactionCtrl.createTransactions);
 router.patch("/:id/review", authenticate, EventTransactionCtrl.reviewItem);
 

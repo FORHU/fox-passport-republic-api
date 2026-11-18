@@ -8,6 +8,7 @@ import { prisma, AppTransactionClient } from "../../utils/prisma";
 import AvailabilitySvc from "../availability/availability.service";
 import TransactionStatusSvc from "../transaction-status/transaction-status.service";
 import NotificationSvc from "../notifications/user-notification.service";
+import { eventLink } from "./event-conflict.service";
 import {
   TransactionKind,
   TransactionAction,
@@ -246,7 +247,7 @@ export default class EventTransactionSvc {
       type: "SUPPLIER_DECLINED",
       title: "A Supplier declined your event",
       message: `${supplier?.name ?? "A Supplier"} declined ${itemName} for ${event.name}. Pick a replacement.`,
-      metadata,
+      metadata: { ...metadata, link: eventLink(row.eventId) },
     });
 
     const citizenId = booking?.userId ?? event.clientId;
@@ -256,7 +257,10 @@ export default class EventTransactionSvc {
         type: "SUPPLIER_DECLINED",
         title: "Part of your booking changed",
         message: `${itemName} for ${event.name} was declined by its Supplier. The event host has been asked to replace it.`,
-        metadata,
+        metadata: {
+          ...metadata,
+          ...(row.bookingId ? { link: `/bookings/${row.bookingId}` } : {}),
+        },
       });
     }
   }

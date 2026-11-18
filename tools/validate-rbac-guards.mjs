@@ -175,6 +175,7 @@ const ALLOW_LIST = new Set([
   // Booked events that lost a Supplier (ADR 0010): always the signed-in Event
   // Foxer's own events, filtered by organizerId in the service.
   "event-transaction.routes.ts GET /needs-attention",
+  "event-transaction.routes.ts GET /event/:eventId",
   // Rewards & Wallet (Phase 2): self-service wallet overview, catalog browsing,
   // and coin redemption scoped to caller's own balance and passport
   "reward.routes.ts GET /me",

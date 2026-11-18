@@ -1,5 +1,9 @@
 import { prisma } from "../../utils/prisma";
+import { notFound } from "../../utils/errors";
 import NotificationSvc from "../notifications/user-notification.service";
+import { blockedDayHitsRange, dayKey } from "../availability/blocked-days";
+
+export { dayKey };
 
 /**
  * Booked events that have lost, or are about to lose, a Supplier (ADR 0010).
@@ -34,6 +38,26 @@ export interface EventNeedingAttention {
   issues: ConflictIssue[];
 }
 
+/** One Supplier of a booked event and where it stands. */
+export interface BookedSupplierRow {
+  kind: ConflictKind;
+  transactionId: string;
+  supplierName: string;
+  itemName: string;
+  status: string;
+  /** Set when this Supplier needs replacing. */
+  reason: ConflictReason | null;
+}
+
+export interface BookedEventDetail {
+  eventId: string;
+  eventName: string;
+  startAt: Date;
+  endAt: Date;
+  eventStatus: string;
+  suppliers: BookedSupplierRow[];
+}
+
 /** A booked item still counts only while it is waiting or approved. */
 const LIVE = ["pending", "pending_provider_confirmation", "approved"] as const;
 
@@ -41,25 +65,138 @@ const LIVE = ["pending", "pending_provider_confirmation", "approved"] as const;
 const ASSET_GONE = ["draft", "pending", "archived", "rejected"];
 const SERVICE_GONE = ["draft", "pending", "paused", "archived", "rejected"];
 
-/** A calendar day, the way the rest of the booking code keys days. */
-export const dayKey = (d: Date) => d.toISOString().split("T")[0];
-
 /**
  * Whether a blocked day falls on an event. By calendar day, so a day blocked
- * after a booking that starts later that same day still counts (the booking
- * availability check compares timestamps and would miss that).
+ * after a booking that starts later that same day still counts. The same rule
+ * the booking check uses (`blockedDayHitsRange`).
  */
 export function blockedDayHitsEvent(
   blocked: Date[],
   event: { startAt: Date; endAt: Date },
 ): boolean {
-  const from = dayKey(event.startAt);
-  const to = dayKey(event.endAt);
-  return blocked.some((d) => {
-    const k = dayKey(d);
-    return k >= from && k <= to;
-  });
+  return blockedDayHitsRange(blocked, event.startAt, event.endAt);
 }
+
+/** The event fields both reads need, with every Supplier row. */
+const EVENT_WITH_SUPPLIERS = {
+  id: true,
+  name: true,
+  startAt: true,
+  endAt: true,
+  eventStatus: true,
+  assetTransactions: {
+    select: {
+      id: true,
+      status: true,
+      rejectionReason: true,
+      provider: { select: { name: true } },
+      asset: { select: { name: true, status: true, deletedAt: true } },
+    },
+  },
+  serviceTransactions: {
+    select: {
+      id: true,
+      status: true,
+      rejectionReason: true,
+      provider: { select: { name: true } },
+      service: { select: { name: true, status: true, deletedAt: true } },
+    },
+  },
+  venueTransactions: {
+    select: {
+      id: true,
+      status: true,
+      rejectionReason: true,
+      provider: { select: { name: true } },
+      venue: { select: { name: true, blockedDates: true } },
+    },
+  },
+} as const;
+
+type EventRow = {
+  startAt: Date;
+  endAt: Date;
+  assetTransactions: {
+    id: string;
+    status: string;
+    rejectionReason: string | null;
+    provider: { name: string };
+    asset: { name: string; status: string; deletedAt: Date | null };
+  }[];
+  serviceTransactions: {
+    id: string;
+    status: string;
+    rejectionReason: string | null;
+    provider: { name: string };
+    service: { name: string; status: string; deletedAt: Date | null };
+  }[];
+  venueTransactions: {
+    id: string;
+    status: string;
+    rejectionReason: string | null;
+    provider: { name: string };
+    venue: { name: string; blockedDates: Date[] };
+  }[];
+};
+
+const isLive = (status: string) => (LIVE as readonly string[]).includes(status);
+const isDeclined = (t: { status: string; rejectionReason: string | null }) =>
+  t.status === "rejected" && t.rejectionReason === "supplier_declined";
+
+/** Every Supplier of an event, each with why it needs replacing, if it does. */
+function supplierRows(e: EventRow): BookedSupplierRow[] {
+  const rows: BookedSupplierRow[] = [];
+
+  for (const t of e.assetTransactions) {
+    rows.push({
+      kind: "asset",
+      transactionId: t.id,
+      supplierName: t.provider.name,
+      itemName: t.asset.name,
+      status: t.status,
+      reason: isDeclined(t)
+        ? "declined"
+        : isLive(t.status) &&
+            (ASSET_GONE.includes(t.asset.status) || t.asset.deletedAt)
+          ? "unavailable"
+          : null,
+    });
+  }
+  for (const t of e.serviceTransactions) {
+    rows.push({
+      kind: "service",
+      transactionId: t.id,
+      supplierName: t.provider.name,
+      itemName: t.service.name,
+      status: t.status,
+      reason: isDeclined(t)
+        ? "declined"
+        : isLive(t.status) &&
+            (SERVICE_GONE.includes(t.service.status) || t.service.deletedAt)
+          ? "unavailable"
+          : null,
+    });
+  }
+  for (const t of e.venueTransactions) {
+    rows.push({
+      kind: "venue",
+      transactionId: t.id,
+      supplierName: t.provider.name,
+      itemName: t.venue.name,
+      status: t.status,
+      reason: isDeclined(t)
+        ? "declined"
+        : isLive(t.status) && blockedDayHitsEvent(t.venue.blockedDates, e)
+          ? "date_blocked"
+          : null,
+    });
+  }
+  return rows;
+}
+
+/** Where the Event Foxer is sent: a valid page on the web, and mobile's too. */
+const eventLink = (eventId: string) =>
+  `/creator-dashboard/events?eventId=${encodeURIComponent(eventId)}`;
 
 export default class EventConflictSvc {
   /**
@@ -77,95 +214,23 @@ export default class EventConflictSvc {
         eventStatus: { notIn: ["cancelled", "completed"] },
       },
       orderBy: { startAt: "asc" },
-      select: {
-        id: true,
-        name: true,
-        startAt: true,
-        endAt: true,
-        assetTransactions: {
-          select: {
-            id: true,
-            status: true,
-            rejectionReason: true,
-            provider: { select: { name: true } },
-            asset: { select: { name: true, status: true, deletedAt: true } },
-          },
-        },
-        serviceTransactions: {
-          select: {
-            id: true,
-            status: true,
-            rejectionReason: true,
-            provider: { select: { name: true } },
-            service: { select: { name: true, status: true, deletedAt: true } },
-          },
-        },
-        venueTransactions: {
-          select: {
-            id: true,
-            status: true,
-            rejectionReason: true,
-            provider: { select: { name: true } },
-            venue: { select: { name: true, blockedDates: true } },
-          },
-        },
-      },
+      select: EVENT_WITH_SUPPLIERS,
     });
-
-    const live = (s: string) => (LIVE as readonly string[]).includes(s);
-    const declined = (t: { status: string; rejectionReason: string | null }) =>
-      t.status === "rejected" && t.rejectionReason === "supplier_declined";
 
     const out: EventNeedingAttention[] = [];
     for (const e of events) {
       const issues: ConflictIssue[] = [];
-
-      for (const t of e.assetTransactions) {
-        const base = {
-          kind: "asset" as const,
-          transactionId: t.id,
-          supplierName: t.provider.name,
-          itemName: t.asset.name,
-        };
-        if (declined(t)) issues.push({ ...base, reason: "declined" });
-        else if (
-          live(t.status) &&
-          (ASSET_GONE.includes(t.asset.status) || t.asset.deletedAt)
-        ) {
-          issues.push({ ...base, reason: "unavailable" });
+      for (const r of supplierRows(e)) {
+        if (r.reason) {
+          issues.push({
+            kind: r.kind,
+            transactionId: r.transactionId,
+            supplierName: r.supplierName,
+            itemName: r.itemName,
+            reason: r.reason,
+          });
         }
       }
-      for (const t of e.serviceTransactions) {
-        const base = {
-          kind: "service" as const,
-          transactionId: t.id,
-          supplierName: t.provider.name,
-          itemName: t.service.name,
-        };
-        if (declined(t)) issues.push({ ...base, reason: "declined" });
-        else if (
-          live(t.status) &&
-          (SERVICE_GONE.includes(t.service.status) || t.service.deletedAt)
-        ) {
-          issues.push({ ...base, reason: "unavailable" });
-        }
-      }
-      for (const t of e.venueTransactions) {
-        const base = {
-          kind: "venue" as const,
-          transactionId: t.id,
-          supplierName: t.provider.name,
-          itemName: t.venue.name,
-        };
-        if (declined(t)) issues.push({ ...base, reason: "declined" });
-        else if (
-          live(t.status) &&
-          blockedDayHitsEvent(t.venue.blockedDates, e)
-        ) {
-          issues.push({ ...base, reason: "date_blocked" });
-        }
-      }
-
       if (issues.length > 0) {
         out.push({
           eventId: e.id,
@@ -176,6 +241,32 @@ export default class EventConflictSvc {
       }
     }
     return out;
+  }
+
+  /**
+   * One of the person's own events with every Supplier on it and where each
+   * stands, so a Supplier that needs replacing can be seen in place. Only the
+   * event's own host can read it; anyone else gets "not found".
+   */
+  static async eventDetail(
+    userId: string,
+    eventId: string,
+  ): Promise<BookedEventDetail> {
+    const e = await prisma.event.findFirst({
+      where: { id: eventId, organizerId: userId },
+      select: EVENT_WITH_SUPPLIERS,
+    });
+    if (!e) throw notFound("Event");
+    return {
+      eventId: e.id,
+      eventName: e.name,
+      startAt: e.startAt,
+      endAt: e.endAt,
+      eventStatus: e.eventStatus,
+      // A cancelled line is gone from the event; the rest are shown, with the
+      // ones to replace marked.
+      suppliers: supplierRows(e).filter((r) => r.status !== "cancelled"),
+    };
   }
 
   /**
@@ -288,10 +379,17 @@ export default class EventConflictSvc {
         type: "EVENT_CONFLICT",
         title: "Your event needs a replacement",
         message: item.text,
-        metadata: { eventId: item.event.id, reason, supplier: item.supplier },
+        metadata: {
+          eventId: item.event.id,
+          reason,
+          supplier: item.supplier,
+          link: eventLink(item.event.id),
+        },
       }).catch((err) =>
         console.error(`Conflict notification failed for ${key}`, err),
       );
     }
   }
 }
+
+export { eventLink };
