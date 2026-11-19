@@ -197,6 +197,8 @@ model EventAssetTransaction {
   // — see the Phase B marketplace migration.
   confirmationDeadline DateTime?
   rejectionReason      String?
+  /// When this line started needing a replacement (ADR 0010); the 48-hour deadline runs from here.
+  attentionSince       DateTime?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   asset                Asset             @relation(fields: [assetId], references: [id])
@@ -231,6 +233,8 @@ model EventServiceTransaction {
   releasedAt           DateTime?
   confirmationDeadline DateTime?
   rejectionReason      String?
+  /// When this line started needing a replacement (ADR 0010); the 48-hour deadline runs from here.
+  attentionSince       DateTime?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   event                Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -272,6 +276,8 @@ model EventVenueTransaction {
   // booking, which never enters that status.
   confirmationDeadline DateTime?
   rejectionReason      String?
+  /// When this line started needing a replacement (ADR 0010); the 48-hour deadline runs from here.
+  attentionSince       DateTime?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   event                Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)

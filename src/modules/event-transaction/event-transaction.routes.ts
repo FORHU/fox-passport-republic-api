@@ -13,6 +13,11 @@ router.get(
 router.get("/event/:eventId", authenticate, EventTransactionCtrl.bookedEvent);
 // Replacing a Supplier on a booked event (ADR 0010).
 router.get("/proposals", authenticate, EventTransactionCtrl.proposals);
+router.get(
+  "/booking/:bookingId/replacement",
+  authenticate,
+  EventTransactionCtrl.bookingReplacement,
+);
 router.post(
   "/proposals/:id/accept",
   authenticate,

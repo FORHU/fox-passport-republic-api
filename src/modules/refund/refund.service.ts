@@ -6,6 +6,7 @@ import { STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents, formatCurrency } from "../../utils/pricing";
 import { sendRefundUpdateEmail } from "../../utils/emails/refund";
 import NotificationService from "../notifications/user-notification.service";
+import EventConflictSvc from "../event-transaction/event-conflict.service";
 
 const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-08-27.basil",
@@ -118,8 +119,14 @@ export default class RefundSvc {
       booking.event.serviceTransactions?.[0]?.service?.cancellationPolicy) as
       CancellationPolicy | undefined;
 
-    const { refundPercent, hoursUntilEvent, matchedRule } =
-      RefundSvc.computeRefund(booking.startAt, policy, now);
+    const computed = RefundSvc.computeRefund(booking.startAt, policy, now);
+    const { hoursUntilEvent, matchedRule } = computed;
+    // A Supplier that was not replaced by its deadline refunds in full,
+    // whatever the policy says (ADR 0010 decision 2).
+    const fullRefund =
+      hoursUntilEvent > 0 &&
+      (await EventConflictSvc.fullRefundDue(booking.eventId, now));
+    const refundPercent = fullRefund ? 100 : computed.refundPercent;
 
     let eligible = true;
     let message = "";
@@ -127,6 +134,8 @@ export default class RefundSvc {
     if (hoursUntilEvent <= 0) {
       eligible = false;
       message = "Event has already started — cancellation is no longer allowed";
+    } else if (fullRefund) {
+      message = "Full refund — a Supplier was not replaced in time";
     } else if (!matchedRule) {
       eligible = refundPercent > 0;
       message = "No refund available under the applicable cancellation policy";
@@ -148,6 +157,7 @@ export default class RefundSvc {
       eligible,
       message,
       refundPercent,
+      fullRefund,
       totalPaid,
       estimatedRefund,
       startAt: booking.startAt,
