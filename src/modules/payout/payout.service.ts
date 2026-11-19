@@ -152,6 +152,15 @@ export default class PayoutSvc {
     });
     if (!payout) return;
     if (payout.status !== PayoutStatus.pending) return; // already paid or failed, don't retry blindly
+    if (!this.isPayable(payout.payoutAmount)) {
+      // Stripe refuses a ₱0 transfer. New ₱0 payouts aren't created
+      // (createAndFire); this covers rows created before that, which stay as
+      // they are rather than being marked paid with no transfer.
+      console.warn(
+        `Payout ${payoutId}: amount ${payout.payoutAmount.toString()} is nothing to send`,
+      );
+      return;
+    }
 
     if (!payout.sourceChargeId && paymentReference) {
       const sourceChargeId = await this.resolveChargeId(paymentReference);
@@ -302,17 +311,80 @@ export default class PayoutSvc {
     );
   }
 
+  /**
+   * Records a sent transfer, but only on a payout that is still `pending`.
+   * A cancellation can land while the transfer is in flight
+   * (`reversePayoutForSource` then marks the row `source_refunded`); writing
+   * `paid` over that would pay a cancelled line, so the transfer is reversed
+   * instead and the row stays unpayable.
+   */
   private static async markPaid(payoutId: string, transferId: string) {
-    await prisma.payout.update({
-      where: { id: payoutId },
+    try {
+      await prisma.payout.update({
+        where: { id: payoutId, status: PayoutStatus.pending },
+        data: {
+          status: PayoutStatus.paid,
+          providerReference: transferId,
+          paidAt: new Date(),
+          failureReason: null,
+          failureMessage: null,
+        },
+      });
+    } catch (e: unknown) {
+      if (
+        !(e instanceof Prisma.PrismaClientKnownRequestError) ||
+        e.code !== "P2025"
+      ) {
+        throw e;
+      }
+      const row = await prisma.payout.findUnique({
+        where: { id: payoutId },
+        select: { status: true },
+      });
+      if (!row || row.status === PayoutStatus.paid) return;
+      await this.reverseSentTransfer(payoutId, transferId);
+    }
+  }
+
+  /**
+   * Pulls back, in full, a transfer that went out for a payout whose line was
+   * cancelled or refunded, and keeps its id on the row. Never throws on a
+   * Stripe error: a failed reversal is logged and noted on the row for manual
+   * reconciliation. One idempotency key per transfer, so the two callers
+   * (a late `markPaid`, `reversePayoutForSource`) can't reverse it twice.
+   */
+  private static async reverseSentTransfer(
+    payoutId: string,
+    transferId: string,
+  ): Promise<void> {
+    let reversed = false;
+    try {
+      await stripe.transfers.createReversal(
+        transferId,
+        {},
+        { idempotencyKey: `payout:${payoutId}:reversal:${transferId}` },
+      );
+      reversed = true;
+    } catch (e: unknown) {
+      console.error(
+        `Payout ${payoutId}: transfer ${transferId} went out after its line was cancelled, and reversing it failed: ${(e as Error).message ?? "unknown error"}`,
+      );
+    }
+    await prisma.payout.updateMany({
+      where: { id: payoutId, status: { not: PayoutStatus.paid } },
       data: {
-        status: PayoutStatus.paid,
         providerReference: transferId,
-        paidAt: new Date(),
-        failureReason: null,
-        failureMessage: null,
+        failureMessage: reversed
+          ? "The booking line was cancelled while the transfer was being sent; the transfer was reversed"
+          : "The booking line was cancelled while the transfer was being sent; reversing the transfer failed, reconcile it in Stripe",
       },
     });
+  }
+
+  /** Whether an amount is at least one centavo, the least Stripe transfers. */
+  private static isPayable(amount: Prisma.Decimal | number): boolean {
+    const value = amount instanceof Prisma.Decimal ? amount.toNumber() : amount;
+    return toStripeCents(value) > 0;
   }
 
   /**
@@ -381,6 +453,13 @@ export default class PayoutSvc {
         "PAYOUT_SOURCE_REFUNDED",
       );
     }
+    if (!this.isPayable(payout.payoutAmount)) {
+      await audit("refused", "zero_amount");
+      throw conflict(
+        "This payout is ₱0, so there is nothing to send",
+        "PAYOUT_ZERO_AMOUNT",
+      );
+    }
     await audit("allowed");
     if (payout.status === PayoutStatus.failed) {
       await prisma.payout.updateMany({
@@ -407,6 +486,8 @@ export default class PayoutSvc {
         providerId: userId,
         status: PayoutStatus.failed,
         failureReason: PayoutFailureReason.not_onboarded,
+        // A ₱0 row from before createAndFire skipped them: nothing to send.
+        payoutAmount: { gt: 0 },
       },
       select: { id: true },
       orderBy: { createdAt: "asc" },
@@ -526,10 +607,11 @@ export default class PayoutSvc {
       return;
     }
 
-    // `pending` or `failed`: nothing moved, so nothing to claw back. Mark it
-    // so no retry (onboarding or admin, api#363) ever pays a line the client
-    // got their money back for.
-    await prisma.payout.updateMany({
+    // `pending` or `failed`: normally nothing moved, so nothing to claw back.
+    // Mark it so no retry (onboarding or admin, api#363) ever pays a line the
+    // client got their money back for. A transfer still in flight is caught
+    // by markPaid, which then reverses it.
+    const voided = await prisma.payout.updateMany({
       where: {
         id: payout.id,
         status: { in: [PayoutStatus.pending, PayoutStatus.failed] },
@@ -540,6 +622,42 @@ export default class PayoutSvc {
         failureMessage: "The booking line was cancelled or refunded",
       },
     });
+    // An earlier attempt may have sent a transfer and failed to record it
+    // (the row stayed pending). Find it by its payout id and pull it back.
+    if (voided.count > 0 && payout.transferAttempts > 0) {
+      await this.reverseUnrecordedTransfer(payout);
+    }
+  }
+
+  /** See reversePayoutForSource. Never throws. */
+  private static async reverseUnrecordedTransfer(payout: {
+    id: string;
+    sourceId: string;
+    providerId: string;
+  }): Promise<void> {
+    try {
+      const recipient = await prisma.user.findUnique({
+        where: { id: payout.providerId },
+        select: {
+          stripeAccountId: true,
+          paymentAccount: { select: { stripeAccountId: true } },
+        },
+      });
+      const destination =
+        recipient?.paymentAccount?.stripeAccountId ||
+        recipient?.stripeAccountId;
+      if (!destination) return;
+      const sent = await this.findSentTransfer(
+        payout.id,
+        payout.sourceId,
+        destination,
+      );
+      if (sent) await this.reverseSentTransfer(payout.id, sent.id);
+    } catch (e: unknown) {
+      console.error(
+        `Payout ${payout.id}: couldn't check Stripe for a transfer sent before its line was cancelled: ${(e as Error).message ?? "unknown error"}`,
+      );
+    }
   }
 
   private static async createAndFire(data: {
@@ -551,6 +669,10 @@ export default class PayoutSvc {
     paymentReference?: string | null;
   }) {
     const { paymentReference, ...record } = data;
+    // Nothing to pay (a Direct venue booking's ₱0 EventFoxer markup, a
+    // commission on lines that were never charged): no row, since Stripe
+    // would refuse the transfer and it would sit in the admin list.
+    if (!this.isPayable(record.amount)) return;
     const payout = await this.createPayoutRecord(record);
     await this.fireTransfer(payout.id, { paymentReference });
   }
