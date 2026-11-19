@@ -143,6 +143,7 @@ model Event {
   createdAt            DateTime                   @default(now())
   updatedAt            DateTime                   @updatedAt
   bookings             Booking[]
+  editProposals        EventEditProposal[]
   assetTransactions    EventAssetTransaction[]
   client               User                       @relation("EventClient", fields: [clientId], references: [id])
   host                 User                       @relation("EventOrganizer", fields: [organizerId], references: [id])
@@ -373,4 +374,48 @@ model EventAssetBid {
   targetRequirement EventTemplateAsset @relation(fields: [eventTemplateAssetId], references: [id])
 
   @@map("event_asset_bids")
+}
+
+/// An Event Foxer's proposal to replace a Supplier on a booked event that
+/// lost one (ADR 0010). Stored, never applied on its own: it applies only once
+/// the citizen accepts, and the new Supplier then confirms like any added item.
+model EventEditProposal {
+  id                    String                  @id @default(uuid())
+  eventId               String
+  bookingId             String
+  proposedById          String
+  /// asset | service | venue: the same kind as the line it replaces.
+  kind                  String
+  /// The line being replaced (an asset, service or venue transaction id).
+  replacesTransactionId String
+  /// The replacement listing.
+  itemId                String
+  quantity              Int                     @default(1)
+  currentPrice          Decimal                 @db.Decimal(12, 2)
+  proposedPrice         Decimal                 @db.Decimal(12, 2)
+  priceDelta            Decimal                 @db.Decimal(12, 2)
+  status                EventEditProposalStatus @default(pending)
+  note                  String?
+  expiresAt             DateTime
+  respondedAt           DateTime?
+  /// The new line, once accepted.
+  appliedTransactionId  String?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  event      Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  booking    Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  proposedBy User    @relation(fields: [proposedById], references: [id])
+
+  @@index([bookingId, status])
+  @@index([eventId])
+  @@map("event_edit_proposals")
+}
+
+enum EventEditProposalStatus {
+  pending
+  accepted
+  declined
+  withdrawn
+  expired
 }

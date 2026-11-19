@@ -1,3 +1,4 @@
+import type { EventEditProposalStatus } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { notFound } from "../../utils/errors";
 import NotificationSvc from "../notifications/user-notification.service";
@@ -31,6 +32,8 @@ export interface ConflictIssue {
   reason: ConflictReason;
   /** "busy" when a declining Supplier has another booking then. */
   cause: "busy" | null;
+  /** A replacement the host proposed, waiting for the citizen's answer. */
+  pendingProposalId: string | null;
 }
 
 export interface EventNeedingAttention {
@@ -51,6 +54,8 @@ export interface BookedSupplierRow {
   reason: ConflictReason | null;
   /** "busy" when a declining Supplier has another booking then. */
   cause: "busy" | null;
+  /** A replacement the host proposed, waiting for the citizen's answer. */
+  pendingProposalId: string | null;
 }
 
 export interface BookedEventDetail {
@@ -120,6 +125,21 @@ const EVENT_WITH_SUPPLIERS = {
       venue: { select: { name: true, blockedDates: true } },
     },
   },
+  // Replacements (ADR 0010): a replaced line is no longer part of the event,
+  // and one with a proposal waiting shows it.
+  editProposals: {
+    where: {
+      status: {
+        in: ["pending", "accepted"] as EventEditProposalStatus[],
+      },
+    },
+    select: {
+      id: true,
+      status: true,
+      replacesTransactionId: true,
+      appliedTransactionId: true,
+    },
+  },
 } as const;
 
 type EventRow = {
@@ -146,6 +166,12 @@ type EventRow = {
     provider: { name: string };
     venue: { name: string; blockedDates: Date[] };
   }[];
+  editProposals?: {
+    id: string;
+    status: string;
+    replacesTransactionId: string;
+    appliedTransactionId: string | null;
+  }[];
 };
 
 const isLive = (status: string) => (LIVE as readonly string[]).includes(status);
@@ -153,13 +179,27 @@ const isDeclined = (t: { status: string; rejectionReason: string | null }) =>
   t.status === "rejected" &&
   (t.rejectionReason === "supplier_declined" ||
     t.rejectionReason === "supplier_declined_busy");
+/**
+ * A replacement whose new Supplier turned it down or let it lapse: the line
+ * needs replacing again, as if it had been declined.
+ */
+const replacementFell = (t: {
+  status: string;
+  rejectionReason: string | null;
+}) =>
+  t.status === "rejected" &&
+  (t.rejectionReason === "provider_declined" ||
+    t.rejectionReason === "deadline_expired");
 /** Set when the Supplier said it has another booking at that time. */
 const declineCause = (t: { rejectionReason: string | null }): "busy" | null =>
   t.rejectionReason === "supplier_declined_busy" ? "busy" : null;
 
 /** Every Supplier of an event, each with why it needs replacing, if it does. */
 function supplierRows(e: EventRow): BookedSupplierRow[] {
-  const rows: BookedSupplierRow[] = [];
+  const raw: Omit<BookedSupplierRow, "pendingProposalId">[] = [];
+  const rows = {
+    push: (r: Omit<BookedSupplierRow, "pendingProposalId">) => raw.push(r),
+  };
 
   for (const t of e.assetTransactions) {
     rows.push({
@@ -208,7 +248,44 @@ function supplierRows(e: EventRow): BookedSupplierRow[] {
           : null,
     });
   }
-  return rows;
+
+  const proposals = e.editProposals ?? [];
+  const replaced = new Set(
+    proposals
+      .filter((p) => p.status === "accepted")
+      .map((p) => p.replacesTransactionId),
+  );
+  const replacements = new Set(
+    proposals
+      .filter((p) => p.status === "accepted" && p.appliedTransactionId)
+      .map((p) => p.appliedTransactionId!),
+  );
+  const waiting = new Map(
+    proposals
+      .filter((p) => p.status === "pending")
+      .map((p) => [p.replacesTransactionId, p.id] as const),
+  );
+  const statusOf = new Map<
+    string,
+    { status: string; rejectionReason: string | null }
+  >(
+    [
+      ...e.assetTransactions,
+      ...e.serviceTransactions,
+      ...e.venueTransactions,
+    ].map((t) => [t.id, t] as const),
+  );
+  return raw
+    .filter((r) => !replaced.has(r.transactionId))
+    .map((r) => {
+      const t = statusOf.get(r.transactionId)!;
+      const fell = replacements.has(r.transactionId) && replacementFell(t);
+      return {
+        ...r,
+        reason: fell ? ("declined" as const) : r.reason,
+        pendingProposalId: waiting.get(r.transactionId) ?? null,
+      };
+    });
 }
 
 /** Where the Event Foxer is sent: a valid page on the web, and mobile's too. */
@@ -246,6 +323,7 @@ export default class EventConflictSvc {
             itemName: r.itemName,
             reason: r.reason,
             cause: r.cause,
+            pendingProposalId: r.pendingProposalId,
           });
         }
       }

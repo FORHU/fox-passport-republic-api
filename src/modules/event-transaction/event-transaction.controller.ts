@@ -1,8 +1,11 @@
 import { Request, Response } from "express";
 import EventTransactionSvc from "./event-transaction.service";
 import EventConflictSvc from "./event-conflict.service";
+import EventEditSvc from "./event-edit.service";
 import Joi from "joi";
-import { AppError } from "../../utils/errors";
+import { AppError, sendServerError } from "../../utils/errors";
+
+const KIND = Joi.string().valid("asset", "service", "venue").required();
 
 export default class EventTransactionCtrl {
   static async listProviderItems(req: Request, res: Response) {
@@ -123,5 +126,84 @@ export default class EventTransactionCtrl {
       const error = e as Error;
       return res.status(400).json({ message: error.message });
     }
+  }
+
+  /**
+   * GET /event-transactions/:id/replacements?kind=: listings that could take
+   * the place of one of the Event Foxer's lines that needs replacing (ADR 0010).
+   */
+  static async replacements(req: Request, res: Response) {
+    const { error, value } = Joi.object({ kind: KIND }).validate(req.query, {
+      allowUnknown: true,
+    });
+    if (error) return res.status(400).json({ message: error.message });
+    try {
+      const data = await EventEditSvc.replacements(
+        req.user!.userId,
+        value.kind,
+        req.params.id as string,
+      );
+      return res.status(200).json({ success: true, data });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: false });
+    }
+  }
+
+  /** POST /event-transactions/:id/replace: the host proposes a replacement. */
+  static async proposeReplacement(req: Request, res: Response) {
+    const schema = Joi.object({
+      kind: KIND,
+      itemId: Joi.string().required(),
+      note: Joi.string().max(500).allow("").optional(),
+    });
+    const { error, value } = schema.validate(req.body ?? {});
+    if (error) return res.status(400).json({ message: error.message });
+    try {
+      const data = await EventEditSvc.propose(req.user!.userId, {
+        kind: value.kind,
+        transactionId: req.params.id as string,
+        itemId: value.itemId,
+        note: value.note,
+      });
+      return res.status(201).json({ success: true, data });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: false });
+    }
+  }
+
+  /** GET /event-transactions/proposals?bookingId=: for its citizen or host. */
+  static async proposals(req: Request, res: Response) {
+    const { error, value } = Joi.object({
+      bookingId: Joi.string().required(),
+    }).validate(req.query, { allowUnknown: true });
+    if (error) return res.status(400).json({ message: error.message });
+    try {
+      const data = await EventEditSvc.forBooking(
+        req.user!.userId,
+        value.bookingId,
+      );
+      return res.status(200).json({ success: true, data });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: false });
+    }
+  }
+
+  /** POST /event-transactions/proposals/:id/{accept,decline,withdraw}. */
+  static answerProposal(action: "accept" | "decline" | "withdraw") {
+    return async (req: Request, res: Response) => {
+      try {
+        const userId = req.user!.userId;
+        const id = req.params.id as string;
+        const data =
+          action === "accept"
+            ? await EventEditSvc.accept(userId, id)
+            : action === "decline"
+              ? await EventEditSvc.decline(userId, id)
+              : await EventEditSvc.withdraw(userId, id);
+        return res.status(200).json({ success: true, data });
+      } catch (e: unknown) {
+        return sendServerError(res, e, { success: false });
+      }
+    };
   }
 }

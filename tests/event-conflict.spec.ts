@@ -166,6 +166,7 @@ describe("EventConflictSvc.needsAttention", () => {
         itemName: "Sound system",
         reason: "declined",
         cause: null,
+        pendingProposalId: null,
       },
     ]);
   });
@@ -601,5 +602,125 @@ describe("EventConflictSvc.eventDetail", () => {
     const out = await EventConflictSvc.eventDetail("host1", "e1");
 
     expect(out.suppliers).toEqual([]);
+  });
+
+  describe("replacements (ADR 0010)", () => {
+    const declined = assetTx({
+      id: "old",
+      status: "rejected",
+      rejectionReason: "supplier_declined",
+    });
+
+    it("reads only proposals waiting for an answer or accepted", async () => {
+      db.eventOne.mockResolvedValue(event());
+
+      await EventConflictSvc.eventDetail("host1", "e1");
+
+      const select = db.eventOne.mock.calls[0][0].select;
+      expect(select.editProposals.where).toEqual({
+        status: { in: ["pending", "accepted"] },
+      });
+    });
+
+    it("shows the proposal waiting on a line that needs replacing", async () => {
+      db.eventOne.mockResolvedValue(
+        event({
+          assetTransactions: [declined],
+          editProposals: [
+            {
+              id: "p1",
+              status: "pending",
+              replacesTransactionId: "old",
+              appliedTransactionId: null,
+            },
+          ],
+        }),
+      );
+
+      const [row] = (await EventConflictSvc.eventDetail("host1", "e1"))
+        .suppliers;
+
+      expect(row).toMatchObject({
+        transactionId: "old",
+        reason: "declined",
+        pendingProposalId: "p1",
+      });
+    });
+
+    it("drops a replaced line and lists its replacement awaiting its Supplier", async () => {
+      const e = event({
+        assetTransactions: [
+          declined,
+          assetTx({ id: "new", status: "pending_provider_confirmation" }),
+        ],
+        editProposals: [
+          {
+            id: "p1",
+            status: "accepted",
+            replacesTransactionId: "old",
+            appliedTransactionId: "new",
+          },
+        ],
+      });
+      db.eventOne.mockResolvedValue(e);
+      db.events.mockResolvedValue([e]);
+
+      const out = await EventConflictSvc.eventDetail("host1", "e1");
+
+      expect(
+        out.suppliers.map((s) => [
+          s.transactionId,
+          s.reason,
+          s.pendingProposalId,
+        ]),
+      ).toEqual([["new", null, null]]);
+      expect(await EventConflictSvc.needsAttention("host1", NOW)).toEqual([]);
+    });
+
+    it.each(["provider_declined", "deadline_expired"])(
+      "flags a replacement again when its new Supplier lets it go (%s)",
+      async (rejectionReason) => {
+        const e = event({
+          assetTransactions: [
+            declined,
+            assetTx({ id: "new", status: "rejected", rejectionReason }),
+          ],
+          editProposals: [
+            {
+              id: "p1",
+              status: "accepted",
+              replacesTransactionId: "old",
+              appliedTransactionId: "new",
+            },
+          ],
+        });
+        db.eventOne.mockResolvedValue(e);
+        db.events.mockResolvedValue([e]);
+
+        const out = await EventConflictSvc.eventDetail("host1", "e1");
+        expect(out.suppliers.map((s) => [s.transactionId, s.reason])).toEqual([
+          ["new", "declined"],
+        ]);
+        const [attention] = await EventConflictSvc.needsAttention("host1", NOW);
+        expect(attention.issues.map((i) => i.transactionId)).toEqual(["new"]);
+      },
+    );
+
+    it("does not flag an ordinary line a Provider turned down", async () => {
+      db.eventOne.mockResolvedValue(
+        event({
+          assetTransactions: [
+            assetTx({
+              status: "rejected",
+              rejectionReason: "provider_declined",
+            }),
+          ],
+        }),
+      );
+
+      const [row] = (await EventConflictSvc.eventDetail("host1", "e1"))
+        .suppliers;
+      expect(row.reason).toBeNull();
+    });
   });
 });
