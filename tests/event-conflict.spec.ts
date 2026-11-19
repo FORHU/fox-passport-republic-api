@@ -971,6 +971,9 @@ describe("the replacement deadline (ADR 0010, 48h capped 24h before)", () => {
         ],
         replaceBy: at("2026-11-17T10:00:00.000Z"),
         fullRefund: true,
+        awaitingConfirmation: 0,
+        unpaid: false,
+        totalAmount: undefined,
       });
     });
 
@@ -1000,5 +1003,78 @@ describe("the replacement deadline (ADR 0010, 48h capped 24h before)", () => {
         EventConflictSvc.replacementForBooking("stranger", "b1", NOW),
       ).rejects.toMatchObject({ status: 404 });
     });
+  });
+});
+
+describe("a package Supplier asked first that refuses (ADR 0010)", () => {
+  const refused = (assetId: string, rejectionReason = "provider_declined") =>
+    assetTx({
+      assetId,
+      status: "rejected",
+      rejectionReason,
+      attentionSince: at("2026-11-18T10:00:00.000Z"),
+    });
+  const withTemplate = (over: Record<string, unknown>) =>
+    event({
+      template: {
+        templateAssets: [{ assetId: "pkg-asset" }],
+        templateServices: [],
+        templateVenues: [],
+      },
+      ...over,
+    });
+
+  it.each(["provider_declined", "deadline_expired"])(
+    "needs replacing when the item is the package's own (%s)",
+    async (reason) => {
+      db.eventOne.mockResolvedValue(
+        withTemplate({ assetTransactions: [refused("pkg-asset", reason)] }),
+      );
+
+      const [row] = (await EventConflictSvc.eventDetail("host1", "e1"))
+        .suppliers;
+
+      expect(row.reason).toBe("declined");
+      expect(row.replaceBy).toEqual(at("2026-11-20T10:00:00.000Z"));
+    },
+  );
+
+  it("leaves an item the citizen added alone", async () => {
+    db.eventOne.mockResolvedValue(
+      withTemplate({ assetTransactions: [refused("added-asset")] }),
+    );
+
+    const [row] = (await EventConflictSvc.eventDetail("host1", "e1")).suppliers;
+
+    expect(row.reason).toBeNull();
+  });
+
+  it("tells the citizen how many Suppliers are still to answer", async () => {
+    db.bookingOne.mockResolvedValue({
+      userId: "citizen1",
+      eventId: "e1",
+      status: "pending",
+      totalAmount: "21240",
+      event: withTemplate({
+        assetTransactions: [
+          assetTx({
+            assetId: "pkg-asset",
+            status: "pending_provider_confirmation",
+          }),
+        ],
+        serviceTransactions: [serviceTx()],
+      }),
+    });
+
+    const out = await EventConflictSvc.replacementForBooking(
+      "citizen1",
+      "b1",
+      NOW,
+    );
+
+    expect(out.awaitingConfirmation).toBe(1);
+    expect(out.items).toEqual([]);
+    expect(out.unpaid).toBe(true);
+    expect(out.totalAmount).toBe("21240");
   });
 });

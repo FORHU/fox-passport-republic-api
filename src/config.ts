@@ -29,6 +29,14 @@ export const CORS_ORIGINS = (
   .filter(Boolean);
 export const SECRET_KEY = process.env.SECRET_KEY as string;
 export const isDev = process.env.NODE_ENV !== "production";
+/**
+ * ADR 0010: book only matched Suppliers automatically; an unmatched one is
+ * asked first (pending_provider_confirmation, 24 hours to answer), and the
+ * booking can't be paid until it answers. Off until the web booking flow
+ * handles the wait (decided 2026-11-19).
+ */
+export const AUTO_BOOK_MATCHED_ONLY =
+  process.env.AUTO_BOOK_MATCHED_ONLY === "true";
 export const MAILER_TRANSPORT_HOST = process.env
   .MAILER_TRANSPORT_HOST as string;
 export const MAILER_TRANSPORT_PORT = Number(

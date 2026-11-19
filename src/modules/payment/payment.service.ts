@@ -114,6 +114,25 @@ export default class PaymentSvc {
         400,
       );
     }
+    // The same for gear or a service still waiting for its Supplier: an item
+    // added to the booking, a replacement (ADR 0010), or an unmatched Supplier
+    // asked first. Checkout refuses them too (BlockingItemsError).
+    const where = {
+      bookingId: data.bookingId,
+      status: "pending_provider_confirmation" as const,
+      included: true,
+    };
+    const [pendingAsset, pendingService] = await Promise.all([
+      prisma.eventAssetTransaction.findFirst({ where, select: { id: true } }),
+      prisma.eventServiceTransaction.findFirst({ where, select: { id: true } }),
+    ]);
+    if (pendingAsset || pendingService) {
+      throw new AppError(
+        "Some Suppliers haven't confirmed yet. You can pay once they do.",
+        409,
+        "AWAITING_SUPPLIERS",
+      );
+    }
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: toStripeCents(data.amount),

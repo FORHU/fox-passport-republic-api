@@ -4,8 +4,9 @@
 far: the Supplier decline with a "busy" cause and conflict alerts with a
 booked-event read (api#397, #399, #401); swapping a Supplier on an unpaid
 booking (api#406); the replacement deadline and full refund (decision 2, set
-to 48 hours on 2026-11-19). Not built yet: auto-booking only matched
-Suppliers, date changes, and edits to a paid booking. Epic:
+to 48 hours on 2026-11-19); auto-booking only matched Suppliers, behind
+`AUTO_BOOK_MATCHED_ONLY` (off until the web booking flow handles the wait).
+Not built yet: date changes, and edits to a paid booking. Epic:
 [#371](https://github.com/FORHU/fox-passport-republic-api/issues/371); this
 API's sub-issue is [#372](https://github.com/FORHU/fox-passport-republic-api/issues/372).
 It is the "needs its own design" that [0003](./0003-booking-edit-requests.md)
