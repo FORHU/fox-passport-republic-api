@@ -76,6 +76,21 @@ export function fromPrisma(err: unknown): AppError | null {
 }
 
 /**
+ * Any error thrown by Prisma Client. Its message quotes the call, the model and
+ * its columns, so it must never reach a client as is: route it through
+ * `sendServerError`, which maps the recognised ones and hides the rest.
+ */
+export function isPrismaError(err: unknown): boolean {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError ||
+    err instanceof Prisma.PrismaClientUnknownRequestError ||
+    err instanceof Prisma.PrismaClientValidationError ||
+    err instanceof Prisma.PrismaClientInitializationError ||
+    err instanceof Prisma.PrismaClientRustPanicError
+  );
+}
+
+/**
  * Answers with an AppError's status, message and code. Controllers call this
  * first in a catch block, then fall back to their own handling for plain
  * Errors. `success` is for controllers whose responses carry that field.

@@ -10,6 +10,13 @@ import {
 } from "../../utils/tax-id-formats";
 import { normalizePhone } from "../../utils/phone";
 import {
+  isPrismaError,
+  sendFailure,
+  sendServerError,
+} from "../../utils/errors";
+import { sendValidationError, VALIDATE_ALL } from "../../utils/validation";
+import Joi from "joi";
+import {
   EventCategory,
   RequestStatus,
   RoleType,
@@ -46,6 +53,107 @@ const ORGANIZER_REQUIRED_DOCUMENTS = [
   "backgroundClearanceFileId",
   "selfieFileId",
 ] as const;
+
+// A list column the application table requires (`String[]`, no default): a
+// client that leaves it out means "none", so it is stored as [] rather than
+// reaching Prisma as undefined (api#366). null counts as left out.
+const requiredList = (label: string) =>
+  Joi.array()
+    .items(
+      Joi.string()
+        .allow("")
+        .messages({ "string.base": `Each of the ${label} must be text.` }),
+    )
+    .empty(null)
+    .default([])
+    .messages({ "array.base": `${label} must be a list.` });
+
+const requiredText = (label: string) =>
+  Joi.string()
+    .trim()
+    .required()
+    .messages({
+      "any.required": `${label} is required.`,
+      "string.empty": `${label} is required.`,
+      "string.base": `${label} must be text.`,
+    });
+
+/**
+ * The fields each role's application table requires, checked before any
+ * document is stored so a missing one gets a field-level 400 instead of a
+ * database error. Only columns the database itself requires are listed, so
+ * nothing that saved before is refused. A Provider's specialties are checked
+ * by ProviderSpecialtySvc, and an Organizer's other fields by
+ * validateOrganizerApplication.
+ */
+const REQUIRED_APPLICATION_FIELDS: Partial<Record<RoleType, Joi.ObjectSchema>> =
+  {
+    [RoleType.venueFoxer]: Joi.object({
+      businessName: requiredText("Business name"),
+      contactNumber: requiredText("Contact number"),
+      address: requiredText("Address"),
+      tinNumber: requiredText("TIN Number"),
+      specializations: requiredList("Specializations"),
+    }).unknown(true),
+    [RoleType.eventFoxer]: Joi.object({
+      specializations: requiredList("Specializations"),
+    }).unknown(true),
+    [RoleType.organizer]: Joi.object({
+      specializations: requiredList("Specializations"),
+    }).unknown(true),
+    [RoleType.investor]: Joi.object({
+      // Decimal(12, 2)
+      investmentRange: Joi.number()
+        .min(0)
+        .max(9_999_999_999.99)
+        .required()
+        .messages({
+          "any.required": "Investment range is required.",
+          "number.base": "Investment range must be a number.",
+          "number.min": "Investment range can't be negative.",
+          "number.max": "Investment range is too large.",
+        }),
+      interests: requiredList("Interests"),
+    }).unknown(true),
+  };
+
+/**
+ * Checks `data` against its role's required fields and fills the defaults in
+ * place. Returns the Joi error to answer with, or null.
+ */
+export function checkRequiredFields(
+  roleType: RoleType,
+  data: Record<string, unknown>,
+): Joi.ValidationError | null {
+  const schema = REQUIRED_APPLICATION_FIELDS[roleType];
+  if (!schema) return null;
+  const { error, value } = schema.validate(data, VALIDATE_ALL);
+  if (error) return error;
+  Object.assign(data, value);
+  return null;
+}
+
+/**
+ * The `data` field of an application: a JSON string in multipart form-data, or
+ * an object in a JSON body. Returns null when it is neither valid JSON nor an
+ * object, so the parser's own text never reaches the client.
+ */
+export function parseApplicationData(
+  raw: unknown,
+): Record<string, unknown> | null {
+  let data: unknown = raw ?? {};
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    return null;
+  }
+  return data as Record<string, unknown>;
+}
 
 export function validateOrganizerApplication(
   data: Record<string, unknown>,
@@ -145,15 +253,14 @@ export default class RoleRequestController {
       const { roleType } = req.body;
 
       // `data` is sent as a JSON string in multipart form-data
-      const data =
-        typeof req.body.data === "string"
-          ? JSON.parse(req.body.data)
-          : req.body.data || {};
+      const data = parseApplicationData(req.body.data);
+      if (!data) {
+        return res.status(400).json({
+          success: false,
+          message: "The application details could not be read.",
+        });
+      }
 
-      if (!userId)
-        return res
-          .status(401)
-          .json({ success: false, message: "Unauthorized" });
       // A retired role gets a pointer to Provider, not "Invalid role type".
       // Checked before any document is stored.
       const retired = retiredRoleError(roleType);
@@ -164,6 +271,12 @@ export default class RoleRequestController {
         return res
           .status(400)
           .json({ success: false, message: "Invalid role type" });
+      }
+
+      // Before any document is stored, like the checks below.
+      const missing = checkRequiredFields(roleType, data);
+      if (missing) {
+        return sendValidationError(res, missing, { success: true });
       }
 
       // A Provider names at least one catalog specialty and has no maximum.
@@ -279,9 +392,15 @@ export default class RoleRequestController {
         data: application,
       });
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("Application error:", error);
-      return res.status(400).json({ success: false, message: error.message });
+      // Prisma's text quotes the query and its columns (api#366): a recognised
+      // error gets a fixed message, anything else is logged and answered 500.
+      if (isPrismaError(e)) {
+        return sendServerError(res, e, { success: true });
+      }
+      // The service throws plain Errors meant for the applicant ("An
+      // application for the venueFoxer role is already pending").
+      console.error("Application error:", e);
+      return sendFailure(res, e, 400, { success: true });
     }
   }
 
