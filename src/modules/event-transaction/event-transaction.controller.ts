@@ -171,6 +171,23 @@ export default class EventTransactionCtrl {
     }
   }
 
+  /**
+   * GET /event-transactions/booking/:bookingId/replacement: for the booking's
+   * citizen or host, the Suppliers that need replacing, by when, and whether
+   * cancelling now refunds in full (ADR 0010).
+   */
+  static async bookingReplacement(req: Request, res: Response) {
+    try {
+      const data = await EventConflictSvc.replacementForBooking(
+        req.user!.userId,
+        req.params.bookingId as string,
+      );
+      return res.status(200).json({ success: true, data });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: false });
+    }
+  }
+
   /** GET /event-transactions/proposals?bookingId=: for its citizen or host. */
   static async proposals(req: Request, res: Response) {
     const { error, value } = Joi.object({

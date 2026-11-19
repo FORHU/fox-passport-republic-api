@@ -180,6 +180,9 @@ const ALLOW_LIST = new Set([
   // organizer list and propose, only the booking's citizen accept or decline,
   // only the proposer withdraw, and only those two read a booking's proposals.
   "event-transaction.routes.ts GET /proposals",
+  // The replacement deadline (ADR 0010): replacementForBooking lets only the
+  // booking's citizen or the event's host read it.
+  "event-transaction.routes.ts GET /booking/:bookingId/replacement",
   "event-transaction.routes.ts POST /proposals/:id/accept",
   "event-transaction.routes.ts POST /proposals/:id/decline",
   "event-transaction.routes.ts POST /proposals/:id/withdraw",

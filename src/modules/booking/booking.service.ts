@@ -18,6 +18,7 @@ import {
 } from "../pricing/event-breakdown";
 import PromotionSvc from "../promotion/promotion.service";
 import RefundSvc from "../refund/refund.service";
+import EventConflictSvc from "../event-transaction/event-conflict.service";
 import WaitlistSvc from "../waitlist/waitlist.service";
 import NotificationService from "../notifications/user-notification.service";
 import { PLATFORM_FEE_PERCENT, STRIPE_SECRET_KEY } from "../../config";
@@ -1845,8 +1846,11 @@ export default class BookingSvc {
       booking.event.template?.cancellationPolicy ??
       booking.event.venueTransactions?.[0]?.venue?.cancellationPolicy ??
       booking.event.serviceTransactions?.[0]?.service?.cancellationPolicy;
-    const { refundPercent, hoursUntilEvent, matchedRule } =
-      RefundSvc.computeRefund(booking.startAt, cancellationPolicy);
+    const computed = RefundSvc.computeRefund(
+      booking.startAt,
+      cancellationPolicy,
+    );
+    const { hoursUntilEvent, matchedRule } = computed;
 
     if (hoursUntilEvent <= 0) {
       throw new BookingError(
@@ -1855,13 +1859,20 @@ export default class BookingSvc {
       );
     }
 
+    // A Supplier that was not replaced by its deadline refunds in full,
+    // whatever the policy says (ADR 0010 decision 2).
+    const fullRefund = await EventConflictSvc.fullRefundDue(booking.eventId);
+    const refundPercent = fullRefund ? 100 : computed.refundPercent;
+
     const policyName = cancellationPolicy?.name ?? null;
     const ruleDesc = matchedRule
       ? `${matchedRule.hoursBeforeEvent}h before = ${matchedRule.refundPercent}% refund`
       : null;
-    const matchedRuleInfo = policyName
-      ? `Policy: ${policyName} — ${ruleDesc ?? "no rule matched"}`
-      : ruleDesc;
+    const matchedRuleInfo = fullRefund
+      ? "Full refund: a Supplier was not replaced within its deadline"
+      : policyName
+        ? `Policy: ${policyName} — ${ruleDesc ?? "no rule matched"}`
+        : ruleDesc;
 
     const bookingPayments = await PaymentRepo.getBookingPayments(id);
     const completedPayments = bookingPayments.filter(

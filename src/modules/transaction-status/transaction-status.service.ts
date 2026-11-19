@@ -95,6 +95,16 @@ const rejectionReasonFor = (
     ? DECLINE_REASON[cause ?? "other"]
     : (REJECTION_REASON[action] ?? current);
 
+/**
+ * A Supplier leaving (decline), or a replacement turned down or let lapse
+ * (reject, expire): the line now needs replacing, and the 48-hour deadline of
+ * ADR 0010 runs from here. Other actions leave the stamp as it is.
+ */
+const attentionFor = (action: TransactionAction) =>
+  action === "decline" || action === "reject" || action === "expire"
+    ? { attentionSince: new Date() }
+    : {};
+
 interface TransitionArgs {
   id: string;
   kind: TransactionKind;
@@ -192,6 +202,7 @@ export default class TransactionStatusSvc {
       data: {
         status: toStatus,
         rejectionReason: rejectionReasonFor(action, cause, row.rejectionReason),
+        ...attentionFor(action),
       },
     });
   }
@@ -246,6 +257,7 @@ export default class TransactionStatusSvc {
       data: {
         status: toStatus,
         rejectionReason: rejectionReasonFor(action, cause, row.rejectionReason),
+        ...attentionFor(action),
       },
     });
   }
@@ -305,6 +317,7 @@ export default class TransactionStatusSvc {
       data: {
         status: toStatus,
         rejectionReason: rejectionReasonFor(action, cause, row.rejectionReason),
+        ...attentionFor(action),
       },
     });
   }
