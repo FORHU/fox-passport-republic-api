@@ -123,9 +123,19 @@ const EVENT_WITH_SUPPLIERS = {
   startAt: true,
   endAt: true,
   eventStatus: true,
+  // The package's own listings: one of these that its Supplier turns down or
+  // lets lapse needs replacing; an item the citizen added does not.
+  template: {
+    select: {
+      templateAssets: { select: { assetId: true } },
+      templateServices: { select: { serviceId: true } },
+      templateVenues: { select: { venueId: true } },
+    },
+  },
   assetTransactions: {
     select: {
       id: true,
+      assetId: true,
       status: true,
       rejectionReason: true,
       attentionSince: true,
@@ -137,6 +147,7 @@ const EVENT_WITH_SUPPLIERS = {
   serviceTransactions: {
     select: {
       id: true,
+      serviceId: true,
       status: true,
       rejectionReason: true,
       attentionSince: true,
@@ -148,6 +159,7 @@ const EVENT_WITH_SUPPLIERS = {
   venueTransactions: {
     select: {
       id: true,
+      venueId: true,
       status: true,
       rejectionReason: true,
       attentionSince: true,
@@ -176,12 +188,18 @@ const EVENT_WITH_SUPPLIERS = {
 type EventRow = {
   startAt: Date;
   endAt: Date;
+  template?: {
+    templateAssets: { assetId: string | null }[];
+    templateServices: { serviceId: string | null }[];
+    templateVenues: { venueId: string | null }[];
+  } | null;
   assetTransactions: {
     id: string;
     status: string;
     rejectionReason: string | null;
     attentionSince?: Date | null;
     updatedAt?: Date;
+    assetId?: string;
     provider: { name: string };
     asset: { name: string; status: string; deletedAt: Date | null };
   }[];
@@ -191,6 +209,7 @@ type EventRow = {
     rejectionReason: string | null;
     attentionSince?: Date | null;
     updatedAt?: Date;
+    serviceId?: string;
     provider: { name: string };
     service: { name: string; status: string; deletedAt: Date | null };
   }[];
@@ -200,6 +219,7 @@ type EventRow = {
     rejectionReason: string | null;
     attentionSince?: Date | null;
     updatedAt?: Date;
+    venueId?: string;
     provider: { name: string };
     venue: { name: string; blockedDates: Date[] };
   }[];
@@ -301,6 +321,18 @@ function supplierRows(e: EventRow): BookedSupplierRow[] {
       .filter((p) => p.status === "pending")
       .map((p) => [p.replacesTransactionId, p.id] as const),
   );
+  const packageListings = new Set([
+    ...(e.template?.templateAssets ?? []).map((x) => `asset:${x.assetId}`),
+    ...(e.template?.templateServices ?? []).map(
+      (x) => `service:${x.serviceId}`,
+    ),
+    ...(e.template?.templateVenues ?? []).map((x) => `venue:${x.venueId}`),
+  ]);
+  const listingOf = new Map<string, string | undefined>([
+    ...e.assetTransactions.map((t) => [t.id, t.assetId] as const),
+    ...e.serviceTransactions.map((t) => [t.id, t.serviceId] as const),
+    ...e.venueTransactions.map((t) => [t.id, t.venueId] as const),
+  ]);
   const statusOf = new Map<
     string,
     {
@@ -320,7 +352,12 @@ function supplierRows(e: EventRow): BookedSupplierRow[] {
     .filter((r) => !replaced.has(r.transactionId))
     .map((r) => {
       const t = statusOf.get(r.transactionId)!;
-      const fell = replacements.has(r.transactionId) && replacementFell(t);
+      // A Supplier asked first (ADR 0010: a replacement, or a package item
+      // its Supplier isn't matched for) that turned it down or let it lapse.
+      const fell =
+        replacementFell(t) &&
+        (replacements.has(r.transactionId) ||
+          packageListings.has(`${r.kind}:${listingOf.get(r.transactionId)}`));
       const reason = fell ? ("declined" as const) : r.reason;
       // A line stamped when it started needing a replacement. One from before
       // the stamp existed: a decline is its last change, so that stands in; a
@@ -460,6 +497,8 @@ export default class EventConflictSvc {
       select: {
         userId: true,
         eventId: true,
+        status: true,
+        totalAmount: true,
         event: { select: EVENT_WITH_SUPPLIERS },
       },
     });
@@ -474,7 +513,13 @@ export default class EventConflictSvc {
     ) {
       throw notFound("Booking");
     }
-    const items = supplierRows(e)
+    const rows = supplierRows(e);
+    // Suppliers still to answer (asked first, a replacement, an added item):
+    // the citizen can pay once none is left.
+    const awaitingConfirmation = rows.filter(
+      (r) => r.status === "pending_provider_confirmation",
+    ).length;
+    const items = rows
       .filter((r) => r.status !== "cancelled" && r.reason !== null)
       .map((r) => ({
         kind: r.kind,
@@ -491,6 +536,11 @@ export default class EventConflictSvc {
       items,
       replaceBy: due[0] ?? null,
       fullRefund: due.length > 0 && due[0] <= now,
+      awaitingConfirmation,
+      // Not paid yet, and what it comes to: the citizen pays once no
+      // Supplier is left to answer.
+      unpaid: booking.status === "pending",
+      totalAmount: booking.totalAmount,
     };
   }
 
