@@ -22,18 +22,19 @@ import {
   quantityJoi,
 } from "../../utils/limits";
 
+// Only `name` is guaranteed: a draft may leave the rest out (api#365).
 interface CreateVenuePayload {
   name: string;
-  description: string;
-  category: VenueCategory;
-  capacity: number;
-  address: string;
-  city: string;
+  description?: string;
+  category?: VenueCategory;
+  capacity?: number;
+  address?: string;
+  city?: string;
   state?: string;
   district?: string;
-  country: string;
+  country?: string;
   boundary?: LngLat[];
-  imgIds: string[];
+  imgIds?: string[];
   spaceType?: string[];
   amenities?: string[];
   techAv?: string[];
@@ -66,18 +67,27 @@ interface CreateVenuePayload {
 export default class VenueCtrl {
   // Create Venue Controller
   static async createVenue(req: Request, res: Response) {
+    // A draft needs only a name (api#365): Venue Studio's Save Draft sends
+    // what is filled so far. Everything else is required to publish, here and
+    // again in VenueSvc when a draft is published later.
+    const publishOnly = <T extends Joi.Schema>(rule: T) =>
+      rule.when("status", {
+        is: VenueStatus.draft,
+        then: Joi.optional(),
+        otherwise: Joi.required(),
+      });
     const schema = Joi.object<CreateVenuePayload>({
       name: nameJoi().required(),
-      description: descriptionJoi(LONG_DESCRIPTION_MAX).required(),
-      category: Joi.string()
-        .valid(...Object.values(VenueCategory))
-        .required(),
-      capacity: quantityJoi().required(),
-      address: Joi.string().required(),
-      city: Joi.string().required(),
+      description: publishOnly(descriptionJoi(LONG_DESCRIPTION_MAX)),
+      category: publishOnly(
+        Joi.string().valid(...Object.values(VenueCategory)),
+      ),
+      capacity: publishOnly(quantityJoi()),
+      address: publishOnly(Joi.string()),
+      city: publishOnly(Joi.string()),
       state: Joi.string().optional(),
       district: Joi.string().allow("").optional(),
-      country: Joi.string().required(),
+      country: publishOnly(Joi.string()),
       // A draft doesn't need a boundary yet; anything else does — see
       // VenueSvc.createVenue for the matching runtime check (which also
       // accounts for the venue_authority perk forcing status to available).
@@ -97,7 +107,14 @@ export default class VenueCtrl {
           then: Joi.optional(),
           otherwise: Joi.required(),
         }),
-      imgIds: Joi.array().items(Joi.string()).min(1).max(5).required(),
+      imgIds: Joi.array()
+        .items(Joi.string())
+        .max(5)
+        .when("status", {
+          is: VenueStatus.draft,
+          then: Joi.optional(),
+          otherwise: Joi.array().min(1).required(),
+        }),
       spaceType: Joi.array().items(Joi.string()).optional(),
       amenities: Joi.array().items(Joi.string()).optional(),
       techAv: Joi.array().items(Joi.string()).optional(),

@@ -18,6 +18,10 @@ import {
   pointInPolygon,
 } from "../../utils/geo";
 import { isPhAddress, isPhilippines } from "../locations/ph-geo";
+import {
+  PUBLISH_NEEDS_DESCRIPTION,
+  PUBLISH_NEEDS_IMAGE,
+} from "../../utils/listing-images";
 
 /**
  * Five minutes.
@@ -78,6 +82,43 @@ function assertPublishableAddress(v: {
   }
 }
 
+/**
+ * Everything a venue needs before it leaves `draft` (api#365). A draft may be
+ * saved with only a name, its required columns stored blank (see createVenue),
+ * so publishing - on create or later from the draft - checks them all here.
+ */
+function assertPublishableVenue(v: {
+  description?: string | null;
+  category?: string | null;
+  capacity?: number | null;
+  address?: string | null;
+  country?: string | null;
+  state?: string | null;
+  city?: string | null;
+  district?: string | null;
+  imageCount: number;
+}) {
+  if (!v.description?.trim()) {
+    throw new AppError(PUBLISH_NEEDS_DESCRIPTION, 400);
+  }
+  if (
+    !v.category ||
+    !(Object.values(VenueCategory) as string[]).includes(v.category)
+  ) {
+    throw new AppError("Pick a venue category before publishing", 400);
+  }
+  if (!v.capacity || v.capacity < 1) {
+    throw new AppError("Capacity must be at least 1", 400);
+  }
+  if (!v.city?.trim() || !v.country?.trim()) {
+    throw new AppError("City and country are required to publish a venue", 400);
+  }
+  if (v.imageCount === 0) {
+    throw new AppError(PUBLISH_NEEDS_IMAGE, 400);
+  }
+  assertPublishableAddress(v);
+}
+
 export default class VenueSvc {
   /**
    * Admins may act on any venue; everyone else must own it.
@@ -116,16 +157,18 @@ export default class VenueSvc {
   static async createVenue(data: {
     mayorId: string;
     name: string;
-    description: string;
-    category: VenueCategory;
-    capacity: number;
-    address: string;
-    city: string;
+    // Optional only for a draft; the controller and assertPublishableVenue
+    // require them for anything else.
+    description?: string;
+    category?: VenueCategory;
+    capacity?: number;
+    address?: string;
+    city?: string;
     state?: string;
     district?: string;
-    country: string;
+    country?: string;
     boundary?: LngLat[];
-    imgIds: string[];
+    imgIds?: string[];
     spaceType?: string[];
     amenities?: string[];
     techAv?: string[];
@@ -157,11 +200,8 @@ export default class VenueSvc {
     if (data.price && data.price < 0) {
       throw new AppError("Price cannot be negative", 400);
     }
-    if (data.capacity < 1) {
+    if (data.capacity !== undefined && data.capacity < 1) {
       throw new AppError("Capacity must be at least 1", 400);
-    }
-    if (!Array.isArray(data.imgIds) || data.imgIds.length === 0) {
-      throw new AppError("At least one image is required", 400);
     }
     if (data.imgIds && data.imgIds.length > 5) {
       throw new AppError("A maximum of 5 images is allowed", 400);
@@ -183,7 +223,7 @@ export default class VenueSvc {
     let centroid: { lat: number; lng: number } | undefined;
 
     if (finalStatus !== VenueStatus.draft) {
-      assertPublishableAddress(data);
+      assertPublishableVenue({ ...data, imageCount: data.imgIds?.length ?? 0 });
       if (!data.boundary) {
         throw new AppError(
           "A service-area boundary is required to publish a venue",
@@ -200,11 +240,19 @@ export default class VenueSvc {
     const { boundary, recommendedAssets, recommendedServices, ...rest } = data;
     const venue = await VenueRepo.createVenue({
       ...rest,
+      // The columns are required, but a draft may not have these yet: they
+      // are stored blank until it is published (api#365).
+      description: data.description ?? "",
+      category: data.category ?? "",
+      capacity: data.capacity ?? 0,
+      address: data.address ?? "",
+      city: data.city ?? "",
+      country: data.country ?? "",
       state: data.state ?? undefined,
       lat: centroid?.lat,
       lng: centroid?.lng,
       boundary: boundary as unknown as Prisma.InputJsonValue | undefined,
-      imgIds: data.imgIds,
+      imgIds: data.imgIds ?? [],
       spaceType: data.spaceType ?? [],
       amenities: data.amenities ?? [],
       techAv: data.techAv ?? [],
@@ -568,7 +616,24 @@ export default class VenueSvc {
       ).some(
         (k) => data[k] !== undefined && data[k] !== (venue[k] ?? undefined),
       );
-      if (addressChanged || venue.status === VenueStatus.draft) {
+      if (venue.status === VenueStatus.draft) {
+        // A draft going out: everything it could be saved without (api#365).
+        assertPublishableVenue({
+          description: data.description ?? venue.description,
+          category: data.category ?? venue.category,
+          capacity: data.capacity ?? venue.capacity,
+          address: data.address ?? venue.address,
+          country: data.country ?? venue.country,
+          state: data.state ?? venue.state,
+          city: data.city ?? venue.city,
+          district: data.district ?? venue.district,
+          imageCount: data.imgIds?.length ?? venue.images.length,
+        });
+      } else if (data.imgIds !== undefined && data.imgIds.length === 0) {
+        // Only when this edit removes every image, so an older venue saved
+        // without one can still be edited.
+        throw new AppError(PUBLISH_NEEDS_IMAGE, 400);
+      } else if (addressChanged) {
         assertPublishableAddress({
           address: data.address ?? venue.address,
           country: data.country ?? venue.country,
