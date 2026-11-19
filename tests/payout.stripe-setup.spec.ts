@@ -31,6 +31,7 @@ const stripeMock = vi.hoisted(() => ({
   event: null as null | { id: string; type: string; data: { object: unknown } },
   transfersCreate: vi.fn(),
   transfersList: vi.fn(),
+  transfersCreateReversal: vi.fn(),
   paymentIntentsRetrieve: vi.fn(),
 }));
 vi.mock("stripe", () => ({
@@ -38,7 +39,7 @@ vi.mock("stripe", () => ({
     transfers = {
       create: stripeMock.transfersCreate,
       list: stripeMock.transfersList,
-      createReversal: vi.fn(),
+      createReversal: stripeMock.transfersCreateReversal,
     };
     paymentIntents = {
       retrieve: stripeMock.paymentIntentsRetrieve,
@@ -60,6 +61,7 @@ describe("Stripe payout setup (api#363)", () => {
   let paymentId: string | undefined;
   let paidRecipient = "";
   let waitingRecipient = "";
+  let zeroRecipient = "";
   let admin = "";
   const acctPaid = `acct_paid_${runId}`;
   const acctWaiting = `acct_wait_${runId}`;
@@ -121,6 +123,14 @@ describe("Stripe payout setup (api#363)", () => {
         create: { stripeAccountId: acctWaiting, stripePayoutsEnabled: false },
       },
     });
+    zeroRecipient = await user("zero", {
+      paymentAccount: {
+        create: {
+          stripeAccountId: `acct_zero_${runId}`,
+          stripePayoutsEnabled: true,
+        },
+      },
+    });
     admin = await user("admin", { systemRole: "admin" });
     const payment = await prisma.payment.create({
       data: {
@@ -153,6 +163,8 @@ describe("Stripe payout setup (api#363)", () => {
     stripeMock.transfersCreate.mockReset();
     stripeMock.transfersList.mockReset();
     stripeMock.paymentIntentsRetrieve.mockReset();
+    stripeMock.transfersCreateReversal.mockReset();
+    stripeMock.transfersCreateReversal.mockResolvedValue({ id: "trr_1" });
     stripeMock.transfersCreate.mockImplementation(async () => ({
       id: `tr_${Math.random().toString(36).slice(2)}`,
     }));
@@ -416,6 +428,134 @@ describe("Stripe payout setup (api#363)", () => {
     expect(stripeMock.transfersCreate).not.toHaveBeenCalled();
   });
 
+  // api#395: Stripe refuses a ₱0 transfer.
+  it("never sends a ₱0 payout, and admins can't retry one", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const zero = await newPayout(zeroRecipient, 0);
+    await PayoutSvc.fireTransfer(zero.id);
+    warn.mockRestore();
+    expect(stripeMock.transfersCreate).not.toHaveBeenCalled();
+    expect(
+      await prisma.payout.findUniqueOrThrow({ where: { id: zero.id } }),
+    ).toMatchObject({ status: "pending", transferAttempts: 0 });
+
+    // A ₱0 row from before the fix, waiting on onboarding: the onboarding
+    // retry skips it, and an admin retry is refused.
+    await prisma.payout.update({
+      where: { id: zero.id },
+      data: { status: "failed", failureReason: "not_onboarded" },
+    });
+    expect(await PayoutSvc.retryNotOnboardedForUser(zeroRecipient)).toBe(0);
+    await expect(
+      PayoutSvc.retryPayout(zero.id, {
+        userId: admin,
+        email: "admin@example.com",
+      }),
+    ).rejects.toMatchObject({ status: 409, code: "PAYOUT_ZERO_AMOUNT" });
+    expect(stripeMock.transfersCreate).not.toHaveBeenCalled();
+    expect(
+      await prisma.payout.findUniqueOrThrow({ where: { id: zero.id } }),
+    ).toMatchObject({ status: "failed", failureReason: "not_onboarded" });
+  });
+
+  // api#395: a cancellation landing while the transfer is in flight.
+  it("reverses a transfer that went out after its line was cancelled", async () => {
+    const payout = await newPayout(paidRecipient, 500);
+    stripeMock.transfersCreate.mockImplementationOnce(async () => {
+      // The cancellation lands while Stripe is still answering.
+      await PayoutSvc.reversePayoutForSource(payout.sourceId, 500);
+      return { id: "tr_late" };
+    });
+
+    await PayoutSvc.fireTransfer(payout.id);
+
+    expect(stripeMock.transfersCreateReversal).toHaveBeenCalledTimes(1);
+    expect(stripeMock.transfersCreateReversal).toHaveBeenCalledWith(
+      "tr_late",
+      {},
+      { idempotencyKey: `payout:${payout.id}:reversal:tr_late` },
+    );
+    const after = await prisma.payout.findUniqueOrThrow({
+      where: { id: payout.id },
+    });
+    expect(after).toMatchObject({
+      status: "failed",
+      failureReason: "source_refunded",
+      providerReference: "tr_late",
+    });
+    expect(after.failureMessage).toMatch(/transfer was reversed/);
+    expect(after.paidAt).toBeNull();
+    await expect(
+      PayoutSvc.retryPayout(payout.id, {
+        userId: admin,
+        email: "admin@example.com",
+      }),
+    ).rejects.toMatchObject({ code: "PAYOUT_SOURCE_REFUNDED" });
+  });
+
+  it("notes a reversal that failed, for manual reconciliation", async () => {
+    const payout = await newPayout(paidRecipient, 600);
+    stripeMock.transfersCreate.mockImplementationOnce(async () => {
+      await PayoutSvc.reversePayoutForSource(payout.sourceId, 600);
+      return { id: "tr_late_2" };
+    });
+    stripeMock.transfersCreateReversal.mockRejectedValueOnce(
+      new Error("Stripe down"),
+    );
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    await PayoutSvc.fireTransfer(payout.id);
+    error.mockRestore();
+
+    const after = await prisma.payout.findUniqueOrThrow({
+      where: { id: payout.id },
+    });
+    expect(after).toMatchObject({
+      status: "failed",
+      failureReason: "source_refunded",
+      providerReference: "tr_late_2",
+    });
+    expect(after.failureMessage).toMatch(/reconcile it in Stripe/);
+  });
+
+  it("reverses a transfer an earlier attempt sent but couldn't record", async () => {
+    const payout = await newPayout(paidRecipient, 700);
+    stripeMock.transfersCreate.mockResolvedValueOnce({ id: "tr_unrecorded" });
+    const update = vi
+      .spyOn(prisma.payout, "update")
+      .mockRejectedValueOnce(new Error("connection lost"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    await PayoutSvc.fireTransfer(payout.id);
+    update.mockRestore();
+    error.mockRestore();
+    // Sent, not recorded: still pending.
+    expect(
+      await prisma.payout.findUniqueOrThrow({ where: { id: payout.id } }),
+    ).toMatchObject({ status: "pending", transferAttempts: 1 });
+
+    stripeMock.transfersList.mockResolvedValue({
+      data: [{ id: "tr_unrecorded", metadata: { payoutId: payout.id } }],
+    });
+    await PayoutSvc.reversePayoutForSource(payout.sourceId, 700);
+
+    expect(stripeMock.transfersList).toHaveBeenCalledWith({
+      destination: acctPaid,
+      transfer_group: payout.sourceId,
+      limit: 100,
+    });
+    expect(stripeMock.transfersCreateReversal).toHaveBeenCalledWith(
+      "tr_unrecorded",
+      {},
+      { idempotencyKey: `payout:${payout.id}:reversal:tr_unrecorded` },
+    );
+    expect(
+      await prisma.payout.findUniqueOrThrow({ where: { id: payout.id } }),
+    ).toMatchObject({
+      status: "failed",
+      failureReason: "source_refunded",
+      providerReference: "tr_unrecorded",
+    });
+  });
+
   it("records a chargeback once per dispute and lists it for admins", async () => {
     const disputeId = `dp_${runId}`;
     disputeIds.push(disputeId);
@@ -468,5 +608,206 @@ describe("Stripe payout setup (api#363)", () => {
         (d: { stripeDisputeId: string }) => d.stripeDisputeId === disputeId,
       ),
     ).toMatchObject({ payment: { id: paymentId } });
+  });
+});
+
+/**
+ * api#395: which client charge funds each Event line's transfer. A line is
+ * funded by the paid invoice that charged it; a line no invoice charged, and
+ * the EventFoxer's commission, by the latest one. A ₱0 commission (a markup
+ * of 0 and no per-line breakdown) creates no payout at all.
+ */
+describe("Event booking: per-line charge mapping (api#395)", () => {
+  const runId = Math.random().toString(36).substring(7);
+  const ids: Record<string, string> = {};
+  const userIds: string[] = [];
+  const serviceIds: string[] = [];
+  const invoiceIds: string[] = [];
+
+  beforeAll(async () => {
+    const user = async (key: string, payable = false) => {
+      const u = await prisma.user.create({
+        data: {
+          email: `lines-${key}-${runId}@example.com`,
+          name: `Lines ${key}`,
+          password: "pw",
+          ...(payable
+            ? {
+                paymentAccount: {
+                  create: {
+                    stripeAccountId: `acct_lines_${key}_${runId}`,
+                    stripePayoutsEnabled: true,
+                  },
+                },
+              }
+            : {}),
+        },
+      });
+      userIds.push(u.id);
+      return u.id;
+    };
+    ids.client = await user("client");
+    ids.organizer = await user("organizer", true);
+    for (const key of ["a", "b", "c"]) ids[key] = await user(key, true);
+
+    const start = new Date(Date.now() + 30 * 86_400_000);
+    const end = new Date(start.getTime() + 4 * 3_600_000);
+    ids.event = (
+      await prisma.event.create({
+        data: {
+          clientId: ids.client,
+          organizerId: ids.organizer,
+          name: `Lines event ${runId}`,
+          description: "desc",
+          eventCategory: "corporate",
+          startAt: start,
+          endAt: end,
+          guestCount: 10,
+          totalAmount: 3000,
+        },
+      })
+    ).id;
+    ids.booking = (
+      await prisma.booking.create({
+        data: {
+          eventId: ids.event,
+          userId: ids.client,
+          guestCount: 10,
+          totalAmount: 3000,
+          status: "completed",
+          startAt: start,
+          endAt: end,
+        },
+      })
+    ).id;
+    const line = async (key: string, price: number) => {
+      const service = await prisma.service.create({
+        data: {
+          ownerId: ids[key],
+          category: "catering",
+          name: `Lines ${key} ${runId}`,
+          description: "desc",
+          price,
+          billingRate: "hourly",
+        },
+      });
+      serviceIds.push(service.id);
+      return (
+        await prisma.eventServiceTransaction.create({
+          data: {
+            eventId: ids.event,
+            bookingId: ids.booking,
+            serviceId: service.id,
+            providerId: ids[key],
+            agreedPrice: price,
+            status: "approved",
+          },
+        })
+      ).id;
+    };
+    ids.txA = await line("a", 1000);
+    ids.txB = await line("b", 1200);
+    ids.txC = await line("c", 800); // charged by no invoice
+
+    // Two paid invoices, the older charging line A, the newer line B.
+    const invoice = async (txId: string, charge: string, ageMs: number) => {
+      const createdAt = new Date(Date.now() - ageMs);
+      const inv = await prisma.invoice.create({
+        data: {
+          payerId: ids.client,
+          subtotalAmount: 1000,
+          grossAmount: 1000,
+          status: "paid",
+          createdAt,
+          items: {
+            create: [
+              {
+                amount: 1000,
+                description: "line",
+                sourceType: "event_service_transaction",
+                sourceId: txId,
+              },
+            ],
+          },
+          payments: {
+            create: [
+              {
+                amount: 1000,
+                method: "card",
+                providerReference: charge,
+                status: "paid",
+                createdAt,
+              },
+            ],
+          },
+        },
+      });
+      invoiceIds.push(inv.id);
+    };
+    ids.chargeA = `ch_line_a_${runId}`;
+    ids.chargeB = `ch_line_b_${runId}`;
+    await invoice(ids.txA, ids.chargeA, 2 * 3_600_000);
+    await invoice(ids.txB, ids.chargeB, 3_600_000);
+  });
+
+  afterAll(async () => {
+    await prisma.payout.deleteMany({ where: { providerId: only(...userIds) } });
+    await prisma.payment.deleteMany({
+      where: { invoiceId: only(...invoiceIds) },
+    });
+    await prisma.invoiceItem.deleteMany({
+      where: { invoiceId: only(...invoiceIds) },
+    });
+    await prisma.invoice.deleteMany({ where: { id: only(...invoiceIds) } });
+    await prisma.eventServiceTransaction.deleteMany({
+      where: { eventId: only(ids.event) },
+    });
+    await prisma.booking.deleteMany({ where: { id: only(ids.booking) } });
+    await prisma.event.deleteMany({ where: { id: only(ids.event) } });
+    await prisma.service.deleteMany({ where: { id: only(...serviceIds) } });
+    await prisma.user.deleteMany({ where: { id: only(...userIds) } });
+  });
+
+  beforeEach(() => {
+    stripeMock.transfersCreate.mockReset();
+    stripeMock.transfersCreate.mockImplementation(async () => ({
+      id: `tr_${Math.random().toString(36).slice(2)}`,
+    }));
+    stripeMock.paymentIntentsRetrieve.mockReset();
+  });
+
+  it("funds each line from the charge that paid for it", async () => {
+    await PayoutSvc.createPayoutsForEventBooking(ids.booking);
+
+    const rows = await prisma.payout.findMany({
+      where: { providerId: only(...userIds) },
+    });
+    const bySource = new Map(rows.map((r) => [r.sourceId, r]));
+    expect(bySource.get(ids.txA)?.sourceChargeId).toBe(ids.chargeA);
+    expect(bySource.get(ids.txB)?.sourceChargeId).toBe(ids.chargeB);
+    // Charged by no invoice: the latest charge.
+    expect(bySource.get(ids.txC)?.sourceChargeId).toBe(ids.chargeB);
+
+    const sentFrom = new Map(
+      stripeMock.transfersCreate.mock.calls.map(([params]) => {
+        const p = params as {
+          metadata: { payoutId: string };
+          source_transaction?: string;
+        };
+        return [p.metadata.payoutId, p.source_transaction];
+      }),
+    );
+    expect(sentFrom.get(bySource.get(ids.txA)!.id)).toBe(ids.chargeA);
+    expect(sentFrom.get(bySource.get(ids.txB)!.id)).toBe(ids.chargeB);
+    expect(sentFrom.get(bySource.get(ids.txC)!.id)).toBe(ids.chargeB);
+    // Charge ids are used as they are; no PaymentIntent lookups.
+    expect(stripeMock.paymentIntentsRetrieve).not.toHaveBeenCalled();
+
+    // The commission is ₱0: no EventFoxer payout row, nothing sent to them.
+    expect(rows.find((r) => r.sourceType === "event_host_markup")).toBe(
+      undefined,
+    );
+    expect(rows.every((r) => r.status === "paid")).toBe(true);
+    expect(stripeMock.transfersCreate).toHaveBeenCalledTimes(3);
   });
 });

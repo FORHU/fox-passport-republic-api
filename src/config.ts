@@ -235,6 +235,15 @@ export const STRIPE_CONNECT_RETURN_URL =
 export const STRIPE_CONNECT_REFRESH_URL =
   process.env.STRIPE_CONNECT_REFRESH_URL ||
   `${FRONTEND_URL}/creator-dashboard/stripe-onboard`;
+// Country of new connected (Foxer) accounts (Accounts v2 `identity.country`),
+// ISO 3166-1 alpha-2. Optional: unset, it is the platform account's own
+// country, as v1 did. The Philippines is not a country Stripe supports for
+// accounts, so don't set "ph". See docs/PAYMENTS.md, gap 10.
+export const STRIPE_CONNECT_ACCOUNT_COUNTRY = (
+  process.env.STRIPE_CONNECT_ACCOUNT_COUNTRY || ""
+)
+  .trim()
+  .toLowerCase();
 export const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
 
 // Google sign-in is optional, but a partially configured integration must fail

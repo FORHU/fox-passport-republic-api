@@ -97,3 +97,16 @@ The decisions above stand. Four things this ADR assumed but the code didn't do:
 
 Details: `docs/PAYMENTS.md` §2 ("Sending a transfer"), §3 ("Two signing
 secrets", "Stripe dashboard setup"), §6.
+
+## Addendum (Nov 2026, api#395 and api#396)
+
+- **Accounts v2.** Connected accounts are now created through
+  `POST /v2/core/accounts` (Express dashboard, `recipient` configuration),
+  because a Stripe account that sets up Connect fresh refuses v1 account
+  creation. The model above is unchanged: still Separate Charges and Transfers
+  to an Express-dashboard account, and v1 endpoints still take the account's
+  id. The exception to keep in mind: Stripe's cross-border recipient service
+  agreement needs v1 (`docs/PAYMENTS.md`, gap 10).
+- **A payout is paid only from `pending`.** A transfer that returns after its
+  line was cancelled is reversed rather than recorded as paid, and a ₱0 share
+  creates no payout.
