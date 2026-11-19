@@ -406,6 +406,11 @@ model EventEditProposal {
   respondedAt           DateTime?
   /// The new line, once accepted.
   appliedTransactionId  String?
+  /// A paid booking whose total goes up (slice 3): the PaymentIntent for the
+  /// difference. The swap applies once it has succeeded.
+  deltaPaymentIntentId  String?   @unique
+  /// A paid booking whose total goes down: the refund of the difference.
+  deltaRefundId         String?
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
 

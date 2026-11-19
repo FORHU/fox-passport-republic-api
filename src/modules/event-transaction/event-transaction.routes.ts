@@ -29,6 +29,11 @@ router.post(
   EventTransactionCtrl.answerProposal("decline"),
 );
 router.post(
+  "/proposals/:id/confirm-payment",
+  authenticate,
+  EventTransactionCtrl.answerProposal("confirm-payment"),
+);
+router.post(
   "/proposals/:id/withdraw",
   authenticate,
   EventTransactionCtrl.answerProposal("withdraw"),

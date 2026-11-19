@@ -19,6 +19,30 @@ const db = vi.hoisted(() => ({
   notify: vi.fn(),
   startInbox: vi.fn(),
   sendMessage: vi.fn(),
+  bookingUpdate: vi.fn(),
+  eventUpdate: vi.fn(),
+  refundCreate: vi.fn(),
+  refundFindMany: vi.fn(),
+  intentCreate: vi.fn(),
+  intentRetrieve: vi.fn(),
+  intentCancel: vi.fn(),
+  stripeRefund: vi.fn(),
+  payments: vi.fn(),
+  createPayment: vi.fn(),
+}));
+
+vi.mock("stripe", () => ({
+  default: class {
+    paymentIntents = {
+      create: db.intentCreate,
+      retrieve: db.intentRetrieve,
+      cancel: db.intentCancel,
+    };
+    refunds = { create: db.stripeRefund };
+  },
+}));
+vi.mock("../src/modules/payment/payment.repository", () => ({
+  default: { getBookingPayments: db.payments, createPayment: db.createPayment },
 }));
 
 vi.mock("../src/utils/prisma", () => {
@@ -28,8 +52,14 @@ vi.mock("../src/utils/prisma", () => {
       create: db.assetTxCreate,
       update: db.assetTxUpdate,
     },
-    asset: { findMany: db.assetFindMany, findUniqueOrThrow: db.assetFindOne },
-    booking: { findUnique: db.bookingFind },
+    asset: {
+      findMany: db.assetFindMany,
+      findUnique: db.assetFindOne,
+      findUniqueOrThrow: db.assetFindOne,
+    },
+    booking: { findUnique: db.bookingFind, update: db.bookingUpdate },
+    event: { update: db.eventUpdate },
+    refund: { create: db.refundCreate, findMany: db.refundFindMany },
     eventEditProposal: {
       create: db.proposalCreate,
       findUnique: db.proposalFind,
@@ -62,7 +92,7 @@ vi.mock("../src/modules/conversations/conversation.service", () => ({
 }));
 
 import EventEditSvc, {
-  EditAfterPaymentError,
+  BookingNotEditableError,
   PROPOSAL_HOURS,
 } from "../src/modules/event-transaction/event-edit.service";
 import { AvailabilityConflictError } from "../src/modules/availability/availability.types";
@@ -124,7 +154,10 @@ const proposal = (over: Record<string, unknown> = {}) => ({
   quantity: 1,
   status: "pending",
   expiresAt: new Date(NOW.getTime() + 3_600_000),
+  currentPrice: D(1000),
   proposedPrice: D(1200),
+  priceDelta: D(200),
+  deltaPaymentIntentId: null,
   booking: { userId: "citizen1", status: "pending" },
   event: { name: "Garden wedding", organizerId: "host1" },
   ...over,
@@ -153,6 +186,15 @@ beforeEach(() => {
   db.assetFindOne.mockResolvedValue({ ownerId: "prov-new", currency: "PHP" });
   db.assetTxCreate.mockResolvedValue({ id: "new", providerId: "prov-new" });
   db.assetTxUpdate.mockResolvedValue({});
+  db.bookingUpdate.mockResolvedValue({});
+  db.eventUpdate.mockResolvedValue({});
+  db.refundCreate.mockResolvedValue({});
+  db.refundFindMany.mockResolvedValue([]);
+  db.intentCreate.mockResolvedValue({ id: "pi_delta", client_secret: "cs_d" });
+  db.intentCancel.mockResolvedValue({});
+  db.stripeRefund.mockResolvedValue({ id: "re_1", status: "succeeded" });
+  db.payments.mockResolvedValue([]);
+  db.createPayment.mockResolvedValue({});
 });
 
 describe("EventEditSvc.replacements", () => {
@@ -243,16 +285,16 @@ describe("EventEditSvc.propose", () => {
     ).rejects.toMatchObject({ status: 409 });
   });
 
-  it("refuses a paid booking", async () => {
+  it("refuses a booking that is over", async () => {
     db.bookingFind.mockResolvedValue({
       id: "b1",
       userId: "citizen1",
-      status: "confirmed",
+      status: "completed",
     });
 
     await expect(
       EventEditSvc.propose("host1", input, NOW),
-    ).rejects.toBeInstanceOf(EditAfterPaymentError);
+    ).rejects.toBeInstanceOf(BookingNotEditableError);
   });
 
   it("refuses a listing that isn't a same-category candidate", async () => {
@@ -294,7 +336,7 @@ describe("EventEditSvc.accept", () => {
 
     expect(out).toEqual({ proposalId: "p1", transactionId: "new" });
     expect(db.proposalUpdateMany.mock.calls[0][0]).toEqual({
-      where: { id: "p1", status: "pending" },
+      where: { id: "p1", status: { in: ["pending"] } },
       data: { status: "accepted", respondedAt: NOW },
     });
     expect(db.assetTxCreate.mock.calls[0][0].data).toMatchObject({
@@ -352,14 +394,14 @@ describe("EventEditSvc.accept", () => {
     expect(db.assetTxCreate).not.toHaveBeenCalled();
   });
 
-  it("refuses once the booking is paid", async () => {
+  it("refuses once the booking is over", async () => {
     db.proposalFind.mockResolvedValue(
-      proposal({ booking: { userId: "citizen1", status: "confirmed" } }),
+      proposal({ booking: { userId: "citizen1", status: "completed" } }),
     );
 
     await expect(
       EventEditSvc.accept("citizen1", "p1", NOW),
-    ).rejects.toBeInstanceOf(EditAfterPaymentError);
+    ).rejects.toBeInstanceOf(BookingNotEditableError);
   });
 
   it("ends the proposal instead of charging a price the citizen wasn't shown", async () => {
@@ -444,13 +486,283 @@ describe("EventEditSvc.forBooking", () => {
       userId: "citizen1",
       event: { organizerId: "host1" },
     });
-    db.proposalFindMany.mockResolvedValue([]);
+    db.proposalFindMany
+      .mockResolvedValueOnce([{ id: "p0", deltaPaymentIntentId: "pi_old" }])
+      .mockResolvedValueOnce([]);
 
     await EventEditSvc.forBooking("host1", "b1", NOW);
 
+    expect(db.proposalFindMany.mock.calls[0][0].where).toEqual({
+      bookingId: "b1",
+      status: "pending",
+      expiresAt: { lt: NOW },
+    });
     expect(db.proposalUpdateMany.mock.calls[0][0]).toEqual({
-      where: { bookingId: "b1", status: "pending", expiresAt: { lt: NOW } },
+      where: { id: "p0", status: "pending" },
       data: { status: "expired" },
     });
+    // A difference still being paid for it can no longer go through.
+    expect(db.intentCancel).toHaveBeenCalledWith("pi_old");
+  });
+});
+
+describe("a paid booking (ADR 0010 slice 3)", () => {
+  /** Old line 1000, new 1200: the total goes up by 200. */
+  const paidProposal = (over: Record<string, unknown> = {}) =>
+    proposal({
+      booking: { userId: "citizen1", status: "confirmed" },
+      currentPrice: D(1000),
+      proposedPrice: D(1200),
+      priceDelta: D(200),
+      deltaPaymentIntentId: null,
+      ...over,
+    });
+
+  it("lets the host propose a replacement on it", async () => {
+    db.bookingFind.mockResolvedValue({
+      id: "b1",
+      userId: "citizen1",
+      status: "confirmed",
+    });
+
+    await expect(
+      EventEditSvc.propose(
+        "host1",
+        { kind: "asset", transactionId: "old", itemId: "asset-new" },
+        NOW,
+      ),
+    ).resolves.toMatchObject({ id: "p1" });
+  });
+
+  it("asks for the difference before a higher price applies", async () => {
+    db.proposalFind.mockResolvedValue(paidProposal());
+
+    const out = await EventEditSvc.accept("citizen1", "p1", NOW);
+
+    expect(db.intentCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 20000,
+        currency: "php",
+        metadata: { eventEditProposalId: "p1" },
+      }),
+    );
+    expect(db.proposalUpdate).toHaveBeenCalledWith({
+      where: { id: "p1" },
+      data: { deltaPaymentIntentId: "pi_delta" },
+    });
+    expect(out).toMatchObject({
+      paymentRequired: true,
+      clientSecret: "cs_d",
+      paid: false,
+    });
+    expect(db.assetTxCreate).not.toHaveBeenCalled();
+    expect(db.bookingUpdate).not.toHaveBeenCalled();
+  });
+
+  it("resumes the same payment when the citizen accepts again", async () => {
+    db.proposalFind.mockResolvedValue(
+      paidProposal({ deltaPaymentIntentId: "pi_delta" }),
+    );
+    db.intentRetrieve.mockResolvedValue({
+      id: "pi_delta",
+      status: "requires_payment_method",
+      client_secret: "cs_d",
+    });
+
+    const out = await EventEditSvc.accept("citizen1", "p1", NOW);
+
+    expect(db.intentCreate).not.toHaveBeenCalled();
+    expect(out).toMatchObject({ paymentRequired: true, clientSecret: "cs_d" });
+  });
+
+  describe("confirming the payment", () => {
+    beforeEach(() => {
+      db.proposalFind.mockResolvedValue(
+        paidProposal({ deltaPaymentIntentId: "pi_delta" }),
+      );
+      db.intentRetrieve.mockResolvedValue({
+        id: "pi_delta",
+        status: "succeeded",
+        amount: 20000,
+      });
+    });
+
+    it("applies the swap, moves the totals and records the payment", async () => {
+      const out = await EventEditSvc.confirmPayment("citizen1", "p1", NOW);
+
+      expect(out).toEqual({ proposalId: "p1", transactionId: "new" });
+      expect(db.proposalUpdateMany.mock.calls[0][0]).toEqual({
+        where: { id: "p1", status: { in: ["pending", "expired"] } },
+        data: { status: "accepted", respondedAt: NOW },
+      });
+      expect(db.bookingUpdate).toHaveBeenCalledWith({
+        where: { id: "b1" },
+        data: { totalAmount: { increment: D(200) } },
+      });
+      expect(db.eventUpdate).toHaveBeenCalledWith({
+        where: { id: "e1" },
+        data: { totalAmount: { increment: D(200) } },
+      });
+      expect(db.createPayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bookingId: "b1",
+          amount: 200,
+          transactionId: "pi_delta",
+        }),
+      );
+    });
+
+    it("waits while the payment hasn't gone through", async () => {
+      db.intentRetrieve.mockResolvedValue({
+        id: "pi_delta",
+        status: "processing",
+        amount: 20000,
+      });
+
+      await expect(
+        EventEditSvc.confirmPayment("citizen1", "p1", NOW),
+      ).rejects.toMatchObject({ status: 409, code: "PAYMENT_NOT_COMPLETE" });
+      expect(db.assetTxCreate).not.toHaveBeenCalled();
+      expect(db.stripeRefund).not.toHaveBeenCalled();
+    });
+
+    it("refunds the payment when the listing was taken meanwhile", async () => {
+      db.reserve.mockRejectedValue(new AvailabilityConflictError([]));
+
+      await expect(
+        EventEditSvc.confirmPayment("citizen1", "p1", NOW),
+      ).rejects.toMatchObject({ status: 409, code: "AVAILABILITY_CONFLICT" });
+      expect(db.stripeRefund).toHaveBeenCalledWith({
+        payment_intent: "pi_delta",
+      });
+      expect(db.refundCreate).toHaveBeenCalled();
+      expect(db.createPayment).not.toHaveBeenCalled();
+    });
+
+    it("refunds the payment when the host withdrew it meanwhile", async () => {
+      db.proposalFind.mockResolvedValue(
+        paidProposal({ deltaPaymentIntentId: "pi_delta", status: "withdrawn" }),
+      );
+
+      await expect(
+        EventEditSvc.confirmPayment("citizen1", "p1", NOW),
+      ).rejects.toMatchObject({ status: 409 });
+      expect(db.stripeRefund).toHaveBeenCalled();
+      expect(db.assetTxCreate).not.toHaveBeenCalled();
+    });
+
+    it("applies a payment made just before the proposal lapsed", async () => {
+      db.proposalFind.mockResolvedValue(
+        paidProposal({ deltaPaymentIntentId: "pi_delta", status: "expired" }),
+      );
+
+      await expect(
+        EventEditSvc.confirmPayment("citizen1", "p1", NOW),
+      ).resolves.toEqual({ proposalId: "p1", transactionId: "new" });
+    });
+
+    it("answers the same again once applied", async () => {
+      db.proposalFind.mockResolvedValue(
+        paidProposal({
+          deltaPaymentIntentId: "pi_delta",
+          status: "accepted",
+          appliedTransactionId: "new",
+        }),
+      );
+
+      await expect(
+        EventEditSvc.confirmPayment("citizen1", "p1", NOW),
+      ).resolves.toEqual({ proposalId: "p1", transactionId: "new" });
+      expect(db.createPayment).not.toHaveBeenCalled();
+    });
+
+    it("refuses a payment that doesn't match the change", async () => {
+      db.intentRetrieve.mockResolvedValue({
+        id: "pi_delta",
+        status: "succeeded",
+        amount: 100,
+      });
+
+      await expect(
+        EventEditSvc.confirmPayment("citizen1", "p1", NOW),
+      ).rejects.toMatchObject({ status: 409 });
+      expect(db.assetTxCreate).not.toHaveBeenCalled();
+    });
+  });
+
+  it("applies a lower price at once and refunds the difference", async () => {
+    // Old line 1000, new 700: 300 back.
+    db.assetFindMany.mockResolvedValue([{ ...candidate, price: D(700) }]);
+    db.proposalFind.mockResolvedValue(
+      paidProposal({ proposedPrice: D(700), priceDelta: D(-300) }),
+    );
+    db.payments.mockResolvedValue([
+      {
+        id: "pay1",
+        status: "paid",
+        amount: D(5000),
+        providerReference: "pi_booking",
+        paidAt: new Date("2026-11-10T00:00:00Z"),
+      },
+    ]);
+    db.refundFindMany.mockResolvedValue([
+      { paymentId: "pay1", amount: D(4800) },
+    ]);
+
+    await EventEditSvc.accept("citizen1", "p1", NOW);
+
+    expect(db.assetTxCreate).toHaveBeenCalled();
+    expect(db.bookingUpdate).toHaveBeenCalledWith({
+      where: { id: "b1" },
+      data: { totalAmount: { increment: D(-300) } },
+    });
+    // Only 200 was left on the payment after an earlier refund.
+    expect(db.stripeRefund).toHaveBeenCalledWith({
+      payment_intent: "pi_booking",
+      amount: 20000,
+    });
+    expect(db.refundCreate.mock.calls[0][0].data).toMatchObject({
+      paymentId: "pay1",
+      bookingId: "b1",
+      reason: "Event change — price decreased",
+    });
+    expect(db.intentCreate).not.toHaveBeenCalled();
+  });
+
+  it("cancels the payment begun for a proposal the host withdraws", async () => {
+    db.proposalFind.mockResolvedValue({
+      id: "p1",
+      proposedById: "host1",
+      deltaPaymentIntentId: "pi_delta",
+    });
+
+    await EventEditSvc.withdraw("host1", "p1");
+
+    expect(db.intentCancel).toHaveBeenCalledWith("pi_delta");
+  });
+
+  it("tells the citizen a proposal is waiting for its difference, without the payment id", async () => {
+    db.bookingFind.mockResolvedValue({
+      userId: "citizen1",
+      event: { organizerId: "host1" },
+    });
+    db.proposalFindMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      {
+        id: "p1",
+        kind: "asset",
+        itemId: "asset-new",
+        replacesTransactionId: "old",
+        status: "pending",
+        deltaPaymentIntentId: "pi_delta",
+        deltaRefundId: null,
+      },
+    ]);
+    db.assetTxFind.mockResolvedValue({ assetId: "asset-old" });
+    db.assetFindOne.mockResolvedValue({ name: "x" });
+
+    const [row] = await EventEditSvc.forBooking("citizen1", "b1", NOW);
+
+    expect(row.awaitingPayment).toBe(true);
+    expect(row).not.toHaveProperty("deltaPaymentIntentId");
   });
 });

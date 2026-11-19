@@ -64,6 +64,44 @@ export default class RefundSvc {
     };
   }
 
+  /**
+   * How much of each payment has already gone back (a change's difference, an
+   * earlier partial refund): refunds that succeeded or are still settling,
+   * not ones that failed. A later refund can only give back what is left.
+   */
+  static async refundedByPayment(
+    paymentIds: string[],
+  ): Promise<Map<string, Prisma.Decimal>> {
+    if (paymentIds.length === 0) return new Map();
+    const rows = await prisma.refund.findMany({
+      where: {
+        paymentId: { in: paymentIds },
+        status: { in: [RefundStatus.succeeded, RefundStatus.pending] },
+      },
+      select: { paymentId: true, amount: true },
+    });
+    const out = new Map<string, Prisma.Decimal>();
+    for (const r of rows) {
+      if (!r.paymentId) continue;
+      out.set(
+        r.paymentId,
+        (out.get(r.paymentId) ?? new Prisma.Decimal(0)).add(r.amount),
+      );
+    }
+    return out;
+  }
+
+  /** A payment's refund at [percent], capped at what is left on it. */
+  static refundFor(
+    amount: Prisma.Decimal,
+    alreadyRefunded: Prisma.Decimal | undefined,
+    percent: number,
+  ): Prisma.Decimal {
+    const left = amount.sub(alreadyRefunded ?? 0);
+    if (left.lte(0)) return new Prisma.Decimal(0);
+    return Prisma.Decimal.min(amount.mul(percent).div(100), left);
+  }
+
   static async checkEligibility(bookingId: string, userId: string) {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
@@ -146,12 +184,24 @@ export default class RefundSvc {
           : "No refund available under the applicable cancellation policy";
     }
 
-    const payments = await PaymentRepo.getBookingPayments(bookingId);
-    const totalPaid = payments
-      .filter((p) => p.status === PaymentStatus.paid)
-      .reduce((sum, p) => sum.add(p.amount), new Prisma.Decimal(0));
-
-    const estimatedRefund = totalPaid.mul(refundPercent).div(100);
+    const payments = (await PaymentRepo.getBookingPayments(bookingId)).filter(
+      (p) => p.status === PaymentStatus.paid,
+    );
+    const totalPaid = payments.reduce(
+      (sum, p) => sum.add(p.amount),
+      new Prisma.Decimal(0),
+    );
+    // What already went back (a change's difference) is not refunded twice.
+    const refunded = await RefundSvc.refundedByPayment(
+      payments.map((p) => p.id),
+    );
+    const estimatedRefund = payments.reduce(
+      (sum, p) =>
+        sum.add(
+          RefundSvc.refundFor(p.amount, refunded.get(p.id), refundPercent),
+        ),
+      new Prisma.Decimal(0),
+    );
 
     return {
       eligible,

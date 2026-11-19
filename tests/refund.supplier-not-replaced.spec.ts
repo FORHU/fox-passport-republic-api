@@ -15,6 +15,7 @@ const m = vi.hoisted(() => ({
   findForCancellation: vi.fn(),
   createRefund: vi.fn(),
   cancel: vi.fn(),
+  refunded: vi.fn(),
 }));
 
 vi.mock("stripe", () => ({
@@ -28,7 +29,10 @@ vi.mock("../src/config", async (importOriginal) => ({
   STRIPE_SECRET_KEY: "sk_test",
 }));
 vi.mock("../src/utils/prisma", () => ({
-  prisma: { booking: { findUnique: m.bookingFind } },
+  prisma: {
+    booking: { findUnique: m.bookingFind },
+    refund: { findMany: m.refunded },
+  },
 }));
 vi.mock("../src/modules/payment/payment.repository", () => ({
   default: { getBookingPayments: m.payments },
@@ -101,6 +105,7 @@ beforeEach(() => {
   m.stripeRefund.mockResolvedValue({ id: "re_1", status: "succeeded" });
   m.createRefund.mockImplementation(async (r) => r);
   m.cancel.mockResolvedValue({ id: "b1", status: "cancelled" });
+  m.refunded.mockResolvedValue([]);
   vi.spyOn(
     BookingSvc as unknown as { recordForPackage: () => Promise<void> },
     "recordForPackage",
@@ -178,5 +183,57 @@ describe("cancelling", () => {
       amount: 50000,
     });
     expect(m.createRefund.mock.calls[0][0].reason).toContain("Moderate");
+  });
+});
+
+describe("what already went back is not refunded twice", () => {
+  // 1000 paid, 300 of it already refunded (a change's lower price).
+  beforeEach(() =>
+    m.refunded.mockResolvedValue([
+      { paymentId: "pay1", amount: new Prisma.Decimal(300) },
+    ]),
+  );
+
+  it("caps the cancel check at what is left", async () => {
+    m.fullRefundDue.mockResolvedValue(true);
+
+    const out = await RefundSvc.checkEligibility("b1", "citizen1");
+
+    expect(out.estimatedRefund.toNumber()).toBe(700);
+    expect(m.refunded.mock.calls[0][0].where).toEqual({
+      paymentId: { in: ["pay1"] },
+      status: { in: ["succeeded", "pending"] },
+    });
+  });
+
+  it("refunds only what is left when cancelling in full", async () => {
+    m.fullRefundDue.mockResolvedValue(true);
+
+    await BookingSvc.cancelWithRefunds("b1", "citizen1");
+
+    expect(m.stripeRefund).toHaveBeenCalledWith({
+      payment_intent: "pi_1",
+      amount: 70000,
+    });
+  });
+
+  it("takes a policy refund from the original, up to what is left", async () => {
+    m.fullRefundDue.mockResolvedValue(false);
+
+    // 50% of 1000 is 500, and 700 is left: 500.
+    const out = await RefundSvc.checkEligibility("b1", "citizen1");
+
+    expect(out.estimatedRefund.toNumber()).toBe(500);
+  });
+});
+
+describe("RefundSvc.refundFor", () => {
+  const D = (n: number) => new Prisma.Decimal(n);
+
+  it("is the percentage of the payment, capped at what is left", () => {
+    expect(RefundSvc.refundFor(D(1000), undefined, 100).toNumber()).toBe(1000);
+    expect(RefundSvc.refundFor(D(1000), D(300), 100).toNumber()).toBe(700);
+    expect(RefundSvc.refundFor(D(1000), D(300), 50).toNumber()).toBe(500);
+    expect(RefundSvc.refundFor(D(1000), D(1000), 100).toNumber()).toBe(0);
   });
 });
