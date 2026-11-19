@@ -39,7 +39,8 @@ export default class VenueRepo {
     mayorId: string;
     name: string;
     description: string;
-    category: VenueCategory;
+    // A free-text column: "" on a draft that has no category yet (api#365).
+    category: VenueCategory | "";
     capacity: number;
     address: string;
     city: string;
