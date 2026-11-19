@@ -23,6 +23,13 @@ async function sessionUser(req: Request): Promise<Request["user"] | null> {
   };
 }
 
+/**
+ * The `code` on a 401 from `authenticate`: the session is missing or over, so
+ * the client must sign in again. Any other failure is not fixed by signing in,
+ * so a client can tell "log in again" apart from "try again later" (#158).
+ */
+export const REAUTH_REQUIRED = "REAUTH_REQUIRED";
+
 /** Requires a signed-in user; answers 401 otherwise. */
 export const authenticate = async (
   req: Request,
@@ -35,13 +42,17 @@ export const authenticate = async (
       req.user = user;
       return next();
     }
-    return res
-      .status(401)
-      .json({ success: false, message: "Not authenticated" });
+    return res.status(401).json({
+      success: false,
+      code: REAUTH_REQUIRED,
+      message: "Not authenticated",
+    });
   } catch {
-    return res
-      .status(401)
-      .json({ success: false, message: "Invalid or expired session" });
+    return res.status(401).json({
+      success: false,
+      code: REAUTH_REQUIRED,
+      message: "Invalid or expired session",
+    });
   }
 };
 
