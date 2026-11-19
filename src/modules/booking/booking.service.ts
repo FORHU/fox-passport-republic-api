@@ -2008,15 +2008,23 @@ export default class BookingSvc {
     }
 
     const refunds: Refund[] = [];
+    // What already went back (a change's difference) is not refunded twice.
+    const alreadyRefunded = await RefundSvc.refundedByPayment(
+      completedPayments.map((p) => p.id),
+    );
 
     for (const payment of completedPayments) {
       let stripeRefundId: string | null = null;
       let refundStatus: RefundStatus = RefundStatus.pending;
       let failureReason: string | null = null;
 
-      const estimatedRefund = payment.amount.mul(refundPercent).div(100);
+      const estimatedRefund = RefundSvc.refundFor(
+        payment.amount,
+        alreadyRefunded.get(payment.id),
+        refundPercent,
+      );
 
-      if (refundPercent <= 0) {
+      if (refundPercent <= 0 || estimatedRefund.lte(0)) {
         refunds.push(
           await BookingRepo.createRefund({
             bookingId: id,

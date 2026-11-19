@@ -186,6 +186,8 @@ const ALLOW_LIST = new Set([
   "event-transaction.routes.ts POST /proposals/:id/accept",
   "event-transaction.routes.ts POST /proposals/:id/decline",
   "event-transaction.routes.ts POST /proposals/:id/withdraw",
+  // Only the booking's citizen can confirm paying a change's difference.
+  "event-transaction.routes.ts POST /proposals/:id/confirm-payment",
   "event-transaction.routes.ts GET /:id/replacements",
   "event-transaction.routes.ts POST /:id/replace",
   // The host leaves an unpaid booking (ADR 0011): the service allows only the

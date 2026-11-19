@@ -205,8 +205,14 @@ export default class EventTransactionCtrl {
     }
   }
 
-  /** POST /event-transactions/proposals/:id/{accept,decline,withdraw}. */
-  static answerProposal(action: "accept" | "decline" | "withdraw") {
+  /**
+   * POST /event-transactions/proposals/:id/{accept,decline,withdraw,
+   * confirm-payment}. confirm-payment applies a paid booking's change once
+   * the citizen has paid the difference (ADR 0010).
+   */
+  static answerProposal(
+    action: "accept" | "decline" | "withdraw" | "confirm-payment",
+  ) {
     return async (req: Request, res: Response) => {
       try {
         const userId = req.user!.userId;
@@ -216,7 +222,9 @@ export default class EventTransactionCtrl {
             ? await EventEditSvc.accept(userId, id)
             : action === "decline"
               ? await EventEditSvc.decline(userId, id)
-              : await EventEditSvc.withdraw(userId, id);
+              : action === "confirm-payment"
+                ? await EventEditSvc.confirmPayment(userId, id)
+                : await EventEditSvc.withdraw(userId, id);
         return res.status(200).json({ success: true, data });
       } catch (e: unknown) {
         return sendServerError(res, e, { success: false });

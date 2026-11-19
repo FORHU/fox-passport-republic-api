@@ -1,5 +1,10 @@
-import { Prisma } from "@prisma/client";
+import Stripe from "stripe";
+import { PaymentStatus, Prisma, RefundStatus } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
+import { STRIPE_SECRET_KEY } from "../../config";
+import { toStripeCents } from "../../utils/pricing";
+import PaymentRepo from "../payment/payment.repository";
+import RefundSvc from "../refund/refund.service";
 import { AppError, notFound } from "../../utils/errors";
 import NotificationSvc from "../notifications/user-notification.service";
 import PricingSvc from "../pricing/pricing.service";
@@ -18,9 +23,9 @@ import EventConflictSvc, {
  * added awaiting its Supplier's confirmation, like any item added to a
  * booking, and the old line is let go.
  *
- * Only an unpaid booking can be edited for now: checkout then charges the new
- * total by itself. A paid booking needs the price difference charged or
- * refunded, which is not built yet.
+ * An unpaid booking's checkout charges the new total by itself. A paid one
+ * settles the difference, as edit requests do for direct bookings (0003): a
+ * higher total is paid before the swap applies, a lower one is refunded.
  */
 
 /** How long the citizen has to answer a proposal. */
@@ -28,13 +33,21 @@ export const PROPOSAL_HOURS = 48;
 /** How long the new Supplier has to confirm (as for any added item). */
 const CONFIRM_HOURS = 24;
 const LIVE = ["pending", "pending_provider_confirmation", "approved"];
+/** Bookings a Supplier can still be replaced on: unpaid, or paid and to come. */
+const EDITABLE = ["pending", "confirmed"];
 
-export class EditAfterPaymentError extends AppError {
+let stripeClient: Stripe | null = null;
+const stripe = () =>
+  (stripeClient ??= new Stripe(STRIPE_SECRET_KEY || "", {
+    apiVersion: "2025-08-27.basil",
+  }));
+
+export class BookingNotEditableError extends AppError {
   constructor() {
     super(
-      "This booking is already paid. Replacing a Supplier on a paid booking is not available yet.",
+      "This booking can no longer be changed.",
       409,
-      "EDIT_AFTER_PAYMENT",
+      "BOOKING_NOT_EDITABLE",
     );
   }
 }
@@ -418,7 +431,9 @@ export default class EventEditSvc {
     if (!booking || booking.status === "cancelled") {
       throw new AppError("This booking is cancelled", 409);
     }
-    if (booking.status !== "pending") throw new EditAfterPaymentError();
+    if (!EDITABLE.includes(booking.status)) {
+      throw new BookingNotEditableError();
+    }
 
     const candidate = (await this.listingsLike(input.kind, row, hostId)).find(
       (c) => c.itemId === input.itemId,
@@ -535,10 +550,11 @@ export default class EventEditSvc {
 
   /** Lazily expires a booking's overdue proposals, as edit requests do (0003). */
   private static async expireOld(bookingId: string, now: Date) {
-    await prisma.eventEditProposal.updateMany({
+    const overdue = await prisma.eventEditProposal.findMany({
       where: { bookingId, status: "pending", expiresAt: { lt: now } },
-      data: { status: "expired" },
+      select: { id: true, deltaPaymentIntentId: true },
     });
+    for (const p of overdue) await this.expire(p.id, p.deltaPaymentIntentId);
   }
 
   /** A proposal with the names of the old and new listings. */
@@ -594,8 +610,11 @@ export default class EventEditSvc {
                 select: { venueId: true },
               })
             )?.venueId;
+    const { deltaPaymentIntentId, deltaRefundId: _refund, ...rest } = p;
     return {
-      ...p,
+      ...rest,
+      // Accepted on a paid booking, with the difference still to pay.
+      awaitingPayment: rest.status === "pending" && !!deltaPaymentIntentId,
       itemName: (await name(p.kind, p.itemId)) ?? "",
       replacesName: replacedListing
         ? ((await name(p.kind, replacedListing)) ?? "")
@@ -603,12 +622,8 @@ export default class EventEditSvc {
     };
   }
 
-  /** The citizen's answer, after the checks both answers share. */
-  private static async openFor(
-    citizenId: string,
-    proposalId: string,
-    now: Date,
-  ) {
+  /** A proposal for its citizen, with what accepting it needs. */
+  private static async load(citizenId: string, proposalId: string) {
     const p = await prisma.eventEditProposal.findUnique({
       where: { id: proposalId },
       include: {
@@ -617,11 +632,18 @@ export default class EventEditSvc {
       },
     });
     if (!p || p.booking.userId !== citizenId) throw notFound("Proposal");
+    return p;
+  }
+
+  /** The citizen's answer, after the checks both answers share. */
+  private static async openFor(
+    citizenId: string,
+    proposalId: string,
+    now: Date,
+  ) {
+    const p = await this.load(citizenId, proposalId);
     if (p.status === "pending" && p.expiresAt < now) {
-      await prisma.eventEditProposal.updateMany({
-        where: { id: p.id, status: "pending" },
-        data: { status: "expired" },
-      });
+      await this.expire(p.id, p.deltaPaymentIntentId);
       throw new AppError("This proposal has expired", 409);
     }
     if (p.status !== "pending") {
@@ -631,16 +653,35 @@ export default class EventEditSvc {
   }
 
   /**
-   * The citizen accepts: the new line is added awaiting its Supplier, the old
-   * one is let go, and checkout charges the new total once it is confirmed.
+   * Ends a proposal no one answered in time. A payment begun for it is
+   * cancelled so it can't go through later; one that already went through is
+   * applied or refunded by confirmPayment.
    */
-  static async accept(
-    citizenId: string,
-    proposalId: string,
-    now: Date = new Date(),
-  ) {
-    const p = await this.openFor(citizenId, proposalId, now);
-    if (p.booking.status !== "pending") throw new EditAfterPaymentError();
+  private static async expire(id: string, paymentIntentId: string | null) {
+    await prisma.eventEditProposal.updateMany({
+      where: { id, status: "pending" },
+      data: { status: "expired" },
+    });
+    if (paymentIntentId) await this.cancelIntent(paymentIntentId);
+  }
+
+  private static async cancelIntent(paymentIntentId: string) {
+    try {
+      await stripe().paymentIntents.cancel(paymentIntentId);
+    } catch {
+      // Already succeeded or cancelled: confirmPayment settles a paid one.
+    }
+  }
+
+  /** The line, the listing and its price, re-checked as the citizen answers. */
+  private static async prepare(p: {
+    id: string;
+    kind: string;
+    replacesTransactionId: string;
+    proposedById: string;
+    itemId: string;
+    proposedPrice: Prisma.Decimal;
+  }) {
     const kind = p.kind as ConflictKind;
     const row = await this.line(kind, p.replacesTransactionId, p.proposedById);
     const candidate = (await this.listingsLike(kind, row, p.proposedById)).find(
@@ -657,16 +698,283 @@ export default class EventEditSvc {
     // The citizen agreed to the price they were shown. If the listing's price
     // has moved since, this proposal ends and the host proposes it again.
     if (!charge.equals(p.proposedPrice)) {
-      await prisma.eventEditProposal.updateMany({
-        where: { id: p.id, status: "pending" },
-        data: { status: "expired" },
-      });
       throw new AppError(
         "The price changed since this was proposed. Ask your host to propose it again.",
         409,
         "PROPOSAL_PRICE_CHANGED",
       );
     }
+    return { kind, row, candidate, snapshot };
+  }
+
+  /**
+   * The citizen accepts. On an unpaid booking, or a paid one whose total goes
+   * down or stays the same, the swap applies now: the new line is added
+   * awaiting its Supplier and the old one is let go (a paid booking gets the
+   * difference back). A paid booking whose total goes up pays the difference
+   * first: this returns what the app needs to take that payment, and
+   * confirmPayment applies the swap once it has gone through.
+   */
+  static async accept(
+    citizenId: string,
+    proposalId: string,
+    now: Date = new Date(),
+  ) {
+    const p = await this.openFor(citizenId, proposalId, now);
+    if (!EDITABLE.includes(p.booking.status)) {
+      throw new BookingNotEditableError();
+    }
+    const paid = p.booking.status !== "pending";
+    let prepared;
+    try {
+      prepared = await this.prepare(p);
+    } catch (err) {
+      if (err instanceof AppError && err.code === "PROPOSAL_PRICE_CHANGED") {
+        await this.expire(p.id, p.deltaPaymentIntentId);
+      }
+      throw err;
+    }
+    const delta = p.priceDelta;
+
+    if (paid && delta.gt(0)) return this.startPayment(p, delta);
+
+    const applied = await this.apply(p, prepared, delta, now);
+    if (paid && delta.lt(0)) await this.refundDifference(p, delta.abs());
+    return applied;
+  }
+
+  /**
+   * The PaymentIntent for the difference, created once per proposal: accepting
+   * again (the app was closed mid-payment) resumes the same one.
+   */
+  private static async startPayment(
+    p: { id: string; deltaPaymentIntentId: string | null },
+    delta: Prisma.Decimal,
+  ) {
+    const amount = toStripeCents(delta.toNumber());
+    if (p.deltaPaymentIntentId) {
+      const pi = await stripe().paymentIntents.retrieve(p.deltaPaymentIntentId);
+      if (pi.status !== "canceled") {
+        return {
+          proposalId: p.id,
+          paymentRequired: true as const,
+          amount: delta,
+          clientSecret: pi.client_secret,
+          paid: pi.status === "succeeded",
+        };
+      }
+    }
+    const pi = await stripe().paymentIntents.create({
+      amount,
+      currency: "php",
+      // Not `bookingId`: the payment webhook acts on that, and this is not a
+      // booking's own payment. confirmPayment records it once applied.
+      metadata: { eventEditProposalId: p.id },
+      description: "Event change — price difference",
+      automatic_payment_methods: { enabled: true },
+    });
+    await prisma.eventEditProposal.update({
+      where: { id: p.id },
+      data: { deltaPaymentIntentId: pi.id },
+    });
+    return {
+      proposalId: p.id,
+      paymentRequired: true as const,
+      amount: delta,
+      clientSecret: pi.client_secret,
+      paid: false,
+    };
+  }
+
+  /**
+   * After the citizen paid the difference: checks the payment with Stripe,
+   * applies the swap and records the payment against the booking. If the swap
+   * can no longer apply (the listing was taken, the price moved, the host
+   * withdrew it), the payment is refunded in full.
+   */
+  static async confirmPayment(
+    citizenId: string,
+    proposalId: string,
+    now: Date = new Date(),
+  ) {
+    const p = await this.load(citizenId, proposalId);
+    if (p.status === "accepted" && p.appliedTransactionId) {
+      return { proposalId: p.id, transactionId: p.appliedTransactionId };
+    }
+    if (!p.deltaPaymentIntentId) {
+      throw new AppError("There is nothing to pay for this proposal", 409);
+    }
+    const pi = await stripe().paymentIntents.retrieve(p.deltaPaymentIntentId);
+    if (pi.status !== "succeeded") {
+      throw new AppError(
+        "The payment hasn't gone through yet",
+        409,
+        "PAYMENT_NOT_COMPLETE",
+      );
+    }
+    const delta = p.priceDelta;
+    if (pi.amount !== toStripeCents(delta.toNumber())) {
+      throw new AppError("The payment doesn't match this change", 409);
+    }
+
+    // Paid in time even if the proposal lapsed while the card was charged.
+    const answerable =
+      (p.status === "pending" || p.status === "expired") &&
+      EDITABLE.includes(p.booking.status);
+    try {
+      if (!answerable) {
+        throw new AppError(`This proposal was already ${p.status}`, 409);
+      }
+      const prepared = await this.prepare(p);
+      const applied = await this.apply(p, prepared, delta, now, [
+        "pending",
+        "expired",
+      ]);
+      await PaymentRepo.createPayment({
+        bookingId: p.bookingId,
+        amount: delta.toNumber(),
+        currency: "PHP",
+        method: "stripe",
+        paymentType: "full",
+        paymentStatus: PaymentStatus.paid,
+        transactionId: pi.id,
+        paidAt: now,
+      });
+      return applied;
+    } catch (err) {
+      if (!(err instanceof AppError)) throw err;
+      await this.refundIntent(p.id, p.bookingId, pi.id, delta);
+      await prisma.eventEditProposal.updateMany({
+        where: { id: p.id, status: { in: ["pending", "expired"] } },
+        data: { status: "expired" },
+      });
+      throw new AppError(
+        `${err.message} Your payment of the difference was refunded.`,
+        409,
+        err.code ?? "CHANGE_NOT_APPLIED",
+      );
+    }
+  }
+
+  /** Gives back a difference that was paid for a change that didn't apply. */
+  private static async refundIntent(
+    proposalId: string,
+    bookingId: string,
+    paymentIntentId: string,
+    amount: Prisma.Decimal,
+  ) {
+    let status: RefundStatus = RefundStatus.failed;
+    let reference: string | null = null;
+    try {
+      const r = await stripe().refunds.create({
+        payment_intent: paymentIntentId,
+      });
+      reference = r.id;
+      status =
+        r.status === "succeeded"
+          ? RefundStatus.succeeded
+          : RefundStatus.pending;
+    } catch (e) {
+      console.error(`Refund of proposal ${proposalId}'s payment failed`, e);
+    }
+    await prisma.refund.create({
+      data: {
+        bookingId,
+        amount,
+        providerReference: reference,
+        status,
+        reason: "Event change not applied — difference refunded",
+      },
+    });
+  }
+
+  /**
+   * Refunds a paid booking the amount its total went down by, from its paid
+   * payments, newest first, never more than is left on each.
+   */
+  private static async refundDifference(
+    p: { id: string; bookingId: string },
+    amount: Prisma.Decimal,
+  ) {
+    const payments = (await PaymentRepo.getBookingPayments(p.bookingId))
+      .filter(
+        (x) =>
+          x.status === PaymentStatus.paid &&
+          x.providerReference?.startsWith("pi_"),
+      )
+      .sort((a, b) => (b.paidAt?.getTime() ?? 0) - (a.paidAt?.getTime() ?? 0));
+    const refunded = await RefundSvc.refundedByPayment(
+      payments.map((x) => x.id),
+    );
+    let left = amount;
+    let firstRefundId: string | null = null;
+    for (const payment of payments) {
+      if (left.lte(0)) break;
+      const room = payment.amount.sub(
+        refunded.get(payment.id) ?? new Prisma.Decimal(0),
+      );
+      if (room.lte(0)) continue;
+      const part = Prisma.Decimal.min(room, left);
+      let status: RefundStatus = RefundStatus.failed;
+      let reference: string | null = null;
+      try {
+        const r = await stripe().refunds.create({
+          payment_intent: payment.providerReference!,
+          amount: toStripeCents(part.toNumber()),
+        });
+        reference = r.id;
+        firstRefundId ??= r.id;
+        status =
+          r.status === "succeeded"
+            ? RefundStatus.succeeded
+            : RefundStatus.pending;
+      } catch (e) {
+        console.error(`Refund for proposal ${p.id} failed`, e);
+      }
+      await prisma.refund.create({
+        data: {
+          bookingId: p.bookingId,
+          paymentId: payment.id,
+          amount: part,
+          providerReference: reference,
+          status,
+          reason: "Event change — price decreased",
+        },
+      });
+      left = left.sub(part);
+    }
+    if (firstRefundId) {
+      await prisma.eventEditProposal.update({
+        where: { id: p.id },
+        data: { deltaRefundId: firstRefundId },
+      });
+    }
+    if (left.gt(0)) {
+      console.error(
+        `Proposal ${p.id}: ${left.toString()} of the difference had no payment left to refund`,
+      );
+    }
+  }
+
+  /**
+   * Applies an accepted proposal: the new line awaiting its Supplier, the old
+   * one let go, and the booking's and event's totals moved by the difference.
+   */
+  private static async apply(
+    p: {
+      id: string;
+      bookingId: string;
+      eventId: string;
+      itemId: string;
+      quantity: number;
+      event: { name: string; organizerId: string };
+    },
+    prepared: Awaited<ReturnType<typeof EventEditSvc.prepare>>,
+    delta: Prisma.Decimal,
+    now: Date,
+    claimFrom: ("pending" | "expired")[] = ["pending"],
+  ) {
+    const { kind, row, candidate, snapshot } = prepared;
     const confirmationDeadline = new Date(
       now.getTime() + CONFIRM_HOURS * 3_600_000,
     );
@@ -684,7 +992,7 @@ export default class EventEditSvc {
       created = await prisma.$transaction(async (tx) => {
         // Taken first, so two answers to the same proposal apply once.
         const claimed = await tx.eventEditProposal.updateMany({
-          where: { id: p.id, status: "pending" },
+          where: { id: p.id, status: { in: claimFrom } },
           data: { status: "accepted", respondedAt: now },
         });
         if (claimed.count !== 1) {
@@ -762,6 +1070,18 @@ export default class EventEditSvc {
           where: { id: p.id },
           data: { appliedTransactionId: line.id },
         });
+        // What the booking comes to now: checkout and the app's pay button
+        // read it, and a later refund is worked out against it.
+        if (!delta.isZero()) {
+          await tx.booking.update({
+            where: { id: p.bookingId },
+            data: { totalAmount: { increment: delta } },
+          });
+          await tx.event.update({
+            where: { id: row.eventId },
+            data: { totalAmount: { increment: delta } },
+          });
+        }
         return line;
       });
     } catch (err) {
@@ -809,6 +1129,7 @@ export default class EventEditSvc {
     if (claimed.count !== 1) {
       throw new AppError("This proposal was already answered", 409);
     }
+    if (p.deltaPaymentIntentId) await this.cancelIntent(p.deltaPaymentIntentId);
     await NotificationSvc.create({
       userId: p.event.organizerId,
       type: "EVENT_EDIT_DECLINED",
@@ -823,7 +1144,7 @@ export default class EventEditSvc {
   static async withdraw(hostId: string, proposalId: string) {
     const p = await prisma.eventEditProposal.findUnique({
       where: { id: proposalId },
-      select: { id: true, proposedById: true },
+      select: { id: true, proposedById: true, deltaPaymentIntentId: true },
     });
     if (!p || p.proposedById !== hostId) throw notFound("Proposal");
     const claimed = await prisma.eventEditProposal.updateMany({
@@ -836,6 +1157,9 @@ export default class EventEditSvc {
         409,
       );
     }
+    // A difference the citizen is paying right now can't go through; one
+    // already paid is refunded when the app confirms it.
+    if (p.deltaPaymentIntentId) await this.cancelIntent(p.deltaPaymentIntentId);
     return { proposalId: p.id, status: "withdrawn" as const };
   }
 }

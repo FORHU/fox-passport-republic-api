@@ -74,6 +74,11 @@ export interface BookedEventDetail {
    * decline (ADR 0011); null once it is paid or when there is none.
    */
   declinableBookingId: string | null;
+  /**
+   * The booking a Supplier can still be replaced on: unpaid, or paid and to
+   * come (ADR 0010 slice 3). Null when there is none.
+   */
+  editableBookingId: string | null;
 }
 
 /** A booked item still counts only while it is waiting or approved. */
@@ -442,12 +447,13 @@ export default class EventConflictSvc {
       select: EVENT_WITH_SUPPLIERS,
     });
     if (!e) throw notFound("Event");
-    const unpaid = await prisma.booking.findFirst({
-      where: { eventId: e.id, status: "pending" },
-      select: { id: true },
+    const live = await prisma.booking.findFirst({
+      where: { eventId: e.id, status: { in: ["pending", "confirmed"] } },
+      select: { id: true, status: true },
     });
     return {
-      declinableBookingId: unpaid?.id ?? null,
+      declinableBookingId: live?.status === "pending" ? live.id : null,
+      editableBookingId: live?.id ?? null,
       eventId: e.id,
       eventName: e.name,
       startAt: e.startAt,

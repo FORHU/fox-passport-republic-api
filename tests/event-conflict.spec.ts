@@ -522,19 +522,25 @@ describe("EventConflictSvc.notifyListingGone", () => {
 describe("EventConflictSvc.eventDetail", () => {
   it("offers the unpaid booking for the host to decline, and none once paid", async () => {
     db.eventOne.mockResolvedValue(event());
-    db.unpaid.mockResolvedValue({ id: "b9" });
-    expect(
-      (await EventConflictSvc.eventDetail("host1", "e1")).declinableBookingId,
-    ).toBe("b9");
+    db.unpaid.mockResolvedValue({ id: "b9", status: "pending" });
+    const unpaid = await EventConflictSvc.eventDetail("host1", "e1");
+    expect(unpaid.declinableBookingId).toBe("b9");
+    expect(unpaid.editableBookingId).toBe("b9");
     expect(db.unpaid.mock.calls[0][0].where).toEqual({
       eventId: "e1",
-      status: "pending",
+      status: { in: ["pending", "confirmed"] },
     });
 
+    // Paid: no longer declinable, but a Supplier can still be replaced.
+    db.unpaid.mockResolvedValue({ id: "b9", status: "confirmed" });
+    const paid = await EventConflictSvc.eventDetail("host1", "e1");
+    expect(paid.declinableBookingId).toBeNull();
+    expect(paid.editableBookingId).toBe("b9");
+
     db.unpaid.mockResolvedValue(null);
-    expect(
-      (await EventConflictSvc.eventDetail("host1", "e1")).declinableBookingId,
-    ).toBeNull();
+    const none = await EventConflictSvc.eventDetail("host1", "e1");
+    expect(none.declinableBookingId).toBeNull();
+    expect(none.editableBookingId).toBeNull();
   });
 
   it("asks for the event only if the person is its host", async () => {
