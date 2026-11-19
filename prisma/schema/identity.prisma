@@ -122,6 +122,7 @@ model User {
   eventAssetBids           EventAssetBid[]
   invoices                 Invoice[]
   bookingEditRequests      BookingEditRequest[]
+  eventEditProposals       EventEditProposal[]
   venueAffiliations        VenueEventFoxerAffiliation[] @relation("VenueAffiliationEventFoxer")
   venueAffiliationReviews  VenueEventFoxerAffiliation[] @relation("VenueAffiliationReviewer")
   rewardEvents             RewardEvent[]

@@ -176,6 +176,15 @@ const ALLOW_LIST = new Set([
   // Foxer's own events, filtered by organizerId in the service.
   "event-transaction.routes.ts GET /needs-attention",
   "event-transaction.routes.ts GET /event/:eventId",
+  // Replacing a Supplier (ADR 0010): EventEditSvc lets only the event's
+  // organizer list and propose, only the booking's citizen accept or decline,
+  // only the proposer withdraw, and only those two read a booking's proposals.
+  "event-transaction.routes.ts GET /proposals",
+  "event-transaction.routes.ts POST /proposals/:id/accept",
+  "event-transaction.routes.ts POST /proposals/:id/decline",
+  "event-transaction.routes.ts POST /proposals/:id/withdraw",
+  "event-transaction.routes.ts GET /:id/replacements",
+  "event-transaction.routes.ts POST /:id/replace",
   // The host leaves an unpaid booking (ADR 0011): the service allows only the
   // event's own organizer.
   "booking.routes.ts POST /:id/decline",
