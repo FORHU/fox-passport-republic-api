@@ -16,3 +16,18 @@ export function assertListingImages(status: string, imageCount: number) {
     throw new Error(PUBLISH_NEEDS_IMAGE);
   }
 }
+
+export const PUBLISH_NEEDS_DESCRIPTION = "Add a description before publishing";
+
+/**
+ * Like the image: a draft may have no description, anything past draft needs
+ * one. Blank (whitespace only) counts as none.
+ */
+export function assertListingDescription(
+  status: string,
+  description: string | null | undefined,
+) {
+  if (status !== "draft" && !description?.trim()) {
+    throw new Error(PUBLISH_NEEDS_DESCRIPTION);
+  }
+}

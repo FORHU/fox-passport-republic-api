@@ -188,37 +188,51 @@ const ENTITY_INCLUDE = {
   },
 } as const;
 
-export interface QueryFeedOptions {
+export interface FeedFilters {
   tab?: FeedTab;
   type?: PostType;
   authorId?: string;
   search?: string;
-  limit?: number;
-  cursor?: string;
   viewerId?: string;
-  mode?: "recent" | "top";
 }
 
-export default class FeedRepo {
-  static async findPosts(options: QueryFeedOptions) {
-    const {
-      tab,
-      type,
-      authorId,
-      search,
-      limit = 20,
-      cursor,
-      viewerId,
-      mode = "recent",
-    } = options;
+export interface QueryFeedOptions extends FeedFilters {
+  limit?: number;
+  cursor?: string;
+  /**
+   * Newest first. `pinnedFirst` keeps the original order (pinned posts on
+   * top), which is what a request without a `mode` gets, so older mobile
+   * builds keep working; an explicit `mode=recent` is strictly newest-first.
+   */
+  pinnedFirst?: boolean;
+}
 
-    // Fetched upfront (not just for this batch's authors) because it now
-    // also gates *which* posts are visible at all — a "followers"-visibility
-    // post from someone the viewer doesn't follow must never reach the
-    // query results, not just render differently once it does.
-    const followingIds: Set<string> = viewerId
-      ? await FeedRepo.getFollowingIds(viewerId)
-      : new Set();
+/** The few columns the For you ranking reads, for hundreds of posts at once. */
+const RANKABLE_SELECT = {
+  id: true,
+  authorId: true,
+  createdAt: true,
+  likesCount: true,
+  commentsCount: true,
+  sharesCount: true,
+} as const;
+
+export type RankableRow = Prisma.PostGetPayload<{
+  select: typeof RANKABLE_SELECT;
+}>;
+
+export default class FeedRepo {
+  /**
+   * Who may see what, shared by every feed query (Recent, both For you pools,
+   * the featured pick and the new-posts count) so none of them can drift: a
+   * "followers"-visibility post from someone the viewer doesn't follow must
+   * never reach any of them.
+   */
+  private static buildFeedWhere(
+    filters: FeedFilters,
+    followingIds: Set<string>,
+  ): Prisma.PostWhereInput {
+    const { tab, type, authorId, search, viewerId } = filters;
 
     const andClauses: Prisma.PostWhereInput[] = [{ isArchived: false }];
     if (tab) andClauses.push({ tab });
@@ -254,110 +268,211 @@ export default class FeedRepo {
       andClauses.push({ hiddenFor: { none: { userId: viewerId } } });
     }
 
-    const where: Prisma.PostWhereInput = { AND: andClauses };
+    return { AND: andClauses };
+  }
 
-    const isTopMode = mode === "top";
-    const take = isTopMode ? 500 : limit + 1; // candidate window for top mode
+  private static postInclude(viewerId?: string) {
+    return {
+      author: AUTHOR_SELECT,
+      ...ENTITY_INCLUDE,
+      originalPost: REPOST_SELECT,
+      mediaTags: MEDIA_TAG_INCLUDE,
+      ...(viewerId
+        ? {
+            likes: {
+              where: { userId: viewerId },
+              select: { userId: true, type: true },
+            },
+            shares: {
+              where: { userId: viewerId },
+              select: { userId: true },
+            },
+          }
+        : {}),
+    } satisfies Prisma.PostInclude;
+  }
 
-    const posts = await prisma.post.findMany({
-      where,
-      take,
-      skip: !isTopMode && cursor ? 1 : 0,
-      cursor: !isTopMode && cursor ? { id: cursor } : undefined,
-      orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
-      include: {
-        author: AUTHOR_SELECT,
-        ...ENTITY_INCLUDE,
-        originalPost: REPOST_SELECT,
-        mediaTags: MEDIA_TAG_INCLUDE,
-        ...(viewerId
-          ? {
-              likes: {
-                where: { userId: viewerId },
-                select: { userId: true, type: true },
-              },
-            }
-          : {}),
-      },
-    });
-
-    let formatted = posts.map((p) => {
+  /** The viewer's own reaction, follow state and reaction counts, per post. */
+  private static async formatPosts<
+    T extends {
+      id: string;
+      authorId: string;
+      likes?: { type: ReactionType }[];
+      shares?: { userId: string }[];
+    },
+  >(posts: T[], viewerId: string | undefined, followingIds: Set<string>) {
+    const reactionCounts = await FeedRepo.findReactionCounts(
+      posts.map((p) => p.id),
+    );
+    return posts.map((p) => {
       const myReaction = viewerId ? p.likes?.[0] : undefined;
-      const isFollowingAuthor = viewerId ? followingIds.has(p.authorId) : false;
-      const { likes: _likes, ...rest } = p;
+      const { likes: _likes, shares, ...rest } = p;
       return {
         ...rest,
         isLikedByMe: !!myReaction,
+        isSharedByMe: (shares?.length ?? 0) > 0,
         myReaction: myReaction?.type ?? null,
-        isFollowingAuthor,
+        isFollowingAuthor: viewerId ? followingIds.has(p.authorId) : false,
+        reactionCounts: reactionCounts.get(p.id) ?? [],
       };
     });
+  }
 
-    let nextCursor = null;
+  /** Recent: newest first, paged by post id. */
+  static async findPosts(options: QueryFeedOptions) {
+    const { limit = 20, cursor, viewerId, pinnedFirst = false } = options;
 
-    if (isTopMode) {
-      const now = Date.now();
-      type ScoredPost = (typeof formatted)[number] & { _score?: number };
-      const scored = formatted as ScoredPost[];
-      scored.forEach((p) => {
-        let score = 0;
+    // Fetched upfront (not just for this batch's authors) because it also
+    // gates *which* posts are visible at all.
+    const followingIds: Set<string> = viewerId
+      ? await FeedRepo.getFollowingIds(viewerId)
+      : new Set();
 
-        // Affinity
-        if (followingIds.has(p.authorId)) score += 50;
-        if (p.authorId === viewerId) score += 50;
+    const posts = await prisma.post.findMany({
+      where: FeedRepo.buildFeedWhere(options, followingIds),
+      take: limit + 1,
+      skip: cursor ? 1 : 0,
+      cursor: cursor ? { id: cursor } : undefined,
+      orderBy: pinnedFirst
+        ? [{ isPinned: "desc" }, { createdAt: "desc" }]
+        : [{ createdAt: "desc" }, { id: "desc" }],
+      include: FeedRepo.postInclude(viewerId),
+    });
 
-        // Engagement
-        score += (p.likesCount || 0) * 2;
-        score += (p.commentsCount || 0) * 5;
-        score += (p.sharesCount || 0) * 10;
+    const hasNextPage = posts.length > limit;
+    const items = hasNextPage ? posts.slice(0, limit) : posts;
+    return {
+      posts: await FeedRepo.formatPosts(items, viewerId, followingIds),
+      nextCursor: hasNextPage ? items[items.length - 1].id : null,
+    };
+  }
 
-        // Decay (Linear/Exponential proxy)
-        const hoursOld =
-          (now - new Date(p.createdAt).getTime()) / (1000 * 60 * 60);
-        // Reduce score smoothly based on age. Avoid negative infinity for very old posts.
-        const decayPenalty = Math.min(hoursOld * 1.5, 100);
-        score -= decayPenalty;
+  /**
+   * Everything the For you ranking needs for one session, as light rows:
+   * - `fresh`: the newest `freshSize` posts at or before the anchor.
+   * - `older`: every post older than those, each with its latest resurfacing
+   *   at or before the anchor. Rows written after the anchor are ignored, so a
+   *   session's own writes never change the list it is paging through.
+   * - `pinned`: the pinned posts at or before the anchor, for the featured spot.
+   */
+  static async findRankingCandidates(
+    filters: FeedFilters,
+    followingIds: Set<string>,
+    anchor: Date,
+    freshSize: number,
+  ) {
+    const where = FeedRepo.buildFeedWhere(filters, followingIds);
+    const atOrBeforeAnchor: Prisma.PostWhereInput = {
+      AND: [where, { createdAt: { lte: anchor } }],
+    };
 
-        p._score = score;
-      });
+    const [fresh, pinned] = await Promise.all([
+      prisma.post.findMany({
+        where: atOrBeforeAnchor,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: freshSize,
+        select: RANKABLE_SELECT,
+      }),
+      prisma.post.findMany({
+        where: { AND: [atOrBeforeAnchor, { isPinned: true }] },
+        select: RANKABLE_SELECT,
+      }),
+    ]);
 
-      // Sort by score
-      scored.sort((a, b) => {
-        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-        return (b._score ?? 0) - (a._score ?? 0);
-      });
-
-      // Paginate in-memory array
-      const cursorIndex = cursor
-        ? scored.findIndex((p) => p.id === cursor)
-        : -1;
-      const startIndex = cursorIndex !== -1 ? cursorIndex + 1 : 0;
-
-      const paged = scored.slice(startIndex, startIndex + limit);
-      nextCursor =
-        startIndex + limit < scored.length
-          ? scored[startIndex + limit - 1].id
-          : null;
-      // Clean up the temporary score property before it reaches the response.
-      paged.forEach((p) => delete p._score);
-      formatted = paged;
-    } else {
-      const hasNextPage = posts.length > limit;
-      const items = hasNextPage ? formatted.slice(0, limit) : formatted;
-      nextCursor = hasNextPage ? items[items.length - 1].id : null;
-      formatted = items;
+    const oldestFresh = fresh[fresh.length - 1];
+    if (fresh.length < freshSize || !oldestFresh) {
+      return { fresh, older: [], pinned };
     }
 
-    const reactionCounts = await FeedRepo.findReactionCounts(
-      formatted.map((p) => p.id),
-    );
-    return {
-      posts: formatted.map((p) => ({
-        ...p,
-        reactionCounts: reactionCounts.get(p.id) ?? [],
-      })),
-      nextCursor,
-    };
+    const olderRows = await prisma.post.findMany({
+      where: {
+        AND: [
+          atOrBeforeAnchor,
+          {
+            OR: [
+              { createdAt: { lt: oldestFresh.createdAt } },
+              { createdAt: oldestFresh.createdAt, id: { lt: oldestFresh.id } },
+            ],
+          },
+        ],
+      },
+      select: {
+        ...RANKABLE_SELECT,
+        resurfacings: {
+          where: { shownAt: { lte: anchor } },
+          orderBy: { shownAt: "desc" },
+          take: 1,
+          select: { shownAt: true },
+        },
+      },
+    });
+
+    const older = olderRows.map(({ resurfacings, ...p }) => ({
+      ...p,
+      lastShownAt: resurfacings[0]?.shownAt ?? null,
+    }));
+    return { fresh, older, pinned };
+  }
+
+  /** Full posts for one page, in the order given. Ids no longer visible are dropped. */
+  static async findPostsByIds(
+    ids: string[],
+    filters: FeedFilters,
+    followingIds: Set<string>,
+  ) {
+    if (ids.length === 0) return [];
+    const { viewerId } = filters;
+    const rows = await prisma.post.findMany({
+      where: {
+        AND: [
+          FeedRepo.buildFeedWhere(filters, followingIds),
+          { id: { in: ids } },
+        ],
+      },
+      include: FeedRepo.postInclude(viewerId),
+    });
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const ordered = ids.flatMap((id) => {
+      const row = byId.get(id);
+      return row ? [row] : [];
+    });
+    return FeedRepo.formatPosts(ordered, viewerId, followingIds);
+  }
+
+  /** Posts newer than `since` the viewer may see, excluding their own. */
+  static async countPostsSince(
+    filters: FeedFilters,
+    followingIds: Set<string>,
+    since: Date,
+  ): Promise<number> {
+    const and: Prisma.PostWhereInput[] = [
+      FeedRepo.buildFeedWhere(filters, followingIds),
+      { createdAt: { gt: since } },
+    ];
+    if (filters.viewerId) and.push({ authorId: { not: filters.viewerId } });
+    return prisma.post.count({ where: { AND: and } });
+  }
+
+  static async recordResurfacings(postIds: string[]): Promise<void> {
+    if (postIds.length === 0) return;
+    await prisma.postResurfacing.createMany({
+      data: postIds.map((postId) => ({ postId })),
+    });
+  }
+
+  /**
+   * Deletes resurfacing rows older than `before`, keeping each post's latest:
+   * only the latest one counts toward a boost, and once it is older than the
+   * cap's ~10.3 days no older row can change anything.
+   */
+  static async pruneResurfacings(before: Date): Promise<number> {
+    return prisma.$executeRaw`
+      DELETE FROM "post_resurfacings" r
+      WHERE r."shownAt" < ${before}
+        AND EXISTS (
+          SELECT 1 FROM "post_resurfacings" newer
+          WHERE newer."postId" = r."postId" AND newer."shownAt" > r."shownAt"
+        )`;
   }
 
   /**
@@ -429,6 +544,10 @@ export default class FeedRepo {
                 where: { userId: viewerId },
                 select: { userId: true, type: true },
               },
+              shares: {
+                where: { userId: viewerId },
+                select: { userId: true },
+              },
             }
           : {}),
       },
@@ -450,11 +569,12 @@ export default class FeedRepo {
           })
           .then((f) => !!f)
       : false;
-    const { likes: _likes, ...rest } = post;
+    const { likes: _likes, shares, ...rest } = post;
     const reactionCounts = await FeedRepo.findReactionCounts([post.id]);
     return {
       ...rest,
       isLikedByMe: !!myReaction,
+      isSharedByMe: (shares?.length ?? 0) > 0,
       myReaction: myReaction?.type ?? null,
       reactionCounts: reactionCounts.get(post.id) ?? [],
       isFollowingAuthor,
@@ -624,11 +744,96 @@ export default class FeedRepo {
     });
   }
 
-  static async incrementShares(id: string) {
+  /**
+   * Records that `userId` shared `postId` outside the feed (copy link,
+   * Facebook, event page). Counted once per (post, user): the
+   * feed_post_shares primary key turns a repeat, or a concurrent duplicate,
+   * into a no-op, and sharesCount only moves when a row was inserted. One
+   * statement, so the two can't drift. Returns whether this call counted and
+   * the post's count afterwards.
+   */
+  static async recordShare(
+    postId: string,
+    userId: string,
+  ): Promise<{ counted: boolean; sharesCount: number }> {
+    const [inserted] = await prisma.$queryRaw<{ sharesCount: number }[]>`
+      WITH ins AS (
+        INSERT INTO "feed_post_shares" ("postId", "userId")
+        VALUES (${postId}, ${userId})
+        ON CONFLICT DO NOTHING
+        RETURNING "postId"
+      )
+      UPDATE "feed_posts" fp
+      SET "sharesCount" = fp."sharesCount" + 1
+      FROM ins
+      WHERE fp."id" = ins."postId"
+      RETURNING fp."sharesCount"
+    `;
+    if (inserted) return { counted: true, sharesCount: inserted.sharesCount };
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { sharesCount: true },
+    });
+    return { counted: false, sharesCount: post?.sharesCount ?? 0 };
+  }
+
+  static async incrementSends(id: string) {
     return prisma.post.update({
       where: { id },
-      data: { sharesCount: { increment: 1 } },
+      data: { sendsCount: { increment: 1 } },
     });
+  }
+
+  static async incrementReposts(id: string) {
+    return prisma.post.update({
+      where: { id },
+      data: { repostsCount: { increment: 1 } },
+    });
+  }
+
+  /**
+   * Records that `viewerId` saw each of `postIds`, at most once per
+   * (post, viewer), and bumps viewsCount only for rows actually inserted.
+   * Posts the viewer wrote, archived posts, and posts the viewer isn't
+   * allowed to see (same rule as canView) are skipped silently. One
+   * statement, so the insert and the counter bump are atomic. Raw SQL so a
+   * view doesn't touch Post.updatedAt. Returns the ids that were counted.
+   */
+  static async recordViews(
+    viewerId: string,
+    postIds: string[],
+  ): Promise<string[]> {
+    if (postIds.length === 0) return [];
+    const rows = await prisma.$queryRaw<{ id: string }[]>`
+      WITH ins AS (
+        INSERT INTO "feed_post_views" ("postId", "userId")
+        SELECT p."id", ${viewerId}
+        FROM "feed_posts" p
+        WHERE p."id" IN (${Prisma.join(postIds)})
+          AND p."isArchived" = false
+          AND p."authorId" <> ${viewerId}
+          AND (
+            p."visibility" = 'public'
+            OR (
+              p."visibility" = 'followers'
+              AND EXISTS (
+                SELECT 1 FROM "follows" f
+                WHERE f."followerId" = ${viewerId}
+                  AND f."followingId" = p."authorId"
+                  AND f."status" = 'accepted'
+              )
+            )
+          )
+        ON CONFLICT DO NOTHING
+        RETURNING "postId"
+      )
+      UPDATE "feed_posts" fp
+      SET "viewsCount" = fp."viewsCount" + 1
+      FROM ins
+      WHERE fp."id" = ins."postId"
+      RETURNING fp."id"
+    `;
+    return rows.map((r) => r.id);
   }
 
   static async deletePost(id: string) {
@@ -751,6 +956,7 @@ export default class FeedRepo {
               where: { userId },
               select: { userId: true, type: true },
             },
+            shares: { where: { userId }, select: { userId: true } },
           },
         },
       },
@@ -762,11 +968,12 @@ export default class FeedRepo {
       items.map(({ post }) => post.id),
     );
     const posts = items.map(({ post }) => {
-      const { likes, ...rest } = post;
+      const { likes, shares, ...rest } = post;
       const myReaction = likes[0];
       return {
         ...rest,
         isLikedByMe: !!myReaction,
+        isSharedByMe: (shares?.length ?? 0) > 0,
         myReaction: myReaction?.type ?? null,
         reactionCounts: reactionCounts.get(post.id) ?? [],
       };

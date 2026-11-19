@@ -3,7 +3,10 @@ import { serviceCache } from "../../utils/cache-namespaces";
 import { fingerprint } from "../../utils/cache.util";
 import { BillingRate, ServiceStatus, ServiceCategory } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
-import { assertListingImages } from "../../utils/listing-images";
+import {
+  assertListingDescription,
+  assertListingImages,
+} from "../../utils/listing-images";
 
 /** Five minutes, matching the other two listing types. */
 const SERVICE_TTL = 300;
@@ -14,7 +17,7 @@ export default class ServiceSvc {
     ownerId: string;
     category: ServiceCategory;
     name: string;
-    description: string;
+    description?: string;
     city: string;
     state?: string;
     country: string;
@@ -29,6 +32,8 @@ export default class ServiceSvc {
     const normalized = {
       ...data,
       id: data.id ?? uuidv4(),
+      // The column is required; a draft may leave the description empty.
+      description: data.description ?? "",
       isWillingToTravel: data.isWillingToTravel ?? false,
       tags: data.tags ?? [],
       currency: data.currency ?? "USD",
@@ -38,6 +43,7 @@ export default class ServiceSvc {
 
     const imgIds = data.imgIds ?? [];
     assertListingImages(normalized.status, imgIds.length);
+    assertListingDescription(normalized.status, normalized.description);
 
     const serviceData = {
       ...normalized,
@@ -138,6 +144,10 @@ export default class ServiceSvc {
       assertListingImages(
         data.status,
         data.imgIds?.length ?? existing.images.length,
+      );
+      assertListingDescription(
+        data.status,
+        data.description ?? existing.description,
       );
     }
 

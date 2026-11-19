@@ -193,12 +193,32 @@ const ALLOW_LIST = new Set([
   "reward.routes.ts GET /me",
   "reward.routes.ts GET /catalog",
   "reward.routes.ts POST /redeem",
+  // Token perks (api#389): the signed-in person lists perks, redeems one for
+  // their own booking, reads their own redemptions and live code. Scoped to the
+  // caller in the service.
+  "perk.routes.ts GET /",
+  "perk.routes.ts GET /mine",
+  "perk.routes.ts GET /redemptions/:id/code",
+  "perk.routes.ts GET /:id",
+  "perk.routes.ts POST /:id/redeem",
+  // Token perks, host and venue side (api#392): ownership of the event or
+  // venue, and the same check-in rights as a ticket scan, are checked in the
+  // service.
+  "perk.routes.ts POST /",
+  "perk.routes.ts GET /offered",
+  "perk.routes.ts POST /check",
+  "perk.routes.ts POST /redemptions/:id/use",
+  "perk.routes.ts POST /:id/take-down",
   // Onboarding: the signed-in user records and reads their own tour steps.
   "onboarding.routes.ts GET /",
   "onboarding.routes.ts POST /:step",
   // Review helpful votes (§9.3): any signed-in citizen can toggle their own
   // helpful vote on a review; ReviewSvc.toggleHelpfulVote blocks self-voting.
   "review.routes.ts POST /:id/helpful",
+  // Post views (app#303): the signed-in user records only their own views,
+  // keyed by the session user id. FeedRepo.recordViews skips the caller's own
+  // posts and posts they can't see; rate limited per account.
+  "feed.routes.ts POST /views",
 ]);
 
 const BANNED_GUARDS = ["requireRole", "requireAdmin", "requireHost"];

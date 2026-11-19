@@ -4,13 +4,25 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import { postJoi } from "../../utils/limits";
 import { VALIDATE_ALL, sendValidationError } from "../../utils/validation";
-import FeedService from "./feed.service";
+import FeedService, { FeedMode } from "./feed.service";
 import {
   PostType,
   FeedTab,
   PostVisibility,
   ReactionType,
 } from "@prisma/client";
+
+/**
+ * `foryou` is the ranked mix and `recent` is strictly newest first. `top`
+ * was the old ranked mode, so older web tabs still sending it get For you.
+ * No mode, or one this server doesn't know, keeps the original pinned-first
+ * order that older mobile builds expect.
+ */
+function parseFeedMode(mode: unknown): FeedMode {
+  if (mode === "foryou" || mode === "top") return "foryou";
+  if (mode === "recent") return "recent";
+  return "legacy";
+}
 
 function statusForError(err: Error): number {
   // AppError carries its own status; message matching is the fallback for
@@ -42,16 +54,41 @@ export default class FeedController {
           : Math.min(50, Math.max(1, parsedLimit)),
         cursor: cursor as string | undefined,
         viewerId: req.user?.userId,
-        mode: mode as "recent" | "top" | undefined,
+        mode: parseFeedMode(mode),
       });
 
       return res.status(200).json({
         success: true,
         data: result.posts,
         nextCursor: result.nextCursor,
+        ...("anchor" in result ? { anchor: result.anchor } : {}),
       });
     } catch (e: unknown) {
       return sendServerError(res, e, { success: true });
+    }
+  }
+
+  /** GET /feed/new-count?since=<ISO>&tab — feeds the "New posts" pill (app#308). */
+  static async getNewPostsCount(req: Request, res: Response) {
+    try {
+      const { since, tab } = req.query;
+      const sinceDate = typeof since === "string" ? new Date(since) : null;
+      if (!sinceDate || Number.isNaN(sinceDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "`since` must be an ISO date",
+        });
+      }
+      const count = await FeedService.countNewPosts(
+        {
+          tab: tab && tab !== "all" ? (tab as FeedTab) : undefined,
+          viewerId: req.user?.userId,
+        },
+        sinceDate,
+      );
+      return res.status(200).json({ success: true, data: { count } });
+    } catch (e: unknown) {
+      return sendServerError(res, e);
     }
   }
 
@@ -172,8 +209,32 @@ export default class FeedController {
   static async trackShare(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const result = await FeedService.trackShare(id);
+      const result = await FeedService.trackShare(id, req.user?.userId);
       return res.status(200).json({ success: true, data: result });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res
+        .status(statusForError(err))
+        .json({ success: false, message: err.message });
+    }
+  }
+
+  static async recordViews(req: Request, res: Response) {
+    const schema = Joi.object({
+      postIds: Joi.array()
+        .items(Joi.string().uuid())
+        .min(1)
+        .max(FeedService.MAX_VIEW_BATCH)
+        .required(),
+    });
+    const { error, value } = schema.validate(req.body, VALIDATE_ALL);
+    if (error) return sendValidationError(res, error, { success: true });
+    try {
+      const recorded = await FeedService.recordViews(
+        req.user!.userId,
+        value.postIds,
+      );
+      return res.status(200).json({ success: true, data: { recorded } });
     } catch (e: unknown) {
       const err = e as Error;
       return res

@@ -1,22 +1,36 @@
 import { Router } from "express";
 import FeedController from "./feed.controller";
 import { authenticate, optionalAuth } from "../../middleware/auth.middleware";
+import { recordViewsLimiter, shareTrackLimiter } from "./feed.rateLimit";
 
 const router = Router();
 
 // Publicly readable feed with optional authentication (to detect isLikedByMe)
 router.get("/", optionalAuth, FeedController.getFeed);
 // Static sub-paths before the "/:id" catch-all so they aren't swallowed by it.
+router.get("/new-count", optionalAuth, FeedController.getNewPostsCount);
 router.get("/saved", authenticate, FeedController.getSavedPosts);
 router.get("/mentions/search", authenticate, FeedController.searchMentions);
 router.get("/:id", optionalAuth, FeedController.getPostById);
 
 // Post interactions requiring authentication
 router.post("/", authenticate, FeedController.createPost);
+// Static path, registered before the "/:id" POST routes below.
+router.post(
+  "/views",
+  authenticate,
+  recordViewsLimiter,
+  FeedController.recordViews,
+);
 router.patch("/:id", authenticate, FeedController.editPost);
 router.delete("/:id", authenticate, FeedController.deletePost);
 router.post("/:id/repost", authenticate, FeedController.repost);
-router.post("/:id/share", optionalAuth, FeedController.trackShare);
+router.post(
+  "/:id/share",
+  optionalAuth,
+  shareTrackLimiter,
+  FeedController.trackShare,
+);
 router.post("/:id/reaction", authenticate, FeedController.setReaction);
 router.get("/:id/reactions", FeedController.getReactionBreakdown);
 router.post("/:id/save", authenticate, FeedController.toggleSave);

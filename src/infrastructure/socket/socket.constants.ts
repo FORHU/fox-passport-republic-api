@@ -84,6 +84,10 @@ export const SOCKET_EVENTS = {
    * many posts at once, so refetching it on every comment (what a
    * DATA_INVALIDATE would ask for) costs far more than the number itself. */
   POST_COMMENTS_COUNT: "post:comments_count",
+  /** A public Republic post was just created on [tab] — sent to everyone
+   * connected, carrying no post id or content. Open feeds show a "New posts"
+   * pill instead of refetching, so nothing moves under the reader (app#308). */
+  FEED_NEW: "feed:new",
 } as const;
 
 export type SocketEvent = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];

@@ -70,7 +70,14 @@ model Post {
   // Counters for performant indexing & sorting
   likesCount    Int @default(0)
   commentsCount Int @default(0)
+  // Distinct signed-in users who shared the post outside the feed (copy
+  // link, Facebook, event page) — one per user, see PostShare. Reposts and
+  // message sends have their own counters below.
   sharesCount   Int @default(0)
+  sendsCount    Int @default(0)
+  repostsCount  Int @default(0)
+  // Distinct logged-in, non-author viewers (see PostView).
+  viewsCount    Int @default(0)
 
   isPinned   Boolean   @default(false)
   isArchived Boolean   @default(false)
@@ -99,15 +106,38 @@ model Post {
   likes     PostLike[]
   savedBy   SavedPost[]
   hiddenFor HiddenPost[]
+  views     PostView[]
+  shares    PostShare[]
   messages  Message[]
   mediaTags PostMediaTag[]
   poll      Poll?
   facebookShares FacebookShare[]
+  resurfacings   PostResurfacing[]
 
   @@index([tab, createdAt(sort: Desc)])
   @@index([authorId, createdAt(sort: Desc)])
+  // The For you fresh pool and Recent on the "All" tab order every post by
+  // `createdAt` with no `tab` filter, which the composite index above can't serve.
+  @@index([createdAt(sort: Desc)])
   @@index([type])
   @@map("feed_posts")
+}
+
+// One row each time the For you feed serves a post from its older pool
+// (app#308). A post's resurfacing boost counts the days since its latest row,
+// read as of the feed session's anchor time, so writes made while someone is
+// scrolling never reshuffle the pages they still have to load. Shared across
+// viewers for now; a `viewerId` column makes it per viewer once view tracking
+// lands (app#303).
+model PostResurfacing {
+  id      String   @id @default(uuid())
+  postId  String
+  shownAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, shownAt(sort: Desc)])
+  @@map("post_resurfacings")
 }
 
 // One-to-one with a `type: poll` Post — the poll's question is just that
@@ -247,6 +277,37 @@ model HiddenPost {
 
   @@id([postId, userId])
   @@map("feed_hidden_posts")
+}
+
+// One row per (post, viewer): a view is counted once per logged-in viewer,
+// and never for the post's author. Post.viewsCount is the running total.
+model PostView {
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@index([userId])
+  @@map("feed_post_views")
+}
+
+// One row per (post, user) who shared it: the primary key is what keeps a
+// user from counting more than once, however often or concurrently they
+// share. Post.sharesCount is the running total of these rows.
+model PostShare {
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@index([userId])
+  @@map("feed_post_shares")
 }
 
 // Polymorphic — targetId points at either a Post or a User depending on
