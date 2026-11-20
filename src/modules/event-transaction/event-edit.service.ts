@@ -1,5 +1,10 @@
 import Stripe from "stripe";
-import { PaymentStatus, Prisma, RefundStatus } from "@prisma/client";
+import {
+  MatchRequestStatus,
+  PaymentStatus,
+  Prisma,
+  RefundStatus,
+} from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents } from "../../utils/pricing";
@@ -21,7 +26,8 @@ import EventConflictSvc, {
  * a listing of the same kind and category for a line that needs replacing;
  * nothing changes until the citizen accepts. On acceptance the new line is
  * added awaiting its Supplier's confirmation, like any item added to a
- * booking, and the old line is let go.
+ * booking, and the old line is let go. A partner's line (an approved venue
+ * affiliation, or a template match the Supplier accepted) is booked at once.
  *
  * An unpaid booking's checkout charges the new total by itself. A paid one
  * settles the difference, as edit requests do for direct bookings (0003): a
@@ -60,9 +66,19 @@ export interface ReplacementCandidate {
   category: string;
   /** The Supplier's price for the line (before the host's commission and fees). */
   price: Prisma.Decimal;
-  /** A venue whose Mayor works with this Event Foxer; listed first. */
+  /**
+   * The Supplier already works with this Event Foxer: a venue affiliation
+   * its Mayor approved, or a template match the Supplier accepted. Listed
+   * first, and booked without asking the Supplier to confirm.
+   */
   partner: boolean;
 }
+
+const ACCEPTED_MATCH: MatchRequestStatus[] = ["accepted", "secured"];
+
+/** Partners first, then cheapest first. */
+const partnersFirst = (a: ReplacementCandidate, b: ReplacementCandidate) =>
+  a.partner === b.partner ? a.price.comparedTo(b.price) : a.partner ? -1 : 1;
 
 interface LineRow {
   id: string;
@@ -261,14 +277,21 @@ export default class EventEditSvc {
           owner: { select: { name: true } },
         },
       });
-      return rows.map((r) => ({
-        itemId: r.id,
-        name: r.name,
-        supplierName: r.owner.name,
-        category: r.category,
-        price: r.price.mul(row.quantity || 1),
-        partner: false,
-      }));
+      const matched = await this.acceptedMatches(
+        hostId,
+        "asset",
+        rows.map((r) => r.id),
+      );
+      return rows
+        .map((r) => ({
+          itemId: r.id,
+          name: r.name,
+          supplierName: r.owner.name,
+          category: r.category,
+          price: r.price.mul(row.quantity || 1),
+          partner: matched.has(r.id),
+        }))
+        .sort(partnersFirst);
     }
     if (kind === "service") {
       const rows = await prisma.service.findMany({
@@ -288,14 +311,21 @@ export default class EventEditSvc {
           owner: { select: { name: true } },
         },
       });
-      return rows.map((r) => ({
-        itemId: r.id,
-        name: r.name,
-        supplierName: r.owner.name,
-        category: r.category,
-        price: r.price,
-        partner: false,
-      }));
+      const matched = await this.acceptedMatches(
+        hostId,
+        "service",
+        rows.map((r) => r.id),
+      );
+      return rows
+        .map((r) => ({
+          itemId: r.id,
+          name: r.name,
+          supplierName: r.owner.name,
+          category: r.category,
+          price: r.price,
+          partner: matched.has(r.id),
+        }))
+        .sort(partnersFirst);
     }
     const rows = await prisma.venue.findMany({
       where: {
@@ -313,10 +343,11 @@ export default class EventEditSvc {
         mayor: { select: { name: true } },
       },
     });
-    const agreed = await this.partnerVenuePrices(
-      hostId,
-      rows.map((r) => r.id),
-    );
+    const venueIds = rows.map((r) => r.id);
+    const [agreed, matched] = await Promise.all([
+      this.partnerVenuePrices(hostId, venueIds),
+      this.acceptedMatches(hostId, "venue", venueIds),
+    ]);
     return rows
       .map((r) => {
         const deal = agreed.get(r.id);
@@ -328,16 +359,47 @@ export default class EventEditSvc {
           // The Mayor's agreed price for this Event Foxer replaces the
           // listing price, as it does when a template is priced.
           price: deal && deal.gte(0) ? deal : r.price,
-          partner: deal !== undefined,
+          partner: deal !== undefined || matched.has(r.id),
         };
       })
-      .sort((a, b) =>
-        a.partner === b.partner
-          ? a.price.comparedTo(b.price)
-          : a.partner
-            ? -1
-            : 1,
-      );
+      .sort(partnersFirst);
+  }
+
+  /**
+   * Listings whose Supplier accepted this Event Foxer's match on one of their
+   * templates (`matchRequestStatus` accepted or secured). Those Suppliers
+   * already agreed to work with the host, so they count as partners.
+   */
+  private static async acceptedMatches(
+    hostId: string,
+    kind: ConflictKind,
+    itemIds: string[],
+  ): Promise<Set<string>> {
+    if (itemIds.length === 0) return new Set();
+    const where = {
+      template: { ownerId: hostId },
+      matched: true,
+      matchRequestStatus: { in: ACCEPTED_MATCH },
+    };
+    if (kind === "asset") {
+      const rows = await prisma.eventTemplateAsset.findMany({
+        where: { ...where, assetId: { in: itemIds } },
+        select: { assetId: true },
+      });
+      return new Set(rows.map((r) => r.assetId!));
+    }
+    if (kind === "service") {
+      const rows = await prisma.eventTemplateService.findMany({
+        where: { ...where, serviceId: { in: itemIds } },
+        select: { serviceId: true },
+      });
+      return new Set(rows.map((r) => r.serviceId!));
+    }
+    const rows = await prisma.eventTemplateVenue.findMany({
+      where: { ...where, venueId: { in: itemIds } },
+      select: { venueId: true },
+    });
+    return new Set(rows.map((r) => r.venueId!));
   }
 
   /** Whether a listing could be reserved for the event, without reserving it. */
@@ -975,15 +1037,21 @@ export default class EventEditSvc {
     claimFrom: ("pending" | "expired")[] = ["pending"],
   ) {
     const { kind, row, candidate, snapshot } = prepared;
-    const confirmationDeadline = new Date(
-      now.getTime() + CONFIRM_HOURS * 3_600_000,
-    );
+    // A partner already agreed to work with this Event Foxer, so their line
+    // is booked now. Anyone else confirms within CONFIRM_HOURS.
+    const partner = candidate.partner;
     const base = {
       eventId: row.eventId,
       bookingId: p.bookingId,
       ...snapshot,
-      status: "pending_provider_confirmation" as const,
-      confirmationDeadline,
+      ...(partner
+        ? { status: "approved" as const, confirmationDeadline: null }
+        : {
+            status: "pending_provider_confirmation" as const,
+            confirmationDeadline: new Date(
+              now.getTime() + CONFIRM_HOURS * 3_600_000,
+            ),
+          }),
       included: true,
     };
 
@@ -1100,16 +1168,26 @@ export default class EventEditSvc {
         userId: p.event.organizerId,
         type: "EVENT_EDIT_ACCEPTED",
         title: "Replacement accepted",
-        message: `The citizen accepted ${candidate.name} for ${p.event.name}. It is waiting for its Supplier to confirm.`,
+        message: partner
+          ? `The citizen accepted ${candidate.name} for ${p.event.name}. ${candidate.supplierName} is your partner, so it's booked.`
+          : `The citizen accepted ${candidate.name} for ${p.event.name}. It is waiting for its Supplier to confirm.`,
         metadata: { link: eventLink(p.eventId), proposalId: p.id },
       }),
-      NotificationSvc.create({
-        userId: created.providerId,
-        type: "EVENT_EDIT_REQUEST",
-        title: "A new event request",
-        message: `${p.event.name} would like ${candidate.name}. Confirm or decline within ${CONFIRM_HOURS} hours.`,
-        metadata: { transactionId: created.id, kind },
-      }),
+      partner
+        ? NotificationSvc.create({
+            userId: created.providerId,
+            type: "EVENT_EDIT_BOOKED",
+            title: "You're booked",
+            message: `${p.event.name} picked ${candidate.name} as a replacement. You're partners, so there's nothing to confirm.`,
+            metadata: { transactionId: created.id, kind },
+          })
+        : NotificationSvc.create({
+            userId: created.providerId,
+            type: "EVENT_EDIT_REQUEST",
+            title: "A new event request",
+            message: `${p.event.name} would like ${candidate.name}. Confirm or decline within ${CONFIRM_HOURS} hours.`,
+            metadata: { transactionId: created.id, kind },
+          }),
     ]).catch((e) => console.error(`Proposal ${p.id} answer not announced`, e));
 
     return { proposalId: p.id, transactionId: created.id };
