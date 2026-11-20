@@ -127,7 +127,7 @@ teammates and deployed environments.
 
 - Redis: `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_TTL_SECONDS`
 - S3: `AWS_REGION`, `AWS_S3_BUCKET`, `S3_CDN_URL` — that's all a deployed (AWS-hosted) environment sets: the instance role grants S3. `AWS_ACCESS_KEY` / `AWS_SECRET_ACCESS_KEY` are only for local MinIO or running off AWS; leave both empty otherwise. (`CLOUD_FRONT_DOMAIN` is the older name for `S3_CDN_URL` and still works.)
-- Stripe: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_RETURN_URL`, `STRIPE_CONNECT_REFRESH_URL`
+- Stripe: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_RETURN_URL`, `STRIPE_CONNECT_REFRESH_URL`, `STRIPE_CONNECT_MOBILE_RETURN_URL`, `STRIPE_CONNECT_MOBILE_REFRESH_URL` (optional; default to the web app's `/stripe-connect/app-return` and `/app-refresh`)
 - Mail: `MAILER_EMAIL`, `MAILER_PASSWORD`, `MAILER_TRANSPORT_HOST`, `MAILER_TRANSPORT_PORT`, `MAILER_TRANSPORT_SECURE`, `RESEND_API_KEY`
 - Pricing: `PLATFORM_FEE_PERCENT`
 
