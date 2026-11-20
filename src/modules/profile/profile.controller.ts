@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import Joi from "joi";
-import ProfileSvc, { USERNAME_TAKEN } from "./profile.service";
+import ProfileSvc, {
+  CredentialSetupError,
+  USERNAME_TAKEN,
+} from "./profile.service";
 import { SUPPORTED_CURRENCIES } from "../fx/fx.service";
 import { usernameJoi } from "../../utils/username";
 import { passwordJoi } from "../../utils/password-policy";
@@ -171,6 +174,72 @@ export default class ProfileCtrl {
     }
   }
 
+  /**
+   * GET /v1/profile/username-availability?username= : whether the caller can
+   * take this username (api#419). Same rule as sign-up and PUT /profile; the
+   * caller's own username counts as available.
+   */
+  static async checkUsername(req: Request, res: Response) {
+    try {
+      const { error, value } = USERNAME_QUERY_SCHEMA.validate(req.query);
+      if (error) {
+        return res.status(400).json({
+          success: false,
+          message: error.message,
+          field: "username",
+        });
+      }
+      const available = await ProfileSvc.isUsernameAvailable(
+        req.user!.userId,
+        value.username,
+      );
+      return res.status(200).json({
+        success: true,
+        data: { username: value.username, available },
+      });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: true });
+    }
+  }
+
+  /**
+   * POST /v1/profile/credentials `{ username?, password?, confirmPassword? }`:
+   * a Google account sets the username and password it lacks (api#419). Each
+   * is required when missing; answers with the fresh profile.
+   */
+  static async setUpCredentials(req: Request, res: Response) {
+    try {
+      const { error, value } = CREDENTIALS_BODY_SCHEMA.validate(req.body);
+      if (error) {
+        return res.status(400).json({
+          success: false,
+          message: error.message,
+          field: error.details[0]?.path[0],
+        });
+      }
+
+      const profile = await ProfileSvc.setUpCredentials(
+        req.user!.userId,
+        { username: value.username, password: value.password },
+        req.headers,
+      );
+      return res.status(200).json({
+        success: true,
+        message: "Account setup complete",
+        data: profile,
+      });
+    } catch (e: unknown) {
+      if (e instanceof CredentialSetupError) {
+        return res.status(e.status).json({
+          success: false,
+          message: e.message,
+          ...(e.field ? { field: e.field } : {}),
+        });
+      }
+      return sendServerError(res, e, { success: true });
+    }
+  }
+
   // Delete account
   static async deleteAccount(req: Request, res: Response) {
     try {
@@ -248,6 +317,24 @@ export default class ProfileCtrl {
     }
   }
 }
+
+const USERNAME_QUERY_SCHEMA = Joi.object({
+  username: usernameJoi().required(),
+});
+
+const CREDENTIALS_BODY_SCHEMA = Joi.object({
+  username: usernameJoi().optional(),
+  password: passwordJoi().optional(),
+  // Typed twice, so a slip doesn't lock someone out of their new password.
+  confirmPassword: Joi.when("password", {
+    is: Joi.exist(),
+    then: Joi.string().valid(Joi.ref("password")).required(),
+    otherwise: Joi.forbidden(),
+  }).messages({
+    "any.only": "Passwords do not match",
+    "any.required": "Type the password again to confirm it",
+  }),
+});
 
 const COMMISSION_BODY_SCHEMA = Joi.object({
   commissionPct: Joi.number()

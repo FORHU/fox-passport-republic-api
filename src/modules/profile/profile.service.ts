@@ -1,4 +1,8 @@
-import ProfileRepo from "./profile.repository";
+import type { IncomingHttpHeaders } from "http";
+import { fromNodeHeaders } from "better-auth/node";
+import { APIError } from "better-auth/api";
+import ProfileRepo, { type CredentialState } from "./profile.repository";
+import { auth } from "../../infrastructure/auth/better-auth";
 import { normalizeSocialLinks } from "../../utils/social-links";
 import { permissionsForUser } from "../../types/permissions";
 import { revokeAllSessions } from "../auth/sessions.service";
@@ -10,10 +14,34 @@ import { RoleType } from "@prisma/client";
 import ProviderSpecialtySvc from "../users/provider-specialty.service";
 
 export const USERNAME_TAKEN = "Username already taken";
+export const CREDENTIALS_ALREADY_SET =
+  "Your account already has a username and password.";
+export const PASSWORD_ALREADY_SET =
+  "Your account already has a password. Change it from your account settings.";
 
 /** A refused specialty edit; the form shows it under the specialties field. */
 export class SpecialtyError extends Error {
   readonly field = "specialties";
+}
+
+/** A refused account setup (api#419), with its HTTP status and the field it is about. */
+export class CredentialSetupError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly field?: "username" | "password",
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * A Google account must have a username and a password before it uses the
+ * app (api#419): without them it could only ever sign in with Google.
+ * Email and Facebook accounts are not asked.
+ */
+export function needsCredentialSetup(state: CredentialState): boolean {
+  return state.hasGoogle && (!state.username || !state.hasPassword);
 }
 
 export default class ProfileSvc {
@@ -25,18 +53,102 @@ export default class ProfileSvc {
       throw new Error("User not found");
     }
 
+    const { credentials, ...profile } = user;
     // Derived on read, never stored. The app holds no grant table, so this is
     // where its server-side guards learn what the person may do - and deriving
     // it here means it cannot go stale against the table the way a column
     // would. The API never reads it back: `can()` re-derives from the role.
-    const specialties = user.roleType.includes(RoleType.providerFoxer)
+    const specialties = profile.roleType.includes(RoleType.providerFoxer)
       ? await ProfileSvc.getProviderSpecialties(userId)
       : undefined;
     return {
-      ...user,
-      permissions: permissionsForUser(user),
+      ...profile,
+      permissions: permissionsForUser(profile),
       ...(specialties ? { specialties } : {}),
+      // The apps send someone who must set these up to account setup before
+      // anything else (api#419).
+      hasPassword: credentials.hasPassword,
+      needsCredentialSetup: needsCredentialSetup(credentials),
     };
+  }
+
+  /** Whether nobody else has this (already normalized) username. */
+  static async isUsernameAvailable(userId: string, username: string) {
+    const taken = await ProfileRepo.findByUsernameExcludingUserId(
+      username,
+      userId,
+    );
+    return !taken;
+  }
+
+  /**
+   * Finishes a Google account's setup (api#419): saves the username and sets
+   * the password, each only when the account lacks it. A password already set
+   * is never replaced here (that is change-password, which asks for the
+   * current one). The username goes first so a taken one changes nothing;
+   * the password is set by Better Auth on the caller's session, which creates
+   * the credential account with its own hash. Answers with the fresh profile.
+   */
+  static async setUpCredentials(
+    userId: string,
+    input: { username?: string; password?: string },
+    headers: IncomingHttpHeaders,
+  ) {
+    const state = await ProfileRepo.findCredentialState(userId);
+    if (!state) throw new Error("User not found");
+    if (!needsCredentialSetup(state)) {
+      throw new CredentialSetupError(CREDENTIALS_ALREADY_SET, 409);
+    }
+    if (state.hasPassword && input.password !== undefined) {
+      throw new CredentialSetupError(PASSWORD_ALREADY_SET, 409, "password");
+    }
+    if (!state.username && !input.username) {
+      throw new CredentialSetupError("Choose a username", 400, "username");
+    }
+    if (!state.hasPassword && !input.password) {
+      throw new CredentialSetupError("Choose a password", 400, "password");
+    }
+
+    // An account that already has a username keeps it.
+    if (!state.username && input.username) {
+      if (!(await ProfileSvc.isUsernameAvailable(userId, input.username))) {
+        throw new CredentialSetupError(USERNAME_TAKEN, 400, "username");
+      }
+      try {
+        await ProfileRepo.updateProfile(userId, { username: input.username });
+      } catch (e) {
+        // Taken by someone else between the check and the save.
+        if ((e as { code?: string } | null)?.code === "P2002") {
+          throw new CredentialSetupError(USERNAME_TAKEN, 400, "username");
+        }
+        throw e;
+      }
+      await OnboardingSvc.syncDetectedSteps(userId).catch(() => {});
+    }
+
+    if (!state.hasPassword && input.password) {
+      try {
+        await auth.api.setPassword({
+          body: { newPassword: input.password },
+          headers: fromNodeHeaders(headers),
+        });
+      } catch (e) {
+        if (e instanceof APIError) {
+          const code = (e.body as { code?: string } | undefined)?.code;
+          if (code === "PASSWORD_ALREADY_SET") {
+            throw new CredentialSetupError(
+              PASSWORD_ALREADY_SET,
+              409,
+              "password",
+            );
+          }
+          throw new CredentialSetupError(e.message, 400, "password");
+        }
+        throw e;
+      }
+    }
+
+    return ProfileSvc.getProfile(userId);
   }
 
   // Update profile
