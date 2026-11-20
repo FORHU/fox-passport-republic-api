@@ -44,6 +44,9 @@ const row = {
   updatedAt: new Date("2026-11-01T00:00:00.000Z"),
   profile: null,
   settings: null,
+  googleId: null,
+  // Prisma returns only a credential account that has a password.
+  accounts: [{ providerId: "credential" }],
 };
 
 function bearer() {
@@ -115,6 +118,42 @@ describe("GET /api/v1/profile for Sync Account", () => {
 
     expect(res.body.data.isEmailVerified).toBe(false);
     expect(res.body.data.identityVerifiedAt).toBeNull();
+  });
+
+  it("says whether account setup is needed (api#419)", async () => {
+    const res = await request(app)
+      .get("/api/v1/profile")
+      .set("Authorization", bearer());
+
+    expect(res.body.data).toMatchObject({
+      hasPassword: true,
+      needsCredentialSetup: false,
+    });
+    expect(res.body.data).not.toHaveProperty("accounts");
+    expect(res.body.data).not.toHaveProperty("googleId");
+  });
+
+  it("reads the sign-in accounts without the password hash (api#419)", async () => {
+    await request(app).get("/api/v1/profile").set("Authorization", bearer());
+
+    const accounts = findUnique.mock.calls[0][0].select.accounts;
+    expect(accounts.select).toEqual({ providerId: true });
+  });
+
+  it("sends a Google account without a password to account setup (api#419)", async () => {
+    findUnique.mockResolvedValue({
+      ...row,
+      accounts: [{ providerId: "google" }],
+    });
+
+    const res = await request(app)
+      .get("/api/v1/profile")
+      .set("Authorization", bearer());
+
+    expect(res.body.data).toMatchObject({
+      hasPassword: false,
+      needsCredentialSetup: true,
+    });
   });
 
   it("answers 401 REAUTH_REQUIRED without a session", async () => {

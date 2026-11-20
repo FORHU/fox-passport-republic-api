@@ -13,6 +13,9 @@ router.use(authenticate);
 router.get("/", ProfileCtrl.getProfile);
 router.put("/", ProfileCtrl.updateProfile);
 router.post("/change-password", ProfileCtrl.changePassword);
+// A Google account sets the username and password it lacks (api#419).
+router.get("/username-availability", ProfileCtrl.checkUsername);
+router.post("/credentials", ProfileCtrl.setUpCredentials);
 router.delete("/", ProfileCtrl.deleteAccount);
 
 // The EventFoxer's one commission rate for all their Events (#264 T5).
