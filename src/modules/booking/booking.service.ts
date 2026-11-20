@@ -1,3 +1,4 @@
+import { bookingDays } from "../../utils/booking-days";
 import { AppError, notFound } from "../../utils/errors";
 import Stripe from "stripe";
 import BookingRepo from "./booking.repository";
@@ -282,10 +283,8 @@ export default class BookingSvc {
     guestCount: number,
     voucherCode?: string,
   ) {
-    const days = Math.max(
-      1,
-      Math.ceil((endAt.getTime() - startAt.getTime()) / (1000 * 60 * 60 * 24)),
-    );
+    // Also refuses an end before the start, and over 60 days.
+    const days = bookingDays(startAt, endAt);
     const rateMultiplier =
       venue.billingRate === "hourly"
         ? days * 24
@@ -1439,11 +1438,15 @@ export default class BookingSvc {
     // The rate used is stored on the Event (T8.2), so this Event's price
     // never moves when the EventFoxer later changes their rate.
     const commissionPct = EventTemplateSvc.ownerCommissionPct(template);
+    // A package booked over several days costs its price for each day.
     const breakdown = await PricingSvc.calculateEventBreakdown(
       template,
       commissionPct,
       { excludedAssetIds, excludedServiceIds, excludedVenueIds },
-      { eventFoxerId: template.ownerId },
+      {
+        eventFoxerId: template.ownerId,
+        days: bookingDays(input.startAt, input.endAt),
+      },
     );
     const {
       itemsTotal,
