@@ -243,6 +243,15 @@ export const STRIPE_CONNECT_RETURN_URL =
 export const STRIPE_CONNECT_REFRESH_URL =
   process.env.STRIPE_CONNECT_REFRESH_URL ||
   `${FRONTEND_URL}/creator-dashboard/stripe-onboard`;
+// The same two for onboarding started in the mobile app (`client: mobile`,
+// mobile#476). Stripe only takes https, so these are web pages that hand off
+// to the app's own `foxpassport://app/stripe/return|refresh` link.
+export const STRIPE_CONNECT_MOBILE_RETURN_URL =
+  process.env.STRIPE_CONNECT_MOBILE_RETURN_URL ||
+  `${FRONTEND_URL}/stripe-connect/app-return`;
+export const STRIPE_CONNECT_MOBILE_REFRESH_URL =
+  process.env.STRIPE_CONNECT_MOBILE_REFRESH_URL ||
+  `${FRONTEND_URL}/stripe-connect/app-refresh`;
 // Country of new connected (Foxer) accounts (Accounts v2 `identity.country`),
 // ISO 3166-1 alpha-2. Optional: unset, it is the platform account's own
 // country, as v1 did. The Philippines is not a country Stripe supports for
