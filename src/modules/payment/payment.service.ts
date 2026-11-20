@@ -633,11 +633,26 @@ export default class PaymentSvc {
    * cancelled or expired, the booking is gone): running it again changes
    * nothing, so it is logged loudly for a person and the delivery is answered
    * as handled. Anything else is treated as transient and rethrown.
+   *
+   * An intent with no `metadata.bookingId` is not a booking payment: Stripe
+   * Checkout (Event, partnership and sponsorship checkout) creates its own
+   * intents, settled by `checkout.session.completed`, and the booking-change
+   * and event-change price differences (`bookingEditRequestId`,
+   * `eventEditProposalId`) are recorded by their own confirm calls. It is
+   * acknowledged without a lookup; looking up an undefined id throws, which
+   * answered 400 and made Stripe retry the delivery for days (api#413).
    */
   private static async settleSucceededIntent(
     paymentIntent: Stripe.PaymentIntent,
   ): Promise<void> {
-    const bookingId = paymentIntent.metadata.bookingId;
+    const bookingId = paymentIntent.metadata?.bookingId;
+
+    if (!bookingId) {
+      console.log(
+        `ℹ️ PaymentIntent succeeded: ${paymentIntent.id} has no bookingId (not a booking payment); nothing to settle`,
+      );
+      return;
+    }
 
     console.log(
       `✅ PaymentIntent succeeded: ${paymentIntent.id} for booking ${bookingId}`,

@@ -204,4 +204,40 @@ describe("settleSucceededIntent", () => {
 
     await expect(settle()).rejects.toThrow("timeout");
   });
+
+  // api#413: Stripe Checkout intents (Event, partnership, sponsorship) carry
+  // no bookingId; checkout.session.completed settles them.
+  it.each([
+    ["no bookingId", { checkoutSessionId: "cs_1" }],
+    ["empty metadata", {}],
+  ])(
+    "acknowledges an intent with %s and changes nothing",
+    async (_label, metadata) => {
+      setup();
+      const checkoutIntent = { ...PI, id: "pi_checkout_1", metadata };
+
+      await expect(
+        (PaymentSvc as any).settleSucceededIntent(checkoutIntent),
+      ).resolves.toBeUndefined();
+
+      for (const spy of Object.values(spies)) {
+        expect(spy).not.toHaveBeenCalled();
+      }
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("pi_checkout_1"),
+      );
+    },
+  );
+
+  it("answers the webhook without error for a Checkout intent", async () => {
+    setup();
+    await expect(
+      PaymentSvc.handleStripeEvent({
+        type: "payment_intent.succeeded",
+        data: { object: { ...PI, id: "pi_checkout_2", metadata: {} } },
+      } as any),
+    ).resolves.toBeUndefined();
+
+    expect(spies.context).not.toHaveBeenCalled();
+  });
 });
