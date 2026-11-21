@@ -22,6 +22,7 @@ import {
   IMAGE_UNREADABLE,
   MAX_UPLOAD_SIZE,
   type DetectedFile,
+  type PrivateUploadPurpose,
 } from "../../utils/file-signature";
 import { optimizeVideo } from "../../utils/video";
 import { AppError, badRequest, notFound } from "../../utils/errors";
@@ -226,7 +227,8 @@ export default class S3Svc {
 
   /**
    * An identity document (ID, clearance, proof of funds) into the private
-   * bucket. Images or PDFs only, checked from their bytes. Returns the
+   * bucket. Images or PDFs only, checked from their bytes; with purpose
+   * `portfolio`, a PDF or Word document only (app#371). Returns the
    * storage key, never a URL: readers get a short-lived link from
    * `getPrivateObjectUrl` instead.
    *
@@ -241,8 +243,9 @@ export default class S3Svc {
       mimetype: string;
       size: number;
     },
+    purpose: PrivateUploadPurpose = "document",
   ) {
-    const detected = checkUpload(file.buffer, file.size, "document");
+    const detected = checkUpload(file.buffer, file.size, purpose);
 
     let body = file.buffer;
     let contentType = detected.mime;

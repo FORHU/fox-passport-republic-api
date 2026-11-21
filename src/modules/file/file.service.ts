@@ -1,5 +1,6 @@
 import FileRepo from "./file.repository";
 import S3Svc from "../s3/s3.service";
+import type { PrivateUploadPurpose } from "../../utils/file-signature";
 
 export default class FileSvc {
   static async createFile(data: {
@@ -37,7 +38,8 @@ export default class FileSvc {
   }
 
   /**
-   * Stores an identity document in the private bucket and registers it.
+   * Stores an identity document (or, with purpose `portfolio`, a portfolio /
+   * resume) in the private bucket and registers it.
    * The record has no URL — see utils/private-files.ts for how it is read.
    */
   static async storePrivateDocument(
@@ -48,8 +50,13 @@ export default class FileSvc {
       mimetype: string;
       size: number;
     },
+    purpose: PrivateUploadPurpose = "document",
   ) {
-    const { key, contentType } = await S3Svc.uploadPrivateFile(userId, file);
+    const { key, contentType } = await S3Svc.uploadPrivateFile(
+      userId,
+      file,
+      purpose,
+    );
     return FileRepo.createPrivateFile({
       storageKey: key,
       name: file.originalname,
