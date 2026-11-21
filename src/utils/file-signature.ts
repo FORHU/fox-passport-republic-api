@@ -8,13 +8,17 @@
  *
  * HEIC is not supported: sharp's prebuilt binaries cannot decode it. The
  * mobile app is unaffected — its image picker hands over JPEG.
+ *
+ * Word documents (.doc, .docx) are taken only as a portfolio (app#371), and
+ * only when the whole file is checked: telling one from a spreadsheet or a
+ * plain ZIP needs more than the first few bytes.
  */
 
 import { badRequest } from "./errors";
 
 const MB = 1024 * 1024;
 
-export type FileKind = "image" | "video" | "pdf";
+export type FileKind = "image" | "video" | "pdf" | "word";
 
 export interface DetectedFile {
   kind: FileKind;
@@ -27,17 +31,20 @@ export const MAX_UPLOAD_SIZE: Record<FileKind, number> = {
   image: 15 * MB,
   video: 100 * MB,
   pdf: 15 * MB,
+  word: 15 * MB,
 };
 
 /**
  * Which kinds each upload route takes: `image` is the presigned listing /
  * venue / avatar upload, `media` is upload-direct (posts, chat), `document`
- * is the private bucket (IDs, clearances, proof of funds).
+ * is the private bucket (IDs, clearances, proof of funds), and `portfolio` is
+ * the private bucket's portfolio / resume slot, documents only (app#371).
  */
 export const UPLOAD_KINDS = {
   image: ["image"],
   media: ["image", "video"],
   document: ["image", "pdf"],
+  portfolio: ["pdf", "word"],
 } as const satisfies Record<string, readonly FileKind[]>;
 
 export type UploadPurpose = keyof typeof UPLOAD_KINDS;
@@ -49,7 +56,19 @@ export const FILE_UNSUPPORTED: Record<UploadPurpose, string> = {
   image: "Use a JPG, PNG, WebP or GIF image",
   media: "Use a JPG, PNG, WebP or GIF image, or an MP4, MOV or WebM video",
   document: "Use a JPG, PNG, WebP or GIF image, or a PDF",
+  portfolio: "Use a PDF or Word document (.pdf, .doc, .docx)",
 };
+
+/** What a private-bucket upload (POST /files/upload-private) may be for. */
+export type PrivateUploadPurpose = Extract<
+  UploadPurpose,
+  "document" | "portfolio"
+>;
+export const isPrivateUploadPurpose = (
+  value: unknown,
+): value is PrivateUploadPurpose =>
+  value === "document" || value === "portfolio";
+
 export const fileTooLarge = (kind: FileKind) =>
   `File size must be ${MAX_UPLOAD_SIZE[kind] / MB}MB or below`;
 
@@ -62,6 +81,12 @@ const FORMATS: Record<string, DetectedFile> = {
   mov: { kind: "video", mime: "video/quicktime", ext: "mov" },
   webm: { kind: "video", mime: "video/webm", ext: "webm" },
   pdf: { kind: "pdf", mime: "application/pdf", ext: "pdf" },
+  doc: { kind: "word", mime: "application/msword", ext: "doc" },
+  docx: {
+    kind: "word",
+    mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ext: "docx",
+  },
 };
 
 /** The supported format with this Content-Type, if any. */
@@ -98,6 +123,20 @@ const MP4_BRANDS = [
 const ascii = (head: Buffer, start: number, end: number) =>
   head.toString("latin1", start, end);
 
+// An OLE compound file (.doc, but also .xls, .ppt, .msg). A Word one holds a
+// stream named "WordDocument"; directory entry names are UTF-16LE.
+const OLE_HEADER = Buffer.from([
+  0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1,
+]);
+const OLE_WORD_STREAM = Buffer.from("WordDocument", "utf16le");
+
+// A ZIP (.docx, but also .xlsx, .pptx, any archive). An Office Open XML file
+// lists its parts in [Content_Types].xml and a Word one keeps them under
+// word/; entry names are stored uncompressed, so they can be searched for.
+const ZIP_HEADER = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+const OOXML_TYPES = Buffer.from("[Content_Types].xml", "latin1");
+const DOCX_PART = Buffer.from("word/document", "latin1");
+
 /** The supported format these bytes start with, or null for anything else. */
 export function detectFileType(head: Buffer): DetectedFile | null {
   if (
@@ -121,6 +160,14 @@ export function detectFileType(head: Buffer): DetectedFile | null {
     return FORMATS.webp;
   }
   if (ascii(head, 0, 5) === "%PDF-") return FORMATS.pdf;
+  if (head.subarray(0, 8).equals(OLE_HEADER)) {
+    return head.includes(OLE_WORD_STREAM) ? FORMATS.doc : null;
+  }
+  if (head.subarray(0, 4).equals(ZIP_HEADER)) {
+    return head.includes(OOXML_TYPES) && head.includes(DOCX_PART)
+      ? FORMATS.docx
+      : null;
+  }
   if (ascii(head, 4, 8) === "ftyp") {
     const brand = ascii(head, 8, 12);
     if (brand === "qt  ") return FORMATS.mov;

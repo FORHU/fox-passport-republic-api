@@ -46,7 +46,11 @@ type Result = { statusCode: number; body: any };
 function apply(
   roleType: string,
   data: unknown,
-  opts: { withFile?: boolean; raw?: boolean } = {},
+  opts: {
+    withFile?: boolean;
+    raw?: boolean;
+    files?: Record<string, object[]>;
+  } = {},
 ): Promise<Result> {
   const res = {
     statusCode: 0,
@@ -63,9 +67,9 @@ function apply(
   const req = {
     user: { userId: "u1" },
     body: { roleType, data: opts.raw ? data : JSON.stringify(data) },
-    files: opts.withFile
-      ? { validId1: [{ originalname: "id.png" }] }
-      : undefined,
+    files:
+      opts.files ??
+      (opts.withFile ? { validId1: [{ originalname: "id.png" }] } : undefined),
   } as unknown as Request;
   return RoleRequestCtrl.apply(req, res as unknown as Response).then(
     () => res as Result,
@@ -228,5 +232,62 @@ describe("Failures never echo Prisma's text", () => {
       success: false,
       message: "An application for the eventFoxer role is already pending",
     });
+  });
+});
+
+describe("Portfolio links and files (app#371)", () => {
+  it("refuses an Event Foxer link that isn't a web address, before storing anything", async () => {
+    const res = await apply(
+      "eventFoxer",
+      { specializations: ["wedding"], portfolioUrls: ["javascript:alert(1)"] },
+      { withFile: true },
+    );
+    expect(res.statusCode).toBe(400);
+    expect(storePrivateDocument).not.toHaveBeenCalled();
+    expect(submitApplication).not.toHaveBeenCalled();
+  });
+
+  it("stores an Event Foxer's links trimmed", async () => {
+    const res = await apply("eventFoxer", {
+      specializations: ["wedding"],
+      portfolioUrls: [" https://behance.net/fox ", ""],
+    });
+    expect(res.statusCode).toBe(201);
+    expect(submitted().portfolioUrls).toEqual(["https://behance.net/fox"]);
+  });
+
+  it("checks a Provider's links too", async () => {
+    const res = await apply("providerFoxer", {
+      specializations: ["dj"],
+      portfolioUrls: ["portfolio"],
+    });
+    expect(res.statusCode).toBe(400);
+    expect(submitApplication).not.toHaveBeenCalled();
+  });
+
+  it("stores a multipart portfolio as a portfolio, and IDs as documents", async () => {
+    const res = await apply(
+      "eventFoxer",
+      { specializations: ["wedding"] },
+      {
+        files: {
+          validId1: [{ originalname: "id.png" }],
+          portfolioFile: [{ originalname: "cv.pdf" }],
+        },
+      },
+    );
+    expect(res.statusCode).toBe(201);
+    const purposes = Object.fromEntries(
+      storePrivateDocument.mock.calls.map((c) => {
+        const [, file, purpose] = c as unknown as [
+          string,
+          { originalname: string },
+          string,
+        ];
+        return [file.originalname, purpose];
+      }),
+    );
+    expect(purposes).toEqual({ "id.png": "document", "cv.pdf": "portfolio" });
+    expect(submitted().portfolioFileId).toBe("file-1");
   });
 });
