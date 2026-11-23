@@ -40,7 +40,17 @@ const policies = [
 export async function seedCancellationPolicies(prisma: PrismaClient) {
   console.log("Seeding cancellation policies...");
 
-  for (const policy of policies) {
+  // Under simplified cancellation policies (api#436), deactivate Moderate and Strict
+  await prisma.cancellationPolicy.updateMany({
+    where: { name: { in: ["Moderate", "Strict"] } },
+    data: { isActive: false },
+  });
+
+  const activePolicies = policies.filter(
+    (p) => p.name === "Flexible" || p.name === "Non-Refundable",
+  );
+
+  for (const policy of activePolicies) {
     const existing = await prisma.cancellationPolicy.findFirst({
       where: { name: policy.name },
     });
@@ -58,5 +68,5 @@ export async function seedCancellationPolicies(prisma: PrismaClient) {
     });
   }
 
-  console.log(`Seeded ${policies.length} cancellation policies.`);
+  console.log(`Seeded active cancellation policies.`);
 }
