@@ -56,6 +56,12 @@ vi.mock("../src/middleware/auth.middleware", async (importOriginal) => {
 
 import express from "express";
 import router from "../src/modules/stripe-connect/stripe-connect.routes";
+import {
+  STRIPE_CONNECT_MOBILE_REFRESH_URL,
+  STRIPE_CONNECT_MOBILE_RETURN_URL,
+  STRIPE_CONNECT_REFRESH_URL,
+  STRIPE_CONNECT_RETURN_URL,
+} from "../src/config";
 
 const app = express().use(express.json()).use("/stripe-connect", router);
 
@@ -152,6 +158,50 @@ describe("POST /stripe-connect/onboard (Accounts v2)", () => {
       expect.objectContaining({ account: "acct_v1_old" }),
     );
   });
+
+  // mobile#476: where Stripe sends the person back depends on who asked,
+  // and only from server config.
+  it("returns a web onboarding to the web dashboard by default", async () => {
+    const res = await request(app).post("/stripe-connect/onboard");
+
+    expect(res.status).toBe(200);
+    expect(stripe.accountLinks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        return_url: STRIPE_CONNECT_RETURN_URL,
+        refresh_url: STRIPE_CONNECT_REFRESH_URL,
+      }),
+    );
+  });
+
+  it("returns a mobile onboarding to the pages that reopen the app", async () => {
+    const res = await request(app)
+      .post("/stripe-connect/onboard")
+      .send({ client: "mobile" });
+
+    expect(res.status).toBe(200);
+    expect(stripe.accountLinks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        return_url: STRIPE_CONNECT_MOBILE_RETURN_URL,
+        refresh_url: STRIPE_CONNECT_MOBILE_REFRESH_URL,
+      }),
+    );
+    expect(STRIPE_CONNECT_MOBILE_RETURN_URL).not.toBe(
+      STRIPE_CONNECT_RETURN_URL,
+    );
+  });
+
+  it.each([["desktop"], ["https://evil.example/steal"], [42]])(
+    "refuses client %s without creating anything",
+    async (client) => {
+      const res = await request(app)
+        .post("/stripe-connect/onboard")
+        .send({ client });
+
+      expect(res.status).toBe(400);
+      expect(stripe.rawRequest).not.toHaveBeenCalled();
+      expect(stripe.accountLinks.create).not.toHaveBeenCalled();
+    },
+  );
 
   it("saves nothing when Stripe returns no account id", async () => {
     stripe.rawRequest.mockResolvedValue({ object: "v2.core.account" });

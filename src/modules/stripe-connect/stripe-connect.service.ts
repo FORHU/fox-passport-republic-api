@@ -6,11 +6,31 @@ import {
   STRIPE_CONNECT_ACCOUNT_COUNTRY,
   STRIPE_CONNECT_REFRESH_URL,
   STRIPE_CONNECT_RETURN_URL,
+  STRIPE_CONNECT_MOBILE_REFRESH_URL,
+  STRIPE_CONNECT_MOBILE_RETURN_URL,
 } from "../../config";
 
 const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-08-27.basil",
 });
+
+/** Who asked for an onboarding link, which decides where Stripe returns. */
+export const ONBOARDING_CLIENTS = ["web", "mobile"] as const;
+export type OnboardingClient = (typeof ONBOARDING_CLIENTS)[number];
+
+const ONBOARDING_URLS: Record<
+  OnboardingClient,
+  { return: string; refresh: string }
+> = {
+  web: {
+    return: STRIPE_CONNECT_RETURN_URL,
+    refresh: STRIPE_CONNECT_REFRESH_URL,
+  },
+  mobile: {
+    return: STRIPE_CONNECT_MOBILE_RETURN_URL,
+    refresh: STRIPE_CONNECT_MOBILE_REFRESH_URL,
+  },
+};
 
 /**
  * Accounts v2 for Connect is generally available from this API version. Only
@@ -206,13 +226,22 @@ export default class StripeConnectSvc {
     return account.id;
   }
 
-  static async createOnboardingLink(userId: string): Promise<{ url: string }> {
+  /**
+   * Stripe's hosted onboarding link for the caller's own account. `client`
+   * picks where Stripe sends them back to, from server config only: the web
+   * dashboard, or (mobile#476) the web pages that reopen the mobile app.
+   */
+  static async createOnboardingLink(
+    userId: string,
+    client: OnboardingClient = "web",
+  ): Promise<{ url: string }> {
     const accountId = await this.createExpressAccount(userId);
+    const urls = ONBOARDING_URLS[client];
 
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
-      refresh_url: STRIPE_CONNECT_REFRESH_URL,
-      return_url: STRIPE_CONNECT_RETURN_URL,
+      refresh_url: urls.refresh,
+      return_url: urls.return,
       type: "account_onboarding",
     });
 
