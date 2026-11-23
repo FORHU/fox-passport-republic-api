@@ -1,4 +1,5 @@
 import CancellationPolicyRepo from "./cancellation-policy.repository";
+import { prisma } from "../../utils/prisma";
 
 interface RuleInput {
   fromHours: number;
@@ -41,15 +42,125 @@ export default class CancellationPolicySvc {
     };
   }
 
+  /**
+   * Returns active cancellation policies.
+   * Under the simplified policy system (api#436, app#400), only "Flexible" and
+   * "Non-Refundable" options are available. Legacy "Moderate" and "Strict"
+   * are excluded from the active list.
+   */
   static async getAll() {
     const policies = await CancellationPolicyRepo.findAll();
-    return policies.map((p) => this.toApi(p));
+    const allowed = policies.filter(
+      (p) =>
+        p.name.toLowerCase() !== "moderate" &&
+        p.name.toLowerCase() !== "strict",
+    );
+    return allowed.map((p) => this.toApi(p));
   }
 
   static async getById(id: string) {
     const policy = await CancellationPolicyRepo.findById(id);
     if (!policy) throw new Error("Cancellation policy not found");
     return this.toApi(policy);
+  }
+
+  /**
+   * Resolves or dynamically provisions a CancellationPolicy for a venue or listing.
+   * Supports simplified options: "Flexible" (with custom refund percent and deadline hours)
+   * or "Non-Refundable" (0% refund).
+   */
+  static async resolvePolicy(input: {
+    cancellationPolicyId?: string;
+    cancellationType?: "Flexible" | "Non-Refundable" | string;
+    flexibleRefundPercent?: number;
+    flexibleRefundHours?: number;
+  }): Promise<string | undefined> {
+    const {
+      cancellationPolicyId,
+      cancellationType,
+      flexibleRefundPercent,
+      flexibleRefundHours,
+    } = input;
+
+    if (cancellationType === "Non-Refundable") {
+      let nonRef = await prisma.cancellationPolicy.findFirst({
+        where: { name: "Non-Refundable", isActive: true },
+        include: { rules: true },
+      });
+      if (!nonRef) {
+        nonRef = await prisma.cancellationPolicy.create({
+          data: {
+            name: "Non-Refundable",
+            description: "No refunds under any circumstances.",
+            isActive: true,
+            rules: {
+              create: [{ hoursBeforeEvent: 0, refundPercent: 0 }],
+            },
+          },
+          include: { rules: true },
+        });
+      }
+      return nonRef.id;
+    }
+
+    if (
+      cancellationType === "Flexible" ||
+      flexibleRefundPercent !== undefined ||
+      flexibleRefundHours !== undefined
+    ) {
+      const refundPercent =
+        typeof flexibleRefundPercent === "number" &&
+        flexibleRefundPercent >= 0 &&
+        flexibleRefundPercent <= 100
+          ? flexibleRefundPercent
+          : 100;
+      const hoursBeforeEvent =
+        typeof flexibleRefundHours === "number" && flexibleRefundHours >= 0
+          ? flexibleRefundHours
+          : 24;
+
+      const candidates = await prisma.cancellationPolicy.findMany({
+        where: { name: "Flexible", isActive: true },
+        include: { rules: { orderBy: { hoursBeforeEvent: "desc" } } },
+      });
+
+      const matched = candidates.find((p) => {
+        const topRule = p.rules[0];
+        return (
+          topRule &&
+          topRule.hoursBeforeEvent === hoursBeforeEvent &&
+          topRule.refundPercent === refundPercent
+        );
+      });
+
+      if (matched) return matched.id;
+
+      const created = await prisma.cancellationPolicy.create({
+        data: {
+          name: "Flexible",
+          description: `${refundPercent}% refund up to ${hoursBeforeEvent} hours before the event.`,
+          isActive: true,
+          rules: {
+            create: [
+              { hoursBeforeEvent, refundPercent },
+              ...(refundPercent < 100
+                ? []
+                : [{ hoursBeforeEvent: 0, refundPercent: 0 }]),
+            ],
+          },
+        },
+      });
+      return created.id;
+    }
+
+    if (cancellationPolicyId) {
+      return cancellationPolicyId;
+    }
+
+    const defaultFlexible = await prisma.cancellationPolicy.findFirst({
+      where: { name: "Flexible", isActive: true },
+    });
+    return defaultFlexible?.id;
   }
 
   static async create(data: {

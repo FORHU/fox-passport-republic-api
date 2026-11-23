@@ -100,6 +100,13 @@ const ALLOW_LIST = new Set([
   "profile.routes.ts GET /username-availability",
   "profile.routes.ts POST /credentials",
 
+  // Provider specialty suggestions (api#440). Any signed-in applicant may ask
+  // for a specialty the catalog lacks. The request is stored as pending under
+  // the session user and grants nothing: only `categories:manage` reviewers
+  // list, approve or reject it. SpecialtySuggestionSvc caps open requests per
+  // person. Self-service, so no capability permission applies.
+  "category.routes.ts POST /provider-specialties/suggestions",
+
   // Foxer Score management console: self-service operational metrics for authenticated Foxer.
   "foxer-score.routes.ts GET /me",
   // Achievements engine: self-service personal progress and rewards evaluation for authenticated user.

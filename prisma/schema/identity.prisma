@@ -137,6 +137,8 @@ model User {
   perkRedemptions          PerkRedemption[]
   facebookConnection       FacebookConnection?
   facebookShares           FacebookShare[]
+  specialtySuggestions     ProviderSpecialtySuggestion[] @relation("SpecialtySuggester")
+  specialtyReviews         ProviderSpecialtySuggestion[] @relation("SpecialtyReviewer")
 
   @@map("users")
 }
@@ -298,8 +300,52 @@ model ProviderFoxerApplication {
   selfieFile           File?       @relation("ProviderFoxerSelfie", fields: [selfieFileId], references: [id])
   tinIdFile            File?       @relation("ProviderFoxerTinId", fields: [tinIdFileId], references: [id])
   validId1             File?       @relation("ProviderFoxerValidId1", fields: [validId1FileId], references: [id])
+  // The Provider wizard (mobile#487, api#440). All optional, so applications
+  // sent before it, and from clients that do not ask, still save.
+  basedIn              String?
+  // Where the device was when the applicant tapped "use my location", for
+  // finding Providers near a venue later. Both or neither.
+  basedInLat           Float?
+  basedInLng           Float?
+  travelRange          ProviderTravelRange?
+  // One of `specializations`: the one they are known for.
+  mainSpecialty        String?
+  specialtyDetails     ProviderApplicationSpecialty[]
 
   @@map("provider_foxer_applications")
+}
+
+enum ProviderTravelRange {
+  city
+  province
+  anywhere
+}
+
+// What a Provider applicant wrote about one of their specialties, with photos
+// of their work, for the reviewer (api#440). The photos are private uploads.
+model ProviderApplicationSpecialty {
+  id            String                             @id @default(uuid())
+  applicationId String
+  application   ProviderFoxerApplication           @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  slug          String
+  description   String
+  photos        ProviderApplicationSpecialtyPhoto[]
+
+  @@unique([applicationId, slug])
+  @@map("provider_application_specialties")
+}
+
+model ProviderApplicationSpecialtyPhoto {
+  id          String                       @id @default(uuid())
+  specialtyId String
+  specialty   ProviderApplicationSpecialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+  fileId      String
+  file        File                         @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  position    Int
+
+  @@index([specialtyId])
+  @@index([fileId])
+  @@map("provider_application_specialty_photos")
 }
 
 model InvestorApplication {

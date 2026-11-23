@@ -1,7 +1,8 @@
-import { AppError, sendAppError } from "../../utils/errors";
+import { AppError, sendAppError, fromPrisma } from "../../utils/errors";
 import { Request, Response } from "express";
 import Joi from "joi";
 import VenueSvc from "./venue.service";
+import CancellationPolicySvc from "../cancellation-policy/cancellation-policy.service";
 import {
   VenueStatus,
   VenueCategory,
@@ -33,6 +34,8 @@ interface CreateVenuePayload {
   state?: string;
   district?: string;
   country?: string;
+  lat?: number;
+  lng?: number;
   boundary?: LngLat[];
   imgIds?: string[];
   spaceType?: string[];
@@ -45,6 +48,9 @@ interface CreateVenuePayload {
   extraGuestRate?: number;
   billingRate?: BillingRate;
   cancellationPolicyId?: string;
+  cancellationType?: string;
+  flexibleRefundPercent?: number;
+  flexibleRefundHours?: number;
 
   facilities?: string[];
   recommendedCapacity?: number;
@@ -80,7 +86,12 @@ export default class VenueCtrl {
       name: nameJoi().required(),
       description: publishOnly(descriptionJoi(LONG_DESCRIPTION_MAX)),
       category: publishOnly(
-        Joi.string().valid(...Object.values(VenueCategory)),
+        Joi.string()
+          .valid(...Object.values(VenueCategory))
+          .messages({
+            "any.only": "Please select a valid venue category.",
+            "any.required": "Venue category is required to publish.",
+          }),
       ),
       capacity: publishOnly(quantityJoi()),
       address: publishOnly(Joi.string()),
@@ -88,9 +99,9 @@ export default class VenueCtrl {
       state: Joi.string().optional(),
       district: Joi.string().allow("").optional(),
       country: publishOnly(Joi.string()),
-      // A draft doesn't need a boundary yet; anything else does — see
-      // VenueSvc.createVenue for the matching runtime check (which also
-      // accounts for the venue_authority perk forcing status to available).
+      lat: Joi.number().min(-90).max(90).optional(),
+      lng: Joi.number().min(-180).max(180).optional(),
+      // Optional for both draft and publish - shape drawing is no longer required (api#438)
       boundary: Joi.array()
         .items(
           Joi.array()
@@ -102,11 +113,7 @@ export default class VenueCtrl {
         )
         .min(MIN_POLYGON_VERTICES)
         .max(MAX_POLYGON_VERTICES)
-        .when("status", {
-          is: "draft",
-          then: Joi.optional(),
-          otherwise: Joi.required(),
-        }),
+        .optional(),
       imgIds: Joi.array()
         .items(Joi.string())
         .max(5)
@@ -129,6 +136,11 @@ export default class VenueCtrl {
         .valid("hourly", "daily", "weekly", "monthly", "yearly", "one_time")
         .default("daily"),
       cancellationPolicyId: Joi.string().uuid().optional(),
+      cancellationType: Joi.string()
+        .valid("Flexible", "Non-Refundable")
+        .optional(),
+      flexibleRefundPercent: Joi.number().integer().min(0).max(100).optional(),
+      flexibleRefundHours: Joi.number().integer().min(0).optional(),
 
       facilities: Joi.array().items(Joi.string()).optional(),
       recommendedCapacity: quantityJoi().optional(),
@@ -160,7 +172,32 @@ export default class VenueCtrl {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const venueData = { ...value, mayorId };
+      let cancellationPolicyId = value.cancellationPolicyId;
+      if (
+        value.cancellationPolicyId ||
+        (value as any).cancellationType ||
+        value.status !== VenueStatus.draft
+      ) {
+        cancellationPolicyId = await CancellationPolicySvc.resolvePolicy({
+          cancellationPolicyId: value.cancellationPolicyId,
+          cancellationType: (value as any).cancellationType,
+          flexibleRefundPercent: (value as any).flexibleRefundPercent,
+          flexibleRefundHours: (value as any).flexibleRefundHours,
+        }).catch(() => value.cancellationPolicyId);
+      }
+
+      const {
+        cancellationType: _cType,
+        flexibleRefundPercent: _frp,
+        flexibleRefundHours: _frh,
+        ...validVenueData
+      } = value as any;
+
+      const venueData = {
+        ...validVenueData,
+        ...(cancellationPolicyId && { cancellationPolicyId }),
+        mayorId,
+      };
       const venue = await VenueSvc.createVenue(venueData);
       announceAdminQueueChanged();
       return res
@@ -168,11 +205,15 @@ export default class VenueCtrl {
         .json({ message: "Venue created successfully", venue });
     } catch (e: unknown) {
       if (e instanceof AppError) return sendAppError(res, e);
+      const safe = fromPrisma(e);
+      if (safe) return sendAppError(res, safe);
       const error = e as Error;
       const status = error.message?.includes("overlaps an existing venue")
         ? 409
         : 400;
-      return res.status(status).json({ message: error.message || error });
+      return res
+        .status(status)
+        .json({ message: error.message || "Failed to create venue" });
     }
   }
 
@@ -249,6 +290,9 @@ export default class VenueCtrl {
       description: descriptionJoi(LONG_DESCRIPTION_MAX).optional(),
       category: Joi.string()
         .valid(...Object.values(VenueCategory))
+        .messages({
+          "any.only": "Please select a valid venue category.",
+        })
         .optional(),
       capacity: quantityJoi().optional(),
       price: priceJoi().optional(),
@@ -259,6 +303,8 @@ export default class VenueCtrl {
       state: Joi.string().optional(),
       district: Joi.string().allow("").optional(),
       country: Joi.string().optional(),
+      lat: Joi.number().min(-90).max(90).optional(),
+      lng: Joi.number().min(-180).max(180).optional(),
       boundary: Joi.array()
         .items(
           Joi.array()
@@ -284,6 +330,11 @@ export default class VenueCtrl {
         .valid("hourly", "daily", "weekly", "monthly", "yearly", "one_time")
         .optional(),
       cancellationPolicyId: Joi.string().uuid().optional(),
+      cancellationType: Joi.string()
+        .valid("Flexible", "Non-Refundable")
+        .optional(),
+      flexibleRefundPercent: Joi.number().integer().min(0).max(100).optional(),
+      flexibleRefundHours: Joi.number().integer().min(0).optional(),
 
       facilities: Joi.array().items(Joi.string()).optional(),
       recommendedCapacity: quantityJoi().optional(),
@@ -314,11 +365,37 @@ export default class VenueCtrl {
       if (!requesterId)
         return res.status(401).json({ message: "Unauthorized" });
 
+      let cancellationPolicyId = value.cancellationPolicyId;
+      if (
+        value.cancellationType !== undefined ||
+        value.flexibleRefundPercent !== undefined ||
+        value.flexibleRefundHours !== undefined
+      ) {
+        cancellationPolicyId = await CancellationPolicySvc.resolvePolicy({
+          cancellationPolicyId: value.cancellationPolicyId,
+          cancellationType: value.cancellationType,
+          flexibleRefundPercent: value.flexibleRefundPercent,
+          flexibleRefundHours: value.flexibleRefundHours,
+        });
+      }
+
+      const {
+        cancellationType: _cType,
+        flexibleRefundPercent: _frp,
+        flexibleRefundHours: _frh,
+        ...validUpdateData
+      } = value as any;
+
+      const updateData = {
+        ...validUpdateData,
+        ...(cancellationPolicyId !== undefined && { cancellationPolicyId }),
+      };
+
       const venue = await VenueSvc.updateVenue({
         id: String(req.params.id),
         requesterId,
         requesterRole,
-        data: value,
+        data: updateData,
       });
       announceAdminQueueChanged();
       return res
@@ -326,6 +403,8 @@ export default class VenueCtrl {
         .json({ message: "Venue updated successfully", venue });
     } catch (e: unknown) {
       if (e instanceof AppError) return sendAppError(res, e);
+      const safe = fromPrisma(e);
+      if (safe) return sendAppError(res, safe);
       const err = e as Error;
       const status =
         err.message === "Unauthorized"
@@ -335,7 +414,9 @@ export default class VenueCtrl {
             : err.message?.includes("overlaps an existing venue")
               ? 409
               : 400;
-      return res.status(status).json({ message: err.message || err });
+      return res
+        .status(status)
+        .json({ message: err.message || "Failed to update venue" });
     }
   }
 
@@ -543,7 +624,6 @@ export default class VenueCtrl {
       staff: [
         "Security Guard",
         "Janitor",
-        "Event Coordinator",
         "Concierge",
         "Bartender",
         "Parking Attendant",
@@ -551,6 +631,14 @@ export default class VenueCtrl {
         "Lighting Technician",
         "Stage Manager",
         "Emcee",
+      ],
+      policies: [
+        "No smoking indoors",
+        "No outside catering without approval",
+        "Quiet hours after 10:00 PM",
+        "Venue must be cleared after event",
+        "No glitter, confetti, or open flames",
+        "Event insurance required for large gatherings",
       ],
     });
   }

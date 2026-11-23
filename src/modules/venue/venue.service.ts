@@ -53,6 +53,40 @@ const ORGANIZER_EDITABLE_VENUE_FIELDS = new Set<string>([
 ]);
 
 /**
+ * Event Coordinators (`organizer`) are hired/appointed separately through the
+ * Event Manager / Venue Appointment flow rather than bundled as generic venue
+ * staff (app#397). Strip any "Event Coordinator" entries from venue staffing
+ * writes while keeping all other staff roles intact.
+ */
+export function sanitizeVenueStaffing(staffing?: string[]): string[] {
+  if (!Array.isArray(staffing)) return [];
+  return staffing.filter(
+    (s) =>
+      typeof s === "string" && s.trim().toLowerCase() !== "event coordinator",
+  );
+}
+
+/**
+ * Dedicated Venue Policies handling (api#433).
+ * Trims, excludes empty strings, and deduplicates policies.
+ */
+export function sanitizeVenuePolicies(policies?: string[]): string[] {
+  if (!Array.isArray(policies)) return [];
+  const seen = new Set<string>();
+  const sanitized: string[] = [];
+  for (const p of policies) {
+    if (typeof p !== "string") continue;
+    const trimmed = p.trim();
+    if (!trimmed) continue;
+    const lower = trimmed.toLowerCase();
+    if (seen.has(lower)) continue;
+    seen.add(lower);
+    sanitized.push(trimmed);
+  }
+  return sanitized;
+}
+
+/**
  * A venue is found by its address, so publishing one needs a street and, in
  * the Philippines, a real province → city/municipality → barangay chain from
  * the PSGC list. Drafts are exempt: they can be saved half-filled.
@@ -167,6 +201,8 @@ export default class VenueSvc {
     state?: string;
     district?: string;
     country?: string;
+    lat?: number;
+    lng?: number;
     boundary?: LngLat[];
     imgIds?: string[];
     spaceType?: string[];
@@ -178,6 +214,7 @@ export default class VenueSvc {
     price?: number;
     extraGuestRate?: number;
     billingRate?: BillingRate;
+    cancellationPolicyId?: string;
 
     facilities?: string[];
     recommendedCapacity?: number;
@@ -224,17 +261,13 @@ export default class VenueSvc {
 
     if (finalStatus !== VenueStatus.draft) {
       assertPublishableVenue({ ...data, imageCount: data.imgIds?.length ?? 0 });
-      if (!data.boundary) {
-        throw new AppError(
-          "A service-area boundary is required to publish a venue",
-          400,
-        );
-      }
-      const validationError = validatePolygon(data.boundary);
-      if (validationError) throw new AppError(validationError, 400);
+      if (data.boundary) {
+        const validationError = validatePolygon(data.boundary);
+        if (validationError) throw new AppError(validationError, 400);
 
-      await this.assertNoOverlap(data.boundary);
-      centroid = polygonCentroid(data.boundary);
+        await this.assertNoOverlap(data.boundary);
+        centroid = polygonCentroid(data.boundary);
+      }
     }
 
     const { boundary, recommendedAssets, recommendedServices, ...rest } = data;
@@ -249,18 +282,19 @@ export default class VenueSvc {
       city: data.city ?? "",
       country: data.country ?? "",
       state: data.state ?? undefined,
-      lat: centroid?.lat,
-      lng: centroid?.lng,
+      lat: centroid?.lat ?? data.lat,
+      lng: centroid?.lng ?? data.lng,
       boundary: boundary as unknown as Prisma.InputJsonValue | undefined,
       imgIds: data.imgIds ?? [],
       spaceType: data.spaceType ?? [],
       amenities: data.amenities ?? [],
       techAv: data.techAv ?? [],
-      staffing: data.staffing ?? [],
-      policies: data.policies ?? [],
+      staffing: sanitizeVenueStaffing(data.staffing),
+      policies: sanitizeVenuePolicies(data.policies),
       status: finalStatus,
       price: data.price ?? 0,
       billingRate: (data.billingRate as BillingRate) ?? BillingRate.daily,
+      cancellationPolicyId: data.cancellationPolicyId,
 
       facilities: data.facilities ?? [],
       recommendedCapacity: data.recommendedCapacity,
@@ -529,6 +563,7 @@ export default class VenueSvc {
       policies: string[];
       status: VenueStatus;
       billingRate: BillingRate;
+      cancellationPolicyId: string;
 
       facilities: string[];
       recommendedCapacity: number;
@@ -642,21 +677,17 @@ export default class VenueSvc {
           district: data.district ?? venue.district,
         });
       }
-      if (!resolvedBoundary) {
-        throw new AppError(
-          "A service-area boundary is required to publish a venue",
-          400,
-        );
-      }
-      const validationError = validatePolygon(resolvedBoundary);
-      if (validationError) throw new AppError(validationError, 400);
+      if (resolvedBoundary) {
+        const validationError = validatePolygon(resolvedBoundary);
+        if (validationError) throw new AppError(validationError, 400);
 
-      // Only worth re-checking when the shape itself moved, or when a draft
-      // with no prior overlap check is being published for the first time.
-      if (boundaryChanged || venue.status === VenueStatus.draft) {
-        await this.assertNoOverlap(resolvedBoundary, id);
+        // Only worth re-checking when the shape itself moved, or when a draft
+        // with no prior overlap check is being published for the first time.
+        if (boundaryChanged || venue.status === VenueStatus.draft) {
+          await this.assertNoOverlap(resolvedBoundary, id);
+        }
+        if (boundaryChanged) centroid = polygonCentroid(resolvedBoundary);
       }
-      if (boundaryChanged) centroid = polygonCentroid(resolvedBoundary);
     }
 
     const {
@@ -668,6 +699,12 @@ export default class VenueSvc {
     } = data;
     return VenueRepo.updateVenue(id, {
       ...rest,
+      ...(data.staffing !== undefined && {
+        staffing: sanitizeVenueStaffing(data.staffing),
+      }),
+      ...(data.policies !== undefined && {
+        policies: sanitizeVenuePolicies(data.policies),
+      }),
       // Never the raw `data.status` — always the clamped value, so a
       // client-requested `available`/`rejected`/`archived` can't slip
       // through this spread even though it was validated out above.
