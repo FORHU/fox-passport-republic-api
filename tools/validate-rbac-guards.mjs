@@ -92,6 +92,14 @@ const ALLOW_LIST = new Set([
   "referral.routes.ts GET /me",
   "referral.routes.ts POST /apply",
 
+  // Account setup (api#419). A Google account sets the username and password
+  // it lacks. Both act only on the session user: the availability check
+  // compares a username against everyone else's, and the setup refuses an
+  // account that needs none and never replaces a password (ProfileSvc).
+  // Self-service, so no capability permission applies.
+  "profile.routes.ts GET /username-availability",
+  "profile.routes.ts POST /credentials",
+
   // Foxer Score management console: self-service operational metrics for authenticated Foxer.
   "foxer-score.routes.ts GET /me",
   // Achievements engine: self-service personal progress and rewards evaluation for authenticated user.
