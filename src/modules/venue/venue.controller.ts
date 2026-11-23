@@ -34,6 +34,8 @@ interface CreateVenuePayload {
   state?: string;
   district?: string;
   country?: string;
+  lat?: number;
+  lng?: number;
   boundary?: LngLat[];
   imgIds?: string[];
   spaceType?: string[];
@@ -97,9 +99,9 @@ export default class VenueCtrl {
       state: Joi.string().optional(),
       district: Joi.string().allow("").optional(),
       country: publishOnly(Joi.string()),
-      // A draft doesn't need a boundary yet; anything else does — see
-      // VenueSvc.createVenue for the matching runtime check (which also
-      // accounts for the venue_authority perk forcing status to available).
+      lat: Joi.number().min(-90).max(90).optional(),
+      lng: Joi.number().min(-180).max(180).optional(),
+      // Optional for both draft and publish - shape drawing is no longer required (api#438)
       boundary: Joi.array()
         .items(
           Joi.array()
@@ -111,11 +113,7 @@ export default class VenueCtrl {
         )
         .min(MIN_POLYGON_VERTICES)
         .max(MAX_POLYGON_VERTICES)
-        .when("status", {
-          is: "draft",
-          then: Joi.optional(),
-          otherwise: Joi.required(),
-        }),
+        .optional(),
       imgIds: Joi.array()
         .items(Joi.string())
         .max(5)
@@ -174,12 +172,19 @@ export default class VenueCtrl {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const cancellationPolicyId = await CancellationPolicySvc.resolvePolicy({
-        cancellationPolicyId: value.cancellationPolicyId,
-        cancellationType: (value as any).cancellationType,
-        flexibleRefundPercent: (value as any).flexibleRefundPercent,
-        flexibleRefundHours: (value as any).flexibleRefundHours,
-      });
+      let cancellationPolicyId = value.cancellationPolicyId;
+      if (
+        value.cancellationPolicyId ||
+        (value as any).cancellationType ||
+        value.status !== VenueStatus.draft
+      ) {
+        cancellationPolicyId = await CancellationPolicySvc.resolvePolicy({
+          cancellationPolicyId: value.cancellationPolicyId,
+          cancellationType: (value as any).cancellationType,
+          flexibleRefundPercent: (value as any).flexibleRefundPercent,
+          flexibleRefundHours: (value as any).flexibleRefundHours,
+        }).catch(() => value.cancellationPolicyId);
+      }
 
       const {
         cancellationType: _cType,
@@ -298,6 +303,8 @@ export default class VenueCtrl {
       state: Joi.string().optional(),
       district: Joi.string().allow("").optional(),
       country: Joi.string().optional(),
+      lat: Joi.number().min(-90).max(90).optional(),
+      lng: Joi.number().min(-180).max(180).optional(),
       boundary: Joi.array()
         .items(
           Joi.array()
