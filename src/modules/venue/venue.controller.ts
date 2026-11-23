@@ -543,7 +543,6 @@ export default class VenueCtrl {
       staff: [
         "Security Guard",
         "Janitor",
-        "Event Coordinator",
         "Concierge",
         "Bartender",
         "Parking Attendant",

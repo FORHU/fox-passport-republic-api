@@ -53,6 +53,20 @@ const ORGANIZER_EDITABLE_VENUE_FIELDS = new Set<string>([
 ]);
 
 /**
+ * Event Coordinators (`organizer`) are hired/appointed separately through the
+ * Event Manager / Venue Appointment flow rather than bundled as generic venue
+ * staff (app#397). Strip any "Event Coordinator" entries from venue staffing
+ * writes while keeping all other staff roles intact.
+ */
+export function sanitizeVenueStaffing(staffing?: string[]): string[] {
+  if (!Array.isArray(staffing)) return [];
+  return staffing.filter(
+    (s) =>
+      typeof s === "string" && s.trim().toLowerCase() !== "event coordinator",
+  );
+}
+
+/**
  * A venue is found by its address, so publishing one needs a street and, in
  * the Philippines, a real province → city/municipality → barangay chain from
  * the PSGC list. Drafts are exempt: they can be saved half-filled.
@@ -256,7 +270,7 @@ export default class VenueSvc {
       spaceType: data.spaceType ?? [],
       amenities: data.amenities ?? [],
       techAv: data.techAv ?? [],
-      staffing: data.staffing ?? [],
+      staffing: sanitizeVenueStaffing(data.staffing),
       policies: data.policies ?? [],
       status: finalStatus,
       price: data.price ?? 0,
@@ -668,6 +682,9 @@ export default class VenueSvc {
     } = data;
     return VenueRepo.updateVenue(id, {
       ...rest,
+      ...(data.staffing !== undefined && {
+        staffing: sanitizeVenueStaffing(data.staffing),
+      }),
       // Never the raw `data.status` — always the clamped value, so a
       // client-requested `available`/`rejected`/`archived` can't slip
       // through this spread even though it was validated out above.
