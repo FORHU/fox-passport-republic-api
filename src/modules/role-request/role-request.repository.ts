@@ -78,6 +78,15 @@ export default class RoleRequestRepo {
             tinIdFile: true,
             birPermitFile: true,
             selfieFile: true,
+            // The wizard's per-specialty lines and work photos (api#440).
+            specialtyDetails: {
+              include: {
+                photos: {
+                  include: { file: true },
+                  orderBy: { position: "asc" },
+                },
+              },
+            },
           },
         },
         investorApplication: { include: { proofOfFunds: true } },
@@ -101,7 +110,7 @@ export default class RoleRequestRepo {
       include: {
         venueFoxerApplication: true,
         eventFoxerApplication: true,
-        providerFoxerApplication: true,
+        providerFoxerApplication: { include: { specialtyDetails: true } },
         investorApplication: { include: { proofOfFunds: true } },
         organizerApplication: true,
       },
@@ -143,6 +152,15 @@ export default class RoleRequestRepo {
             tinIdFile: true,
             birPermitFile: true,
             selfieFile: true,
+            // The wizard's per-specialty lines and work photos (api#440).
+            specialtyDetails: {
+              include: {
+                photos: {
+                  include: { file: true },
+                  orderBy: { position: "asc" },
+                },
+              },
+            },
           },
         },
         investorApplication: { include: { proofOfFunds: true } },
