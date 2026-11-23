@@ -7,6 +7,7 @@ const db = vi.hoisted(() => ({
   assetTxUpdate: vi.fn(),
   assetFindMany: vi.fn(),
   assetFindOne: vi.fn(),
+  templateAssetMatches: vi.fn(),
   bookingFind: vi.fn(),
   proposalCreate: vi.fn(),
   proposalFind: vi.fn(),
@@ -57,6 +58,7 @@ vi.mock("../src/utils/prisma", () => {
       findUnique: db.assetFindOne,
       findUniqueOrThrow: db.assetFindOne,
     },
+    eventTemplateAsset: { findMany: db.templateAssetMatches },
     booking: { findUnique: db.bookingFind, update: db.bookingUpdate },
     event: { update: db.eventUpdate },
     refund: { create: db.refundCreate, findMany: db.refundFindMany },
@@ -167,6 +169,7 @@ beforeEach(() => {
   Object.values(db).forEach((f) => f.mockReset());
   db.assetTxFind.mockResolvedValue(line());
   db.assetFindMany.mockResolvedValue([candidate]);
+  db.templateAssetMatches.mockResolvedValue([]);
   db.bookingFind.mockResolvedValue({
     id: "b1",
     userId: "citizen1",
@@ -227,6 +230,27 @@ describe("EventEditSvc.replacements", () => {
     expect(await EventEditSvc.replacements("host1", "asset", "old")).toEqual(
       [],
     );
+  });
+
+  it("marks a Supplier who accepted the host's template match as a partner, listed first", async () => {
+    db.assetFindMany.mockResolvedValue([
+      { ...candidate, id: "cheap", price: D(500) },
+      candidate,
+    ]);
+    db.templateAssetMatches.mockResolvedValue([{ assetId: "asset-new" }]);
+
+    const out = await EventEditSvc.replacements("host1", "asset", "old");
+
+    expect(db.templateAssetMatches.mock.calls[0][0].where).toEqual({
+      template: { ownerId: "host1" },
+      matched: true,
+      matchRequestStatus: { in: ["accepted", "secured"] },
+      assetId: { in: ["cheap", "asset-new"] },
+    });
+    expect(out.map((c) => [c.itemId, c.partner])).toEqual([
+      ["asset-new", true],
+      ["cheap", false],
+    ]);
   });
 });
 
@@ -357,6 +381,40 @@ describe("EventEditSvc.accept", () => {
       "host1",
       "prov-new",
     ]);
+  });
+
+  it("asks a non-partner to confirm within 24 hours", async () => {
+    await EventEditSvc.accept("citizen1", "p1", NOW);
+
+    expect(db.assetTxCreate.mock.calls[0][0].data.confirmationDeadline).toEqual(
+      new Date(NOW.getTime() + 24 * 3_600_000),
+    );
+    expect(
+      db.notify.mock.calls.find((c) => c[0].userId === "prov-new")![0].type,
+    ).toBe("EVENT_EDIT_REQUEST");
+  });
+
+  it("books a partner's line at once, with nothing to confirm", async () => {
+    db.templateAssetMatches.mockResolvedValue([{ assetId: "asset-new" }]);
+
+    await EventEditSvc.accept("citizen1", "p1", NOW);
+
+    expect(db.assetTxCreate.mock.calls[0][0].data).toMatchObject({
+      assetId: "asset-new",
+      status: "approved",
+      confirmationDeadline: null,
+    });
+    const toSupplier = db.notify.mock.calls.find(
+      (c) => c[0].userId === "prov-new",
+    )![0];
+    expect(toSupplier).toMatchObject({
+      type: "EVENT_EDIT_BOOKED",
+      title: "You're booked",
+    });
+    const toHost = db.notify.mock.calls.find(
+      (c) => c[0].userId === "host1",
+    )![0];
+    expect(toHost.message).toContain("is your partner, so it's booked");
   });
 
   it("doesn't touch an old line that already let its slot go", async () => {
