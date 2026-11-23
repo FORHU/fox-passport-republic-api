@@ -7,18 +7,51 @@
 // validate their category against the enums in common.prisma, catalog.prisma
 // and event.prisma; this table does not replace those yet.
 model Category {
-  id               String     @id @default(uuid())
-  slug             String     @unique
-  name             String
-  description      String?
-  icon             String?
-  parentCategoryId String?
-  parent           Category?  @relation("CategoryTree", fields: [parentCategoryId], references: [id], onDelete: Restrict)
-  children         Category[] @relation("CategoryTree")
+  id                   String                        @id @default(uuid())
+  slug                 String                        @unique
+  name                 String
+  description          String?
+  icon                 String?
+  parentCategoryId     String?
+  parent               Category?                     @relation("CategoryTree", fields: [parentCategoryId], references: [id], onDelete: Restrict)
+  children             Category[]                    @relation("CategoryTree")
+  specialtySuggestions ProviderSpecialtySuggestion[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([parentCategoryId])
   @@map("categories")
+}
+
+enum ProviderSpecialtySuggestionStatus {
+  pending
+  approved
+  rejected
+}
+
+// A specialty a Provider applicant asked for that the catalog lacks (api#440).
+// It is never a valid specialty itself: only approval, by someone with
+// `categories:manage`, creates the catalog row (`categoryId`) that the apply
+// form and the specialty checks read.
+model ProviderSpecialtySuggestion {
+  id            String                            @id @default(uuid())
+  name          String
+  slug          String
+  status        ProviderSpecialtySuggestionStatus @default(pending)
+  suggestedById String
+  suggestedBy   User                              @relation("SpecialtySuggester", fields: [suggestedById], references: [id], onDelete: Cascade)
+  reviewedById  String?
+  reviewedBy    User?                             @relation("SpecialtyReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt    DateTime?
+  categoryId    String?
+  category      Category?                         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([slug])
+  @@index([suggestedById])
+  @@map("provider_specialty_suggestions")
 }

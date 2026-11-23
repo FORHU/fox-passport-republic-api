@@ -126,6 +126,45 @@ async function assertIdentityDocuments(fileIds: unknown[]) {
   }
 }
 
+type SpecialtyDetail = {
+  slug: string;
+  description: string;
+  photoFileIds: string[];
+};
+
+/**
+ * A Provider's per-specialty details (api#440), checked for shape by the
+ * controller, become nested rows. Photos must be images the applicant
+ * uploaded themselves, like any document they name.
+ */
+async function providerSpecialtyRows(userId: string, details: unknown) {
+  if (!Array.isArray(details)) return undefined;
+  const list = details as SpecialtyDetail[];
+  const ids = list.flatMap((d) => d.photoFileIds);
+  await assertOwnDocuments(userId, ids);
+  if (ids.length > 0) {
+    const files = await prisma.file.findMany({
+      where: { id: { in: ids } },
+      select: { type: true },
+    });
+    if (files.some((f) => !f.type?.startsWith("image/"))) {
+      throw badRequest("Photos of your work must be images");
+    }
+  }
+  return {
+    create: list.map((d) => ({
+      slug: d.slug,
+      description: d.description,
+      photos: {
+        create: d.photoFileIds.map((fileId, position) => ({
+          fileId,
+          position,
+        })),
+      },
+    })),
+  };
+}
+
 export default class RoleRequestService {
   /**
    * Submit an application for a specific role
@@ -168,6 +207,16 @@ export default class RoleRequestService {
         (column) => cleanedData[column],
       ),
     );
+    if (roleType === RoleType.providerFoxer) {
+      const rows = await providerSpecialtyRows(
+        userId,
+        cleanedData.specialtyDetails,
+      );
+      if (rows) cleanedData.specialtyDetails = rows;
+      else delete cleanedData.specialtyDetails;
+    } else {
+      delete cleanedData.specialtyDetails;
+    }
 
     return RoleRequestRepo.createRequest(
       userId,

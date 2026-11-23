@@ -218,6 +218,131 @@ export function checkTin(data: Record<string, unknown>): string | null {
   return null;
 }
 
+const TRAVEL_RANGES = new Set(["city", "province", "anywhere"]);
+export const MAX_SPECIALTY_PHOTOS = 6;
+const MAX_SPECIALTY_DESCRIPTION = 500;
+
+/**
+ * The Provider wizard's extra answers (mobile#487, api#440): where they are
+ * based, how far they travel, their main specialty, and per specialty a line
+ * and photos of their work. Every one is optional, so older clients still
+ * apply. Runs after the specialties are checked, so `data.specializations` is
+ * the clean list. Rewrites `data` in place for storage; returns the message to
+ * show, or null. Photo ownership and type are checked in the service.
+ */
+export function checkProviderDetails(
+  data: Record<string, unknown>,
+): string | null {
+  const picked = (data.specializations as string[] | undefined) ?? [];
+
+  if (
+    data.basedIn === undefined ||
+    data.basedIn === null ||
+    data.basedIn === ""
+  ) {
+    delete data.basedIn;
+  } else if (
+    typeof data.basedIn !== "string" ||
+    data.basedIn.trim().length > 120
+  ) {
+    return "Where you're based must be up to 120 characters";
+  } else {
+    data.basedIn = data.basedIn.trim();
+  }
+
+  // The device's position when "use my location" filled `basedIn`: both or
+  // neither, and on the globe.
+  const lat = data.basedInLat;
+  const lng = data.basedInLng;
+  const absent = (v: unknown) => v === undefined || v === null || v === "";
+  if (absent(lat) && absent(lng)) {
+    delete data.basedInLat;
+    delete data.basedInLng;
+  } else if (
+    typeof lat !== "number" ||
+    typeof lng !== "number" ||
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng) ||
+    lat < -90 ||
+    lat > 90 ||
+    lng < -180 ||
+    lng > 180
+  ) {
+    return "Your location must be a latitude and longitude";
+  }
+
+  if (
+    data.travelRange === undefined ||
+    data.travelRange === null ||
+    data.travelRange === ""
+  ) {
+    delete data.travelRange;
+  } else if (!TRAVEL_RANGES.has(String(data.travelRange))) {
+    return "Travel range must be city, province or anywhere";
+  }
+
+  if (
+    data.mainSpecialty === undefined ||
+    data.mainSpecialty === null ||
+    data.mainSpecialty === ""
+  ) {
+    if (picked.length > 0) data.mainSpecialty = picked[0];
+    else delete data.mainSpecialty;
+  } else if (!picked.includes(String(data.mainSpecialty))) {
+    return "Your main specialty must be one of the specialties you picked";
+  }
+
+  if (data.specialtyDetails === undefined || data.specialtyDetails === null) {
+    delete data.specialtyDetails;
+    return null;
+  }
+  if (!Array.isArray(data.specialtyDetails)) {
+    return "Specialty details must be a list";
+  }
+  const seen = new Set<string>();
+  const details: {
+    slug: string;
+    description: string;
+    photoFileIds: string[];
+  }[] = [];
+  for (const raw of data.specialtyDetails) {
+    if (typeof raw !== "object" || raw === null) {
+      return "Each specialty detail must be an object";
+    }
+    const entry = raw as Record<string, unknown>;
+    const slug = String(entry.slug ?? "");
+    if (!picked.includes(slug)) {
+      return `Details were given for a specialty you did not pick: ${slug}`;
+    }
+    if (seen.has(slug)) return `Details for ${slug} were given twice`;
+    seen.add(slug);
+
+    const description =
+      typeof entry.description === "string" ? entry.description.trim() : "";
+    if (description.length === 0) {
+      return "Add a line about each specialty";
+    }
+    if (description.length > MAX_SPECIALTY_DESCRIPTION) {
+      return `Each specialty line must be up to ${MAX_SPECIALTY_DESCRIPTION} characters`;
+    }
+
+    const photos = entry.photoFileIds ?? [];
+    if (
+      !Array.isArray(photos) ||
+      photos.some((p) => typeof p !== "string" || p === "")
+    ) {
+      return "Photos must be a list of uploaded files";
+    }
+    const photoFileIds = [...new Set(photos as string[])];
+    if (photoFileIds.length > MAX_SPECIALTY_PHOTOS) {
+      return `Up to ${MAX_SPECIALTY_PHOTOS} photos per specialty`;
+    }
+    details.push({ slug, description, photoFileIds });
+  }
+  data.specialtyDetails = details;
+  return null;
+}
+
 /**
  * Checks a Venue Foxer's contact number with the same rule as the profile
  * phone (utils/phone) and rewrites it as E.164 for storage. A number without
@@ -293,6 +418,12 @@ export default class RoleRequestController {
             .json({ success: false, message: specialties.message });
         }
         data.specializations = specialties.slugs;
+        const detailsError = checkProviderDetails(data);
+        if (detailsError) {
+          return res
+            .status(400)
+            .json({ success: false, message: detailsError });
+        }
       }
 
       // Also before any document is stored.
