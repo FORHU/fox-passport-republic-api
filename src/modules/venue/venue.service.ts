@@ -201,6 +201,8 @@ export default class VenueSvc {
     state?: string;
     district?: string;
     country?: string;
+    lat?: number;
+    lng?: number;
     boundary?: LngLat[];
     imgIds?: string[];
     spaceType?: string[];
@@ -259,17 +261,13 @@ export default class VenueSvc {
 
     if (finalStatus !== VenueStatus.draft) {
       assertPublishableVenue({ ...data, imageCount: data.imgIds?.length ?? 0 });
-      if (!data.boundary) {
-        throw new AppError(
-          "A service-area boundary is required to publish a venue",
-          400,
-        );
-      }
-      const validationError = validatePolygon(data.boundary);
-      if (validationError) throw new AppError(validationError, 400);
+      if (data.boundary) {
+        const validationError = validatePolygon(data.boundary);
+        if (validationError) throw new AppError(validationError, 400);
 
-      await this.assertNoOverlap(data.boundary);
-      centroid = polygonCentroid(data.boundary);
+        await this.assertNoOverlap(data.boundary);
+        centroid = polygonCentroid(data.boundary);
+      }
     }
 
     const { boundary, recommendedAssets, recommendedServices, ...rest } = data;
@@ -284,8 +282,8 @@ export default class VenueSvc {
       city: data.city ?? "",
       country: data.country ?? "",
       state: data.state ?? undefined,
-      lat: centroid?.lat,
-      lng: centroid?.lng,
+      lat: centroid?.lat ?? data.lat,
+      lng: centroid?.lng ?? data.lng,
       boundary: boundary as unknown as Prisma.InputJsonValue | undefined,
       imgIds: data.imgIds ?? [],
       spaceType: data.spaceType ?? [],
@@ -679,21 +677,17 @@ export default class VenueSvc {
           district: data.district ?? venue.district,
         });
       }
-      if (!resolvedBoundary) {
-        throw new AppError(
-          "A service-area boundary is required to publish a venue",
-          400,
-        );
-      }
-      const validationError = validatePolygon(resolvedBoundary);
-      if (validationError) throw new AppError(validationError, 400);
+      if (resolvedBoundary) {
+        const validationError = validatePolygon(resolvedBoundary);
+        if (validationError) throw new AppError(validationError, 400);
 
-      // Only worth re-checking when the shape itself moved, or when a draft
-      // with no prior overlap check is being published for the first time.
-      if (boundaryChanged || venue.status === VenueStatus.draft) {
-        await this.assertNoOverlap(resolvedBoundary, id);
+        // Only worth re-checking when the shape itself moved, or when a draft
+        // with no prior overlap check is being published for the first time.
+        if (boundaryChanged || venue.status === VenueStatus.draft) {
+          await this.assertNoOverlap(resolvedBoundary, id);
+        }
+        if (boundaryChanged) centroid = polygonCentroid(resolvedBoundary);
       }
-      if (boundaryChanged) centroid = polygonCentroid(resolvedBoundary);
     }
 
     const {
