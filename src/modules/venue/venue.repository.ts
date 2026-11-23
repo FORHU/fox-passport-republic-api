@@ -60,6 +60,7 @@ export default class VenueRepo {
     price: number;
     extraGuestRate?: number;
     billingRate: BillingRate;
+    cancellationPolicyId?: string;
 
     facilities: string[];
     recommendedCapacity?: number;
@@ -94,6 +95,9 @@ export default class VenueRepo {
           packages: true,
           recommendedAssets: true,
           recommendedServices: true,
+          cancellationPolicy: {
+            include: { rules: { orderBy: { hoursBeforeEvent: "desc" } } },
+          },
         },
       }),
     );
@@ -115,6 +119,9 @@ export default class VenueRepo {
           },
         },
         packages: true,
+        cancellationPolicy: {
+          include: { rules: { orderBy: { hoursBeforeEvent: "desc" } } },
+        },
         recommendedAssets: {
           include: { images: true },
         },
@@ -212,6 +219,9 @@ export default class VenueRepo {
         mayor: mayorSelect,
         images: true,
         packages: true,
+        cancellationPolicy: {
+          include: { rules: { orderBy: { hoursBeforeEvent: "desc" } } },
+        },
       };
     }
 
@@ -246,6 +256,9 @@ export default class VenueRepo {
         mayor: mayorSelect,
         images: true,
         packages: true,
+        cancellationPolicy: {
+          include: { rules: { orderBy: { hoursBeforeEvent: "desc" } } },
+        },
         recommendedAssets: {
           include: { images: true },
         },
@@ -284,6 +297,8 @@ export default class VenueRepo {
       policies: string[];
       status: VenueStatus;
       billingRate: BillingRate;
+      cancellationPolicyId: string;
+      operatingHours: Prisma.InputJsonValue;
     }>,
   ) {
     const { imgIds, ...rest } = data;
@@ -302,6 +317,9 @@ export default class VenueRepo {
           packages: true,
           recommendedAssets: true,
           recommendedServices: true,
+          cancellationPolicy: {
+            include: { rules: { orderBy: { hoursBeforeEvent: "desc" } } },
+          },
         },
       }),
     );
