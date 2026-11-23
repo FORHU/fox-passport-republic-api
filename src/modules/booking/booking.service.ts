@@ -18,9 +18,14 @@ import {
 } from "../pricing/event-breakdown";
 import PromotionSvc from "../promotion/promotion.service";
 import RefundSvc from "../refund/refund.service";
+import EventConflictSvc from "../event-transaction/event-conflict.service";
 import WaitlistSvc from "../waitlist/waitlist.service";
 import NotificationService from "../notifications/user-notification.service";
-import { PLATFORM_FEE_PERCENT, STRIPE_SECRET_KEY } from "../../config";
+import {
+  AUTO_BOOK_MATCHED_ONLY,
+  PLATFORM_FEE_PERCENT,
+  STRIPE_SECRET_KEY,
+} from "../../config";
 import { toStripeCents, formatCurrency } from "../../utils/pricing";
 import { sendBookingCancelledEmail } from "../../utils/emails/cancellation";
 import { sendBookingConfirmationEmail } from "../../utils/emails/confirmation";
@@ -1550,6 +1555,19 @@ export default class BookingSvc {
       totalAmount,
     });
 
+    // ADR 0010: with AUTO_BOOK_MATCHED_ONLY, a Supplier the Event Foxer is
+    // not matched with is asked first: its line waits for its answer (24
+    // hours, as for an added item), and checkout waits for it. Matched ones,
+    // and every item while the flag is off, are booked as before.
+    const confirmationDeadline = new Date(
+      Date.now() + this.CONFIRMATION_DEADLINE_HOURS * 60 * 60 * 1000,
+    );
+    const askFirst = (matched: boolean) => AUTO_BOOK_MATCHED_ONLY && !matched;
+    const awaiting = {
+      status: "pending_provider_confirmation" as const,
+      confirmationDeadline,
+    };
+
     // Per-partner escrow transactions for all matched template items
     const escrowRows = {
       assets: template.templateAssets
@@ -1564,7 +1582,7 @@ export default class BookingSvc {
           // row has no line and keeps its old price; it is never paid.
           ...snapshotFor(ta.id, ta.agreedPrice),
           included: !excludedAssetIds.includes(ta.id),
-          status: "pending" as const,
+          ...(askFirst(ta.matched) ? awaiting : { status: "pending" as const }),
         })),
       services: template.templateServices
         .filter((ts) => ts.serviceId && ts.service?.ownerId)
@@ -1575,7 +1593,7 @@ export default class BookingSvc {
           providerId: ts.service!.ownerId,
           ...snapshotFor(ts.id, ts.agreedPrice),
           included: !excludedServiceIds.includes(ts.id),
-          status: "pending" as const,
+          ...(askFirst(ts.matched) ? awaiting : { status: "pending" as const }),
         })),
       venues: template.templateVenues
         .filter((tv) => tv.venueId && tv.venue?.mayorId)
@@ -1586,7 +1604,13 @@ export default class BookingSvc {
           providerId: tv.venue!.mayorId,
           ...snapshotFor(tv.id, tv.agreedPrice),
           included: !excludedVenueIds.includes(tv.id),
-          status: tv.matched ? ("approved" as const) : ("pending" as const),
+          ...(askFirst(tv.matched)
+            ? awaiting
+            : {
+                status: tv.matched
+                  ? ("approved" as const)
+                  : ("pending" as const),
+              }),
         })),
     };
     // The reserve that decides: under its row locks, in the same transaction
@@ -1620,7 +1644,53 @@ export default class BookingSvc {
       startAt: input.startAt,
     });
 
-    return { booking, eventId: event.id };
+    // Each Supplier asked first is told, best effort: the request already
+    // shows in its list of requests either way.
+    const asked = [
+      ...template.templateAssets
+        .filter(
+          (ta) =>
+            ta.assetId &&
+            ta.asset?.ownerId &&
+            !excludedAssetIds.includes(ta.id) &&
+            askFirst(ta.matched),
+        )
+        .map((ta) => ({ to: ta.asset!.ownerId, item: ta.asset!.name })),
+      ...template.templateServices
+        .filter(
+          (ts) =>
+            ts.serviceId &&
+            ts.service?.ownerId &&
+            !excludedServiceIds.includes(ts.id) &&
+            askFirst(ts.matched),
+        )
+        .map((ts) => ({ to: ts.service!.ownerId, item: ts.service!.name })),
+      ...template.templateVenues
+        .filter(
+          (tv) =>
+            tv.venueId &&
+            tv.venue?.mayorId &&
+            !excludedVenueIds.includes(tv.id) &&
+            askFirst(tv.matched),
+        )
+        .map((tv) => ({ to: tv.venue!.mayorId, item: tv.venue!.name })),
+    ];
+    await Promise.all(
+      asked.map((a) =>
+        NotificationService.create({
+          userId: a.to,
+          type: "EVENT_ITEM_REQUEST",
+          title: "A new event request",
+          message: `${template.name} would like ${a.item} on ${input.startAt.toDateString()}. Confirm or decline within ${this.CONFIRMATION_DEADLINE_HOURS} hours.`,
+          metadata: { eventId: event.id, bookingId: booking.id },
+        }).catch((e) =>
+          console.error(`Event request for booking ${booking.id} not sent`, e),
+        ),
+      ),
+    );
+
+    // How many Suppliers must answer before the citizen can pay.
+    return { booking, eventId: event.id, awaitingConfirmation: asked.length };
   }
 
   // Ad-hoc marketplace items always require provider confirmation (Design
@@ -1845,8 +1915,11 @@ export default class BookingSvc {
       booking.event.template?.cancellationPolicy ??
       booking.event.venueTransactions?.[0]?.venue?.cancellationPolicy ??
       booking.event.serviceTransactions?.[0]?.service?.cancellationPolicy;
-    const { refundPercent, hoursUntilEvent, matchedRule } =
-      RefundSvc.computeRefund(booking.startAt, cancellationPolicy);
+    const computed = RefundSvc.computeRefund(
+      booking.startAt,
+      cancellationPolicy,
+    );
+    const { hoursUntilEvent, matchedRule } = computed;
 
     if (hoursUntilEvent <= 0) {
       throw new BookingError(
@@ -1855,13 +1928,20 @@ export default class BookingSvc {
       );
     }
 
+    // A Supplier that was not replaced by its deadline refunds in full,
+    // whatever the policy says (ADR 0010 decision 2).
+    const fullRefund = await EventConflictSvc.fullRefundDue(booking.eventId);
+    const refundPercent = fullRefund ? 100 : computed.refundPercent;
+
     const policyName = cancellationPolicy?.name ?? null;
     const ruleDesc = matchedRule
       ? `${matchedRule.hoursBeforeEvent}h before = ${matchedRule.refundPercent}% refund`
       : null;
-    const matchedRuleInfo = policyName
-      ? `Policy: ${policyName} — ${ruleDesc ?? "no rule matched"}`
-      : ruleDesc;
+    const matchedRuleInfo = fullRefund
+      ? "Full refund: a Supplier was not replaced within its deadline"
+      : policyName
+        ? `Policy: ${policyName} — ${ruleDesc ?? "no rule matched"}`
+        : ruleDesc;
 
     const bookingPayments = await PaymentRepo.getBookingPayments(id);
     const completedPayments = bookingPayments.filter(
@@ -1928,15 +2008,23 @@ export default class BookingSvc {
     }
 
     const refunds: Refund[] = [];
+    // What already went back (a change's difference) is not refunded twice.
+    const alreadyRefunded = await RefundSvc.refundedByPayment(
+      completedPayments.map((p) => p.id),
+    );
 
     for (const payment of completedPayments) {
       let stripeRefundId: string | null = null;
       let refundStatus: RefundStatus = RefundStatus.pending;
       let failureReason: string | null = null;
 
-      const estimatedRefund = payment.amount.mul(refundPercent).div(100);
+      const estimatedRefund = RefundSvc.refundFor(
+        payment.amount,
+        alreadyRefunded.get(payment.id),
+        refundPercent,
+      );
 
-      if (refundPercent <= 0) {
+      if (refundPercent <= 0 || estimatedRefund.lte(0)) {
         refunds.push(
           await BookingRepo.createRefund({
             bookingId: id,

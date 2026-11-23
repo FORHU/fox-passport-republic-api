@@ -8,15 +8,29 @@ const db = vi.hoisted(() => ({
   assetTx: vi.fn(),
   serviceTx: vi.fn(),
   notify: vi.fn(),
+  eventById: vi.fn(),
+  eventCount: vi.fn(),
+  bookingOne: vi.fn(),
+  venueStamp: vi.fn(),
+  assetStamp: vi.fn(),
+  serviceStamp: vi.fn(),
 }));
 
 vi.mock("../src/utils/prisma", () => ({
   prisma: {
-    event: { findMany: db.events, findFirst: db.eventOne },
-    booking: { findFirst: db.unpaid },
-    eventVenueTransaction: { findMany: db.venueTx },
-    eventAssetTransaction: { findMany: db.assetTx },
-    eventServiceTransaction: { findMany: db.serviceTx },
+    event: {
+      findMany: db.events,
+      findFirst: db.eventOne,
+      findUnique: db.eventById,
+      count: db.eventCount,
+    },
+    booking: { findFirst: db.unpaid, findUnique: db.bookingOne },
+    eventVenueTransaction: { findMany: db.venueTx, updateMany: db.venueStamp },
+    eventAssetTransaction: { findMany: db.assetTx, updateMany: db.assetStamp },
+    eventServiceTransaction: {
+      findMany: db.serviceTx,
+      updateMany: db.serviceStamp,
+    },
   },
 }));
 
@@ -27,6 +41,7 @@ vi.mock("../src/modules/notifications/user-notification.service", () => ({
 import EventConflictSvc, {
   blockedDayHitsEvent,
   dayKey,
+  replaceByFor,
 } from "../src/modules/event-transaction/event-conflict.service";
 
 const NOW = new Date("2026-11-18T10:00:00.000Z");
@@ -166,6 +181,8 @@ describe("EventConflictSvc.needsAttention", () => {
         itemName: "Sound system",
         reason: "declined",
         cause: null,
+        pendingProposalId: null,
+        replaceBy: null,
       },
     ]);
   });
@@ -505,19 +522,25 @@ describe("EventConflictSvc.notifyListingGone", () => {
 describe("EventConflictSvc.eventDetail", () => {
   it("offers the unpaid booking for the host to decline, and none once paid", async () => {
     db.eventOne.mockResolvedValue(event());
-    db.unpaid.mockResolvedValue({ id: "b9" });
-    expect(
-      (await EventConflictSvc.eventDetail("host1", "e1")).declinableBookingId,
-    ).toBe("b9");
+    db.unpaid.mockResolvedValue({ id: "b9", status: "pending" });
+    const unpaid = await EventConflictSvc.eventDetail("host1", "e1");
+    expect(unpaid.declinableBookingId).toBe("b9");
+    expect(unpaid.editableBookingId).toBe("b9");
     expect(db.unpaid.mock.calls[0][0].where).toEqual({
       eventId: "e1",
-      status: "pending",
+      status: { in: ["pending", "confirmed"] },
     });
 
+    // Paid: no longer declinable, but a Supplier can still be replaced.
+    db.unpaid.mockResolvedValue({ id: "b9", status: "confirmed" });
+    const paid = await EventConflictSvc.eventDetail("host1", "e1");
+    expect(paid.declinableBookingId).toBeNull();
+    expect(paid.editableBookingId).toBe("b9");
+
     db.unpaid.mockResolvedValue(null);
-    expect(
-      (await EventConflictSvc.eventDetail("host1", "e1")).declinableBookingId,
-    ).toBeNull();
+    const none = await EventConflictSvc.eventDetail("host1", "e1");
+    expect(none.declinableBookingId).toBeNull();
+    expect(none.editableBookingId).toBeNull();
   });
 
   it("asks for the event only if the person is its host", async () => {
@@ -601,5 +624,463 @@ describe("EventConflictSvc.eventDetail", () => {
     const out = await EventConflictSvc.eventDetail("host1", "e1");
 
     expect(out.suppliers).toEqual([]);
+  });
+
+  describe("replacements (ADR 0010)", () => {
+    const declined = assetTx({
+      id: "old",
+      status: "rejected",
+      rejectionReason: "supplier_declined",
+    });
+
+    it("reads only proposals waiting for an answer or accepted", async () => {
+      db.eventOne.mockResolvedValue(event());
+
+      await EventConflictSvc.eventDetail("host1", "e1");
+
+      const select = db.eventOne.mock.calls[0][0].select;
+      expect(select.editProposals.where).toEqual({
+        status: { in: ["pending", "accepted"] },
+      });
+    });
+
+    it("shows the proposal waiting on a line that needs replacing", async () => {
+      db.eventOne.mockResolvedValue(
+        event({
+          assetTransactions: [declined],
+          editProposals: [
+            {
+              id: "p1",
+              status: "pending",
+              replacesTransactionId: "old",
+              appliedTransactionId: null,
+            },
+          ],
+        }),
+      );
+
+      const [row] = (await EventConflictSvc.eventDetail("host1", "e1"))
+        .suppliers;
+
+      expect(row).toMatchObject({
+        transactionId: "old",
+        reason: "declined",
+        pendingProposalId: "p1",
+      });
+    });
+
+    it("drops a replaced line and lists its replacement awaiting its Supplier", async () => {
+      const e = event({
+        assetTransactions: [
+          declined,
+          assetTx({ id: "new", status: "pending_provider_confirmation" }),
+        ],
+        editProposals: [
+          {
+            id: "p1",
+            status: "accepted",
+            replacesTransactionId: "old",
+            appliedTransactionId: "new",
+          },
+        ],
+      });
+      db.eventOne.mockResolvedValue(e);
+      db.events.mockResolvedValue([e]);
+
+      const out = await EventConflictSvc.eventDetail("host1", "e1");
+
+      expect(
+        out.suppliers.map((s) => [
+          s.transactionId,
+          s.reason,
+          s.pendingProposalId,
+        ]),
+      ).toEqual([["new", null, null]]);
+      expect(await EventConflictSvc.needsAttention("host1", NOW)).toEqual([]);
+    });
+
+    it.each(["provider_declined", "deadline_expired"])(
+      "flags a replacement again when its new Supplier lets it go (%s)",
+      async (rejectionReason) => {
+        const e = event({
+          assetTransactions: [
+            declined,
+            assetTx({ id: "new", status: "rejected", rejectionReason }),
+          ],
+          editProposals: [
+            {
+              id: "p1",
+              status: "accepted",
+              replacesTransactionId: "old",
+              appliedTransactionId: "new",
+            },
+          ],
+        });
+        db.eventOne.mockResolvedValue(e);
+        db.events.mockResolvedValue([e]);
+
+        const out = await EventConflictSvc.eventDetail("host1", "e1");
+        expect(out.suppliers.map((s) => [s.transactionId, s.reason])).toEqual([
+          ["new", "declined"],
+        ]);
+        const [attention] = await EventConflictSvc.needsAttention("host1", NOW);
+        expect(attention.issues.map((i) => i.transactionId)).toEqual(["new"]);
+      },
+    );
+
+    it("does not flag an ordinary line a Provider turned down", async () => {
+      db.eventOne.mockResolvedValue(
+        event({
+          assetTransactions: [
+            assetTx({
+              status: "rejected",
+              rejectionReason: "provider_declined",
+            }),
+          ],
+        }),
+      );
+
+      const [row] = (await EventConflictSvc.eventDetail("host1", "e1"))
+        .suppliers;
+      expect(row.reason).toBeNull();
+    });
+  });
+});
+
+describe("the replacement deadline (ADR 0010, 48h capped 24h before)", () => {
+  const START = at("2026-12-05T10:00:00.000Z");
+  const declinedAt = (
+    iso: string | null,
+    updatedAt = "2026-11-17T10:00:00.000Z",
+  ) =>
+    assetTx({
+      status: "rejected",
+      rejectionReason: "supplier_declined",
+      attentionSince: iso ? at(iso) : null,
+      updatedAt: at(updatedAt),
+    });
+
+  describe("replaceByFor", () => {
+    it("gives the host 48 hours from the dropout", () => {
+      expect(replaceByFor(at("2026-11-18T10:00:00.000Z"), START)).toEqual(
+        at("2026-11-20T10:00:00.000Z"),
+      );
+    });
+
+    it("never runs later than 24 hours before the event", () => {
+      expect(replaceByFor(at("2026-12-03T10:00:00.000Z"), START)).toEqual(
+        at("2026-12-04T10:00:00.000Z"),
+      );
+    });
+
+    it("is already due for a dropout inside the last day", () => {
+      const since = at("2026-12-04T20:00:00.000Z");
+      expect(replaceByFor(since, START).getTime()).toBeLessThan(
+        since.getTime(),
+      );
+    });
+  });
+
+  describe("on the booked event", () => {
+    it("shows by when a Supplier that needs replacing must be replaced", async () => {
+      db.eventOne.mockResolvedValue(
+        event({
+          assetTransactions: [declinedAt("2026-11-18T10:00:00.000Z")],
+          serviceTransactions: [serviceTx()],
+        }),
+      );
+
+      const out = await EventConflictSvc.eventDetail("host1", "e1");
+
+      expect(out.suppliers.map((r) => r.replaceBy)).toEqual([
+        at("2026-11-20T10:00:00.000Z"),
+        null,
+      ]);
+    });
+
+    it("falls back to the line's last change when it has no stamp", async () => {
+      db.eventOne.mockResolvedValue(
+        event({ assetTransactions: [declinedAt(null)] }),
+      );
+
+      const [row] = (await EventConflictSvc.eventDetail("host1", "e1"))
+        .suppliers;
+
+      expect(row.replaceBy).toEqual(at("2026-11-19T10:00:00.000Z"));
+    });
+
+    it("gives an unstamped conflict no deadline, rather than an old one", async () => {
+      db.eventOne.mockResolvedValue(
+        event({
+          venueTransactions: [
+            venueTx({
+              updatedAt: at("2026-10-01T00:00:00.000Z"),
+              venue: {
+                name: "Sky Hall",
+                blockedDates: [at("2026-12-05T00:00:00.000Z")],
+              },
+            }),
+          ],
+        }),
+      );
+
+      const [row] = (await EventConflictSvc.eventDetail("host1", "e1"))
+        .suppliers;
+
+      expect(row.reason).toBe("date_blocked");
+      expect(row.replaceBy).toBeNull();
+    });
+
+    it("lists it on the host's needs-attention too", async () => {
+      db.events.mockResolvedValue([
+        event({ assetTransactions: [declinedAt("2026-11-18T10:00:00.000Z")] }),
+      ]);
+
+      const [e] = await EventConflictSvc.needsAttention("host1", NOW);
+
+      expect(e.issues[0].replaceBy).toEqual(at("2026-11-20T10:00:00.000Z"));
+    });
+  });
+
+  describe("stamping a conflict when it is raised", () => {
+    it("starts the clock on the venue rows a blocked day hits, once", async () => {
+      db.venueTx.mockResolvedValue([
+        {
+          id: "v1",
+          venue: { name: "Sky Hall" },
+          event: {
+            id: "e1",
+            name: "Garden wedding",
+            organizerId: "host1",
+            startAt: START,
+            endAt: at("2026-12-05T15:00:00.000Z"),
+          },
+        },
+      ]);
+
+      await EventConflictSvc.notifyDayBlocked(
+        "venue1",
+        at("2026-12-05T00:00:00.000Z"),
+        NOW,
+      );
+
+      expect(db.venueStamp).toHaveBeenCalledWith({
+        where: { id: { in: ["v1"] }, attentionSince: null },
+        data: { attentionSince: NOW },
+      });
+    });
+
+    it("stamps nothing when a blocked day hits no event", async () => {
+      db.venueTx.mockResolvedValue([]);
+
+      await EventConflictSvc.notifyDayBlocked(
+        "venue1",
+        at("2026-12-05T00:00:00.000Z"),
+        NOW,
+      );
+
+      expect(db.venueStamp).not.toHaveBeenCalled();
+    });
+
+    it("starts the clock on the lines of a listing taken down", async () => {
+      db.assetTx.mockResolvedValue([
+        {
+          id: "a1",
+          asset: { name: "Sound system" },
+          event: { id: "e1", name: "Garden wedding", organizerId: "host1" },
+        },
+      ]);
+
+      await EventConflictSvc.notifyListingGone("asset", "asset1", NOW);
+
+      expect(db.assetStamp).toHaveBeenCalledWith({
+        where: { id: { in: ["a1"] }, attentionSince: null },
+        data: { attentionSince: NOW },
+      });
+      expect(db.serviceStamp).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("fullRefundDue", () => {
+    it("is due once a Supplier is past its deadline unreplaced", async () => {
+      db.eventById.mockResolvedValue(
+        event({ assetTransactions: [declinedAt("2026-11-15T10:00:00.000Z")] }),
+      );
+
+      expect(await EventConflictSvc.fullRefundDue("e1", NOW)).toBe(true);
+    });
+
+    it("is not due while the host still has time", async () => {
+      db.eventById.mockResolvedValue(
+        event({ assetTransactions: [declinedAt("2026-11-18T09:00:00.000Z")] }),
+      );
+
+      expect(await EventConflictSvc.fullRefundDue("e1", NOW)).toBe(false);
+    });
+
+    it("is not due once the line was replaced", async () => {
+      db.eventById.mockResolvedValue(
+        event({
+          assetTransactions: [
+            declinedAt("2026-11-15T10:00:00.000Z"),
+            assetTx({ id: "new", status: "pending_provider_confirmation" }),
+          ],
+          editProposals: [
+            {
+              id: "p1",
+              status: "accepted",
+              replacesTransactionId: "a1",
+              appliedTransactionId: "new",
+            },
+          ],
+        }),
+      );
+
+      expect(await EventConflictSvc.fullRefundDue("e1", NOW)).toBe(false);
+    });
+
+    it("is not due for an event with no problem, or no event", async () => {
+      db.eventById.mockResolvedValue(event({ assetTransactions: [assetTx()] }));
+      expect(await EventConflictSvc.fullRefundDue("e1", NOW)).toBe(false);
+
+      db.eventById.mockResolvedValue(null);
+      expect(await EventConflictSvc.fullRefundDue("e1", NOW)).toBe(false);
+      expect(await EventConflictSvc.fullRefundDue(null, NOW)).toBe(false);
+    });
+  });
+
+  describe("replacementForBooking", () => {
+    const booking = (since: string) => ({
+      userId: "citizen1",
+      eventId: "e1",
+      event: event({ assetTransactions: [declinedAt(since)] }),
+    });
+
+    it("tells the citizen what needs replacing, by when, and if a full refund is due", async () => {
+      db.bookingOne.mockResolvedValue(booking("2026-11-15T10:00:00.000Z"));
+
+      const out = await EventConflictSvc.replacementForBooking(
+        "citizen1",
+        "b1",
+        NOW,
+      );
+
+      expect(out).toEqual({
+        items: [
+          {
+            kind: "asset",
+            itemName: "Sound system",
+            reason: "declined",
+            replaceBy: at("2026-11-17T10:00:00.000Z"),
+            pendingProposalId: null,
+          },
+        ],
+        replaceBy: at("2026-11-17T10:00:00.000Z"),
+        fullRefund: true,
+        awaitingConfirmation: 0,
+        unpaid: false,
+        totalAmount: undefined,
+      });
+    });
+
+    it("says no full refund yet while there is time", async () => {
+      db.bookingOne.mockResolvedValue(booking("2026-11-18T09:00:00.000Z"));
+
+      const out = await EventConflictSvc.replacementForBooking(
+        "citizen1",
+        "b1",
+        NOW,
+      );
+
+      expect(out.fullRefund).toBe(false);
+      expect(out.replaceBy).toEqual(at("2026-11-20T09:00:00.000Z"));
+    });
+
+    it("lets the event's host read it, and nobody else", async () => {
+      db.bookingOne.mockResolvedValue(booking("2026-11-18T09:00:00.000Z"));
+
+      db.eventCount.mockResolvedValue(1);
+      await expect(
+        EventConflictSvc.replacementForBooking("host1", "b1", NOW),
+      ).resolves.toBeTruthy();
+
+      db.eventCount.mockResolvedValue(0);
+      await expect(
+        EventConflictSvc.replacementForBooking("stranger", "b1", NOW),
+      ).rejects.toMatchObject({ status: 404 });
+    });
+  });
+});
+
+describe("a package Supplier asked first that refuses (ADR 0010)", () => {
+  const refused = (assetId: string, rejectionReason = "provider_declined") =>
+    assetTx({
+      assetId,
+      status: "rejected",
+      rejectionReason,
+      attentionSince: at("2026-11-18T10:00:00.000Z"),
+    });
+  const withTemplate = (over: Record<string, unknown>) =>
+    event({
+      template: {
+        templateAssets: [{ assetId: "pkg-asset" }],
+        templateServices: [],
+        templateVenues: [],
+      },
+      ...over,
+    });
+
+  it.each(["provider_declined", "deadline_expired"])(
+    "needs replacing when the item is the package's own (%s)",
+    async (reason) => {
+      db.eventOne.mockResolvedValue(
+        withTemplate({ assetTransactions: [refused("pkg-asset", reason)] }),
+      );
+
+      const [row] = (await EventConflictSvc.eventDetail("host1", "e1"))
+        .suppliers;
+
+      expect(row.reason).toBe("declined");
+      expect(row.replaceBy).toEqual(at("2026-11-20T10:00:00.000Z"));
+    },
+  );
+
+  it("leaves an item the citizen added alone", async () => {
+    db.eventOne.mockResolvedValue(
+      withTemplate({ assetTransactions: [refused("added-asset")] }),
+    );
+
+    const [row] = (await EventConflictSvc.eventDetail("host1", "e1")).suppliers;
+
+    expect(row.reason).toBeNull();
+  });
+
+  it("tells the citizen how many Suppliers are still to answer", async () => {
+    db.bookingOne.mockResolvedValue({
+      userId: "citizen1",
+      eventId: "e1",
+      status: "pending",
+      totalAmount: "21240",
+      event: withTemplate({
+        assetTransactions: [
+          assetTx({
+            assetId: "pkg-asset",
+            status: "pending_provider_confirmation",
+          }),
+        ],
+        serviceTransactions: [serviceTx()],
+      }),
+    });
+
+    const out = await EventConflictSvc.replacementForBooking(
+      "citizen1",
+      "b1",
+      NOW,
+    );
+
+    expect(out.awaitingConfirmation).toBe(1);
+    expect(out.items).toEqual([]);
+    expect(out.unpaid).toBe(true);
+    expect(out.totalAmount).toBe("21240");
   });
 });

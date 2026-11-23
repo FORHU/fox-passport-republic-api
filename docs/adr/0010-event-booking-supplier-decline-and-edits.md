@@ -2,9 +2,12 @@
 
 **Status: accepted (2026-11-18), with the proposed answers below.** Built so
 far: the Supplier decline with a "busy" cause and conflict alerts with a
-booked-event read (api#397, #399, #401). Not built yet: auto-booking only
-matched Suppliers, editing a booked event, and the replacement deadline and
-refund. Epic:
+booked-event read (api#397, #399, #401); swapping a Supplier on an unpaid
+booking (api#406); the replacement deadline and full refund (decision 2, set
+to 48 hours on 2026-11-19); auto-booking only matched Suppliers, behind
+`AUTO_BOOK_MATCHED_ONLY` (off until the web booking flow handles the wait);
+swapping a Supplier on a paid booking, with the difference paid before it
+applies or refunded at once (slice 3). Not built yet: date changes. Epic:
 [#371](https://github.com/FORHU/fox-passport-republic-api/issues/371); this
 API's sub-issue is [#372](https://github.com/FORHU/fox-passport-republic-api/issues/372).
 It is the "needs its own design" that [0003](./0003-booking-edit-requests.md)
@@ -81,7 +84,12 @@ These are the epic's, accepted as proposed.
    paid citizen is not left without a Supplier on a Supplier's whim.
 2. **A declined or conflicting Supplier is never replaced.** *Proposed:* a fixed
    deadline (suggest 48 to 72 hours, to be set), after which the citizen can
-   cancel with a **full** refund, as with a provider cancellation in 0003. For a
+   cancel with a **full** refund, as with a provider cancellation in 0003.
+   *Set (2026-11-19):* 48 hours from when the line started needing a
+   replacement (its `attentionSince`: the decline, the rejection or lapse of a
+   replacement, the blocked day, or the listing taken down), but never later
+   than 24 hours before the event; a dropout inside that last day opens the
+   full-refund cancel at once. A replacement accepted in time closes it. For a
    conflict, *proposed:* allow the change but flag it, rather than refusing a
    Mayor's block, since a Mayor refused a day off is worse than an event that
    needs a swap.

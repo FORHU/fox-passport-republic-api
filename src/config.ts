@@ -29,6 +29,14 @@ export const CORS_ORIGINS = (
   .filter(Boolean);
 export const SECRET_KEY = process.env.SECRET_KEY as string;
 export const isDev = process.env.NODE_ENV !== "production";
+/**
+ * ADR 0010: book only matched Suppliers automatically; an unmatched one is
+ * asked first (pending_provider_confirmation, 24 hours to answer), and the
+ * booking can't be paid until it answers. Off until the web booking flow
+ * handles the wait (decided 2026-11-19).
+ */
+export const AUTO_BOOK_MATCHED_ONLY =
+  process.env.AUTO_BOOK_MATCHED_ONLY === "true";
 export const MAILER_TRANSPORT_HOST = process.env
   .MAILER_TRANSPORT_HOST as string;
 export const MAILER_TRANSPORT_PORT = Number(
@@ -235,6 +243,24 @@ export const STRIPE_CONNECT_RETURN_URL =
 export const STRIPE_CONNECT_REFRESH_URL =
   process.env.STRIPE_CONNECT_REFRESH_URL ||
   `${FRONTEND_URL}/creator-dashboard/stripe-onboard`;
+// The same two for onboarding started in the mobile app (`client: mobile`,
+// mobile#476). Stripe only takes https, so these are web pages that hand off
+// to the app's own `foxpassport://app/stripe/return|refresh` link.
+export const STRIPE_CONNECT_MOBILE_RETURN_URL =
+  process.env.STRIPE_CONNECT_MOBILE_RETURN_URL ||
+  `${FRONTEND_URL}/stripe-connect/app-return`;
+export const STRIPE_CONNECT_MOBILE_REFRESH_URL =
+  process.env.STRIPE_CONNECT_MOBILE_REFRESH_URL ||
+  `${FRONTEND_URL}/stripe-connect/app-refresh`;
+// Country of new connected (Foxer) accounts (Accounts v2 `identity.country`),
+// ISO 3166-1 alpha-2. Optional: unset, it is the platform account's own
+// country, as v1 did. The Philippines is not a country Stripe supports for
+// accounts, so don't set "ph". See docs/PAYMENTS.md, gap 10.
+export const STRIPE_CONNECT_ACCOUNT_COUNTRY = (
+  process.env.STRIPE_CONNECT_ACCOUNT_COUNTRY || ""
+)
+  .trim()
+  .toLowerCase();
 export const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
 
 // Google sign-in is optional, but a partially configured integration must fail

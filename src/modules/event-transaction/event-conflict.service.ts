@@ -1,3 +1,4 @@
+import type { EventEditProposalStatus } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { notFound } from "../../utils/errors";
 import NotificationSvc from "../notifications/user-notification.service";
@@ -31,6 +32,10 @@ export interface ConflictIssue {
   reason: ConflictReason;
   /** "busy" when a declining Supplier has another booking then. */
   cause: "busy" | null;
+  /** A replacement the host proposed, waiting for the citizen's answer. */
+  pendingProposalId: string | null;
+  /** When the citizen may cancel for a full refund if it isn't replaced. */
+  replaceBy: Date | null;
 }
 
 export interface EventNeedingAttention {
@@ -51,6 +56,10 @@ export interface BookedSupplierRow {
   reason: ConflictReason | null;
   /** "busy" when a declining Supplier has another booking then. */
   cause: "busy" | null;
+  /** A replacement the host proposed, waiting for the citizen's answer. */
+  pendingProposalId: string | null;
+  /** When the citizen may cancel for a full refund if it isn't replaced. */
+  replaceBy: Date | null;
 }
 
 export interface BookedEventDetail {
@@ -65,6 +74,11 @@ export interface BookedEventDetail {
    * decline (ADR 0011); null once it is paid or when there is none.
    */
   declinableBookingId: string | null;
+  /**
+   * The booking a Supplier can still be replaced on: unpaid, or paid and to
+   * come (ADR 0010 slice 3). Null when there is none.
+   */
+  editableBookingId: string | null;
 }
 
 /** A booked item still counts only while it is waiting or approved. */
@@ -86,6 +100,27 @@ export function blockedDayHitsEvent(
   return blockedDayHitsRange(blocked, event.startAt, event.endAt);
 }
 
+/** How long the host has to replace a Supplier (ADR 0010, decided 2026-11-19). */
+export const REPLACE_HOURS = 48;
+/** The deadline never falls later than this long before the event starts. */
+export const REPLACE_CAP_HOURS_BEFORE = 24;
+const HOUR = 3_600_000;
+
+/**
+ * When a line that started needing a replacement at [since] must be replaced
+ * by: 48 hours later, but never later than 24 hours before the event. Past it,
+ * the citizen may cancel for a full refund. A dropout inside the last day is
+ * therefore due at once.
+ */
+export function replaceByFor(since: Date, eventStart: Date): Date {
+  return new Date(
+    Math.min(
+      since.getTime() + REPLACE_HOURS * HOUR,
+      eventStart.getTime() - REPLACE_CAP_HOURS_BEFORE * HOUR,
+    ),
+  );
+}
+
 /** The event fields both reads need, with every Supplier row. */
 const EVENT_WITH_SUPPLIERS = {
   id: true,
@@ -93,11 +128,23 @@ const EVENT_WITH_SUPPLIERS = {
   startAt: true,
   endAt: true,
   eventStatus: true,
+  // The package's own listings: one of these that its Supplier turns down or
+  // lets lapse needs replacing; an item the citizen added does not.
+  template: {
+    select: {
+      templateAssets: { select: { assetId: true } },
+      templateServices: { select: { serviceId: true } },
+      templateVenues: { select: { venueId: true } },
+    },
+  },
   assetTransactions: {
     select: {
       id: true,
+      assetId: true,
       status: true,
       rejectionReason: true,
+      attentionSince: true,
+      updatedAt: true,
       provider: { select: { name: true } },
       asset: { select: { name: true, status: true, deletedAt: true } },
     },
@@ -105,8 +152,11 @@ const EVENT_WITH_SUPPLIERS = {
   serviceTransactions: {
     select: {
       id: true,
+      serviceId: true,
       status: true,
       rejectionReason: true,
+      attentionSince: true,
+      updatedAt: true,
       provider: { select: { name: true } },
       service: { select: { name: true, status: true, deletedAt: true } },
     },
@@ -114,10 +164,28 @@ const EVENT_WITH_SUPPLIERS = {
   venueTransactions: {
     select: {
       id: true,
+      venueId: true,
       status: true,
       rejectionReason: true,
+      attentionSince: true,
+      updatedAt: true,
       provider: { select: { name: true } },
       venue: { select: { name: true, blockedDates: true } },
+    },
+  },
+  // Replacements (ADR 0010): a replaced line is no longer part of the event,
+  // and one with a proposal waiting shows it.
+  editProposals: {
+    where: {
+      status: {
+        in: ["pending", "accepted"] as EventEditProposalStatus[],
+      },
+    },
+    select: {
+      id: true,
+      status: true,
+      replacesTransactionId: true,
+      appliedTransactionId: true,
     },
   },
 } as const;
@@ -125,10 +193,18 @@ const EVENT_WITH_SUPPLIERS = {
 type EventRow = {
   startAt: Date;
   endAt: Date;
+  template?: {
+    templateAssets: { assetId: string | null }[];
+    templateServices: { serviceId: string | null }[];
+    templateVenues: { venueId: string | null }[];
+  } | null;
   assetTransactions: {
     id: string;
     status: string;
     rejectionReason: string | null;
+    attentionSince?: Date | null;
+    updatedAt?: Date;
+    assetId?: string;
     provider: { name: string };
     asset: { name: string; status: string; deletedAt: Date | null };
   }[];
@@ -136,6 +212,9 @@ type EventRow = {
     id: string;
     status: string;
     rejectionReason: string | null;
+    attentionSince?: Date | null;
+    updatedAt?: Date;
+    serviceId?: string;
     provider: { name: string };
     service: { name: string; status: string; deletedAt: Date | null };
   }[];
@@ -143,8 +222,17 @@ type EventRow = {
     id: string;
     status: string;
     rejectionReason: string | null;
+    attentionSince?: Date | null;
+    updatedAt?: Date;
+    venueId?: string;
     provider: { name: string };
     venue: { name: string; blockedDates: Date[] };
+  }[];
+  editProposals?: {
+    id: string;
+    status: string;
+    replacesTransactionId: string;
+    appliedTransactionId: string | null;
   }[];
 };
 
@@ -153,13 +241,26 @@ const isDeclined = (t: { status: string; rejectionReason: string | null }) =>
   t.status === "rejected" &&
   (t.rejectionReason === "supplier_declined" ||
     t.rejectionReason === "supplier_declined_busy");
+/**
+ * A replacement whose new Supplier turned it down or let it lapse: the line
+ * needs replacing again, as if it had been declined.
+ */
+const replacementFell = (t: {
+  status: string;
+  rejectionReason: string | null;
+}) =>
+  t.status === "rejected" &&
+  (t.rejectionReason === "provider_declined" ||
+    t.rejectionReason === "deadline_expired");
 /** Set when the Supplier said it has another booking at that time. */
 const declineCause = (t: { rejectionReason: string | null }): "busy" | null =>
   t.rejectionReason === "supplier_declined_busy" ? "busy" : null;
 
 /** Every Supplier of an event, each with why it needs replacing, if it does. */
 function supplierRows(e: EventRow): BookedSupplierRow[] {
-  const rows: BookedSupplierRow[] = [];
+  type Raw = Omit<BookedSupplierRow, "pendingProposalId" | "replaceBy">;
+  const raw: Raw[] = [];
+  const rows = { push: (r: Raw) => raw.push(r) };
 
   for (const t of e.assetTransactions) {
     rows.push({
@@ -208,7 +309,76 @@ function supplierRows(e: EventRow): BookedSupplierRow[] {
           : null,
     });
   }
-  return rows;
+
+  const proposals = e.editProposals ?? [];
+  const replaced = new Set(
+    proposals
+      .filter((p) => p.status === "accepted")
+      .map((p) => p.replacesTransactionId),
+  );
+  const replacements = new Set(
+    proposals
+      .filter((p) => p.status === "accepted" && p.appliedTransactionId)
+      .map((p) => p.appliedTransactionId!),
+  );
+  const waiting = new Map(
+    proposals
+      .filter((p) => p.status === "pending")
+      .map((p) => [p.replacesTransactionId, p.id] as const),
+  );
+  const packageListings = new Set([
+    ...(e.template?.templateAssets ?? []).map((x) => `asset:${x.assetId}`),
+    ...(e.template?.templateServices ?? []).map(
+      (x) => `service:${x.serviceId}`,
+    ),
+    ...(e.template?.templateVenues ?? []).map((x) => `venue:${x.venueId}`),
+  ]);
+  const listingOf = new Map<string, string | undefined>([
+    ...e.assetTransactions.map((t) => [t.id, t.assetId] as const),
+    ...e.serviceTransactions.map((t) => [t.id, t.serviceId] as const),
+    ...e.venueTransactions.map((t) => [t.id, t.venueId] as const),
+  ]);
+  const statusOf = new Map<
+    string,
+    {
+      status: string;
+      rejectionReason: string | null;
+      attentionSince?: Date | null;
+      updatedAt?: Date;
+    }
+  >(
+    [
+      ...e.assetTransactions,
+      ...e.serviceTransactions,
+      ...e.venueTransactions,
+    ].map((t) => [t.id, t] as const),
+  );
+  return raw
+    .filter((r) => !replaced.has(r.transactionId))
+    .map((r) => {
+      const t = statusOf.get(r.transactionId)!;
+      // A Supplier asked first (ADR 0010: a replacement, or a package item
+      // its Supplier isn't matched for) that turned it down or let it lapse.
+      const fell =
+        replacementFell(t) &&
+        (replacements.has(r.transactionId) ||
+          packageListings.has(`${r.kind}:${listingOf.get(r.transactionId)}`));
+      const reason = fell ? ("declined" as const) : r.reason;
+      // A line stamped when it started needing a replacement. One from before
+      // the stamp existed: a decline is its last change, so that stands in; a
+      // conflict (blocked day, listing gone) changed nothing on the line, so it
+      // gets no deadline until the next block or removal stamps it.
+      const since =
+        t.attentionSince ??
+        (reason === "declined" ? t.updatedAt : null) ??
+        null;
+      return {
+        ...r,
+        reason,
+        pendingProposalId: waiting.get(r.transactionId) ?? null,
+        replaceBy: reason && since ? replaceByFor(since, e.startAt) : null,
+      };
+    });
 }
 
 /** Where the Event Foxer is sent: a valid page on the web, and mobile's too. */
@@ -246,6 +416,8 @@ export default class EventConflictSvc {
             itemName: r.itemName,
             reason: r.reason,
             cause: r.cause,
+            pendingProposalId: r.pendingProposalId,
+            replaceBy: r.replaceBy,
           });
         }
       }
@@ -275,12 +447,13 @@ export default class EventConflictSvc {
       select: EVENT_WITH_SUPPLIERS,
     });
     if (!e) throw notFound("Event");
-    const unpaid = await prisma.booking.findFirst({
-      where: { eventId: e.id, status: "pending" },
-      select: { id: true },
+    const live = await prisma.booking.findFirst({
+      where: { eventId: e.id, status: { in: ["pending", "confirmed"] } },
+      select: { id: true, status: true },
     });
     return {
-      declinableBookingId: unpaid?.id ?? null,
+      declinableBookingId: live?.status === "pending" ? live.id : null,
+      editableBookingId: live?.id ?? null,
       eventId: e.id,
       eventName: e.name,
       startAt: e.startAt,
@@ -289,6 +462,91 @@ export default class EventConflictSvc {
       // A cancelled line is gone from the event; the rest are shown, with the
       // ones to replace marked.
       suppliers: supplierRows(e).filter((r) => r.status !== "cancelled"),
+    };
+  }
+
+  /**
+   * Whether an event has a Supplier that was not replaced by its deadline, so
+   * its citizen may cancel for a full refund (ADR 0010 decision 2).
+   */
+  static async fullRefundDue(
+    eventId: string | null | undefined,
+    now: Date = new Date(),
+  ): Promise<boolean> {
+    if (!eventId) return false;
+    const e = await prisma.event.findUnique({
+      where: { id: eventId },
+      select: EVENT_WITH_SUPPLIERS,
+    });
+    if (!e) return false;
+    return supplierRows(e).some(
+      (r) =>
+        r.status !== "cancelled" &&
+        r.reason !== null &&
+        r.replaceBy !== null &&
+        r.replaceBy <= now,
+    );
+  }
+
+  /**
+   * For a booking's citizen (or its host): which Suppliers need replacing,
+   * by when, and whether cancelling now refunds in full. Anyone else gets
+   * "not found".
+   */
+  static async replacementForBooking(
+    userId: string,
+    bookingId: string,
+    now: Date = new Date(),
+  ) {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        userId: true,
+        eventId: true,
+        status: true,
+        totalAmount: true,
+        event: { select: EVENT_WITH_SUPPLIERS },
+      },
+    });
+    const e = booking?.event;
+    if (
+      !booking ||
+      !e ||
+      (booking.userId !== userId &&
+        (await prisma.event.count({
+          where: { id: e.id, organizerId: userId },
+        })) === 0)
+    ) {
+      throw notFound("Booking");
+    }
+    const rows = supplierRows(e);
+    // Suppliers still to answer (asked first, a replacement, an added item):
+    // the citizen can pay once none is left.
+    const awaitingConfirmation = rows.filter(
+      (r) => r.status === "pending_provider_confirmation",
+    ).length;
+    const items = rows
+      .filter((r) => r.status !== "cancelled" && r.reason !== null)
+      .map((r) => ({
+        kind: r.kind,
+        itemName: r.itemName,
+        reason: r.reason!,
+        replaceBy: r.replaceBy,
+        pendingProposalId: r.pendingProposalId,
+      }));
+    const due = items
+      .map((i) => i.replaceBy)
+      .filter((d): d is Date => d !== null)
+      .sort((a, b) => a.getTime() - b.getTime());
+    return {
+      items,
+      replaceBy: due[0] ?? null,
+      fullRefund: due.length > 0 && due[0] <= now,
+      awaitingConfirmation,
+      // Not paid yet, and what it comes to: the citizen pays once no
+      // Supplier is left to answer.
+      unpaid: booking.status === "pending",
+      totalAmount: booking.totalAmount,
     };
   }
 
@@ -311,6 +569,7 @@ export default class EventConflictSvc {
         },
       },
       select: {
+        id: true,
         venue: { select: { name: true } },
         event: {
           select: {
@@ -324,6 +583,13 @@ export default class EventConflictSvc {
       },
     });
     const hit = rows.filter((r) => blockedDayHitsEvent([blockedDate], r.event));
+    if (hit.length > 0) {
+      // The replacement deadline runs from the first conflict, not the latest.
+      await prisma.eventVenueTransaction.updateMany({
+        where: { id: { in: hit.map((r) => r.id) }, attentionSince: null },
+        data: { attentionSince: now },
+      });
+    }
     await this.notifyOrganizers(
       hit.map((r) => ({
         event: r.event,
@@ -359,18 +625,35 @@ export default class EventConflictSvc {
         ? (
             await prisma.eventAssetTransaction.findMany({
               where: { ...where, assetId: itemId },
-              select: { asset: { select: { name: true } }, event: eventSelect },
+              select: {
+                id: true,
+                asset: { select: { name: true } },
+                event: eventSelect,
+              },
             })
-          ).map((r) => ({ name: r.asset.name, event: r.event }))
+          ).map((r) => ({ id: r.id, name: r.asset.name, event: r.event }))
         : (
             await prisma.eventServiceTransaction.findMany({
               where: { ...where, serviceId: itemId },
               select: {
+                id: true,
                 service: { select: { name: true } },
                 event: eventSelect,
               },
             })
-          ).map((r) => ({ name: r.service.name, event: r.event }));
+          ).map((r) => ({ id: r.id, name: r.service.name, event: r.event }));
+
+    if (found.length > 0) {
+      const stamp = {
+        where: { id: { in: found.map((r) => r.id) }, attentionSince: null },
+        data: { attentionSince: now },
+      };
+      if (kind === "asset") {
+        await prisma.eventAssetTransaction.updateMany(stamp);
+      } else {
+        await prisma.eventServiceTransaction.updateMany(stamp);
+      }
+    }
 
     await this.notifyOrganizers(
       found.map((r) => ({

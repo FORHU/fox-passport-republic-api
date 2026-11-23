@@ -92,6 +92,14 @@ const ALLOW_LIST = new Set([
   "referral.routes.ts GET /me",
   "referral.routes.ts POST /apply",
 
+  // Account setup (api#419). A Google account sets the username and password
+  // it lacks. Both act only on the session user: the availability check
+  // compares a username against everyone else's, and the setup refuses an
+  // account that needs none and never replaces a password (ProfileSvc).
+  // Self-service, so no capability permission applies.
+  "profile.routes.ts GET /username-availability",
+  "profile.routes.ts POST /credentials",
+
   // Foxer Score management console: self-service operational metrics for authenticated Foxer.
   "foxer-score.routes.ts GET /me",
   // Achievements engine: self-service personal progress and rewards evaluation for authenticated user.
@@ -176,6 +184,20 @@ const ALLOW_LIST = new Set([
   // Foxer's own events, filtered by organizerId in the service.
   "event-transaction.routes.ts GET /needs-attention",
   "event-transaction.routes.ts GET /event/:eventId",
+  // Replacing a Supplier (ADR 0010): EventEditSvc lets only the event's
+  // organizer list and propose, only the booking's citizen accept or decline,
+  // only the proposer withdraw, and only those two read a booking's proposals.
+  "event-transaction.routes.ts GET /proposals",
+  // The replacement deadline (ADR 0010): replacementForBooking lets only the
+  // booking's citizen or the event's host read it.
+  "event-transaction.routes.ts GET /booking/:bookingId/replacement",
+  "event-transaction.routes.ts POST /proposals/:id/accept",
+  "event-transaction.routes.ts POST /proposals/:id/decline",
+  "event-transaction.routes.ts POST /proposals/:id/withdraw",
+  // Only the booking's citizen can confirm paying a change's difference.
+  "event-transaction.routes.ts POST /proposals/:id/confirm-payment",
+  "event-transaction.routes.ts GET /:id/replacements",
+  "event-transaction.routes.ts POST /:id/replace",
   // The host leaves an unpaid booking (ADR 0011): the service allows only the
   // event's own organizer.
   "booking.routes.ts POST /:id/decline",

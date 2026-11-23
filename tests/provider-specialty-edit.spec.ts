@@ -182,7 +182,11 @@ describe("ProfileSvc.updateProfile with specialties", () => {
 });
 
 describe("ProfileSvc.getProfile", () => {
-  const base = { id: "u1", systemRole: "user" };
+  const base = {
+    id: "u1",
+    systemRole: "user",
+    credentials: { username: "u1", hasGoogle: false, hasPassword: true },
+  };
 
   it("lists a Provider's specialties with their names", async () => {
     repo.findProfileById.mockResolvedValue({

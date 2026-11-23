@@ -32,6 +32,7 @@ model Booking {
   reviews               Review[]
   refunds               Refund[]
   editRequests          BookingEditRequest[]
+  eventEditProposals    EventEditProposal[]
   stamp                 PassportStamp?
 
   @@map("bookings")

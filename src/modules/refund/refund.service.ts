@@ -6,6 +6,7 @@ import { STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents, formatCurrency } from "../../utils/pricing";
 import { sendRefundUpdateEmail } from "../../utils/emails/refund";
 import NotificationService from "../notifications/user-notification.service";
+import EventConflictSvc from "../event-transaction/event-conflict.service";
 
 const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-08-27.basil",
@@ -63,6 +64,44 @@ export default class RefundSvc {
     };
   }
 
+  /**
+   * How much of each payment has already gone back (a change's difference, an
+   * earlier partial refund): refunds that succeeded or are still settling,
+   * not ones that failed. A later refund can only give back what is left.
+   */
+  static async refundedByPayment(
+    paymentIds: string[],
+  ): Promise<Map<string, Prisma.Decimal>> {
+    if (paymentIds.length === 0) return new Map();
+    const rows = await prisma.refund.findMany({
+      where: {
+        paymentId: { in: paymentIds },
+        status: { in: [RefundStatus.succeeded, RefundStatus.pending] },
+      },
+      select: { paymentId: true, amount: true },
+    });
+    const out = new Map<string, Prisma.Decimal>();
+    for (const r of rows) {
+      if (!r.paymentId) continue;
+      out.set(
+        r.paymentId,
+        (out.get(r.paymentId) ?? new Prisma.Decimal(0)).add(r.amount),
+      );
+    }
+    return out;
+  }
+
+  /** A payment's refund at [percent], capped at what is left on it. */
+  static refundFor(
+    amount: Prisma.Decimal,
+    alreadyRefunded: Prisma.Decimal | undefined,
+    percent: number,
+  ): Prisma.Decimal {
+    const left = amount.sub(alreadyRefunded ?? 0);
+    if (left.lte(0)) return new Prisma.Decimal(0);
+    return Prisma.Decimal.min(amount.mul(percent).div(100), left);
+  }
+
   static async checkEligibility(bookingId: string, userId: string) {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
@@ -118,8 +157,14 @@ export default class RefundSvc {
       booking.event.serviceTransactions?.[0]?.service?.cancellationPolicy) as
       CancellationPolicy | undefined;
 
-    const { refundPercent, hoursUntilEvent, matchedRule } =
-      RefundSvc.computeRefund(booking.startAt, policy, now);
+    const computed = RefundSvc.computeRefund(booking.startAt, policy, now);
+    const { hoursUntilEvent, matchedRule } = computed;
+    // A Supplier that was not replaced by its deadline refunds in full,
+    // whatever the policy says (ADR 0010 decision 2).
+    const fullRefund =
+      hoursUntilEvent > 0 &&
+      (await EventConflictSvc.fullRefundDue(booking.eventId, now));
+    const refundPercent = fullRefund ? 100 : computed.refundPercent;
 
     let eligible = true;
     let message = "";
@@ -127,6 +172,8 @@ export default class RefundSvc {
     if (hoursUntilEvent <= 0) {
       eligible = false;
       message = "Event has already started — cancellation is no longer allowed";
+    } else if (fullRefund) {
+      message = "Full refund — a Supplier was not replaced in time";
     } else if (!matchedRule) {
       eligible = refundPercent > 0;
       message = "No refund available under the applicable cancellation policy";
@@ -137,17 +184,30 @@ export default class RefundSvc {
           : "No refund available under the applicable cancellation policy";
     }
 
-    const payments = await PaymentRepo.getBookingPayments(bookingId);
-    const totalPaid = payments
-      .filter((p) => p.status === PaymentStatus.paid)
-      .reduce((sum, p) => sum.add(p.amount), new Prisma.Decimal(0));
-
-    const estimatedRefund = totalPaid.mul(refundPercent).div(100);
+    const payments = (await PaymentRepo.getBookingPayments(bookingId)).filter(
+      (p) => p.status === PaymentStatus.paid,
+    );
+    const totalPaid = payments.reduce(
+      (sum, p) => sum.add(p.amount),
+      new Prisma.Decimal(0),
+    );
+    // What already went back (a change's difference) is not refunded twice.
+    const refunded = await RefundSvc.refundedByPayment(
+      payments.map((p) => p.id),
+    );
+    const estimatedRefund = payments.reduce(
+      (sum, p) =>
+        sum.add(
+          RefundSvc.refundFor(p.amount, refunded.get(p.id), refundPercent),
+        ),
+      new Prisma.Decimal(0),
+    );
 
     return {
       eligible,
       message,
       refundPercent,
+      fullRefund,
       totalPaid,
       estimatedRefund,
       startAt: booking.startAt,

@@ -20,7 +20,8 @@ import VenueSvc from "../src/modules/venue/venue.service";
 const base = {
   mayorId: "m1",
   name: "Pine Hall",
-  description: "",
+  // Publishing needs one too (api#365); these tests are about the address.
+  description: "A hall among the pines",
   category: "outdoor",
   capacity: 50,
   price: 0,

@@ -1,6 +1,7 @@
 import { prisma } from "../../utils/prisma";
 import { PayoutSourceType } from "@prisma/client";
 import PayoutSvc from "../payout/payout.service";
+import { toStripeCents } from "../../utils/pricing";
 
 /**
  * See docs/adr/0002-stripe-connect-payouts.md's "Addendum: why there are two
@@ -93,6 +94,9 @@ export default class PaymentPayoutSvc {
         // FoxPassport fee and processing fee are never paid out. Sponsorships
         // stay as they are until Q8 is decided.
         if (item.sourceType !== PayoutSourceType.sponsorship) continue;
+        // Fees can leave a tiny sponsorship with nothing to pay; Stripe
+        // refuses a transfer under one centavo.
+        if (toStripeCents(payoutAmount) <= 0) continue;
 
         const sponsorship = await tx.partnershipProposal.findUnique({
           where: { id: item.sourceId },

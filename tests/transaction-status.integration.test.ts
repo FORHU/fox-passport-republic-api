@@ -171,6 +171,8 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
       }),
     );
     expect((result as any).status).toBe("approved");
+    // Confirming is not a dropout: no replacement deadline starts.
+    expect((result as any).attentionSince).toBeNull();
   });
 
   it("rejects confirm from someone who is not the item's provider", async () => {
@@ -347,6 +349,8 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
       }),
     );
     expect((result as any).rejectionReason).toBe("provider_declined");
+    // A replacement turned down needs replacing again; its deadline starts now.
+    expect((result as any).attentionSince).toBeInstanceOf(Date);
   });
 
   describe("transaction-kind confusion", () => {
@@ -386,6 +390,8 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
       expect((result as any).status).toBe("rejected");
       // Not "provider_declined": that means turning down a request.
       expect((result as any).rejectionReason).toBe("supplier_declined");
+      // The replacement deadline (ADR 0010) runs from the decline.
+      expect((result as any).attentionSince).toBeInstanceOf(Date);
     });
 
     it("records that the Supplier was busy, when it says so", async () => {

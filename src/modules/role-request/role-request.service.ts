@@ -2,6 +2,11 @@ import RoleRequestRepo from "./role-request.repository";
 import UsersRepo from "../users/users.repository";
 import { RoleType, RequestStatus } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
+import {
+  acceptedMimeTypes,
+  FILE_UNSUPPORTED,
+} from "../../utils/file-signature";
+import { badRequest } from "../../utils/errors";
 import NotificationService from "../notifications/user-notification.service";
 
 /**
@@ -80,6 +85,47 @@ async function assertOwnDocuments(userId: string, fileIds: unknown[]) {
   }
 }
 
+/**
+ * A portfolio / resume is a PDF or Word document (app#371). The upload route
+ * already checks the bytes when told it is a portfolio, but a file uploaded
+ * as an identity document (an image) could still be named as the portfolio,
+ * so the stored type is checked again here. Ownership is checked separately.
+ */
+async function assertPortfolioDocument(fileId: unknown) {
+  if (typeof fileId !== "string" || fileId === "") return;
+  const file = await prisma.file.findUnique({
+    where: { id: fileId },
+    select: { type: true },
+  });
+  if (!file?.type || !acceptedMimeTypes("portfolio").includes(file.type)) {
+    throw badRequest(FILE_UNSUPPORTED.portfolio);
+  }
+}
+
+// What a portfolio may be but an identity document may not: Word files.
+const PORTFOLIO_ONLY_TYPES = acceptedMimeTypes("portfolio").filter(
+  (type) => !acceptedMimeTypes("document").includes(type),
+);
+
+/**
+ * The other way round: a Word file uploaded as a portfolio must not be named
+ * as an ID, clearance or proof of funds (app#371). Files stored before Word
+ * was accepted anywhere are unaffected.
+ */
+async function assertIdentityDocuments(fileIds: unknown[]) {
+  const ids = fileIds.filter(
+    (v): v is string => typeof v === "string" && v !== "",
+  );
+  if (ids.length === 0) return;
+  const files = await prisma.file.findMany({
+    where: { id: { in: ids } },
+    select: { type: true },
+  });
+  if (files.some((f) => f.type && PORTFOLIO_ONLY_TYPES.includes(f.type))) {
+    throw badRequest(FILE_UNSUPPORTED.document);
+  }
+}
+
 export default class RoleRequestService {
   /**
    * Submit an application for a specific role
@@ -115,6 +161,12 @@ export default class RoleRequestService {
     await assertOwnDocuments(
       userId,
       DOCUMENT_COLUMNS.map((column) => cleanedData[column]),
+    );
+    await assertPortfolioDocument(cleanedData.portfolioFileId);
+    await assertIdentityDocuments(
+      DOCUMENT_COLUMNS.filter((column) => column !== "portfolioFileId").map(
+        (column) => cleanedData[column],
+      ),
     );
 
     return RoleRequestRepo.createRequest(
@@ -274,6 +326,12 @@ export default class RoleRequestService {
     }
 
     await assertOwnDocuments(userId, Object.values(documents));
+    await assertPortfolioDocument(documents.portfolioFile);
+    await assertIdentityDocuments(
+      Object.entries(documents)
+        .filter(([key]) => key !== "portfolioFile")
+        .map(([, fileId]) => fileId),
+    );
 
     const fileColumns: Record<string, string> = {};
     for (const key of submittedKeys) {

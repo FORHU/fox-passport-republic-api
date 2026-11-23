@@ -7,6 +7,44 @@ import {
 import { prisma } from "../../utils/prisma";
 import { userCache, eventTemplateCache } from "../../utils/cache-namespaces";
 
+/**
+ * The sign-in accounts that decide whether someone must finish setting up
+ * their username and password (api#419): Google's, and a credential one that
+ * has a password. Matched in the query, so the hash itself is never read.
+ */
+const SIGN_IN_ACCOUNTS = {
+  where: {
+    OR: [
+      { providerId: "google" },
+      { providerId: "credential", password: { not: null } },
+    ],
+  },
+  select: { providerId: true },
+} satisfies Prisma.User$accountsArgs;
+
+/** How the account signs in, read from its user row and sign-in accounts. */
+export interface CredentialState {
+  username: string | null;
+  /** Linked to Google: a Better Auth `google` account, or `googleId` from before Better Auth. */
+  hasGoogle: boolean;
+  /** A password on the credential account, so email and password sign-in works. */
+  hasPassword: boolean;
+}
+
+function credentialState(user: {
+  username: string | null;
+  googleId: string | null;
+  accounts: { providerId: string }[];
+}): CredentialState {
+  return {
+    username: user.username,
+    hasGoogle:
+      !!user.googleId || user.accounts.some((a) => a.providerId === "google"),
+    // Only a credential account with a password is selected.
+    hasPassword: user.accounts.some((a) => a.providerId === "credential"),
+  };
+}
+
 export default class ProfileRepo {
   /** A profile edit changes what the public listings show. */
   private static async retiring<T>(write: Promise<T>): Promise<T> {
@@ -59,12 +97,15 @@ export default class ProfileRepo {
             preferredCurrency: true,
           },
         },
+        googleId: true,
+        accounts: SIGN_IN_ACCOUNTS,
       },
     });
 
     if (!user) return null;
 
     return {
+      credentials: credentialState(user),
       id: user.id,
       email: user.email,
       username: user.username,
@@ -72,8 +113,15 @@ export default class ProfileRepo {
       phone: user.profile?.phone ?? user.phone,
       imgId: user.profile?.imgId ?? user.imgId,
       city: user.profile?.city ?? user.city,
+      state: user.profile?.state ?? user.state,
+      country: user.profile?.country ?? user.country,
+      district: user.district,
       systemRole: user.systemRole,
       roleType: user.roleType,
+      // The app replaces its stored user with this response on Sync Account,
+      // so a field left out here is a field the app forgets (#158).
+      isEmailVerified: user.isEmailVerified,
+      identityVerifiedAt: user.identityVerifiedAt,
       isPrivate: user.profile?.isPrivate ?? user.isPrivate,
       bio: user.bio,
       socialLinks: user.socialLinks,
@@ -103,6 +151,17 @@ export default class ProfileRepo {
       select: { password: true },
     });
     return { id: user.id, password: credential?.password ?? null };
+  }
+
+  /** How the account signs in (api#419), or null when there is no such user. */
+  static async findCredentialState(
+    userId: string,
+  ): Promise<CredentialState | null> {
+    const user = await prisma.user.findUnique({
+      where: { id: String(userId) },
+      select: { username: true, googleId: true, accounts: SIGN_IN_ACCOUNTS },
+    });
+    return user ? credentialState(user) : null;
   }
 
   static async findByUsernameExcludingUserId(
