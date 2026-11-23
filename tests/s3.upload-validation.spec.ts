@@ -113,6 +113,34 @@ describe("private documents (S3Svc.uploadPrivateFile)", () => {
     );
     expect(contentType).toBe("application/pdf");
   });
+
+  it("stores a Word portfolio as it is, and refuses an image portfolio (app#371)", async () => {
+    const docx = Buffer.concat([
+      Buffer.from([0x50, 0x4b, 0x03, 0x04]),
+      Buffer.alloc(26),
+      Buffer.from("[Content_Types].xml<x/>word/document.xml<x/>", "latin1"),
+    ]);
+    const { key, contentType } = await S3Svc.uploadPrivateFile(
+      "u1",
+      upload(docx, "cv.docx", "application/octet-stream"),
+      "portfolio",
+    );
+    expect(contentType).toBe(
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    );
+    expect(key).toMatch(/^users\/u1\/private\/.+\.docx$/);
+    expect(s3.uploadPrivateToS3).toHaveBeenCalledWith(
+      expect.objectContaining({ body: docx }),
+    );
+
+    await expect(
+      S3Svc.uploadPrivateFile(
+        "u1",
+        upload(png, "cv.png", "image/png"),
+        "portfolio",
+      ),
+    ).rejects.toThrow(FILE_UNSUPPORTED.portfolio);
+  });
 });
 
 describe("presigned uploads", () => {

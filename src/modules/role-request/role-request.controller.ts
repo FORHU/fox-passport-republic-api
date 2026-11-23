@@ -9,6 +9,7 @@ import {
   validateTin,
 } from "../../utils/tax-id-formats";
 import { normalizePhone } from "../../utils/phone";
+import { checkPortfolioUrls } from "../../utils/portfolio-urls";
 import {
   isPrismaError,
   sendFailure,
@@ -307,6 +308,15 @@ export default class RoleRequestController {
           return res.status(400).json({ success: false, message: phoneError });
         }
       }
+      if ([RoleType.eventFoxer, RoleType.providerFoxer].includes(roleType)) {
+        const links = checkPortfolioUrls(data.portfolioUrls);
+        if (!links.ok) {
+          return res
+            .status(400)
+            .json({ success: false, message: links.message });
+        }
+        data.portfolioUrls = links.urls;
+      }
 
       // Store each uploaded document
       const files = req.files as
@@ -320,8 +330,13 @@ export default class RoleRequestController {
           const dbColumn = FILE_FIELD_TO_DB_COLUMN[fieldName];
           if (!dbColumn) continue;
 
-          // Identity documents go to the private bucket — no public URL.
-          const dbFile = await FileSvc.storePrivateDocument(userId, file);
+          // Identity documents go to the private bucket — no public URL. A
+          // portfolio is a PDF or Word document only (app#371).
+          const dbFile = await FileSvc.storePrivateDocument(
+            userId,
+            file,
+            fieldName === "portfolioFile" ? "portfolio" : "document",
+          );
 
           // Inject the file ID into application data
           data[dbColumn] = dbFile.id;

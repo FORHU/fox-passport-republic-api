@@ -3,6 +3,7 @@ import Joi from "joi";
 import FileSvc from "./file.service";
 import S3Svc from "../s3/s3.service";
 import { AppError, sendServerError } from "../../utils/errors";
+import { isPrivateUploadPurpose } from "../../utils/file-signature";
 
 export default class FileCtrl {
   static async uploadDirect(req: Request, res: Response) {
@@ -69,15 +70,22 @@ export default class FileCtrl {
   }
 
   // POST /files/upload-private — an identity document (ID, clearance, proof
-  // of funds). Answers with the record's id only: there is no URL to hand
-  // back, and the uploader never needs one.
+  // of funds), or with `purpose=portfolio` a portfolio / resume (PDF or Word
+  // only, app#371). Answers with the record's id only: there is no URL to
+  // hand back, and the uploader never needs one.
   static async uploadPrivate(req: Request, res: Response) {
     const file = req.file;
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
     if (!file) return res.status(400).json({ message: "No file uploaded" });
+    const purpose = req.body?.purpose ?? "document";
+    if (!isPrivateUploadPurpose(purpose)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Unknown upload purpose" });
+    }
     try {
-      const dbFile = await FileSvc.storePrivateDocument(userId, file);
+      const dbFile = await FileSvc.storePrivateDocument(userId, file, purpose);
       return res.status(201).json({
         success: true,
         fileId: dbFile.id,
