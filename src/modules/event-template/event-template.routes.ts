@@ -3,6 +3,7 @@ import EventTemplateCtrl from "./event-template.controller";
 import {
   authenticate,
   requirePermission,
+  requirePermissionAny,
 } from "../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -144,6 +145,14 @@ router.patch(
   "/matches/:matchId/respond",
   authenticate,
   EventTemplateCtrl.respondToMatch,
+);
+// A Supplier leaves a package they joined (api#461); the service checks the
+// line is theirs.
+router.post(
+  "/matches/:matchId/leave",
+  authenticate,
+  requirePermissionAny(["venue:manage", "asset:manage", "service:manage"]),
+  EventTemplateCtrl.leaveMatch,
 );
 
 // Approve/reject moved to admin.routes.ts (AdminCtrl) — this pair had

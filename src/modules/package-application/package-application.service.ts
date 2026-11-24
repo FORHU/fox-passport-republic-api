@@ -117,12 +117,17 @@ export function linesOf(t: WithLines): PackageLineView[] {
   return lines;
 }
 
+/**
+ * A line that holds its spot: waiting or accepted. Declined and expired
+ * (api#462) lines free it.
+ */
+const isOpenAnswer = (s: MatchRequestStatus) =>
+  s !== MatchRequestStatus.declined && s !== MatchRequestStatus.expired;
+
 /** The spots taken by a waiting or accepted line. */
 export function takenSpots(lines: PackageLineView[]): Set<SpotKey> {
   return new Set(
-    lines
-      .filter((l) => l.status !== MatchRequestStatus.declined)
-      .map((l) => l.spot),
+    lines.filter((l) => isOpenAnswer(l.status)).map((l) => l.spot),
   );
 }
 
@@ -345,9 +350,7 @@ export default class PackageApplicationSvc {
   /** One open package: its lines (as spots) and the caller's applications. */
   static async getOpen(userId: string, templateId: string) {
     const t = await openPackageFor(userId, templateId);
-    const lines = linesOf(t).filter(
-      (l) => l.status !== MatchRequestStatus.declined,
-    );
+    const lines = linesOf(t).filter((l) => isOpenAnswer(l.status));
     const mine = await prisma.packageApplication.findMany({
       where: { applicantId: userId, templateId },
       select: {
