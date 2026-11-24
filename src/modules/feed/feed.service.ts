@@ -22,6 +22,7 @@ import {
 } from "../../utils/feed-ranking";
 import PassportSvc from "../passport/passport.service";
 import NotificationService from "../notifications/user-notification.service";
+import { feedTargetMetadata } from "../notifications/feed-notification-target";
 import { prisma } from "../../utils/prisma";
 import { AuthenticatedUser } from "../../types/auth";
 import { can } from "../../types/permissions";
@@ -162,7 +163,7 @@ async function notifyMediaTags(
         type: "feed:media_tag",
         title: "You were tagged in a photo",
         message: "Someone tagged you in a photo on the Republic feed.",
-        metadata: { postId },
+        metadata: feedTargetMetadata({ postId }),
       }).catch((err) =>
         console.warn(
           "[FeedService] Best-effort media tag notification failed:",
@@ -562,7 +563,11 @@ export default class FeedService {
       pollOptions: trimmedPollOptions,
     });
 
-    notifyMentions(content, user.userId, { postId: post.id }).catch(() => {});
+    notifyMentions(
+      content,
+      user.userId,
+      feedTargetMetadata({ postId: post.id }),
+    ).catch(() => {});
     broadcastNewPost(post);
     if (mediaTags && mediaTags.length > 0) {
       notifyMediaTags(mediaTags, user.userId, post.id).catch(() => {});
@@ -712,7 +717,11 @@ export default class FeedService {
         type: "feed:repost",
         title: "Your post was reposted",
         message: `${user.email} reposted your post.`,
-        metadata: { postId, repostId: post.id, reposterId: user.userId },
+        metadata: {
+          ...feedTargetMetadata({ postId }),
+          repostId: post.id,
+          reposterId: user.userId,
+        },
       }).catch(() => {});
     }
 
@@ -764,7 +773,11 @@ export default class FeedService {
         type: "feed:like",
         title: "New Reaction on your Republic Post",
         message: `${name} reacted to your post.`,
-        metadata: { postId, reactorId: user.userId, reaction: type },
+        metadata: {
+          ...feedTargetMetadata({ postId }),
+          reactorId: user.userId,
+          reaction: type,
+        },
       }).catch((err) =>
         console.warn(
           "[FeedService] Best-effort reaction notification failed:",
@@ -859,10 +872,15 @@ export default class FeedService {
 
     broadcastCommentsCount(postId);
 
-    notifyMentions(trimmed, user.userId, {
+    // Every notification about this comment points at it, and at the comment
+    // it answers when it is a reply.
+    const target = feedTargetMetadata({
       postId,
       commentId: comment.id,
-    }).catch(() => {});
+      parentCommentId: parentId,
+    });
+
+    notifyMentions(trimmed, user.userId, target).catch(() => {});
 
     const name = await actorName(user.userId);
     const preview = `"${trimmed.slice(0, 60)}${trimmed.length > 60 ? "..." : ""}"`;
@@ -879,7 +897,7 @@ export default class FeedService {
         type: "feed:reply",
         title: "New reply to your comment",
         message: `${name} replied to your comment: ${preview}`,
-        metadata: { postId, commentId: comment.id, authorId: user.userId },
+        metadata: { ...target, authorId: user.userId },
       }).catch((err) =>
         console.warn(
           "[FeedService] Best-effort reply notification failed:",
@@ -895,11 +913,7 @@ export default class FeedService {
         type: "feed:comment",
         title: "New Comment on your Republic Post",
         message: `${name} commented on your post: ${preview}`,
-        metadata: {
-          postId,
-          commentId: comment.id,
-          authorId: user.userId,
-        },
+        metadata: { ...target, authorId: user.userId },
       }).catch((err) =>
         console.warn(
           "[FeedService] Best-effort comment notification failed:",
@@ -967,7 +981,14 @@ export default class FeedService {
         type: "feed:comment_like",
         title: "New Like on your Comment",
         message: `${user.email} liked your comment.`,
-        metadata: { commentId, likerId: user.userId },
+        metadata: {
+          ...feedTargetMetadata({
+            postId: comment.postId,
+            commentId,
+            parentCommentId: comment.parentId,
+          }),
+          likerId: user.userId,
+        },
       }).catch(() => {});
     }
 
@@ -1000,7 +1021,11 @@ export default class FeedService {
         type: "feed:media_tag",
         title: "You were tagged in a photo",
         message: `${user.email} tagged you in a photo on the Republic feed.`,
-        metadata: { postId, tagId: tag.id, taggerId: user.userId },
+        metadata: {
+          ...feedTargetMetadata({ postId }),
+          tagId: tag.id,
+          taggerId: user.userId,
+        },
       }).catch((err) =>
         console.warn(
           "[FeedService] Best-effort media tag notification failed:",
