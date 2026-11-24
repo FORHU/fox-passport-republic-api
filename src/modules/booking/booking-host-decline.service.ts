@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { AppError, notFound } from "../../utils/errors";
 import { prisma } from "../../utils/prisma";
+import { bookingLink } from "../../utils/notification-links";
 import { STRIPE_SECRET_KEY } from "../../config";
 import BookingRepo from "./booking.repository";
 import PaymentRepo from "../payment/payment.repository";
@@ -140,7 +141,7 @@ export default class BookingHostDeclineSvc {
       type: "BOOKING_HOST_DECLINED",
       title: "The host can't run your event",
       message: `The host declined ${eventName}${why}. Nothing was charged.`,
-      metadata: { link: `/bookings/${booking.id}`, bookingId: booking.id },
+      metadata: { link: bookingLink(booking.id), bookingId: booking.id },
     });
 
     const suppliers = new Set(providerIds);

@@ -6,6 +6,7 @@ import {
   RefundStatus,
 } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
+import { bookingLink } from "../../utils/notification-links";
 import { STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents } from "../../utils/pricing";
 import PaymentRepo from "../payment/payment.repository";
@@ -566,7 +567,7 @@ export default class EventEditSvc {
       title: "Your host proposes a replacement",
       message: text,
       metadata: {
-        link: `/bookings/${proposal.bookingId}`,
+        link: bookingLink(proposal.bookingId),
         bookingId: proposal.bookingId,
         proposalId: proposal.id,
       },

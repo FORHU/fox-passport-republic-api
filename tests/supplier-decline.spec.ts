@@ -101,7 +101,7 @@ describe("EventTransactionSvc.reviewItem with a decline", () => {
       userId: "citizen1",
       type: "SUPPLIER_DECLINED",
       // The citizen goes to their booking, not the host's event page.
-      metadata: { link: "/bookings/b1" },
+      metadata: { link: "/booking/b1" },
     });
   });
 
