@@ -60,6 +60,16 @@ vi.mock("../src/modules/auth/sessions.service", () => ({
   }),
 }));
 
+// Losing a role ends the teams that depended on it (ADR 0005); what that
+// does to appointments has its own tests.
+const appointments = vi.hoisted(() => ({
+  endForRevokedOrganizer: vi.fn(async () => undefined),
+  endForRevokedOwner: vi.fn(async () => undefined),
+}));
+vi.mock("../src/modules/appointment/appointment.service", () => ({
+  default: appointments,
+}));
+
 import RoleAssignmentSvc, {
   RoleAssignmentError,
 } from "../src/modules/admin/role-assignment.service";
@@ -196,5 +206,50 @@ describe("changing role types", () => {
       ]),
     ).rejects.toThrow(/not a role type/i);
     expect(lastAudit().metadata).toMatchObject({ reason: "unknown_role_type" });
+  });
+
+  // api#463: Event Coordinator comes from an approved application only.
+  describe("Event Coordinator (organizer)", () => {
+    it("can't be newly assigned by an admin, and the refusal is recorded", async () => {
+      await expect(
+        RoleAssignmentSvc.changeRoleTypes(admin, "user-1", [
+          "providerFoxer",
+          "organizer",
+        ]),
+      ).rejects.toMatchObject({
+        status: 400,
+        reason: "not_admin_assignable",
+      });
+      expect(lastAudit()).toMatchObject({ outcome: "refused" });
+      expect(db.users.find((u) => u.id === "user-1")!.roleType).toEqual([]);
+    });
+
+    it("stays with someone who already holds it when other roles change", async () => {
+      db.users.find((u) => u.id === "user-1")!.roleType = ["organizer"];
+
+      const r = await RoleAssignmentSvc.changeRoleTypes(admin, "user-1", [
+        "organizer",
+        "venueFoxer",
+      ]);
+
+      expect(r.target.roleType).toEqual(["organizer", "venueFoxer"]);
+    });
+
+    it("can still be removed", async () => {
+      db.users.find((u) => u.id === "user-1")!.roleType = [
+        "organizer",
+        "providerFoxer",
+      ];
+
+      const r = await RoleAssignmentSvc.changeRoleTypes(admin, "user-1", [
+        "providerFoxer",
+      ]);
+
+      expect(r.target.roleType).toEqual(["providerFoxer"]);
+      expect(appointments.endForRevokedOrganizer).toHaveBeenCalledWith(
+        "user-1",
+        "admin-1",
+      );
+    });
   });
 });
