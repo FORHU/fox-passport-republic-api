@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { userCache } from "../../utils/cache-namespaces";
@@ -493,7 +494,16 @@ export default class UsersRepo {
   }
 
   // CREATE (username MUST be required)
-  // [MIGRATION-FLAG: Stage 3 Switch] Dual-write passwordHash and create 1:1 models (profile, settings, activity)
+  /**
+   * `data.password` is the already-hashed password. It goes onto a Better Auth
+   * credential account, the only place email sign-in reads it (api#368); the
+   * `users` row gets no copy. The account is written with the user, so one
+   * can't exist without the other.
+   *
+   * Creating a user here is an admin vouching for the address, so it is
+   * stored verified: `requireEmailVerification` would otherwise answer 403
+   * `EMAIL_NOT_VERIFIED` and no verification email is sent from this path.
+   */
   static async createUser(data: {
     email: string;
     username: string;
@@ -501,14 +511,26 @@ export default class UsersRepo {
     role?: SystemRole;
     name: string;
   }) {
+    const { password, ...fields } = data;
+    // A credential account's accountId is the user's own id, as Better Auth
+    // writes it, so the id is fixed up front instead of read back.
+    const id = randomUUID();
     return this.retiring(
       prisma.user.create({
         data: {
-          ...data,
+          ...fields,
+          id,
           // Better Auth looks a user up by the lowercased email: one stored
           // with capitals could never sign in (BUG-22).
           email: data.email.trim().toLowerCase(),
-          passwordHash: data.password, // Dual-write passwordHash during Stage 3
+          isEmailVerified: true,
+          accounts: {
+            create: {
+              accountId: id,
+              providerId: "credential",
+              password,
+            },
+          },
           profile: {
             create: {},
           },
@@ -537,7 +559,12 @@ export default class UsersRepo {
   }
 
   // UPDATE (fields optional)
-  // [MIGRATION-FLAG: Stage 3 Switch] Dual-write passwordHash if password is updated
+  /**
+   * `data.password` is the already-hashed password. It is written to the
+   * Better Auth credential account, the only place email sign-in reads it
+   * (api#368), and nowhere on the `users` row. A user with no credential
+   * account yet (a Google-only one) gets one, so the password works.
+   */
   static async updateUser(
     id: string,
     data: Partial<{
@@ -549,6 +576,14 @@ export default class UsersRepo {
       isActive: boolean;
     }>,
   ) {
+    const credential =
+      data.password !== undefined
+        ? await prisma.account.findFirst({
+            where: { userId: String(id), providerId: "credential" },
+            select: { id: true },
+          })
+        : null;
+
     const updateData: Prisma.UserUpdateInput = {
       ...(data.email !== undefined && {
         email: data.email.trim().toLowerCase(),
@@ -558,8 +593,20 @@ export default class UsersRepo {
       ...(data.systemRole !== undefined && { systemRole: data.systemRole }),
       ...(data.isActive !== undefined && { isActive: data.isActive }),
       ...(data.password !== undefined && {
-        password: data.password,
-        passwordHash: data.password,
+        accounts: credential
+          ? {
+              update: {
+                where: { id: credential.id },
+                data: { password: data.password },
+              },
+            }
+          : {
+              create: {
+                accountId: String(id),
+                providerId: "credential",
+                password: data.password,
+              },
+            },
       }),
     };
 
