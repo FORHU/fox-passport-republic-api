@@ -1,7 +1,8 @@
-import { AppError, notFound } from "../../utils/errors";
+import { AppError, badRequest, conflict, notFound } from "../../utils/errors";
 import {
   EventCategory,
   MatchConstraint,
+  MatchDeclineReason,
   MatchRequestStatus,
   Prisma,
 } from "@prisma/client";
@@ -821,12 +822,45 @@ export default class EventTemplateSvc {
     // Conditional Validation Rule
     this.validateMatchData(true, params.description, params.matchedAt);
 
+    // A new Provider, or a fresh ask after a decline, is a new invite: it
+    // starts pending with no answer (api#447). Editing the details of an
+    // invite the same Provider is still answering, or accepted, keeps it.
+    const current =
+      params.type === "venue"
+        ? await prisma.eventTemplateVenue
+            .findUnique({ where: { id: params.itemId } })
+            .then(
+              (r) => r && { holder: r.venueId, status: r.matchRequestStatus },
+            )
+        : params.type === "service"
+          ? await prisma.eventTemplateService
+              .findUnique({ where: { id: params.itemId } })
+              .then(
+                (r) =>
+                  r && { holder: r.serviceId, status: r.matchRequestStatus },
+              )
+          : await prisma.eventTemplateAsset
+              .findUnique({ where: { id: params.itemId } })
+              .then(
+                (r) => r && { holder: r.assetId, status: r.matchRequestStatus },
+              );
+    const freshInvite =
+      !current ||
+      current.holder !== params.providerId ||
+      current.status === MatchRequestStatus.declined;
+
     const matchData = {
       matched: true,
       matchConstraint: constraint,
       description: params.description,
       matchedAt: params.matchedAt,
       date: params.date,
+      ...(freshInvite && {
+        matchRequestStatus: MatchRequestStatus.pending,
+        declineReason: null,
+        declineNote: null,
+        respondedAt: null,
+      }),
     };
 
     if (params.type === "venue")
@@ -884,6 +918,11 @@ export default class EventTemplateSvc {
           select: {
             id: true,
             matchRequestStatus: true,
+            agreedPrice: true,
+            currency: true,
+            declineReason: true,
+            declineNote: true,
+            respondedAt: true,
             matchedAt: true,
             description: true,
             date: true,
@@ -901,6 +940,11 @@ export default class EventTemplateSvc {
           select: {
             id: true,
             matchRequestStatus: true,
+            agreedPrice: true,
+            currency: true,
+            declineReason: true,
+            declineNote: true,
+            respondedAt: true,
             matchedAt: true,
             description: true,
             date: true,
@@ -918,6 +962,11 @@ export default class EventTemplateSvc {
           select: {
             id: true,
             matchRequestStatus: true,
+            agreedPrice: true,
+            currency: true,
+            declineReason: true,
+            declineNote: true,
+            respondedAt: true,
             matchedAt: true,
             description: true,
             date: true,
@@ -978,6 +1027,11 @@ export default class EventTemplateSvc {
         select: {
           id: true,
           matchRequestStatus: true,
+          agreedPrice: true,
+          currency: true,
+          declineReason: true,
+          declineNote: true,
+          respondedAt: true,
           matchedAt: true,
           description: true,
           date: true,
@@ -999,6 +1053,11 @@ export default class EventTemplateSvc {
         select: {
           id: true,
           matchRequestStatus: true,
+          agreedPrice: true,
+          currency: true,
+          declineReason: true,
+          declineNote: true,
+          respondedAt: true,
           matchedAt: true,
           description: true,
           date: true,
@@ -1020,6 +1079,11 @@ export default class EventTemplateSvc {
         select: {
           id: true,
           matchRequestStatus: true,
+          agreedPrice: true,
+          currency: true,
+          declineReason: true,
+          declineNote: true,
+          respondedAt: true,
           matchedAt: true,
           description: true,
           date: true,
@@ -1053,12 +1117,18 @@ export default class EventTemplateSvc {
     );
   }
 
-  // Provider accepts or declines a match request.
+  /**
+   * A Provider accepts or declines a package invite (a matched template
+   * line). A decline names a reason the Event Foxer sees; `other` needs a
+   * note (api#447). An invite is answered once: only a pending one can be.
+   */
   static async respondToMatch(params: {
     matchId: string;
     type: "asset" | "service" | "venue";
     responderId: string;
     status: MatchRequestStatus;
+    reason?: MatchDeclineReason;
+    note?: string;
   }) {
     if (
       params.status !== MatchRequestStatus.accepted &&
@@ -1066,44 +1136,68 @@ export default class EventTemplateSvc {
     ) {
       throw new AppError("status must be 'accepted' or 'declined'", 400);
     }
+    const declining = params.status === MatchRequestStatus.declined;
+    const note = params.note?.trim() || null;
+    if (declining && !params.reason) {
+      throw badRequest("Choose why you're declining");
+    }
+    if (declining && params.reason === MatchDeclineReason.other && !note) {
+      throw badRequest("Add a note when the reason is Other");
+    }
 
-    if (params.type === "asset") {
-      const row = await prisma.eventTemplateAsset.findUnique({
-        where: { id: params.matchId },
-        include: { asset: true },
-      });
-      if (!row || row.asset?.ownerId !== params.responderId)
-        throw new AppError("Not found or unauthorized", 404);
-      return prisma.eventTemplateAsset.update({
-        where: { id: params.matchId },
-        data: { matchRequestStatus: params.status },
-      });
+    const found =
+      params.type === "asset"
+        ? await prisma.eventTemplateAsset
+            .findUnique({
+              where: { id: params.matchId },
+              include: { asset: { select: { ownerId: true } } },
+            })
+            .then((r) => r && { ...r, ownerId: r.asset?.ownerId })
+        : params.type === "service"
+          ? await prisma.eventTemplateService
+              .findUnique({
+                where: { id: params.matchId },
+                include: { service: { select: { ownerId: true } } },
+              })
+              .then((r) => r && { ...r, ownerId: r.service?.ownerId })
+          : params.type === "venue"
+            ? await prisma.eventTemplateVenue
+                .findUnique({
+                  where: { id: params.matchId },
+                  include: { venue: { select: { mayorId: true } } },
+                })
+                .then((r) => r && { ...r, ownerId: r.venue?.mayorId })
+            : undefined;
+    if (found === undefined) throw new AppError("Invalid type", 400);
+    if (!found || !found.matched || found.ownerId !== params.responderId) {
+      throw new AppError("Not found or unauthorized", 404);
     }
-    if (params.type === "service") {
-      const row = await prisma.eventTemplateService.findUnique({
-        where: { id: params.matchId },
-        include: { service: true },
-      });
-      if (!row || row.service?.ownerId !== params.responderId)
-        throw new AppError("Not found or unauthorized", 404);
-      return prisma.eventTemplateService.update({
-        where: { id: params.matchId },
-        data: { matchRequestStatus: params.status },
-      });
+    if (found.matchRequestStatus !== MatchRequestStatus.pending) {
+      throw conflict("You've already answered this invite");
     }
-    if (params.type === "venue") {
-      const row = await prisma.eventTemplateVenue.findUnique({
-        where: { id: params.matchId },
-        include: { venue: true },
-      });
-      if (!row || row.venue?.mayorId !== params.responderId)
-        throw new AppError("Not found or unauthorized", 404);
-      return prisma.eventTemplateVenue.update({
-        where: { id: params.matchId },
-        data: { matchRequestStatus: params.status },
-      });
-    }
-    throw new AppError("Invalid type", 400);
+
+    const data = {
+      matchRequestStatus: params.status,
+      respondedAt: new Date(),
+      declineReason: declining ? params.reason : null,
+      declineNote: declining ? note : null,
+    };
+    // Only a still-pending row changes, so two answers at once can't both win.
+    const where = {
+      id: params.matchId,
+      matchRequestStatus: MatchRequestStatus.pending,
+    };
+    const { count } =
+      params.type === "asset"
+        ? await prisma.eventTemplateAsset.updateMany({ where, data })
+        : params.type === "service"
+          ? await prisma.eventTemplateService.updateMany({ where, data })
+          : await prisma.eventTemplateVenue.updateMany({ where, data });
+    if (count === 0) throw conflict("You've already answered this invite");
+
+    // Both the Provider's and the Event Foxer's lists are cached.
+    await eventTemplateCache.invalidateAll();
+    return { id: params.matchId, type: params.type, ...data };
   }
 
   /**

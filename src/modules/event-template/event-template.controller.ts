@@ -4,7 +4,7 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import { totalPages } from "../../utils/pagination";
 import EventTemplateSvc from "./event-template.service";
-import { EventCategory, Prisma } from "@prisma/client";
+import { EventCategory, MatchDeclineReason, Prisma } from "@prisma/client";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
 import {
   EVENT_DESCRIPTION_MAX,
@@ -571,6 +571,11 @@ export default class EventTemplateCtrl {
     const schema = Joi.object({
       type: Joi.string().valid("asset", "service", "venue").required(),
       status: Joi.string().valid("accepted", "declined").required(),
+      // A decline names why (api#447); the service checks it is given.
+      reason: Joi.string()
+        .valid(...Object.values(MatchDeclineReason))
+        .optional(),
+      note: Joi.string().trim().max(300).allow("").optional(),
     });
     const { error, value } = schema.validate(req.body);
     if (error) return res.status(400).json({ message: error.message });
