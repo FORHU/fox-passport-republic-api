@@ -12,6 +12,8 @@ const prisma = vi.hoisted(() => ({
     findMany: vi.fn(),
     create: vi.fn(async () => ({})),
     delete: vi.fn(),
+    upsert: vi.fn(),
+    deleteMany: vi.fn(),
   },
   user: { findUnique: vi.fn(), findMany: vi.fn(async () => []) },
   venue: { findMany: vi.fn(async () => []) },
@@ -27,27 +29,68 @@ const { default: FavoriteSvc } =
 beforeEach(() => vi.clearAllMocks());
 
 describe("FavoriteSvc.addFavorite", () => {
-  it("creates the favourite the first time", async () => {
-    prisma.user.findUnique.mockResolvedValue({ id: "fox-1" });
-    prisma.favorite.findFirst.mockResolvedValue(null);
-
-    await expect(
-      FavoriteSvc.addFavorite("u-1", "fox-1", "foxer"),
-    ).resolves.toEqual({ added: true });
-    expect(prisma.favorite.create).toHaveBeenCalledWith({
-      data: { userId: "u-1", entityId: "fox-1", entityType: "foxer" },
-    });
+  const createdAt = new Date("2026-11-24T00:00:00Z");
+  const row = (entityId: string, entityType: string) => ({
+    id: "fav-1",
+    userId: "u-1",
+    entityId,
+    entityType,
+    createdAt,
   });
 
-  it("keeps the one favourite when added again", async () => {
+  // api#455: an upsert on the (user, type, item) key, so a double click or two
+  // devices saving at once leave one row; the unique index backs it.
+  it("upserts the favourite on its (user, type, item) key", async () => {
     prisma.user.findUnique.mockResolvedValue({ id: "fox-1" });
-    prisma.favorite.findFirst.mockResolvedValue({ id: "fav-1" });
+    prisma.favorite.upsert.mockResolvedValue(row("fox-1", "foxer"));
 
-    await expect(
-      FavoriteSvc.addFavorite("u-1", "fox-1", "foxer"),
-    ).resolves.toEqual({ added: true });
+    await FavoriteSvc.addFavorite("u-1", "fox-1", "foxer");
+
+    const key = { userId: "u-1", entityId: "fox-1", entityType: "foxer" };
+    expect(prisma.favorite.upsert).toHaveBeenCalledWith({
+      where: { userId_entityType_entityId: key },
+      create: key,
+      update: {},
+    });
     expect(prisma.favorite.create).not.toHaveBeenCalled();
     expect(prisma.favorite.delete).not.toHaveBeenCalled();
+  });
+
+  // app#415: the saved card can be shown at once, name and image included.
+  it("returns the saved favourite with its card data", async () => {
+    prisma.favorite.upsert.mockResolvedValue(row("v-1", "venue"));
+    prisma.venue.findMany.mockResolvedValue([
+      {
+        id: "v-1",
+        name: "Rooftop",
+        city: "Makati",
+        state: "Metro Manila",
+        price: 500,
+        billingRate: "hourly",
+        images: [{ imageUrl: "https://cdn/rooftop.jpg" }],
+      },
+    ] as never);
+
+    await expect(
+      FavoriteSvc.addFavorite("u-1", "v-1", "venue"),
+    ).resolves.toEqual({
+      added: true,
+      favorite: {
+        id: "fav-1",
+        targetId: "v-1",
+        type: "venue",
+        createdAt,
+        venue: {
+          id: "v-1",
+          name: "Rooftop",
+          city: "Makati",
+          state: "Metro Manila",
+          price: 500,
+          billingRate: "hourly",
+          images: [{ imageUrl: "https://cdn/rooftop.jpg" }],
+        },
+      },
+    });
   });
 
   it("refuses a Foxer id that is no user", async () => {
@@ -56,22 +99,44 @@ describe("FavoriteSvc.addFavorite", () => {
     await expect(
       FavoriteSvc.addFavorite("u-1", "nobody", "foxer"),
     ).rejects.toThrow("Foxer not found");
-    expect(prisma.favorite.create).not.toHaveBeenCalled();
+    expect(prisma.favorite.upsert).not.toHaveBeenCalled();
   });
 
   it("refuses saving yourself as a Foxer", async () => {
     await expect(
       FavoriteSvc.addFavorite("u-1", "u-1", "foxer"),
     ).rejects.toThrow("You can't save yourself");
-    expect(prisma.favorite.create).not.toHaveBeenCalled();
+    expect(prisma.favorite.upsert).not.toHaveBeenCalled();
   });
 
   it("doesn't look up a user for a venue", async () => {
-    prisma.favorite.findFirst.mockResolvedValue(null);
+    prisma.favorite.upsert.mockResolvedValue(row("v-1", "venue"));
 
     await FavoriteSvc.addFavorite("u-1", "v-1", "venue");
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
-    expect(prisma.favorite.create).toHaveBeenCalled();
+    expect(prisma.favorite.upsert).toHaveBeenCalled();
+  });
+});
+
+describe("FavoriteSvc.removeFavorite", () => {
+  // It used to delete any id, so one user could remove another's favourite.
+  it("deletes only the caller's own favourite", async () => {
+    prisma.favorite.deleteMany.mockResolvedValue({ count: 1 });
+
+    await FavoriteSvc.removeFavorite("fav-1", "u-1");
+
+    expect(prisma.favorite.deleteMany).toHaveBeenCalledWith({
+      where: { id: "fav-1", userId: "u-1" },
+    });
+    expect(prisma.favorite.delete).not.toHaveBeenCalled();
+  });
+
+  it("answers not found for someone else's id", async () => {
+    prisma.favorite.deleteMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      FavoriteSvc.removeFavorite("fav-of-another", "u-1"),
+    ).rejects.toMatchObject({ status: 404 });
   });
 });
 

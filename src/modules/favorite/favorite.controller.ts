@@ -1,4 +1,4 @@
-import { sendServerError } from "../../utils/errors";
+import { sendFailure, sendServerError } from "../../utils/errors";
 import { Request, Response } from "express";
 import FavoriteSvc from "./favorite.service";
 import {
@@ -84,13 +84,12 @@ export default class FavoriteCtrl {
   static async removeFavorite(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      await FavoriteSvc.removeFavorite(id);
+      await FavoriteSvc.removeFavorite(id, req.user!.userId);
       return res
         .status(200)
         .json({ success: true, message: "Favorite removed successfully" });
     } catch (e: unknown) {
-      const error = e as Error;
-      return res.status(400).json({ success: false, message: error.message });
+      return sendFailure(res, e, 400, { success: true });
     }
   }
 
