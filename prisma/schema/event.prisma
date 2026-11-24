@@ -54,6 +54,10 @@ model EventTemplateAsset {
   matchedAt          DateTime?
   matchConstraint    MatchConstraint    @default(NONE)
   matchRequestStatus MatchRequestStatus @default(pending)
+  // Why the Provider declined the invite (api#447); null until declined.
+  declineReason      MatchDeclineReason?
+  declineNote        String?
+  respondedAt        DateTime?
   asset              Asset?             @relation(fields: [assetId], references: [id])
   template           EventTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
   eventAssetBids     EventAssetBid[]
@@ -76,6 +80,10 @@ model EventTemplateService {
   matchedAt          DateTime?
   matchConstraint    MatchConstraint    @default(NONE)
   matchRequestStatus MatchRequestStatus @default(pending)
+  // Why the Provider declined the invite (api#447); null until declined.
+  declineReason      MatchDeclineReason?
+  declineNote        String?
+  respondedAt        DateTime?
   service            Service?           @relation(fields: [serviceId], references: [id])
   template           EventTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
   eventServiceBids   EventServiceBid[]
@@ -98,6 +106,10 @@ model EventTemplateVenue {
   matchedAt          DateTime?
   matchConstraint    MatchConstraint    @default(NONE)
   matchRequestStatus MatchRequestStatus @default(pending)
+  // Why the Provider declined the invite (api#447); null until declined.
+  declineReason      MatchDeclineReason?
+  declineNote        String?
+  respondedAt        DateTime?
   template           EventTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
   venue              Venue?             @relation(fields: [venueId], references: [id])
 
@@ -286,6 +298,16 @@ model EventVenueTransaction {
   venue                Venue             @relation(fields: [venueId], references: [id])
 
   @@map("event_venue_transactions")
+}
+
+/// Why a Provider declined a package invite (api#447). `other` needs a note.
+enum MatchDeclineReason {
+  unavailable_on_date
+  price_too_low
+  not_my_kind_of_event
+  too_far
+  no_capacity
+  other
 }
 
 enum MatchRequestStatus {
