@@ -61,7 +61,12 @@ export default class EventRequestSvc {
     tx: AppTransactionClient = prisma,
   ) {
     // 1. Fetch Template
-    const template = await EventTemplateRepo.findTemplateById(data.templateId);
+    // Through `tx`: the match flow creates the template in this same
+    // transaction, invisible to the bare client until it commits (api#465).
+    const template = await EventTemplateRepo.findTemplateById(
+      data.templateId,
+      tx,
+    );
     if (!template) throw notFound("Event template");
 
     // Priced by the server from the template's Foxers (#264 T9.1), never
