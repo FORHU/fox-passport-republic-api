@@ -50,7 +50,9 @@ const REPORT_ONLY = process.argv.includes("--report");
 // 179: GET /milestones/me (RR-6), a read of the caller's own progress scoped by
 // the session user id, like achievements/me and rewards/me. Approved by the
 // task owner on 2026-11-12.
-const MAX_UNGUARDED_ROUTES = 179;
+// 173: routes guarded by `requirePermissionAny` are now counted as guarded
+// (api#460, 2026-11-24); they were miscounted before.
+const MAX_UNGUARDED_ROUTES = 173;
 
 /**
  * Routes that are `authenticate`d but deliberately have no `requirePermission`
@@ -299,7 +301,9 @@ function scanFile(file) {
     }
     const isAuthed = fileWideAuth || /\bauthenticate\b/.test(call.args);
     if (!isAuthed) continue;
-    if (/\brequirePermission\s*\(/.test(call.args)) continue;
+    // `requirePermissionAny([...])` is the same capability check for "any of
+    // these" (api#460); it used to be missed and counted as unguarded.
+    if (/\brequirePermission(Any)?\s*\(/.test(call.args)) continue;
 
     const routePath = firstStringLiteral(call.args) ?? "(dynamic path)";
     const key = `${path.basename(file)} ${call.verb.toUpperCase()} ${routePath}`;
