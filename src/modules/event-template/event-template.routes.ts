@@ -60,6 +60,13 @@ router.post(
   requirePermission("template:manage"),
   EventTemplateCtrl.attachAsset,
 );
+// Make a line optional or required, keeping it and its answer (api#459).
+router.patch(
+  "/:id/assets/:itemId",
+  authenticate,
+  requirePermission("template:manage"),
+  EventTemplateCtrl.setLineOptional("asset"),
+);
 router.delete(
   "/:id/assets/:assetId",
   authenticate,
@@ -74,6 +81,12 @@ router.post(
   requirePermission("template:manage"),
   EventTemplateCtrl.attachService,
 );
+router.patch(
+  "/:id/services/:itemId",
+  authenticate,
+  requirePermission("template:manage"),
+  EventTemplateCtrl.setLineOptional("service"),
+);
 router.delete(
   "/:id/services/:serviceId",
   authenticate,
@@ -87,6 +100,12 @@ router.post(
   authenticate,
   requirePermission("template:manage"),
   EventTemplateCtrl.attachVenue,
+);
+router.patch(
+  "/:id/venues/:itemId",
+  authenticate,
+  requirePermission("template:manage"),
+  EventTemplateCtrl.setLineOptional("venue"),
 );
 router.delete(
   "/:id/venues/:venueId",

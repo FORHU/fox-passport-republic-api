@@ -485,6 +485,38 @@ export default class EventTemplateRepo {
     });
   }
 
+  /** Sets one line's optional flag; the line and its answer stay (api#459). */
+  static async setLineOptional(
+    kind: "asset" | "service" | "venue",
+    templateId: string,
+    listingId: string,
+    isOptional: boolean,
+  ) {
+    const data = { isOptional };
+    if (kind === "asset") {
+      return this.retiring(
+        prisma.eventTemplateAsset.updateMany({
+          where: { templateId, assetId: listingId },
+          data,
+        }),
+      );
+    }
+    if (kind === "service") {
+      return this.retiring(
+        prisma.eventTemplateService.updateMany({
+          where: { templateId, serviceId: listingId },
+          data,
+        }),
+      );
+    }
+    return this.retiring(
+      prisma.eventTemplateVenue.updateMany({
+        where: { templateId, venueId: listingId },
+        data,
+      }),
+    );
+  }
+
   static async removeAsset(templateId: string, assetId: string) {
     return this.retiring(
       prisma.eventTemplateAsset.deleteMany({

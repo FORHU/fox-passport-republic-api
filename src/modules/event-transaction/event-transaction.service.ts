@@ -14,6 +14,7 @@ import {
   TransactionKind,
   TransactionAction,
 } from "../transaction-status/transaction-status.types";
+import { hasAgreed } from "../event-template/template-partners";
 
 export default class EventTransactionSvc {
   static async getProviderDashboard(providerId: string) {
@@ -162,7 +163,7 @@ export default class EventTransactionSvc {
               agreedPrice: item.venue.price,
               ...snapshots.get(item.id),
               currency: item.currency,
-              status: item.matched
+              status: hasAgreed(item)
                 ? TransactionStatus.approved
                 : TransactionStatus.pending,
             },

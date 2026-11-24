@@ -276,6 +276,37 @@ export default class EventTemplateCtrl {
     }
   }
 
+  /**
+   * Makes a package line optional or required (api#459), keeping the line
+   * and its Supplier's answer. `kind` comes from the route.
+   */
+  static setLineOptional(kind: "asset" | "service" | "venue") {
+    return async (req: Request, res: Response) => {
+      const { error, value } = Joi.object({
+        isOptional: Joi.boolean().required(),
+      }).validate(req.body);
+      if (error) return res.status(400).json({ message: error.message });
+      try {
+        const ownerId = req.user?.userId;
+        if (!ownerId) return res.status(401).json({ message: "Unauthorized" });
+        const result = await EventTemplateSvc.setLineOptional(
+          req.params.id,
+          ownerId,
+          kind,
+          req.params.itemId,
+          value.isOptional,
+        );
+        return res.status(200).json({ success: true, data: result });
+      } catch (e: unknown) {
+        if (e instanceof AppError) return sendAppError(res, e);
+        const err = e as Error;
+        return res
+          .status(err.message.includes("Unauthorized") ? 403 : 400)
+          .json({ message: err.message });
+      }
+    };
+  }
+
   static async removeAsset(req: Request, res: Response) {
     try {
       const ownerId = req.user?.userId;
