@@ -221,6 +221,23 @@ export default class RoleAssignmentSvc {
       );
     }
 
+    // Event Coordinator (`organizer`) is a Provider who runs an event when its
+    // Event Foxer is absent, granted only by approving that application (its
+    // background clearance is the point). An admin can't hand it out here
+    // (api#463); someone who already holds it keeps it, and it can be removed.
+    const added = unique.filter((r) => !previous.includes(r as RoleType));
+    if (added.includes(RoleType.organizer)) {
+      await refuse(
+        actor,
+        action,
+        target.id,
+        target.email,
+        "not_admin_assignable",
+        "Event Coordinator can't be assigned here. It comes from an approved Event Coordinator application.",
+        { previous, attempted: unique },
+      );
+    }
+
     const updated = await prisma.user.update({
       where: { id: target.id },
       data: { roleType: unique as RoleType[] },
