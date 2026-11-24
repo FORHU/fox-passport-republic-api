@@ -28,14 +28,27 @@ export default class MatchSvc {
     let venue: Awaited<ReturnType<typeof prisma.venue.findUnique>> = null;
     let existingTemplateId: string | null = null;
 
+    // An id that is no user would otherwise fail as a foreign-key error
+    // halfway through the transaction below.
+    const foxer = await prisma.user.findUnique({
+      where: { id: data.foxerId },
+      select: { id: true },
+    });
+    if (!foxer) throw notFound("Foxer");
+
     if (data.venueId) {
       venue = await prisma.venue.findUnique({ where: { id: data.venueId } });
       if (!venue) throw notFound("Venue");
     } else {
+      // The package the client picked: the match page sends its name as
+      // `style`. Any of the Foxer's own packages qualifies, seeded or built
+      // in the app (api#465); it used to take the first one whatever was
+      // picked.
       const { templates: foxerTemplates } =
         await EventTemplateRepo.findAllTemplates({ ownerId: data.foxerId });
-      existingTemplateId =
-        foxerTemplates.length > 0 ? foxerTemplates[0].id : null;
+      const picked =
+        foxerTemplates.find((t) => t.name === data.style) ?? foxerTemplates[0];
+      existingTemplateId = picked?.id ?? null;
     }
 
     // Template creation/venue-attach, event-request creation, booking

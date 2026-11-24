@@ -355,8 +355,10 @@ export default class EventTemplateRepo {
     };
   }
 
-  static async findTemplateById(id: string) {
-    return prisma.eventTemplate.findUnique({
+  // `tx`: inside a transaction that created this template, only that
+  // transaction's client can see it (the match flow, api#465).
+  static async findTemplateById(id: string, tx: AppTransactionClient = prisma) {
+    return tx.eventTemplate.findUnique({
       where: { id },
       include: {
         owner: {
