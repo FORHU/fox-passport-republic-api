@@ -57,6 +57,7 @@ import {
   announceToAdmins,
   announceToUser,
 } from "../../infrastructure/socket/invalidate";
+import { hasAgreed } from "../event-template/template-partners";
 
 /*
  * Every cached booking read hangs off one version counter, and every write
@@ -1562,7 +1563,7 @@ export default class BookingSvc {
     const confirmationDeadline = new Date(
       Date.now() + this.CONFIRMATION_DEADLINE_HOURS * 60 * 60 * 1000,
     );
-    const askFirst = (matched: boolean) => AUTO_BOOK_MATCHED_ONLY && !matched;
+    const askFirst = (agreed: boolean) => AUTO_BOOK_MATCHED_ONLY && !agreed;
     const awaiting = {
       status: "pending_provider_confirmation" as const,
       confirmationDeadline,
@@ -1582,7 +1583,9 @@ export default class BookingSvc {
           // row has no line and keeps its old price; it is never paid.
           ...snapshotFor(ta.id, ta.agreedPrice),
           included: !excludedAssetIds.includes(ta.id),
-          ...(askFirst(ta.matched) ? awaiting : { status: "pending" as const }),
+          ...(askFirst(hasAgreed(ta))
+            ? awaiting
+            : { status: "pending" as const }),
         })),
       services: template.templateServices
         .filter((ts) => ts.serviceId && ts.service?.ownerId)
@@ -1593,7 +1596,9 @@ export default class BookingSvc {
           providerId: ts.service!.ownerId,
           ...snapshotFor(ts.id, ts.agreedPrice),
           included: !excludedServiceIds.includes(ts.id),
-          ...(askFirst(ts.matched) ? awaiting : { status: "pending" as const }),
+          ...(askFirst(hasAgreed(ts))
+            ? awaiting
+            : { status: "pending" as const }),
         })),
       venues: template.templateVenues
         .filter((tv) => tv.venueId && tv.venue?.mayorId)
@@ -1604,10 +1609,10 @@ export default class BookingSvc {
           providerId: tv.venue!.mayorId,
           ...snapshotFor(tv.id, tv.agreedPrice),
           included: !excludedVenueIds.includes(tv.id),
-          ...(askFirst(tv.matched)
+          ...(askFirst(hasAgreed(tv))
             ? awaiting
             : {
-                status: tv.matched
+                status: hasAgreed(tv)
                   ? ("approved" as const)
                   : ("pending" as const),
               }),
@@ -1653,7 +1658,7 @@ export default class BookingSvc {
             ta.assetId &&
             ta.asset?.ownerId &&
             !excludedAssetIds.includes(ta.id) &&
-            askFirst(ta.matched),
+            askFirst(hasAgreed(ta)),
         )
         .map((ta) => ({ to: ta.asset!.ownerId, item: ta.asset!.name })),
       ...template.templateServices
@@ -1662,7 +1667,7 @@ export default class BookingSvc {
             ts.serviceId &&
             ts.service?.ownerId &&
             !excludedServiceIds.includes(ts.id) &&
-            askFirst(ts.matched),
+            askFirst(hasAgreed(ts)),
         )
         .map((ts) => ({ to: ts.service!.ownerId, item: ts.service!.name })),
       ...template.templateVenues
@@ -1671,7 +1676,7 @@ export default class BookingSvc {
             tv.venueId &&
             tv.venue?.mayorId &&
             !excludedVenueIds.includes(tv.id) &&
-            askFirst(tv.matched),
+            askFirst(hasAgreed(tv)),
         )
         .map((tv) => ({ to: tv.venue!.mayorId, item: tv.venue!.name })),
     ];

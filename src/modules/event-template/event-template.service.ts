@@ -1,10 +1,12 @@
 import { AppError, badRequest, conflict, notFound } from "../../utils/errors";
+import { acceptedMatchListings, type LineKind } from "./template-partners";
 import {
   EventCategory,
   MatchConstraint,
   MatchDeclineReason,
   MatchRequestStatus,
   Prisma,
+  VenueStatus,
 } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import EventTemplateRepo from "./event-template.repository";
@@ -488,14 +490,72 @@ export default class EventTemplateSvc {
       templateId,
       assetId,
       quantity,
-      matchedAt
-        ? { matched: true, matchConstraint: MatchConstraint.SAME_STATE }
-        : undefined,
+      await this.newLineRequest(
+        "asset",
+        ownerId,
+        assetId,
+        asset.ownerId,
+        matchedAt,
+      ),
       description,
       matchedAt,
       finalAgreedPrice,
       isOptional,
     );
+  }
+
+  /**
+   * How a line starts when the Event Foxer adds a listing to a package
+   * (api#459): as a request to its Supplier, which they accept or decline
+   * (#447). Venues and Providers alike. It starts accepted when the listing
+   * is the Event Foxer's own, or a partner's: a venue they hold an approved
+   * affiliation with (`partner`), or a listing that accepted one of their
+   * requests before. `matchedAt` (the match-search flow) also pins the line
+   * to the package's state, as before.
+   */
+  private static async newLineRequest(
+    kind: LineKind,
+    hostId: string,
+    listingId: string,
+    supplierId: string | null | undefined,
+    matchedAt?: Date,
+    partner = false,
+  ) {
+    const agreed =
+      supplierId === hostId ||
+      partner ||
+      (await acceptedMatchListings(hostId, kind, [listingId])).has(listingId);
+    return {
+      matched: true,
+      matchRequestStatus: agreed
+        ? MatchRequestStatus.accepted
+        : MatchRequestStatus.pending,
+      respondedAt: agreed ? new Date() : null,
+      ...(matchedAt && { matchConstraint: MatchConstraint.SAME_STATE }),
+    };
+  }
+
+  /**
+   * Makes a line optional or required (api#459). The line, and its
+   * Supplier's answer, stay: nothing they agreed to changes, since the price
+   * is always their listing's own (#264 C6).
+   */
+  static async setLineOptional(
+    templateId: string,
+    ownerId: string,
+    kind: LineKind,
+    listingId: string,
+    isOptional: boolean,
+  ) {
+    await this.verifyOwnership(templateId, ownerId);
+    const { count } = await EventTemplateRepo.setLineOptional(
+      kind,
+      templateId,
+      listingId,
+      isOptional,
+    );
+    if (count === 0) throw notFound("Package item");
+    return { templateId, kind, listingId, isOptional };
   }
 
   static async removeAsset(
@@ -562,9 +622,13 @@ export default class EventTemplateSvc {
     return EventTemplateRepo.attachService(
       templateId,
       serviceId,
-      matchedAt
-        ? { matched: true, matchConstraint: MatchConstraint.SAME_STATE }
-        : undefined,
+      await this.newLineRequest(
+        "service",
+        ownerId,
+        serviceId,
+        service.ownerId,
+        matchedAt,
+      ),
       description,
       matchedAt,
       finalAgreedPrice,
@@ -620,12 +684,15 @@ export default class EventTemplateSvc {
     const venue = await prisma.venue.findUnique({ where: { id: venueId } });
     if (!venue) throw notFound("Venue");
 
-    // A venue may only be attached by its own mayor, or by an Event Foxer
-    // holding an approved VenueEventFoxerAffiliation with "template:attach"
-    // for this venue — the Studio's "Apply to host here" gate is UX only;
-    // this is the check that actually enforces it.
+    // Any live venue can be added, as any Provider can (api#459): its Mayor
+    // gets a request and accepts or declines. An approved affiliation with
+    // "template:attach" makes the Event Foxer a partner: the venue joins at
+    // once, at the affiliation's agreed price.
     let affiliation: { agreedPrice: Prisma.Decimal | null } | null = null;
     if (venue.mayorId !== ownerId) {
+      if (venue.status !== VenueStatus.available) {
+        throw new AppError("This venue isn't taking bookings", 400);
+      }
       const { default: VenueAffiliationSvc } =
         await import("../venue-affiliation/venue-affiliation.service");
       affiliation =
@@ -634,12 +701,6 @@ export default class EventTemplateSvc {
           ownerId,
           "template:attach",
         );
-      if (!affiliation) {
-        throw new AppError(
-          "Unauthorized: you need an approved affiliation with this venue's owner to attach it",
-          403,
-        );
-      }
     }
 
     if (
@@ -670,9 +731,14 @@ export default class EventTemplateSvc {
     return EventTemplateRepo.attachVenue(
       templateId,
       venueId,
-      matchedAt
-        ? { matched: true, matchConstraint: MatchConstraint.SAME_STATE }
-        : undefined,
+      await this.newLineRequest(
+        "venue",
+        ownerId,
+        venueId,
+        venue.mayorId,
+        matchedAt,
+        affiliation !== null,
+      ),
       description,
       matchedAt,
       finalAgreedPrice,

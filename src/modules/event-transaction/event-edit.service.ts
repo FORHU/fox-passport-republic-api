@@ -1,10 +1,5 @@
 import Stripe from "stripe";
-import {
-  MatchRequestStatus,
-  PaymentStatus,
-  Prisma,
-  RefundStatus,
-} from "@prisma/client";
+import { PaymentStatus, Prisma, RefundStatus } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents } from "../../utils/pricing";
@@ -20,6 +15,7 @@ import EventConflictSvc, {
   eventLink,
   type ConflictKind,
 } from "./event-conflict.service";
+import { acceptedMatchListings } from "../event-template/template-partners";
 
 /**
  * Replacing a Supplier on a booked event (ADR 0010). The Event Foxer proposes
@@ -73,8 +69,6 @@ export interface ReplacementCandidate {
    */
   partner: boolean;
 }
-
-const ACCEPTED_MATCH: MatchRequestStatus[] = ["accepted", "secured"];
 
 /** Partners first, then cheapest first. */
 const partnersFirst = (a: ReplacementCandidate, b: ReplacementCandidate) =>
@@ -367,39 +361,15 @@ export default class EventEditSvc {
 
   /**
    * Listings whose Supplier accepted this Event Foxer's match on one of their
-   * templates (`matchRequestStatus` accepted or secured). Those Suppliers
-   * already agreed to work with the host, so they count as partners.
+   * templates. Those Suppliers already agreed to work with the host, so they
+   * count as partners. Shared with adding a line to a package (api#459).
    */
-  private static async acceptedMatches(
+  private static acceptedMatches(
     hostId: string,
     kind: ConflictKind,
     itemIds: string[],
   ): Promise<Set<string>> {
-    if (itemIds.length === 0) return new Set();
-    const where = {
-      template: { ownerId: hostId },
-      matched: true,
-      matchRequestStatus: { in: ACCEPTED_MATCH },
-    };
-    if (kind === "asset") {
-      const rows = await prisma.eventTemplateAsset.findMany({
-        where: { ...where, assetId: { in: itemIds } },
-        select: { assetId: true },
-      });
-      return new Set(rows.map((r) => r.assetId!));
-    }
-    if (kind === "service") {
-      const rows = await prisma.eventTemplateService.findMany({
-        where: { ...where, serviceId: { in: itemIds } },
-        select: { serviceId: true },
-      });
-      return new Set(rows.map((r) => r.serviceId!));
-    }
-    const rows = await prisma.eventTemplateVenue.findMany({
-      where: { ...where, venueId: { in: itemIds } },
-      select: { venueId: true },
-    });
-    return new Set(rows.map((r) => r.venueId!));
+    return acceptedMatchListings(hostId, kind, itemIds);
   }
 
   /** Whether a listing could be reserved for the event, without reserving it. */
