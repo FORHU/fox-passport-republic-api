@@ -33,6 +33,7 @@ model EventTemplate {
   templateAssets       EventTemplateAsset[]
   templateServices     EventTemplateService[]
   templateVenues       EventTemplateVenue[]
+  applications         PackageApplication[]
   waitlist             Waitlist[]
 
   @@map("event_templates")
@@ -298,6 +299,46 @@ model EventVenueTransaction {
   venue                Venue             @relation(fields: [venueId], references: [id])
 
   @@map("event_venue_transactions")
+}
+
+/// A Mayor or Provider offering one of their listings for a spot in an open
+/// package (api#460). The Event Foxer accepts it (the listing joins as an
+/// accepted line) or declines it with a reason. One waiting application per
+/// listing and package.
+model PackageApplication {
+  id            String                   @id @default(uuid())
+  templateId    String
+  applicantId   String
+  kind          PackageLineKind
+  listingId     String
+  message       String?
+  status        PackageApplicationStatus @default(pending)
+  declineReason MatchDeclineReason?
+  declineNote   String?
+  respondedAt   DateTime?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  template  EventTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  applicant User          @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+
+  @@index([templateId, status])
+  @@index([applicantId])
+  @@map("package_applications")
+}
+
+/// What a package line holds.
+enum PackageLineKind {
+  asset
+  service
+  venue
+}
+
+enum PackageApplicationStatus {
+  pending
+  accepted
+  declined
+  withdrawn
 }
 
 /// Why a Provider declined a package invite (api#447). `other` needs a note.
