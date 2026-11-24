@@ -4,6 +4,7 @@ import { prisma } from "../../utils/prisma";
 import PaymentRepo from "../payment/payment.repository";
 import { STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents, formatCurrency } from "../../utils/pricing";
+import { bookingLink, invoiceRefundLink } from "../../utils/notification-links";
 import { sendRefundUpdateEmail } from "../../utils/emails/refund";
 import NotificationService from "../notifications/user-notification.service";
 import EventConflictSvc from "../event-transaction/event-conflict.service";
@@ -412,7 +413,7 @@ export default class RefundSvc {
         userId: existing.booking.user.id,
         email: existing.booking.user.email,
         label: existing.booking.event?.name ?? "your booking",
-        link: `/bookings/${existing.bookingId}`,
+        link: bookingLink(existing.booking.id),
       };
     }
     if (existing.assetBooking?.user) {
@@ -436,7 +437,7 @@ export default class RefundSvc {
         userId: existing.invoiceItem.invoice.payer.id,
         email: existing.invoiceItem.invoice.payer.email,
         label: "your payment",
-        link: `/invoices/${existing.invoiceItem.invoiceId}`,
+        link: invoiceRefundLink(existing.invoiceItem),
       };
     }
     return null;

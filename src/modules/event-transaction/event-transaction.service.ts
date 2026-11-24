@@ -5,6 +5,7 @@ import PricingSvc from "../pricing/pricing.service";
 import { commissionPctOf, lineSnapshot } from "../pricing/event-breakdown";
 import { TransactionStatus } from "@prisma/client";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
+import { bookingLink } from "../../utils/notification-links";
 import AvailabilitySvc from "../availability/availability.service";
 import TransactionStatusSvc from "../transaction-status/transaction-status.service";
 import NotificationSvc from "../notifications/user-notification.service";
@@ -276,7 +277,7 @@ export default class EventTransactionSvc {
         message: `${itemName} for ${event.name} was declined by its Supplier. The event host has been asked to replace it.`,
         metadata: {
           ...metadata,
-          ...(row.bookingId ? { link: `/bookings/${row.bookingId}` } : {}),
+          ...(row.bookingId ? { link: bookingLink(row.bookingId) } : {}),
         },
       });
     }

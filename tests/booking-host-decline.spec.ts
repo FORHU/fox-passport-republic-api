@@ -130,7 +130,7 @@ describe("BookingHostDeclineSvc.decline", () => {
     const citizen = sent.find((n) => n.userId === "citizen1");
     expect(citizen.message).toContain("busy with another event");
     expect(citizen.message).toContain("Nothing was charged");
-    expect(citizen.metadata.link).toBe("/bookings/b1");
+    expect(citizen.metadata.link).toBe("/booking/b1");
     expect(sent.filter((n) => n.userId === "prov1")).toHaveLength(1);
     expect(sent.some((n) => n.userId === "mayor1")).toBe(true);
     expect(sent.some((n) => n.userId === "host1")).toBe(false);

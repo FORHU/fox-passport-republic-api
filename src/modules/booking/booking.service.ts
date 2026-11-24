@@ -27,6 +27,7 @@ import {
   STRIPE_SECRET_KEY,
 } from "../../config";
 import { toStripeCents, formatCurrency } from "../../utils/pricing";
+import { bookingLink } from "../../utils/notification-links";
 import { sendBookingCancelledEmail } from "../../utils/emails/cancellation";
 import { sendBookingConfirmationEmail } from "../../utils/emails/confirmation";
 import { prisma } from "../../utils/prisma";
@@ -2177,7 +2178,7 @@ export default class BookingSvc {
         type: "BOOKING_CANCELLED",
         title: "Booking cancelled",
         message: `Your booking for ${eventName} has been cancelled.`,
-        metadata: { link: `/bookings/${bookingId}` },
+        metadata: { link: bookingLink(bookingId) },
       }).catch((e) => console.error("Failed to create guest notification", e));
     }
 
@@ -2187,7 +2188,7 @@ export default class BookingSvc {
         type: "BOOKING_CANCELLED",
         title: "Booking cancelled",
         message: `The booking for ${eventName} has been cancelled.`,
-        metadata: { link: `/host/bookings/${bookingId}` },
+        metadata: { link: bookingLink(bookingId) },
       }).catch((e) => console.error("Failed to create host notification", e));
     }
   }
@@ -2372,7 +2373,7 @@ export default class BookingSvc {
         type: "BOOKING_CONFIRMED",
         title: "Booking confirmed",
         message: `Your booking for ${eventName} is confirmed.`,
-        metadata: { link: `/bookings/${bookingId}` },
+        metadata: { link: bookingLink(bookingId) },
       }).catch((e) => console.error("Failed to create guest notification", e));
 
       if (hostId && hostId !== guestId) {
@@ -2381,7 +2382,7 @@ export default class BookingSvc {
           type: "BOOKING_CONFIRMED",
           title: "New booking",
           message: `You have a new confirmed booking for ${eventName}.`,
-          metadata: { link: `/host/bookings/${bookingId}` },
+          metadata: { link: bookingLink(bookingId) },
         }).catch((e) => console.error("Failed to create host notification", e));
       }
     } catch (emailErr) {
