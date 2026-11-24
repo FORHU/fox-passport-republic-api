@@ -86,6 +86,9 @@ describe("adding a listing to a package", () => {
       matched: true,
       matchRequestStatus: "pending",
       respondedAt: null,
+      // When they were asked: the request expires after 3 days (api#462).
+      requestedAt: expect.any(Date),
+      remindedAt: null,
     });
   });
 

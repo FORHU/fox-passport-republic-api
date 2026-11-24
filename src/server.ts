@@ -9,6 +9,7 @@ import { scheduleUnattendedEventsSweep } from "./jobs/unattended-events.job";
 import { scheduleVoucherReturn } from "./jobs/voucher-return.job";
 import { schedulePerkReturn } from "./jobs/perk-return.job";
 import { scheduleMilestoneSweep } from "./jobs/milestone-sweep.job";
+import { schedulePackageRequestSweep } from "./jobs/package-request-sweep.job";
 import { scheduleFeedResurfacingPrune } from "./jobs/feed-resurfacing-prune.job";
 
 const httpServer = createServer(app);
@@ -24,6 +25,7 @@ scheduleUnattendedEventsSweep();
 scheduleVoucherReturn();
 schedulePerkReturn();
 scheduleMilestoneSweep();
+schedulePackageRequestSweep();
 scheduleFeedResurfacingPrune();
 
 httpServer.listen(PORT, () => {

@@ -598,6 +598,29 @@ export default class EventTemplateCtrl {
     }
   }
 
+  /** A Supplier leaves a package they joined, with a reason (api#461). */
+  static async leaveMatch(req: Request, res: Response) {
+    const { error, value } = Joi.object({
+      type: Joi.string().valid("asset", "service", "venue").required(),
+      reason: Joi.string()
+        .valid(...Object.values(MatchDeclineReason))
+        .required(),
+      note: Joi.string().trim().max(300).allow("").optional(),
+    }).validate(req.body);
+    if (error) return res.status(400).json({ message: error.message });
+    try {
+      const result = await EventTemplateSvc.leaveMatch({
+        matchId: req.params.matchId,
+        supplierId: req.user!.userId,
+        ...value,
+      });
+      return res.status(200).json({ success: true, data: result });
+    } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
+      return res.status(400).json({ message: (e as Error).message });
+    }
+  }
+
   static async respondToMatch(req: Request, res: Response) {
     const schema = Joi.object({
       type: Joi.string().valid("asset", "service", "venue").required(),

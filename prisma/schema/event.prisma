@@ -59,6 +59,10 @@ model EventTemplateAsset {
   declineReason      MatchDeclineReason?
   declineNote        String?
   respondedAt        DateTime?
+  // When the Supplier was last asked, and reminded (api#462): a request
+  // not answered in 3 days expires.
+  requestedAt        DateTime           @default(now())
+  remindedAt         DateTime?
   asset              Asset?             @relation(fields: [assetId], references: [id])
   template           EventTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
   eventAssetBids     EventAssetBid[]
@@ -85,6 +89,10 @@ model EventTemplateService {
   declineReason      MatchDeclineReason?
   declineNote        String?
   respondedAt        DateTime?
+  // When the Supplier was last asked, and reminded (api#462): a request
+  // not answered in 3 days expires.
+  requestedAt        DateTime           @default(now())
+  remindedAt         DateTime?
   service            Service?           @relation(fields: [serviceId], references: [id])
   template           EventTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
   eventServiceBids   EventServiceBid[]
@@ -111,6 +119,10 @@ model EventTemplateVenue {
   declineReason      MatchDeclineReason?
   declineNote        String?
   respondedAt        DateTime?
+  // When the Supplier was last asked, and reminded (api#462): a request
+  // not answered in 3 days expires.
+  requestedAt        DateTime           @default(now())
+  remindedAt         DateTime?
   template           EventTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
   venue              Venue?             @relation(fields: [venueId], references: [id])
 
@@ -356,6 +368,8 @@ enum MatchRequestStatus {
   accepted
   declined
   secured
+  /// Not answered in 3 days (api#462). Frees the spot, like declined.
+  expired
 }
 
 enum MatchConstraint {
