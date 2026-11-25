@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import EventRequestSvc from "./event-request.service";
+import { venueRequired } from "../event-template/package-venue";
 import { sendFailure } from "../../utils/errors";
 import Joi from "joi";
 import {
@@ -45,31 +46,23 @@ export default class EventRequestCtrl {
           .json({ success: false, message: "Unauthorized" });
       const templateId = value.templateId;
 
-      let request;
-      if (templateId) {
-        request = await EventRequestSvc.spawnRequestFromTemplate({
-          templateId,
-          clientId,
-          name: value.name,
-          description: value.description,
-          startAt: value.startAt || value.startDatetime,
-          endAt: value.endAt || value.endDatetime,
-          guestCount: value.guestCount || value.maxAttendees || 1,
-          totalAmount: value.totalAmount || value.totalPrice,
-        });
-      } else {
-        request = await EventRequestSvc.createDirectEvent({
-          clientId,
-          name: value.name,
-          description: value.description,
-          eventCategory: value.eventType || "other",
-          startAt: value.startAt || value.startDatetime,
-          endAt: value.endAt || value.endDatetime,
-          guestCount: value.guestCount || value.maxAttendees || 1,
-          totalAmount: value.totalAmount || value.totalPrice,
-          currency: value.currency,
-        });
+      // A venue is booked from its own page (POST /bookings/draft): an Event
+      // made here from a venue alone kept no link to it (api#481).
+      if (!templateId) {
+        throw venueRequired(
+          "Choose a package, or book the venue from its own page.",
+        );
       }
+      const request = await EventRequestSvc.requestPackage({
+        templateId,
+        clientId,
+        name: value.name,
+        description: value.description,
+        startAt: value.startAt || value.startDatetime,
+        endAt: value.endAt || value.endDatetime,
+        guestCount: value.guestCount || value.maxAttendees || 1,
+        totalAmount: value.totalAmount || value.totalPrice,
+      });
       return res.status(201).json({ success: true, data: { id: request.id } });
     } catch (e: unknown) {
       return sendFailure(res, e, 400, { success: true });

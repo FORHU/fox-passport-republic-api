@@ -313,7 +313,11 @@ export default class PassportSvc {
     // The venue on the stamp must be the one actually confirmed for THIS
     // booking. The scoping that guarantees that is in the repository, with the
     // reason it matters.
-    const venueTx = await PassportRepo.findApprovedVenueForBooking(bookingId);
+    const venueTx =
+      (await PassportRepo.findApprovedVenueForBooking(bookingId)) ??
+      (booking.event
+        ? await PassportRepo.findVenueForEvent(booking.event.id)
+        : null);
 
     const venue = venueTx?.venue;
     const venueId = venue?.id ?? null;
@@ -332,16 +336,22 @@ export default class PassportSvc {
 
     const imageUrl = venue?.stampIconUrl || fallbackSeal;
 
-    await PassportRepo.createStamp({
-      passportId: passport.id,
-      bookingId,
-      eventName: booking.event?.name ?? "Event",
-      eventDate: booking.startAt,
-      location,
-      venueId,
-      imageUrl,
-      xpEarned: XP_REWARDS.attendEvent,
-    });
+    // A stamp always names its venue (api#481). An Event from before every one
+    // had a venue gives no stamp; its attendance still counts below.
+    if (venueId) {
+      await PassportRepo.createStamp({
+        passportId: passport.id,
+        bookingId,
+        eventName: booking.event?.name ?? "Event",
+        eventDate: booking.startAt,
+        location,
+        venueId,
+        imageUrl,
+        xpEarned: XP_REWARDS.attendEvent,
+      });
+    } else {
+      console.warn(`[PassportSvc] No venue, so no stamp: booking ${bookingId}`);
+    }
 
     // Award attend_event XP and Coins via RewardService (enforces booking fee budget)
     try {

@@ -37,12 +37,37 @@ describe("POST /api/v1/event-templates/:id/submit", () => {
       },
     });
     draftTemplateId = draftTemplate.id;
+    // A package goes for review with its venue (api#481).
+    const venue = await prisma.venue.create({
+      data: {
+        mayorId: ownerId,
+        category: "indoor",
+        name: "Gala Hall",
+        description: "A hall",
+        capacity: 100,
+        price: 1000,
+        billingRate: "daily",
+        address: "1 Test Street",
+        city: "Manila",
+        country: "Philippines",
+        status: "available",
+      },
+    });
+    await prisma.eventTemplateVenue.create({
+      data: {
+        templateId: draftTemplateId,
+        venueId: venue.id,
+        matched: true,
+        matchRequestStatus: "accepted",
+      },
+    });
   });
 
   afterAll(async () => {
     await prisma.eventTemplate.deleteMany({
       where: { ownerId: { in: [ownerId, otherFoxerId] } },
     });
+    await prisma.venue.deleteMany({ where: { mayorId: ownerId } });
     await prisma.user.deleteMany({
       where: { id: { in: [ownerId, otherFoxerId] } },
     });

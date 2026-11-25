@@ -72,7 +72,14 @@ describe("sending a package for review", () => {
   ) =>
     db.eventTemplate.findUnique.mockResolvedValue({
       ownerId: EF,
-      templateVenues: [],
+      templateVenues: [
+        {
+          isOptional: false,
+          venueId: "v-1",
+          matchRequestStatus: "accepted",
+          venue: { name: "Sky Hall", status: "available" },
+        },
+      ],
       templateAssets: [],
       templateServices: services.map((s, i) => ({
         serviceId: `s-${i}`,

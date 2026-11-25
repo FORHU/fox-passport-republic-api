@@ -4,6 +4,7 @@ import {
   acceptedMatchListings,
   type LineKind,
 } from "./template-partners";
+import { hasVenue, venueRequired } from "./package-venue";
 import NotificationService from "../notifications/user-notification.service";
 import {
   EventCategory,
@@ -100,6 +101,8 @@ export default class EventTemplateSvc {
     // recommends one), but the column is required: store it empty.
     const template = await EventTemplateRepo.createTemplate({
       ...data,
+      // A new package is a draft; an admin's approval makes it public.
+      isPublic: false,
       description: data.description ?? "",
     });
     return this.withBreakdownForDisplay(template);
@@ -122,8 +125,13 @@ export default class EventTemplateSvc {
       maxAttendees: number | null;
     }>;
   }) {
-    const { id, ownerId, data } = params;
+    const { id, ownerId } = params;
+    const data = { ...params.data };
     const existing = await this.verifyOwnership(id, ownerId);
+    // An owner can hide a package; only an admin's approval makes one public.
+    if (data.isPublic && existing.status !== EventTemplateStatus.published) {
+      delete data.isPublic;
+    }
     const template = await EventTemplateRepo.updateTemplate(id, data);
 
     // The package's History: each detail that actually changed, before and
@@ -225,7 +233,7 @@ export default class EventTemplateSvc {
             isOptional: true,
             venueId: true,
             matchRequestStatus: true,
-            venue: { select: { name: true } },
+            venue: { select: { name: true, status: true } },
           },
         },
         templateAssets: {
@@ -247,10 +255,16 @@ export default class EventTemplateSvc {
       },
     });
     if (template && template.ownerId === ownerId) {
+      if (!hasVenue(template.templateVenues)) {
+        throw venueRequired(
+          "Add a venue that is taking bookings before sending this package for review.",
+        );
+      }
       const waitingOn = [
+        // A venue is never optional (api#481).
         ...template.templateVenues
           .filter((l) => l.venueId)
-          .map((l) => ({ ...l, name: l.venue?.name })),
+          .map((l) => ({ ...l, isOptional: false, name: l.venue?.name })),
         ...template.templateAssets
           .filter((l) => l.assetId)
           .map((l) => ({ ...l, name: l.asset?.name })),
@@ -634,6 +648,9 @@ export default class EventTemplateSvc {
     isOptional: boolean,
   ) {
     await this.verifyOwnership(templateId, ownerId);
+    if (kind === "venue" && isOptional) {
+      throw venueRequired("A package's venue can't be optional.");
+    }
     const { count } = await EventTemplateRepo.setLineOptional(
       kind,
       templateId,
@@ -746,9 +763,10 @@ export default class EventTemplateSvc {
     venueId?: string,
     description?: string,
     matchedAt?: Date,
-    date?: Date,
+    _date?: Date,
     _agreedPrice?: number,
-    isOptional?: boolean,
+    // Accepted for older callers and unused: a venue is never optional.
+    _isOptional?: boolean,
   ) {
     await this.verifyOwnership(templateId, ownerId);
 
@@ -759,8 +777,6 @@ export default class EventTemplateSvc {
         undefined,
         description,
         matchedAt,
-        undefined,
-        isOptional,
       );
     }
 
@@ -837,7 +853,6 @@ export default class EventTemplateSvc {
       description,
       matchedAt,
       finalAgreedPrice,
-      isOptional,
     );
     await this.askSupplier(request, venue.mayorId, venue.name, template.name);
     return line;
@@ -850,7 +865,9 @@ export default class EventTemplateSvc {
   ) {
     await this.verifyOwnership(templateId, ownerId);
     await EventTemplateRepo.removeVenue(templateId, venueId);
-    return { message: "Venue removed from template" };
+    // A live package is open again until it has a venue (api#481).
+    const reopened = await EventTemplateRepo.reopenIfNoVenue(templateId);
+    return { message: "Venue removed from template", reopened };
   }
 
   static async deleteTemplate(id: string, ownerId: string) {
@@ -1457,7 +1474,7 @@ export default class EventTemplateSvc {
     if (count === 0) throw conflict("You can only leave a package you joined");
 
     let reopened = false;
-    if (!found.isOptional) {
+    if (params.type === "venue" || !found.isOptional) {
       const { count: back } = await prisma.eventTemplate.updateMany({
         where: {
           id: found.templateId,

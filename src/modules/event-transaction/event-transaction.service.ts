@@ -137,6 +137,15 @@ export default class EventTransactionSvc {
           dateRange,
           eventId: event.id,
         })),
+        // Venues too, as bookFromTemplate does: a match used to leave its
+        // venue free for the same dates (api#481).
+        ...template.templateVenues
+          .filter((item) => item.venue)
+          .map((item) => ({
+            kind: "venue" as const,
+            itemId: item.venueId!,
+            dateRange,
+          })),
       ]);
 
       const created: unknown[] = [];
