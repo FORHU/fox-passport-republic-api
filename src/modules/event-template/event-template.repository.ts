@@ -362,7 +362,14 @@ export default class EventTemplateRepo {
       where: { id },
       include: {
         owner: {
-          select: { id: true, name: true, email: true, commissionPct: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            commissionPct: true,
+            // The host card's "Verified" badge (app#382) — display only.
+            identityVerifiedAt: true,
+          },
         },
         templateAssets: { include: { asset: true } },
         templateServices: { include: { service: true } },
@@ -386,7 +393,13 @@ export default class EventTemplateRepo {
         },
         include: {
           owner: {
-            select: { id: true, name: true, email: true, commissionPct: true },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              commissionPct: true,
+              identityVerifiedAt: true,
+            },
           },
           // NOTE: must match findTemplateById's include: the price breakdown
           // (EventTemplateSvc.withBreakdown) needs every item and the owner's
