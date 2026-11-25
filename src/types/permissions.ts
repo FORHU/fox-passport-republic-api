@@ -128,6 +128,10 @@ export const PERFORMER_SERVICE_CATEGORIES: readonly ServiceCategory[] = [
   "dj",
   "live_band",
   "mc",
+  // Catalog subcategories that perform (api#503 follow-up).
+  "solo_performer",
+  "dancers",
+  "kids_entertainers",
 ] as const;
 
 export const isPerformerServiceCategory = (

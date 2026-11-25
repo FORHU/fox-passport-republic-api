@@ -104,6 +104,7 @@ describe("catalog query", () => {
           name: "Music & Entertainment",
           icon: "music_note",
         },
+        listingKind: "service",
       },
       {
         slug: "photography",
@@ -113,6 +114,7 @@ describe("catalog query", () => {
           name: "Photo & Video",
           icon: "photo_camera",
         },
+        listingKind: "service",
       },
       {
         slug: "videography",
@@ -122,8 +124,14 @@ describe("catalog query", () => {
           name: "Photo & Video",
           icon: "photo_camera",
         },
+        listingKind: "service",
       },
-      { slug: "kite_flying", name: "Kite flying", group: null },
+      {
+        slug: "kite_flying",
+        name: "Kite flying",
+        group: null,
+        listingKind: null,
+      },
     ]);
   });
 
@@ -159,6 +167,18 @@ describe("catalog query", () => {
     await expect(
       ProviderSpecialtySvc.check(["dj", "entertainment"], ["entertainment"]),
     ).resolves.toEqual({ ok: true, slugs: ["dj", "entertainment"] });
+  });
+});
+
+describe("listingKindOf", () => {
+  it("says which listing each subcategory is offered as", async () => {
+    const { listingKindOf } =
+      await import("../src/modules/category/category.repository");
+    expect(listingKindOf("tents")).toBe("asset");
+    expect(listingKindOf("sound_system")).toBe("asset");
+    expect(listingKindOf("photo_booth")).toBe("service");
+    expect(listingKindOf("hair_makeup")).toBe("service");
+    expect(listingKindOf("kite_flying")).toBeNull();
   });
 });
 
