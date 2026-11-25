@@ -66,12 +66,46 @@ export function announcePostCommentsCount(
 }
 
 /**
- * A public post was just created on [tab]. Goes to everyone connected, so it
- * carries no post id or content; callers send it for public posts only.
+ * A public post was just created on [tab] by [authorId]. Goes to everyone
+ * connected, so it carries no post id or content; callers send it for public
+ * posts only. The author is already public on the post itself; it lets an
+ * open profile of theirs refetch (api#427).
  */
-export function announceNewPost(tab: string): void {
+export function announceNewPost(tab: string, authorId: string): void {
   try {
-    emitToAll(io, SOCKET_EVENTS.FEED_NEW, { tab });
+    emitToAll(io, SOCKET_EVENTS.FEED_NEW, { tab, authorId });
+  } catch {
+    // As above.
+  }
+}
+
+/**
+ * A post's reaction count is now [likesCount]. Goes to everyone connected,
+ * so callers send it for public posts only, and it never says who reacted.
+ */
+export function announcePostReactionsCount(
+  postId: string,
+  likesCount: number,
+): void {
+  try {
+    emitToAll(io, SOCKET_EVENTS.POST_REACTIONS_COUNT, { postId, likesCount });
+  } catch {
+    // As above.
+  }
+}
+
+/** A comment's reaction count is now [likesCount]. Public posts only. */
+export function announceCommentReactionsCount(
+  postId: string,
+  commentId: string,
+  likesCount: number,
+): void {
+  try {
+    emitToAll(io, SOCKET_EVENTS.COMMENT_REACTIONS_COUNT, {
+      postId,
+      commentId,
+      likesCount,
+    });
   } catch {
     // As above.
   }

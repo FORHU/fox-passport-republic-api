@@ -440,6 +440,34 @@ export default class FeedController {
     }
   }
 
+  static async setCommentReaction(req: Request, res: Response) {
+    const schema = Joi.object({
+      type: Joi.string()
+        .valid(...Object.values(ReactionType))
+        .allow(null)
+        .required(),
+    });
+    const { error, value } = schema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    try {
+      const { id, commentId } = req.params;
+      const result = await FeedService.setCommentReaction(
+        id,
+        commentId,
+        req.user!,
+        value.type,
+      );
+      return res.status(200).json({ success: true, data: result });
+    } catch (e: unknown) {
+      const err = e as Error;
+      return res
+        .status(statusForError(err))
+        .json({ success: false, message: err.message });
+    }
+  }
+
   static async toggleCommentLike(req: Request, res: Response) {
     try {
       const { commentId } = req.params;

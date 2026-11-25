@@ -56,10 +56,16 @@ router.delete(
   authenticate,
   FeedController.deleteComment,
 );
+// Heart toggle kept for clients that only know likes (mobile).
 router.post(
   "/:id/comments/:commentId/like",
   authenticate,
   FeedController.toggleCommentLike,
+);
+router.post(
+  "/:id/comments/:commentId/reaction",
+  authenticate,
+  FeedController.setCommentReaction,
 );
 
 export default router;
