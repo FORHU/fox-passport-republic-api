@@ -1,8 +1,11 @@
 import {
   MatchRequestStatus,
+  Prisma,
   PrismaClient,
   TransactionStatus,
 } from "@prisma/client";
+
+type Db = PrismaClient | Prisma.TransactionClient;
 
 /**
  * Every seeded package, event and stamp has a venue (api#480). Only seeded
@@ -159,9 +162,45 @@ export const BULK_EVENT_VENUES: Record<string, string> = {
   Taguig: "seed-venue-bulk-test-venue-33---taguig",
 };
 
+/**
+ * Package lines that named a venue in another city (api#500), by line id:
+ * the venue it was, and the one in the package's own city.
+ */
+export const PACKAGE_VENUE_MOVES: Record<string, { from: string; to: string }> =
+  {
+    "seed-tv-corporate-loft": {
+      from: "seed-venue-the-loft-bgc",
+      to: "seed-venue-summit-corporate-center",
+    },
+    "seed-tv-social-gazebo": {
+      from: "seed-venue-garden-gazebo",
+      to: "seed-venue-busay-hillside-gardens",
+    },
+    "seed-tv-other-loft": {
+      from: "seed-venue-the-loft-bgc",
+      to: "seed-venue-reyes-manila-hall",
+    },
+    "seed-tv-gala-palace": {
+      from: "seed-venue-grand-palace-hall",
+      to: "seed-venue-the-neon-glass-hangar",
+    },
+    "seed-tv-fundraiser-gazebo": {
+      from: "seed-venue-garden-gazebo",
+      to: "seed-venue-orchid-heritage-gardens",
+    },
+    "seed-tv-reunion-gazebo": {
+      from: "seed-venue-garden-gazebo",
+      to: "seed-venue-skyline-function-hall-cebu",
+    },
+    "seed-tv-retreat-gazebo": {
+      from: "seed-venue-garden-gazebo",
+      to: "seed-venue-pinecrest-mountain-estate",
+    },
+  };
+
 /** Gives a seeded package its venue, unless it has one already. */
 export async function seedPackageVenue(
-  prisma: PrismaClient,
+  prisma: Db,
   templateId: string,
   venueId: string,
 ) {
@@ -189,7 +228,7 @@ export async function seedPackageVenue(
  * sweep pays the ones a booking carries.
  */
 export async function seedEventVenue(
-  prisma: PrismaClient,
+  prisma: Db,
   eventId: string,
   line: { venueId: string; agreedPrice: number; status?: TransactionStatus },
 ) {

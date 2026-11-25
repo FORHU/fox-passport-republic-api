@@ -3,8 +3,13 @@ import { BULK_TEMPLATE_DEFS } from "../prisma/seeder/event.seeder";
 import {
   BULK_EVENT_VENUES,
   EVENT_VENUES,
+  PACKAGE_VENUE_MOVES,
   PACKAGE_VENUES,
 } from "../prisma/seeder/event-venues";
+import {
+  SAMPLE_VENUE_IMAGES,
+  SAMPLE_VENUES,
+} from "../prisma/seeder/sample-venues";
 import {
   buildGlobeStressEventData,
   buildGlobeStressVenueData,
@@ -19,9 +24,20 @@ describe("seed venues", () => {
     expect(missing).toEqual([]);
   });
 
+  it("has every sample venue and its picture", () => {
+    const names = SAMPLE_VENUES.map((v) => v.name);
+    expect(SAMPLE_VENUE_IMAGES.map((i) => i.venueName)).toEqual(names);
+    const ids = names.map(
+      (n) => `seed-venue-${n.toLowerCase().replace(/\s+/g, "-")}`,
+    );
+    const used = new Set(Object.values(PACKAGE_VENUES));
+    expect(ids.filter((id) => !used.has(id))).toEqual([]);
+  });
+
   it("names only seeded venues", () => {
     const ids = [
       ...Object.values(PACKAGE_VENUES),
+      ...Object.values(PACKAGE_VENUE_MOVES).flatMap((m) => [m.from, m.to]),
       ...Object.values(EVENT_VENUES).map((e) => e.venueId),
       ...Object.values(BULK_EVENT_VENUES),
     ];
