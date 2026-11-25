@@ -3,6 +3,7 @@ import EventTransactionSvc from "./event-transaction.service";
 import EventConflictSvc from "./event-conflict.service";
 import EventEditSvc from "./event-edit.service";
 import Joi from "joi";
+import { SupplierDeclineReason } from "@prisma/client";
 import { AppError, sendServerError } from "../../utils/errors";
 
 const KIND = Joi.string().valid("asset", "service", "venue").required();
@@ -94,6 +95,32 @@ export default class EventTransactionCtrl {
         .required(),
       // Why a Supplier declined; a fixed set, only read for "decline".
       cause: Joi.string().valid("busy", "other").optional(),
+      // The Supplier's own reason and words when it turns a line down or
+      // leaves it (api#476), shown to the Event Foxer. A note is required
+      // for "other"; neither is taken on confirm or cancel.
+      reason: Joi.when("action", {
+        is: Joi.valid("reject", "decline"),
+        then: Joi.string()
+          .valid(...Object.values(SupplierDeclineReason))
+          .optional(),
+        otherwise: Joi.forbidden(),
+      }),
+      note: Joi.when("action", {
+        is: Joi.valid("reject", "decline"),
+        then: Joi.alternatives().conditional("reason", [
+          {
+            is: SupplierDeclineReason.other,
+            then: Joi.string().trim().min(1).max(300).required(),
+          },
+          // A note only goes with a reason.
+          {
+            is: Joi.exist(),
+            then: Joi.string().trim().allow("").max(300).optional(),
+            otherwise: Joi.forbidden(),
+          },
+        ]),
+        otherwise: Joi.forbidden(),
+      }),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -108,7 +135,13 @@ export default class EventTransactionCtrl {
         value.type,
         value.action,
         actorId,
-        value.cause,
+        // An older client sends only a cause; a newer one may send only a
+        // reason, and "already booked" means busy.
+        value.cause ??
+          (value.reason === SupplierDeclineReason.already_booked
+            ? "busy"
+            : undefined),
+        value.reason ? { reason: value.reason, note: value.note } : undefined,
       );
       const done = {
         confirm: "confirmed",

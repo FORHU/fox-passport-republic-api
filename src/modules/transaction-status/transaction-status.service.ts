@@ -1,4 +1,4 @@
-import { TransactionStatus } from "@prisma/client";
+import { SupplierDeclineReason, TransactionStatus } from "@prisma/client";
 import { AppTransactionClient } from "../../utils/prisma";
 import {
   TransactionKind,
@@ -105,12 +105,30 @@ const attentionFor = (action: TransactionAction) =>
     ? { attentionSince: new Date() }
     : {};
 
+/**
+ * The Supplier's own reason and note, written when it turns a line down
+ * (reject) or leaves it (decline), and cleared there when none is given, so
+ * an old answer never shows against a new one (api#476). Other actions leave
+ * them as they are.
+ */
+const declineFor = (
+  action: TransactionAction,
+  reason: SupplierDeclineReason | undefined,
+  note: string | undefined,
+) =>
+  action === "decline" || action === "reject"
+    ? { declineReason: reason ?? null, declineNote: note?.trim() || null }
+    : {};
+
 interface TransitionArgs {
   id: string;
   kind: TransactionKind;
   action: TransactionAction;
   /** Only read for `decline`; defaults to "other". */
   cause?: DeclineCause;
+  /** Only read for `reject` and `decline` (api#476). */
+  reason?: SupplierDeclineReason;
+  note?: string;
   actorId?: string; // omitted only for the system-driven "expire" action
 }
 
@@ -151,7 +169,7 @@ export default class TransactionStatusSvc {
 
   private static async transitionAsset(
     tx: AppTransactionClient,
-    { id, action, actorId, cause }: TransitionArgs,
+    { id, action, actorId, cause, reason, note }: TransitionArgs,
   ) {
     await tx.$executeRaw`SELECT id FROM event_asset_transactions WHERE id = ${id} FOR UPDATE`;
 
@@ -202,6 +220,7 @@ export default class TransactionStatusSvc {
       data: {
         status: toStatus,
         rejectionReason: rejectionReasonFor(action, cause, row.rejectionReason),
+        ...declineFor(action, reason, note),
         ...attentionFor(action),
       },
     });
@@ -209,7 +228,7 @@ export default class TransactionStatusSvc {
 
   private static async transitionService(
     tx: AppTransactionClient,
-    { id, action, actorId, cause }: TransitionArgs,
+    { id, action, actorId, cause, reason, note }: TransitionArgs,
   ) {
     await tx.$executeRaw`SELECT id FROM event_service_transactions WHERE id = ${id} FOR UPDATE`;
 
@@ -257,6 +276,7 @@ export default class TransactionStatusSvc {
       data: {
         status: toStatus,
         rejectionReason: rejectionReasonFor(action, cause, row.rejectionReason),
+        ...declineFor(action, reason, note),
         ...attentionFor(action),
       },
     });
@@ -264,7 +284,7 @@ export default class TransactionStatusSvc {
 
   private static async transitionVenue(
     tx: AppTransactionClient,
-    { id, action, actorId, cause }: TransitionArgs,
+    { id, action, actorId, cause, reason, note }: TransitionArgs,
   ) {
     await tx.$executeRaw`SELECT id FROM event_venue_transactions WHERE id = ${id} FOR UPDATE`;
 
@@ -317,6 +337,7 @@ export default class TransactionStatusSvc {
       data: {
         status: toStatus,
         rejectionReason: rejectionReasonFor(action, cause, row.rejectionReason),
+        ...declineFor(action, reason, note),
         ...attentionFor(action),
       },
     });

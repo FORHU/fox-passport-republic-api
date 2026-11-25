@@ -3,7 +3,7 @@ import EventRequestRepo from "../event-request/event-request.repository";
 import EventTemplateRepo from "../event-template/event-template.repository";
 import PricingSvc from "../pricing/pricing.service";
 import { commissionPctOf, lineSnapshot } from "../pricing/event-breakdown";
-import { TransactionStatus } from "@prisma/client";
+import { SupplierDeclineReason, TransactionStatus } from "@prisma/client";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
 import { bookingLink } from "../../utils/notification-links";
 import AvailabilitySvc from "../availability/availability.service";
@@ -16,6 +16,23 @@ import {
   TransactionAction,
 } from "../transaction-status/transaction-status.types";
 import { hasAgreed } from "../event-template/template-partners";
+
+/** The Supplier's reason, as the Event Foxer reads it in a notification. */
+export const declineReasonText = (
+  kind: TransactionKind,
+  reason: SupplierDeclineReason,
+): string => {
+  switch (reason) {
+    case "already_booked":
+      return "already booked that day";
+    case "closed":
+      return kind === "venue" ? "closed that day" : "not available that day";
+    case "not_suitable":
+      return "the event doesn't suit them";
+    case "other":
+      return "another reason";
+  }
+};
 
 export default class EventTransactionSvc {
   static async getProviderDashboard(providerId: string) {
@@ -207,6 +224,8 @@ export default class EventTransactionSvc {
     action: TransactionAction,
     actorId: string,
     cause?: DeclineCause,
+    /** The Supplier's reason and note on reject or decline (api#476). */
+    answer?: { reason: SupplierDeclineReason; note?: string },
   ) {
     const updated = await prisma.$transaction((tx) =>
       TransactionStatusSvc.transition(tx, {
@@ -215,11 +234,14 @@ export default class EventTransactionSvc {
         action,
         actorId,
         cause,
+        reason: answer?.reason,
+        note: answer?.note,
       }),
     );
     if (action === "decline") {
-      await this.notifyDeclined(type, updated, cause).catch((err) =>
-        console.error(`Decline notification failed for ${type} ${id}`, err),
+      await this.notifyDeclined(type, updated, cause, answer?.reason).catch(
+        (err) =>
+          console.error(`Decline notification failed for ${type} ${id}`, err),
       );
     }
     return updated;
@@ -239,6 +261,7 @@ export default class EventTransactionSvc {
       providerId: string;
     },
     cause?: DeclineCause,
+    reason?: SupplierDeclineReason,
   ) {
     const [event, supplier, itemName, booking] = await Promise.all([
       prisma.event.findUnique({
@@ -264,7 +287,9 @@ export default class EventTransactionSvc {
       userId: event.organizerId,
       type: "SUPPLIER_DECLINED",
       title: "A Supplier declined your event",
-      message: `${supplier?.name ?? "A Supplier"} ${cause === "busy" ? "is busy with another booking and declined" : "declined"} ${itemName} for ${event.name}. Pick a replacement.`,
+      message: reason
+        ? `${supplier?.name ?? "A Supplier"} declined ${itemName} for ${event.name}: ${declineReasonText(kind, reason)}. Pick a replacement.`
+        : `${supplier?.name ?? "A Supplier"} ${cause === "busy" ? "is busy with another booking and declined" : "declined"} ${itemName} for ${event.name}. Pick a replacement.`,
       metadata: { ...metadata, link: eventLink(row.eventId) },
     });
 

@@ -224,6 +224,10 @@ model EventAssetTransaction {
   rejectionReason      String?
   /// When this line started needing a replacement (ADR 0010); the 48-hour deadline runs from here.
   attentionSince       DateTime?
+  /// Why the Supplier turned this down or left it (api#476); null when not given.
+  declineReason        SupplierDeclineReason?
+  /// The Supplier's own words, shown to the Event Foxer (api#476).
+  declineNote          String?           @db.VarChar(300)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   asset                Asset             @relation(fields: [assetId], references: [id])
@@ -260,6 +264,10 @@ model EventServiceTransaction {
   rejectionReason      String?
   /// When this line started needing a replacement (ADR 0010); the 48-hour deadline runs from here.
   attentionSince       DateTime?
+  /// Why the Supplier turned this down or left it (api#476); null when not given.
+  declineReason        SupplierDeclineReason?
+  /// The Supplier's own words, shown to the Event Foxer (api#476).
+  declineNote          String?           @db.VarChar(300)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   event                Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -303,6 +311,10 @@ model EventVenueTransaction {
   rejectionReason      String?
   /// When this line started needing a replacement (ADR 0010); the 48-hour deadline runs from here.
   attentionSince       DateTime?
+  /// Why the Supplier turned this down or left it (api#476); null when not given.
+  declineReason        SupplierDeclineReason?
+  /// The Supplier's own words, shown to the Event Foxer (api#476).
+  declineNote          String?           @db.VarChar(300)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   event                Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -360,6 +372,15 @@ enum MatchDeclineReason {
   not_my_kind_of_event
   too_far
   no_capacity
+  other
+}
+
+/// Why a venue or Provider turns down a booking request or leaves a booked
+/// event (api#476). Shown to the Event Foxer.
+enum SupplierDeclineReason {
+  already_booked
+  closed
+  not_suitable
   other
 }
 
