@@ -114,6 +114,71 @@ describe("Republic notifications", () => {
     expect(n.message).toBe("Gus Guest mentioned you in a comment.");
   });
 
+  // api#473: these used to show the email, or "Someone" for a new post's tags.
+  it("names who reposted a post", async () => {
+    await FeedService.repost(postId, as("guest"), "");
+
+    const [n] = await notificationsOf(ids.owner, "feed:repost");
+    expect(n.message).toBe("Gus Guest reposted your post.");
+  });
+
+  it("names who liked a comment", async () => {
+    const mine = await FeedService.addComment(postId, as("owner"), "Bring ID");
+    await FeedService.toggleCommentLike(mine.id, as("other"));
+
+    const [n] = await notificationsOf(ids.owner, "feed:comment_like");
+    expect(n.message).toBe("Orla Other liked your comment.");
+  });
+
+  it("names who tagged you, in a new post or one already there", async () => {
+    const mediaUrl = `https://cdn.test/${runId}.jpg`;
+    const tagged = (key: string) => ({
+      mediaUrl,
+      userId: ids[key],
+      x: 5,
+      y: 5,
+    });
+    const message = "Olive Owner tagged you in a photo on the Republic feed.";
+
+    const post = await FeedService.createPost(as("owner"), {
+      type: "citizen_experience",
+      content: "Last night",
+      mediaUrls: [mediaUrl],
+      mediaTags: [tagged("guest")],
+    });
+    const [fromNew] = await notificationsOf(ids.guest, "feed:media_tag");
+    expect(fromNew.message).toBe(message);
+
+    await FeedService.addMediaTag(post.id, as("owner"), tagged("other"));
+    const [fromLater] = await notificationsOf(ids.other, "feed:media_tag");
+    expect(fromLater.message).toBe(message);
+  });
+
+  it("falls back to the username, and never to the email", async () => {
+    await prisma.user.update({ where: { id: ids.other }, data: { name: "" } });
+    const post = await prisma.post.create({
+      data: {
+        authorId: ids.guest,
+        type: "citizen_experience",
+        tab: "community",
+        content: "Encore",
+      },
+    });
+    await FeedService.repost(post.id, as("other"), "");
+
+    const [n] = await notificationsOf(ids.guest, "feed:repost");
+    expect(n.message).toBe(`other_${runId} reposted your post.`);
+    await prisma.user.update({
+      where: { id: ids.other },
+      data: { name: "Orla Other" },
+    });
+
+    const all = await prisma.notification.findMany({
+      where: { userId: { in: Object.values(ids) } },
+    });
+    expect(all.filter((x) => x.message.includes("@test.com"))).toEqual([]);
+  });
+
   // api#450: each notification says where it leads.
   describe("routing data", () => {
     it("points a reaction at the post", async () => {
