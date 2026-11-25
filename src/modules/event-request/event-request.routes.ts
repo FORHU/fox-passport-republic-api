@@ -1,11 +1,20 @@
 import express from "express";
 import EventRequestCtrl from "./event-request.controller";
-import { authenticate } from "../../middleware/auth.middleware";
+import {
+  authenticate,
+  requirePermission,
+} from "../../middleware/auth.middleware";
 
 const router = express.Router();
 
-// Public — approved events for landing page
-router.get("/", EventRequestCtrl.listApproved);
+// Admins only. An Event is someone's booking, so its list is never public
+// (api#478); the public pages list packages instead.
+router.get(
+  "/",
+  authenticate,
+  requirePermission("queue:read"),
+  EventRequestCtrl.listApproved,
+);
 
 // Authenticated — create event context (booking flow step 1)
 router.post("/", authenticate, EventRequestCtrl.spawnRequest);
