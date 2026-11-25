@@ -11,6 +11,17 @@ router.get(
   EventTransactionCtrl.needsAttention,
 );
 router.get("/event/:eventId", authenticate, EventTransactionCtrl.bookedEvent);
+// Moving a booked event to another date (ADR 0010 decision 6).
+router.get(
+  "/event/:eventId/reschedule-preview",
+  authenticate,
+  EventTransactionCtrl.reschedulePreview,
+);
+router.post(
+  "/event/:eventId/reschedule",
+  authenticate,
+  EventTransactionCtrl.proposeReschedule,
+);
 // Replacing a Supplier on a booked event (ADR 0010).
 router.get("/proposals", authenticate, EventTransactionCtrl.proposals);
 router.get(

@@ -459,20 +459,28 @@ model EventAssetBid {
   @@map("event_asset_bids")
 }
 
-/// An Event Foxer's proposal to replace a Supplier on a booked event that
-/// lost one (ADR 0010). Stored, never applied on its own: it applies only once
-/// the citizen accepts, and the new Supplier then confirms like any added item.
+/// An Event Foxer's proposal to change a booked event (ADR 0010): replace a
+/// Supplier that was lost (`swap`), or move the whole event to another date
+/// (`reschedule`, decision 6). Stored, never applied on its own: it applies
+/// only once the citizen accepts.
 model EventEditProposal {
   id                    String                  @id @default(uuid())
   eventId               String
   bookingId             String
   proposedById          String
-  /// asset | service | venue: the same kind as the line it replaces.
-  kind                  String
-  /// The line being replaced (an asset, service or venue transaction id).
-  replacesTransactionId String
-  /// The replacement listing.
-  itemId                String
+  type                  EventEditProposalType   @default(swap)
+  /// Swap only. asset | service | venue: the same kind as the line it replaces.
+  kind                  String?
+  /// Swap only. The line being replaced (an asset, service or venue transaction id).
+  replacesTransactionId String?
+  /// Swap only. The replacement listing.
+  itemId                String?
+  /// Reschedule only: the new dates (the event keeps its length) and the
+  /// dates it was proposed against, so a stale proposal is caught on accept.
+  proposedStartAt       DateTime?
+  proposedEndAt         DateTime?
+  previousStartAt       DateTime?
+  previousEndAt         DateTime?
   quantity              Int                     @default(1)
   currentPrice          Decimal                 @db.Decimal(12, 2)
   proposedPrice         Decimal                 @db.Decimal(12, 2)
@@ -498,6 +506,11 @@ model EventEditProposal {
   @@index([bookingId, status])
   @@index([eventId])
   @@map("event_edit_proposals")
+}
+
+enum EventEditProposalType {
+  swap
+  reschedule
 }
 
 enum EventEditProposalStatus {

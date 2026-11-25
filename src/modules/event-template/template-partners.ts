@@ -59,3 +59,25 @@ export async function acceptedMatchListings(
   });
   return new Set(rows.map((r) => r.venueId!));
 }
+
+/**
+ * Of `venueIds`, the venues whose Mayor approved this Event Foxer's
+ * affiliation with `template:attach`: partners too, so their line is kept
+ * without asking again (ADR 0010).
+ */
+export async function approvedVenuePartners(
+  hostId: string,
+  venueIds: string[],
+): Promise<Set<string>> {
+  if (venueIds.length === 0) return new Set();
+  const rows = await prisma.venueEventFoxerAffiliation.findMany({
+    where: {
+      eventFoxerId: hostId,
+      venueId: { in: venueIds },
+      status: "approved",
+      permissions: { has: "template:attach" },
+    },
+    select: { venueId: true },
+  });
+  return new Set(rows.map((r) => r.venueId));
+}

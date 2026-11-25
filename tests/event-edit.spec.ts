@@ -14,6 +14,8 @@ const db = vi.hoisted(() => ({
   proposalFindMany: vi.fn(),
   proposalUpdateMany: vi.fn(),
   proposalUpdate: vi.fn(),
+  proposalCount: vi.fn(),
+  rescheduleAccept: vi.fn(),
   reserve: vi.fn(),
   eventDetail: vi.fn(),
   breakdown: vi.fn(),
@@ -68,6 +70,7 @@ vi.mock("../src/utils/prisma", () => {
       findMany: db.proposalFindMany,
       updateMany: db.proposalUpdateMany,
       update: db.proposalUpdate,
+      count: db.proposalCount,
     },
     $transaction: async (fn: (tx: unknown) => unknown) => fn(prisma),
   };
@@ -79,6 +82,9 @@ vi.mock("../src/modules/availability/availability.service", () => ({
 vi.mock("../src/modules/event-transaction/event-conflict.service", () => ({
   default: { eventDetail: db.eventDetail },
   eventLink: (id: string) => `/creator-dashboard/events?eventId=${id}`,
+}));
+vi.mock("../src/modules/event-transaction/event-reschedule.service", () => ({
+  default: { accept: db.rescheduleAccept },
 }));
 vi.mock("../src/modules/pricing/pricing.service", () => ({
   default: { calculateEventBreakdownForLines: db.breakdown },
@@ -186,6 +192,7 @@ beforeEach(() => {
   db.sendMessage.mockResolvedValue({});
   db.proposalUpdateMany.mockResolvedValue({ count: 1 });
   db.proposalUpdate.mockResolvedValue({});
+  db.proposalCount.mockResolvedValue(0);
   db.assetFindOne.mockResolvedValue({ ownerId: "prov-new", currency: "PHP" });
   db.assetTxCreate.mockResolvedValue({ id: "new", providerId: "prov-new" });
   db.assetTxUpdate.mockResolvedValue({});
@@ -389,9 +396,12 @@ describe("EventEditSvc.accept", () => {
     expect(db.assetTxCreate.mock.calls[0][0].data.confirmationDeadline).toEqual(
       new Date(NOW.getTime() + 24 * 3_600_000),
     );
-    expect(
-      db.notify.mock.calls.find((c) => c[0].userId === "prov-new")![0].type,
-    ).toBe("EVENT_EDIT_REQUEST");
+    const toSupplier = db.notify.mock.calls.find(
+      (c) => c[0].userId === "prov-new",
+    )![0];
+    expect(toSupplier.type).toBe("EVENT_EDIT_REQUEST");
+    // Sent where the Supplier confirms it.
+    expect(toSupplier.metadata.link).toBe("/foxer/marketplace-requests");
   });
 
   it("books a partner's line at once, with nothing to confirm", async () => {
@@ -524,6 +534,112 @@ describe("EventEditSvc.decline and withdraw", () => {
     await expect(EventEditSvc.withdraw("host1", "p1")).rejects.toMatchObject({
       status: 409,
     });
+  });
+});
+
+describe("a date change (ADR 0010 decision 6)", () => {
+  const reschedule = (over: Record<string, unknown> = {}) =>
+    proposal({
+      type: "reschedule",
+      kind: null,
+      replacesTransactionId: null,
+      itemId: null,
+      proposedPrice: D(1000),
+      priceDelta: D(0),
+      proposedStartAt: new Date("2026-12-12T10:00:00.000Z"),
+      proposedEndAt: new Date("2026-12-12T15:00:00.000Z"),
+      previousStartAt: new Date("2026-12-05T10:00:00.000Z"),
+      ...over,
+    });
+
+  it("refuses a swap while a date change waits for the citizen", async () => {
+    db.proposalCount.mockResolvedValue(1);
+
+    await expect(
+      EventEditSvc.propose(
+        "host1",
+        { kind: "asset", transactionId: "old", itemId: "asset-new" },
+        NOW,
+      ),
+    ).rejects.toMatchObject({ status: 409, code: "PROPOSAL_PENDING" });
+    expect(db.proposalCount.mock.calls[0][0].where).toMatchObject({
+      bookingId: "b1",
+      type: "reschedule",
+      status: "pending",
+    });
+    expect(db.proposalCreate).not.toHaveBeenCalled();
+  });
+
+  it("hands an accepted date change to the reschedule service", async () => {
+    db.proposalFind.mockResolvedValue(reschedule());
+    db.rescheduleAccept.mockResolvedValue({ proposalId: "p1" });
+
+    expect(await EventEditSvc.accept("citizen1", "p1", NOW)).toEqual({
+      proposalId: "p1",
+    });
+    expect(db.rescheduleAccept).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "p1", type: "reschedule" }),
+      NOW,
+    );
+    expect(db.intentCreate).not.toHaveBeenCalled();
+  });
+
+  it("has nothing to pay for a date change, and confirms an accepted one again", async () => {
+    db.proposalFind.mockResolvedValue(reschedule());
+    await expect(
+      EventEditSvc.confirmPayment("citizen1", "p1", NOW),
+    ).rejects.toMatchObject({ status: 409 });
+
+    db.proposalFind.mockResolvedValue(reschedule({ status: "accepted" }));
+    expect(await EventEditSvc.confirmPayment("citizen1", "p1", NOW)).toEqual({
+      proposalId: "p1",
+    });
+  });
+
+  it("tells the host the citizen declined the new date", async () => {
+    db.proposalFind.mockResolvedValue(reschedule());
+
+    await EventEditSvc.decline("citizen1", "p1", NOW);
+
+    expect(db.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "host1",
+        type: "EVENT_EDIT_DECLINED",
+        title: "Date change declined",
+        metadata: expect.objectContaining({ proposalType: "reschedule" }),
+      }),
+    );
+  });
+
+  it("lists date changes only when asked, without listing names", async () => {
+    db.bookingFind.mockResolvedValue({
+      userId: "citizen1",
+      event: { organizerId: "host1" },
+    });
+    db.proposalFindMany.mockResolvedValue([]);
+
+    await EventEditSvc.forBooking("citizen1", "b1", NOW);
+    expect(db.proposalFindMany.mock.calls[1][0].where).toEqual({
+      bookingId: "b1",
+      type: "swap",
+    });
+
+    db.proposalFindMany
+      .mockReset()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([reschedule({ deltaRefundId: null })]);
+    const [row] = await EventEditSvc.forBooking("citizen1", "b1", NOW, true);
+    expect(db.proposalFindMany.mock.calls[1][0].where).toEqual({
+      bookingId: "b1",
+    });
+    expect(row).toMatchObject({
+      type: "reschedule",
+      itemName: "",
+      replacesName: "",
+      awaitingPayment: false,
+    });
+    expect(row).not.toHaveProperty("deltaPaymentIntentId");
+    expect(db.assetFindOne).not.toHaveBeenCalled();
   });
 });
 
