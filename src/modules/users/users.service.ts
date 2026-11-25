@@ -105,12 +105,24 @@ export default class UsersSvc {
    * the person themselves.
    */
   static async getPublicProfile(idOrUsername: string, viewerId?: string) {
-    const profile = await userCache.cached(
+    const cached = await userCache.cached(
       `publicProfile:${idOrUsername}`,
       USER_TTL,
       () => UsersRepo.findPublicCitizenProfile(idOrUsername),
     );
-    if (!profile) throw new Error("Citizen profile not found");
+    if (!cached) throw new Error("Citizen profile not found");
+
+    // Posts depend on who is looking (visibility, their own reactions), so
+    // they are loaded per request, outside the per-profile cache (api#427).
+    const { posts, count } = await UsersRepo.findProfilePosts(
+      cached.id,
+      viewerId,
+    );
+    const profile = {
+      ...cached,
+      posts,
+      _count: { ...cached._count, posts: count },
+    };
     if (viewerId === profile.id || !profile.passport) return profile;
 
     return {

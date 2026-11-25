@@ -5,6 +5,14 @@ import {
   EventStatus,
   MatchRequestStatus,
 } from "@prisma/client";
+import {
+  BULK_EVENT_VENUES,
+  EVENT_VENUES,
+  PACKAGE_VENUE_MOVES,
+  PACKAGE_VENUES,
+  seedEventVenue,
+  seedPackageVenue,
+} from "./event-venues";
 
 // ── Deterministic IDs ────────────────────────────────────────────────────────
 const TEMPLATE_IDS = {
@@ -1511,7 +1519,12 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
             serviceId: SERVICE_IDS.waitstaff,
           },
         ],
-        venues: [{ id: "seed-tv-corporate-loft", venueId: VENUE_IDS.loft }],
+        venues: [
+          {
+            id: "seed-tv-corporate-loft",
+            venueId: PACKAGE_VENUE_MOVES["seed-tv-corporate-loft"].to,
+          },
+        ],
       },
       {
         templateId: TEMPLATE_IDS.social,
@@ -1532,7 +1545,12 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
           { id: "seed-ts-social-catering", serviceId: SERVICE_IDS.catering },
           { id: "seed-ts-social-waitstaff", serviceId: SERVICE_IDS.waitstaff },
         ],
-        venues: [{ id: "seed-tv-social-gazebo", venueId: VENUE_IDS.gazebo }],
+        venues: [
+          {
+            id: "seed-tv-social-gazebo",
+            venueId: PACKAGE_VENUE_MOVES["seed-tv-social-gazebo"].to,
+          },
+        ],
       },
       {
         templateId: TEMPLATE_IDS.other,
@@ -1544,7 +1562,12 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
           },
         ],
         services: [{ id: "seed-ts-other-photo", serviceId: SERVICE_IDS.photo }],
-        venues: [{ id: "seed-tv-other-loft", venueId: VENUE_IDS.loft }],
+        venues: [
+          {
+            id: "seed-tv-other-loft",
+            venueId: PACKAGE_VENUE_MOVES["seed-tv-other-loft"].to,
+          },
+        ],
       },
       {
         templateId: TEMPLATE_IDS.customGala,
@@ -1560,7 +1583,12 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
           { id: "seed-ts-gala-photo", serviceId: SERVICE_IDS.photo },
           { id: "seed-ts-gala-catering", serviceId: SERVICE_IDS.catering },
         ],
-        venues: [{ id: "seed-tv-gala-palace", venueId: VENUE_IDS.palace }],
+        venues: [
+          {
+            id: "seed-tv-gala-palace",
+            venueId: PACKAGE_VENUE_MOVES["seed-tv-gala-palace"].to,
+          },
+        ],
       },
       {
         templateId: TEMPLATE_IDS.customFundraiser,
@@ -1584,7 +1612,10 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
           },
         ],
         venues: [
-          { id: "seed-tv-fundraiser-gazebo", venueId: VENUE_IDS.gazebo },
+          {
+            id: "seed-tv-fundraiser-gazebo",
+            venueId: PACKAGE_VENUE_MOVES["seed-tv-fundraiser-gazebo"].to,
+          },
         ],
       },
       {
@@ -1625,7 +1656,12 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
           { id: "seed-ts-reunion-band", serviceId: SERVICE_IDS.band },
           { id: "seed-ts-reunion-catering", serviceId: SERVICE_IDS.catering },
         ],
-        venues: [{ id: "seed-tv-reunion-gazebo", venueId: VENUE_IDS.gazebo }],
+        venues: [
+          {
+            id: "seed-tv-reunion-gazebo",
+            venueId: PACKAGE_VENUE_MOVES["seed-tv-reunion-gazebo"].to,
+          },
+        ],
       },
       {
         templateId: TEMPLATE_IDS.customRetreat,
@@ -1645,7 +1681,12 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
           { id: "seed-ts-retreat-catering", serviceId: SERVICE_IDS.catering },
           { id: "seed-ts-retreat-photo", serviceId: SERVICE_IDS.photo },
         ],
-        venues: [{ id: "seed-tv-retreat-gazebo", venueId: VENUE_IDS.gazebo }],
+        venues: [
+          {
+            id: "seed-tv-retreat-gazebo",
+            venueId: PACKAGE_VENUE_MOVES["seed-tv-retreat-gazebo"].to,
+          },
+        ],
       },
     ];
 
@@ -1696,6 +1737,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         await prisma.eventTemplateVenue.upsert({
           where: { id: v.id },
           update: {
+            venueId: v.venueId,
             matched: v.matched ?? false,
             matchRequestStatus:
               v.matchRequestStatus ?? MatchRequestStatus.pending,
@@ -1712,6 +1754,13 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
           },
         });
       }
+    }
+    for (const [templateId, venueId] of Object.entries(PACKAGE_VENUES)) {
+      // The multi-role packages exist only when that user does.
+      const exists = await prisma.eventTemplate.count({
+        where: { id: templateId },
+      });
+      if (exists) await seedPackageVenue(prisma, templateId, venueId);
     }
     console.log(
       "✓ Template assets/services/venues attached with match statuses",
@@ -1807,7 +1856,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         eventCategory: EventCategory.corporate,
         startAt: new Date(now.getTime() + 21 * 86400000),
         endAt: new Date(now.getTime() + 21 * 86400000 + 6 * 3600000),
-        guestCount: 200,
+        guestCount: 100,
         totalAmount: 80000,
         requestStatus: RequestStatus.pending,
         eventStatus: EventStatus.pending,
@@ -1892,6 +1941,15 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         },
         create: e,
       });
+      // The bulk events' totals are made up, so their venue takes no share.
+      await seedEventVenue(
+        prisma,
+        e.id,
+        EVENT_VENUES[e.id] ?? {
+          venueId: BULK_EVENT_VENUES[e.targetCity],
+          agreedPrice: 0,
+        },
+      );
       console.log(`✓ Seeded event: ${e.name}`);
     }
 

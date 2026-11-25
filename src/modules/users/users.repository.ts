@@ -764,6 +764,101 @@ export default class UsersRepo {
     );
   }
 
+  /**
+   * A profile's latest posts as `viewerId` may see them (api#427), with the
+   * viewer's own reaction on each, and how many such posts there are. Kept
+   * out of findPublicCitizenProfile because that result is cached per
+   * profile, not per viewer. Same visibility rule as the feed
+   * (FeedRepo.buildFeedWhere / canView): public posts for everyone,
+   * "followers" posts for accepted followers, everything for the author.
+   */
+  static async findProfilePosts(authorId: string, viewerId?: string) {
+    const visibility: Prisma.PostWhereInput[] = [{ visibility: "public" }];
+    if (viewerId === authorId) {
+      visibility.push({ authorId });
+    } else if (viewerId) {
+      const follow = await prisma.follow.findUnique({
+        where: {
+          followerId_followingId: {
+            followerId: viewerId,
+            followingId: authorId,
+          },
+        },
+        select: { status: true },
+      });
+      if (follow?.status === "accepted") {
+        visibility.push({ visibility: "followers" });
+      }
+    }
+    const where: Prisma.PostWhereInput = {
+      authorId,
+      isArchived: false,
+      OR: visibility,
+    };
+
+    const [posts, count] = await Promise.all([
+      prisma.post.findMany({
+        where,
+        take: 10,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          type: true,
+          tab: true,
+          content: true,
+          mediaUrls: true,
+          createdAt: true,
+          likesCount: true,
+          commentsCount: true,
+          sharesCount: true,
+          sendsCount: true,
+          repostsCount: true,
+          viewsCount: true,
+          venue: {
+            select: {
+              id: true,
+              name: true,
+              city: true,
+              stampIconUrl: true,
+            },
+          },
+          asset: {
+            select: {
+              id: true,
+              name: true,
+              category: true,
+            },
+          },
+          service: {
+            select: {
+              id: true,
+              name: true,
+              category: true,
+            },
+          },
+          stamp: {
+            select: {
+              id: true,
+              eventName: true,
+            },
+          },
+          likes: viewerId
+            ? { where: { userId: viewerId }, select: { type: true } }
+            : false,
+        },
+      }),
+      prisma.post.count({ where }),
+    ]);
+
+    return {
+      count,
+      posts: posts.map(({ likes, ...post }) => {
+        const myReaction = viewerId ? (likes?.[0]?.type ?? null) : null;
+        return { ...post, isLikedByMe: myReaction !== null, myReaction };
+      }),
+    };
+  }
+
   // READ PUBLIC CITIZEN PROFILE (for /user/:id or author popovers)
   // [MIGRATION-FLAG: Stage 3 Switch] Read user with profile relation, map profile fields
   static async findPublicCitizenProfile(idOrUsername: string) {
@@ -888,56 +983,8 @@ export default class UsersRepo {
             images: { take: 1, select: { url: true } },
           },
         },
-        posts: {
-          where: { isArchived: false },
-          take: 10,
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            type: true,
-            tab: true,
-            content: true,
-            mediaUrls: true,
-            createdAt: true,
-            likesCount: true,
-            commentsCount: true,
-            sharesCount: true,
-            sendsCount: true,
-            repostsCount: true,
-            viewsCount: true,
-            venue: {
-              select: {
-                id: true,
-                name: true,
-                city: true,
-                stampIconUrl: true,
-              },
-            },
-            asset: {
-              select: {
-                id: true,
-                name: true,
-                category: true,
-              },
-            },
-            service: {
-              select: {
-                id: true,
-                name: true,
-                category: true,
-              },
-            },
-            stamp: {
-              select: {
-                id: true,
-                eventName: true,
-              },
-            },
-          },
-        },
         _count: {
           select: {
-            posts: { where: { isArchived: false } },
             organizedEvents: true,
             bookings: true,
           },

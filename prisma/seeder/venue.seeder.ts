@@ -11,6 +11,7 @@ import {
   CITY_COORDS,
 } from "./city-coords";
 import type { LngLat } from "../../src/utils/geo";
+import { SAMPLE_VENUE_IMAGES, SAMPLE_VENUES } from "./sample-venues";
 
 export async function seedVenues(prisma: PrismaClient, host?: any) {
   try {
@@ -1637,6 +1638,10 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
       });
     }
 
+    // Venues for the sample packages no other seeded venue suits (api#480).
+    // Last, so the pins of the ones above stay where they are.
+    venues.push(...SAMPLE_VENUES.map((v) => ({ mayorId: host.id, ...v })));
+
     // Tracks every boundary placed so far in this loop so
     // resolveNonOverlappingBoundary can nudge a new venue clear of ones
     // already seeded, using the same overlap check the real API enforces.
@@ -2256,6 +2261,7 @@ export async function seedVenues(prisma: PrismaClient, host?: any) {
         url: "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800&auto=format&fit=crop",
         venueName: "Industrial Rooftop Water Tower Deck",
       },
+      ...SAMPLE_VENUE_IMAGES,
     ];
 
     // ── Structural Upsert Loop For Venue Images ────────────────────────────

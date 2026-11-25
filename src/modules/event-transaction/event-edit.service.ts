@@ -1,7 +1,10 @@
 import Stripe from "stripe";
 import { PaymentStatus, Prisma, RefundStatus } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
-import { bookingLink } from "../../utils/notification-links";
+import {
+  bookingLink,
+  providerRequestsLink,
+} from "../../utils/notification-links";
 import { STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents } from "../../utils/pricing";
 import PaymentRepo from "../payment/payment.repository";
@@ -17,6 +20,7 @@ import EventConflictSvc, {
   type ConflictKind,
 } from "./event-conflict.service";
 import { acceptedMatchListings } from "../event-template/template-partners";
+import EventRescheduleSvc from "./event-reschedule.service";
 
 /**
  * Replacing a Supplier on a booked event (ADR 0010). The Event Foxer proposes
@@ -130,6 +134,31 @@ const chargeOf = (r: {
 
 /** Sentinel used to roll back an availability check that passed. */
 class Probe extends Error {}
+
+const pendingError = () =>
+  new AppError(
+    "A replacement is already waiting for an answer",
+    409,
+    "PROPOSAL_PENDING",
+  );
+
+/** A swap's own fields, which a date change (a reschedule) leaves empty. */
+function swapOf<
+  T extends {
+    kind: string | null;
+    itemId: string | null;
+    replacesTransactionId: string | null;
+  },
+>(p: T): T & { kind: string; itemId: string; replacesTransactionId: string } {
+  if (!p.kind || !p.itemId || !p.replacesTransactionId) {
+    throw new AppError("This proposal is not a replacement", 409);
+  }
+  return p as T & {
+    kind: string;
+    itemId: string;
+    replacesTransactionId: string;
+  };
+}
 
 export default class EventEditSvc {
   /** The line being replaced, or 404 when it isn't the host's. */
@@ -453,9 +482,7 @@ export default class EventEditSvc {
     if (!shown?.reason) {
       throw new AppError("This Supplier doesn't need replacing", 409);
     }
-    if (shown.pendingProposalId) {
-      throw new AppError("A replacement is already waiting for an answer", 409);
-    }
+    if (shown.pendingProposalId) throw pendingError();
     if (!row.bookingId) throw new AppError("This event has no booking", 409);
     const booking = await prisma.booking.findUnique({
       where: { id: row.bookingId },
@@ -466,6 +493,22 @@ export default class EventEditSvc {
     }
     if (!EDITABLE.includes(booking.status)) {
       throw new BookingNotEditableError();
+    }
+    // A date change waiting for an answer moves every line, so a swap waits.
+    const reschedule = await prisma.eventEditProposal.count({
+      where: {
+        bookingId: booking.id,
+        type: "reschedule",
+        status: "pending",
+        expiresAt: { gte: now },
+      },
+    });
+    if (reschedule > 0) {
+      throw new AppError(
+        "A date change is waiting for the citizen's answer. Withdraw it first.",
+        409,
+        "PROPOSAL_PENDING",
+      );
     }
 
     const candidate = (await this.listingsLike(input.kind, row, hostId)).find(
@@ -510,10 +553,7 @@ export default class EventEditSvc {
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2002"
       ) {
-        throw new AppError(
-          "A replacement is already waiting for an answer",
-          409,
-        );
+        throw pendingError();
       }
       throw err;
     }
@@ -557,11 +597,16 @@ export default class EventEditSvc {
     });
   }
 
-  /** A booking's proposals, for its citizen or its host; newest first. */
+  /**
+   * A booking's proposals, for its citizen or its host; newest first. Date
+   * changes are left out unless asked for, so an app that only knows swaps
+   * doesn't show one as an empty swap.
+   */
   static async forBooking(
     userId: string,
     bookingId: string,
     now: Date = new Date(),
+    includeReschedule = false,
   ) {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
@@ -575,7 +620,7 @@ export default class EventEditSvc {
     }
     await this.expireOld(bookingId, now);
     const rows = await prisma.eventEditProposal.findMany({
-      where: { bookingId },
+      where: includeReschedule ? { bookingId } : { bookingId, type: "swap" },
       orderBy: { createdAt: "desc" },
     });
     return Promise.all(rows.map((p) => this.describe(p)));
@@ -593,11 +638,22 @@ export default class EventEditSvc {
   /** A proposal with the names of the old and new listings. */
   private static async describe(p: {
     id: string;
-    kind: string;
-    itemId: string;
-    replacesTransactionId: string;
+    type?: string;
+    kind: string | null;
+    itemId: string | null;
+    replacesTransactionId: string | null;
     [k: string]: unknown;
   }) {
+    if (p.type === "reschedule" || !p.kind || !p.itemId) {
+      const { deltaPaymentIntentId: _pi, deltaRefundId: _r, ...rest } = p;
+      return {
+        ...rest,
+        awaitingPayment: false,
+        itemName: "",
+        replacesName: "",
+      };
+    }
+    const swap = swapOf(p);
     const name = async (kind: string, listingId: string) => {
       if (kind === "asset") {
         return (
@@ -623,23 +679,23 @@ export default class EventEditSvc {
       )?.name;
     };
     const replacedListing =
-      p.kind === "asset"
+      swap.kind === "asset"
         ? (
             await prisma.eventAssetTransaction.findUnique({
-              where: { id: p.replacesTransactionId },
+              where: { id: swap.replacesTransactionId },
               select: { assetId: true },
             })
           )?.assetId
-        : p.kind === "service"
+        : swap.kind === "service"
           ? (
               await prisma.eventServiceTransaction.findUnique({
-                where: { id: p.replacesTransactionId },
+                where: { id: swap.replacesTransactionId },
                 select: { serviceId: true },
               })
             )?.serviceId
           : (
               await prisma.eventVenueTransaction.findUnique({
-                where: { id: p.replacesTransactionId },
+                where: { id: swap.replacesTransactionId },
                 select: { venueId: true },
               })
             )?.venueId;
@@ -648,9 +704,9 @@ export default class EventEditSvc {
       ...rest,
       // Accepted on a paid booking, with the difference still to pay.
       awaitingPayment: rest.status === "pending" && !!deltaPaymentIntentId,
-      itemName: (await name(p.kind, p.itemId)) ?? "",
+      itemName: (await name(swap.kind, swap.itemId)) ?? "",
       replacesName: replacedListing
-        ? ((await name(p.kind, replacedListing)) ?? "")
+        ? ((await name(swap.kind, replacedListing)) ?? "")
         : "",
     };
   }
@@ -707,14 +763,15 @@ export default class EventEditSvc {
   }
 
   /** The line, the listing and its price, re-checked as the citizen answers. */
-  private static async prepare(p: {
+  private static async prepare(proposal: {
     id: string;
-    kind: string;
-    replacesTransactionId: string;
+    kind: string | null;
+    replacesTransactionId: string | null;
     proposedById: string;
-    itemId: string;
+    itemId: string | null;
     proposedPrice: Prisma.Decimal;
   }) {
+    const p = swapOf(proposal);
     const kind = p.kind as ConflictKind;
     const row = await this.line(kind, p.replacesTransactionId, p.proposedById);
     const candidate = (await this.listingsLike(kind, row, p.proposedById)).find(
@@ -757,6 +814,8 @@ export default class EventEditSvc {
     if (!EDITABLE.includes(p.booking.status)) {
       throw new BookingNotEditableError();
     }
+    // A date change keeps every agreed price, so there is nothing to pay.
+    if (p.type === "reschedule") return EventRescheduleSvc.accept(p, now);
     const paid = p.booking.status !== "pending";
     let prepared;
     try {
@@ -833,6 +892,10 @@ export default class EventEditSvc {
     const p = await this.load(citizenId, proposalId);
     if (p.status === "accepted" && p.appliedTransactionId) {
       return { proposalId: p.id, transactionId: p.appliedTransactionId };
+    }
+    if (p.type === "reschedule") {
+      if (p.status === "accepted") return { proposalId: p.id };
+      throw new AppError("There is nothing to pay for this proposal", 409);
     }
     if (!p.deltaPaymentIntentId) {
       throw new AppError("There is nothing to pay for this proposal", 409);
@@ -998,7 +1061,6 @@ export default class EventEditSvc {
       id: string;
       bookingId: string;
       eventId: string;
-      itemId: string;
       quantity: number;
       event: { name: string; organizerId: string };
     },
@@ -1040,7 +1102,7 @@ export default class EventEditSvc {
         await AvailabilitySvc.reserve(tx, [
           {
             kind,
-            itemId: p.itemId,
+            itemId: candidate.itemId,
             dateRange: { start: row.event.startAt, end: row.event.endAt },
             eventId: kind === "service" ? row.eventId : undefined,
             quantity: kind === "asset" ? p.quantity : undefined,
@@ -1050,13 +1112,13 @@ export default class EventEditSvc {
         let line: { id: string; providerId: string };
         if (kind === "asset") {
           const asset = await tx.asset.findUniqueOrThrow({
-            where: { id: p.itemId },
+            where: { id: candidate.itemId },
             select: { ownerId: true, currency: true },
           });
           line = await tx.eventAssetTransaction.create({
             data: {
               ...base,
-              assetId: p.itemId,
+              assetId: candidate.itemId,
               providerId: asset.ownerId,
               quantity: p.quantity,
               currency: asset.currency,
@@ -1071,13 +1133,13 @@ export default class EventEditSvc {
           }
         } else if (kind === "service") {
           const service = await tx.service.findUniqueOrThrow({
-            where: { id: p.itemId },
+            where: { id: candidate.itemId },
             select: { ownerId: true, currency: true },
           });
           line = await tx.eventServiceTransaction.create({
             data: {
               ...base,
-              serviceId: p.itemId,
+              serviceId: candidate.itemId,
               providerId: service.ownerId,
               currency: service.currency,
             },
@@ -1091,11 +1153,15 @@ export default class EventEditSvc {
           }
         } else {
           const venue = await tx.venue.findUniqueOrThrow({
-            where: { id: p.itemId },
+            where: { id: candidate.itemId },
             select: { mayorId: true },
           });
           line = await tx.eventVenueTransaction.create({
-            data: { ...base, venueId: p.itemId, providerId: venue.mayorId },
+            data: {
+              ...base,
+              venueId: candidate.itemId,
+              providerId: venue.mayorId,
+            },
             select: { id: true, providerId: true },
           });
           if (LIVE.includes(row.status)) {
@@ -1150,14 +1216,22 @@ export default class EventEditSvc {
             type: "EVENT_EDIT_BOOKED",
             title: "You're booked",
             message: `${p.event.name} picked ${candidate.name} as a replacement. You're partners, so there's nothing to confirm.`,
-            metadata: { transactionId: created.id, kind },
+            metadata: {
+              transactionId: created.id,
+              kind,
+              link: providerRequestsLink(),
+            },
           })
         : NotificationSvc.create({
             userId: created.providerId,
             type: "EVENT_EDIT_REQUEST",
             title: "A new event request",
             message: `${p.event.name} would like ${candidate.name}. Confirm or decline within ${CONFIRM_HOURS} hours.`,
-            metadata: { transactionId: created.id, kind },
+            metadata: {
+              transactionId: created.id,
+              kind,
+              link: providerRequestsLink(),
+            },
           }),
     ]).catch((e) => console.error(`Proposal ${p.id} answer not announced`, e));
 
@@ -1182,9 +1256,19 @@ export default class EventEditSvc {
     await NotificationSvc.create({
       userId: p.event.organizerId,
       type: "EVENT_EDIT_DECLINED",
-      title: "Replacement declined",
-      message: `The citizen declined your replacement for ${p.event.name}. You can propose another.`,
-      metadata: { link: eventLink(p.eventId), proposalId: p.id },
+      title:
+        p.type === "reschedule"
+          ? "Date change declined"
+          : "Replacement declined",
+      message:
+        p.type === "reschedule"
+          ? `The citizen declined moving ${p.event.name} to another date. It stays on its current date.`
+          : `The citizen declined your replacement for ${p.event.name}. You can propose another.`,
+      metadata: {
+        link: eventLink(p.eventId),
+        proposalId: p.id,
+        proposalType: p.type,
+      },
     }).catch((e) => console.error(`Proposal ${p.id} decline not announced`, e));
     return { proposalId: p.id, status: "declined" as const };
   }

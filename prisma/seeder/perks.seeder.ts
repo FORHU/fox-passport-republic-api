@@ -195,7 +195,12 @@ const HOUR = 60 * 60 * 1000;
 async function seedDemoBookings(
   userId: string,
   venues: { id: string; name: string; mayorId: string }[],
-  templates: { id: string; name: string; ownerId: string }[],
+  templates: {
+    id: string;
+    name: string;
+    ownerId: string;
+    templateVenues: { venue: { id: string; mayorId: string } | null }[];
+  }[],
 ) {
   const now = Date.now();
   let n = 0;
@@ -205,6 +210,8 @@ async function seedDemoBookings(
     organizerId: string;
     templateId: string | null;
     venueId: string | null;
+    // The Mayor, when the organizer isn't: a package's Event Foxer.
+    mayorId?: string;
   }) => {
     n += 1;
     const startAt = new Date(now + (6 + n) * DAY);
@@ -257,7 +264,7 @@ async function seedDemoBookings(
         eventId,
         bookingId: booking.id,
         venueId: args.venueId,
-        providerId: args.organizerId,
+        providerId: args.mayorId ?? args.organizerId,
         status: "approved" as const,
         agreedPrice: 2000,
       };
@@ -284,7 +291,8 @@ async function seedDemoBookings(
       name: t.name,
       organizerId: t.ownerId,
       templateId: t.id,
-      venueId: null,
+      venueId: t.templateVenues[0]?.venue?.id ?? null,
+      mayorId: t.templateVenues[0]?.venue?.mayorId,
     });
   }
 }
@@ -308,11 +316,24 @@ async function main() {
     orderBy: { createdAt: "asc" },
     select: { id: true, name: true, mayorId: true },
   });
+  // Only packages with a venue: the sample bookings are held there.
   const templates = await prisma.eventTemplate.findMany({
-    where: { status: "published" },
+    where: {
+      status: "published",
+      templateVenues: { some: { venueId: { not: null } } },
+    },
     take: 3,
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, ownerId: true },
+    select: {
+      id: true,
+      name: true,
+      ownerId: true,
+      templateVenues: {
+        where: { venueId: { not: null } },
+        take: 1,
+        select: { venue: { select: { id: true, mayorId: true } } },
+      },
+    },
   });
   if (venues.length === 0 && templates.length === 0) {
     console.error(

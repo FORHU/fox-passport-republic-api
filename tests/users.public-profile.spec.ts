@@ -7,7 +7,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * record of where the person was; the person themselves still sees them.
  */
 
-const repo = vi.hoisted(() => ({ findPublicCitizenProfile: vi.fn() }));
+const repo = vi.hoisted(() => ({
+  findPublicCitizenProfile: vi.fn(),
+  findProfilePosts: vi.fn(),
+}));
 vi.mock("../src/modules/users/users.repository", () => ({ default: repo }));
 vi.mock("../src/utils/cache-namespaces", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -34,7 +37,9 @@ beforeEach(() => {
     id: "ana",
     name: "Ana",
     passport: { id: "p1", stamps: [structuredClone(STAMP)] },
+    _count: { organizedEvents: 2, bookings: 3 },
   });
+  repo.findProfilePosts.mockResolvedValue({ posts: [], count: 0 });
 });
 
 describe("UsersSvc.getPublicProfile", () => {
@@ -63,5 +68,25 @@ describe("UsersSvc.getPublicProfile", () => {
     await expect(UsersSvc.getPublicProfile("nobody")).rejects.toThrow(
       /not found/,
     );
+  });
+
+  it("loads posts for the viewer, outside the cached profile (api#427)", async () => {
+    const post = { id: "post1", myReaction: "love", isLikedByMe: true };
+    repo.findProfilePosts.mockResolvedValue({ posts: [post], count: 4 });
+
+    const profile = await UsersSvc.getPublicProfile("ana", "bo");
+
+    expect(repo.findProfilePosts).toHaveBeenCalledWith("ana", "bo");
+    expect(profile.posts).toEqual([post]);
+    expect(profile._count).toEqual({
+      organizedEvents: 2,
+      bookings: 3,
+      posts: 4,
+    });
+  });
+
+  it("asks for a signed-out visitor's posts with no viewer", async () => {
+    await UsersSvc.getPublicProfile("ana");
+    expect(repo.findProfilePosts).toHaveBeenCalledWith("ana", undefined);
   });
 });

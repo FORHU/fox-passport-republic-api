@@ -43,3 +43,9 @@ export function invoiceRefundLink(item: {
       return bookingsListLink();
   }
 }
+
+/**
+ * A Supplier's requests and bookings (Marketplace Requests), where they
+ * confirm, reject or decline a line on a booked event.
+ */
+export const providerRequestsLink = (): string => "/foxer/marketplace-requests";

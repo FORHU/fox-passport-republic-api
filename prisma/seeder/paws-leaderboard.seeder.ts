@@ -445,6 +445,23 @@ async function main() {
         spec.name,
         new Date(now - 60 * DAY),
       );
+      // Held at a hall of the host's. No booking is linked, so it earns the
+      // host no place on the venue board.
+      const hallId = await seedVenue(
+        hostId,
+        { ...spec, name: `${spec.name} hall` },
+        venueIndex++,
+      );
+      await prisma.eventVenueTransaction.create({
+        data: {
+          id: `${ID_PREFIX}${spec.key}-hall`,
+          eventId,
+          venueId: hallId,
+          providerId: hostId,
+          status: "approved",
+          agreedPrice: 0,
+        },
+      });
     }
 
     for (let i = 0; i < ratings.length; i++) {

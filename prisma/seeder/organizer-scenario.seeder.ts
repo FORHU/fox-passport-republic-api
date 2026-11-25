@@ -244,6 +244,23 @@ async function main() {
     });
   }
 
+  // Rosa's request is for Sky Hall too; Juan hasn't answered it.
+  const requested = await prisma.eventVenueTransaction.findFirst({
+    where: { eventId: requestId, venueId },
+    select: { id: true },
+  });
+  if (!requested) {
+    await prisma.eventVenueTransaction.create({
+      data: {
+        eventId: requestId,
+        venueId,
+        providerId: u.maria,
+        status: "pending",
+        agreedPrice: 25000,
+      },
+    });
+  }
+
   // Guests with tickets for Jazz Night, reset to not-yet-checked-in.
   const guests: [CastKey, string][] = [
     ["rosa", "ORGTEST-ROSA"],

@@ -80,7 +80,7 @@ export default class SearchRepo {
       prisma.eventTemplate.findMany({
         where: templateWhere,
         include: {
-          owner: { select: { id: true, name: true, email: true } },
+          owner: { select: { id: true, name: true } },
           images: true,
         },
         orderBy: { createdAt: "desc" },

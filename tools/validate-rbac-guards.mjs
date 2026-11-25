@@ -193,6 +193,10 @@ const ALLOW_LIST = new Set([
   // Foxer's own events, filtered by organizerId in the service.
   "event-transaction.routes.ts GET /needs-attention",
   "event-transaction.routes.ts GET /event/:eventId",
+  // Moving a booked event (ADR 0010 decision 6): EventRescheduleSvc reads and
+  // proposes only for the event's own organizer.
+  "event-transaction.routes.ts GET /event/:eventId/reschedule-preview",
+  "event-transaction.routes.ts POST /event/:eventId/reschedule",
   // Replacing a Supplier (ADR 0010): EventEditSvc lets only the event's
   // organizer list and propose, only the booking's citizen accept or decline,
   // only the proposer withdraw, and only those two read a booking's proposals.
@@ -241,6 +245,10 @@ const ALLOW_LIST = new Set([
   // keyed by the session user id. FeedRepo.recordViews skips the caller's own
   // posts and posts they can't see; rate limited per account.
   "feed.routes.ts POST /views",
+  // Comment reactions (api#427): the signed-in user sets only their own
+  // reaction, keyed by the session user id. FeedService.setCommentReaction
+  // checks the comment belongs to the post and the caller can see the post.
+  "feed.routes.ts POST /:id/comments/:commentId/reaction",
 ]);
 
 const BANNED_GUARDS = ["requireRole", "requireAdmin", "requireHost"];

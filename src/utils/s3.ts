@@ -6,6 +6,7 @@ import {
   DeleteObjectCommand,
   HeadBucketCommand,
   CreateBucketCommand,
+  PutBucketPolicyCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
@@ -72,6 +73,49 @@ s3Client.middlewareStack.add(
   },
 );
 
+let mediaBucketReady: Promise<void> | null = null;
+
+/**
+ * Local MinIO only: create the media bucket on first use, readable without a
+ * signature as the CDN serves it in deployed environments (the stored links
+ * are direct, see getGetObjectPresignedUrl). Without it a fresh setup, or a
+ * new AWS_S3_BUCKET name, failed every image upload with NoSuchBucket
+ * (api#443). An existing bucket is left as it is; real AWS buckets are
+ * provisioned by infrastructure, never from here.
+ */
+function ensureMediaBucket(): Promise<void> {
+  if (!S3_ENDPOINT || !AWS_S3_BUCKET) return Promise.resolve();
+  mediaBucketReady ??= (async () => {
+    try {
+      await s3Client.send(new HeadBucketCommand({ Bucket: AWS_S3_BUCKET }));
+      return;
+    } catch {
+      // Missing: create it below.
+    }
+    await s3Client.send(new CreateBucketCommand({ Bucket: AWS_S3_BUCKET }));
+    await s3Client.send(
+      new PutBucketPolicyCommand({
+        Bucket: AWS_S3_BUCKET,
+        Policy: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: { AWS: ["*"] },
+              Action: ["s3:GetObject"],
+              Resource: [`arn:aws:s3:::${AWS_S3_BUCKET}/*`],
+            },
+          ],
+        }),
+      }),
+    );
+  })().catch((err) => {
+    mediaBucketReady = null; // retry on the next upload
+    throw err;
+  });
+  return mediaBucketReady;
+}
+
 /**
  * Generates a presigned URL for direct S3 upload.
  *
@@ -85,6 +129,7 @@ export async function getPutObjectPresignedUrl(params: {
   contentLength: number;
 }) {
   const { key, contentType, contentLength } = params;
+  await ensureMediaBucket();
 
   const command = new PutObjectCommand({
     Bucket: AWS_S3_BUCKET,
@@ -136,6 +181,7 @@ export async function uploadToS3(params: {
   contentType: string;
 }) {
   const { key, body, contentType } = params;
+  await ensureMediaBucket();
   const command = new PutObjectCommand({
     Bucket: AWS_S3_BUCKET,
     Key: key,

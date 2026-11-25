@@ -181,6 +181,8 @@ describe("EventConflictSvc.needsAttention", () => {
         itemName: "Sound system",
         reason: "declined",
         cause: null,
+        declineReason: null,
+        declineNote: null,
         pendingProposalId: null,
         replaceBy: null,
       },
@@ -667,6 +669,51 @@ describe("EventConflictSvc.eventDetail", () => {
         reason: "declined",
         pendingProposalId: "p1",
       });
+    });
+
+    it("returns the citizen and a date change waiting for them, which replaces no line", async () => {
+      const proposedStartAt = new Date("2026-12-12T10:00:00.000Z");
+      const proposedEndAt = new Date("2026-12-12T15:00:00.000Z");
+      const expiresAt = new Date("2026-11-27T10:00:00.000Z");
+      db.eventOne.mockResolvedValue(
+        event({
+          clientId: "citizen1",
+          assetTransactions: [assetTx({ id: "kept", status: "approved" })],
+          editProposals: [
+            {
+              id: "r1",
+              status: "pending",
+              type: "reschedule",
+              replacesTransactionId: null,
+              appliedTransactionId: null,
+              proposedStartAt,
+              proposedEndAt,
+              expiresAt,
+            },
+            // An accepted date change before it: nothing was replaced.
+            {
+              id: "r0",
+              status: "accepted",
+              type: "reschedule",
+              replacesTransactionId: null,
+              appliedTransactionId: null,
+            },
+          ],
+        }),
+      );
+
+      const out = await EventConflictSvc.eventDetail("host1", "e1");
+
+      expect(out.clientId).toBe("citizen1");
+      expect(out.pendingReschedule).toEqual({
+        proposalId: "r1",
+        proposedStartAt,
+        proposedEndAt,
+        expiresAt,
+      });
+      expect(
+        out.suppliers.map((s) => [s.transactionId, s.pendingProposalId]),
+      ).toEqual([["kept", null]]);
     });
 
     it("drops a replaced line and lists its replacement awaiting its Supplier", async () => {

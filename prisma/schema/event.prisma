@@ -224,6 +224,10 @@ model EventAssetTransaction {
   rejectionReason      String?
   /// When this line started needing a replacement (ADR 0010); the 48-hour deadline runs from here.
   attentionSince       DateTime?
+  /// Why the Supplier turned this down or left it (api#476); null when not given.
+  declineReason        SupplierDeclineReason?
+  /// The Supplier's own words, shown to the Event Foxer (api#476).
+  declineNote          String?           @db.VarChar(300)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   asset                Asset             @relation(fields: [assetId], references: [id])
@@ -260,6 +264,10 @@ model EventServiceTransaction {
   rejectionReason      String?
   /// When this line started needing a replacement (ADR 0010); the 48-hour deadline runs from here.
   attentionSince       DateTime?
+  /// Why the Supplier turned this down or left it (api#476); null when not given.
+  declineReason        SupplierDeclineReason?
+  /// The Supplier's own words, shown to the Event Foxer (api#476).
+  declineNote          String?           @db.VarChar(300)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   event                Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -303,6 +311,10 @@ model EventVenueTransaction {
   rejectionReason      String?
   /// When this line started needing a replacement (ADR 0010); the 48-hour deadline runs from here.
   attentionSince       DateTime?
+  /// Why the Supplier turned this down or left it (api#476); null when not given.
+  declineReason        SupplierDeclineReason?
+  /// The Supplier's own words, shown to the Event Foxer (api#476).
+  declineNote          String?           @db.VarChar(300)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   event                Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -360,6 +372,15 @@ enum MatchDeclineReason {
   not_my_kind_of_event
   too_far
   no_capacity
+  other
+}
+
+/// Why a venue or Provider turns down a booking request or leaves a booked
+/// event (api#476). Shown to the Event Foxer.
+enum SupplierDeclineReason {
+  already_booked
+  closed
+  not_suitable
   other
 }
 
@@ -459,20 +480,28 @@ model EventAssetBid {
   @@map("event_asset_bids")
 }
 
-/// An Event Foxer's proposal to replace a Supplier on a booked event that
-/// lost one (ADR 0010). Stored, never applied on its own: it applies only once
-/// the citizen accepts, and the new Supplier then confirms like any added item.
+/// An Event Foxer's proposal to change a booked event (ADR 0010): replace a
+/// Supplier that was lost (`swap`), or move the whole event to another date
+/// (`reschedule`, decision 6). Stored, never applied on its own: it applies
+/// only once the citizen accepts.
 model EventEditProposal {
   id                    String                  @id @default(uuid())
   eventId               String
   bookingId             String
   proposedById          String
-  /// asset | service | venue: the same kind as the line it replaces.
-  kind                  String
-  /// The line being replaced (an asset, service or venue transaction id).
-  replacesTransactionId String
-  /// The replacement listing.
-  itemId                String
+  type                  EventEditProposalType   @default(swap)
+  /// Swap only. asset | service | venue: the same kind as the line it replaces.
+  kind                  String?
+  /// Swap only. The line being replaced (an asset, service or venue transaction id).
+  replacesTransactionId String?
+  /// Swap only. The replacement listing.
+  itemId                String?
+  /// Reschedule only: the new dates (the event keeps its length) and the
+  /// dates it was proposed against, so a stale proposal is caught on accept.
+  proposedStartAt       DateTime?
+  proposedEndAt         DateTime?
+  previousStartAt       DateTime?
+  previousEndAt         DateTime?
   quantity              Int                     @default(1)
   currentPrice          Decimal                 @db.Decimal(12, 2)
   proposedPrice         Decimal                 @db.Decimal(12, 2)
@@ -498,6 +527,11 @@ model EventEditProposal {
   @@index([bookingId, status])
   @@index([eventId])
   @@map("event_edit_proposals")
+}
+
+enum EventEditProposalType {
+  swap
+  reschedule
 }
 
 enum EventEditProposalStatus {

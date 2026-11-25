@@ -2,7 +2,9 @@ import { Request, Response } from "express";
 import EventTransactionSvc from "./event-transaction.service";
 import EventConflictSvc from "./event-conflict.service";
 import EventEditSvc from "./event-edit.service";
+import EventRescheduleSvc from "./event-reschedule.service";
 import Joi from "joi";
+import { SupplierDeclineReason } from "@prisma/client";
 import { AppError, sendServerError } from "../../utils/errors";
 
 const KIND = Joi.string().valid("asset", "service", "venue").required();
@@ -94,6 +96,32 @@ export default class EventTransactionCtrl {
         .required(),
       // Why a Supplier declined; a fixed set, only read for "decline".
       cause: Joi.string().valid("busy", "other").optional(),
+      // The Supplier's own reason and words when it turns a line down or
+      // leaves it (api#476), shown to the Event Foxer. A note is required
+      // for "other"; neither is taken on confirm or cancel.
+      reason: Joi.when("action", {
+        is: Joi.valid("reject", "decline"),
+        then: Joi.string()
+          .valid(...Object.values(SupplierDeclineReason))
+          .optional(),
+        otherwise: Joi.forbidden(),
+      }),
+      note: Joi.when("action", {
+        is: Joi.valid("reject", "decline"),
+        then: Joi.alternatives().conditional("reason", [
+          {
+            is: SupplierDeclineReason.other,
+            then: Joi.string().trim().min(1).max(300).required(),
+          },
+          // A note only goes with a reason.
+          {
+            is: Joi.exist(),
+            then: Joi.string().trim().allow("").max(300).optional(),
+            otherwise: Joi.forbidden(),
+          },
+        ]),
+        otherwise: Joi.forbidden(),
+      }),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -108,7 +136,13 @@ export default class EventTransactionCtrl {
         value.type,
         value.action,
         actorId,
-        value.cause,
+        // An older client sends only a cause; a newer one may send only a
+        // reason, and "already booked" means busy.
+        value.cause ??
+          (value.reason === SupplierDeclineReason.already_booked
+            ? "busy"
+            : undefined),
+        value.reason ? { reason: value.reason, note: value.note } : undefined,
       );
       const done = {
         confirm: "confirmed",
@@ -172,6 +206,47 @@ export default class EventTransactionCtrl {
   }
 
   /**
+   * GET /event-transactions/event/:eventId/reschedule-preview?startAt=: what
+   * moving one of the Event Foxer's booked events would mean (ADR 0010
+   * decision 6): which Suppliers are free then and which must re-confirm.
+   */
+  static async reschedulePreview(req: Request, res: Response) {
+    const { error, value } = Joi.object({
+      startAt: Joi.date().iso().required(),
+    }).validate(req.query, { allowUnknown: true });
+    if (error) return res.status(400).json({ message: error.message });
+    try {
+      const data = await EventRescheduleSvc.preview(
+        req.user!.userId,
+        req.params.eventId as string,
+        value.startAt,
+      );
+      return res.status(200).json({ success: true, data });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: false });
+    }
+  }
+
+  /** POST /event-transactions/event/:eventId/reschedule: the host proposes a new date. */
+  static async proposeReschedule(req: Request, res: Response) {
+    const { error, value } = Joi.object({
+      startAt: Joi.date().iso().required(),
+      note: Joi.string().max(500).allow("").optional(),
+    }).validate(req.body ?? {});
+    if (error) return res.status(400).json({ message: error.message });
+    try {
+      const data = await EventRescheduleSvc.propose(
+        req.user!.userId,
+        req.params.eventId as string,
+        { startAt: value.startAt, note: value.note },
+      );
+      return res.status(201).json({ success: true, data });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: false });
+    }
+  }
+
+  /**
    * GET /event-transactions/booking/:bookingId/replacement: for the booking's
    * citizen or host, the Suppliers that need replacing, by when, and whether
    * cancelling now refunds in full (ADR 0010).
@@ -192,12 +267,16 @@ export default class EventTransactionCtrl {
   static async proposals(req: Request, res: Response) {
     const { error, value } = Joi.object({
       bookingId: Joi.string().required(),
+      // Date changes are listed only when asked for (ADR 0010 decision 6).
+      include: Joi.string().valid("reschedule").optional(),
     }).validate(req.query, { allowUnknown: true });
     if (error) return res.status(400).json({ message: error.message });
     try {
       const data = await EventEditSvc.forBooking(
         req.user!.userId,
         value.bookingId,
+        new Date(),
+        value.include === "reschedule",
       );
       return res.status(200).json({ success: true, data });
     } catch (e: unknown) {
