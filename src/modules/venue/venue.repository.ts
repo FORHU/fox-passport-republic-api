@@ -17,7 +17,7 @@ const LIVE_STATUSES: VenueStatus[] = [
 ];
 
 const mayorSelect = {
-  select: { id: true, name: true, email: true, imgId: true },
+  select: { id: true, name: true, imgId: true },
 } as const;
 
 export default class VenueRepo {
@@ -112,7 +112,6 @@ export default class VenueRepo {
           select: {
             id: true,
             name: true,
-            email: true,
             imgId: true,
             // The venue page's "Listed by" card shows it (BUG-27).
             bio: true,

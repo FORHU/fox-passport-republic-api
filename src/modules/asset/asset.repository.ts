@@ -51,7 +51,7 @@ export default class AssetRepo {
       prisma.asset.findMany({
         where,
         include: {
-          owner: { select: { id: true, name: true, email: true } },
+          owner: { select: { id: true, name: true } },
           images: true,
         },
         orderBy: { createdAt: "desc" },
@@ -150,7 +150,7 @@ export default class AssetRepo {
         deletedAt: null,
       },
       include: {
-        owner: { select: { id: true, name: true, email: true } },
+        owner: { select: { id: true, name: true } },
         images: true,
       },
       orderBy: { createdAt: "desc" },
@@ -193,7 +193,7 @@ export default class AssetRepo {
             }),
         },
         include: {
-          owner: { select: { id: true, name: true, email: true } },
+          owner: { select: { id: true, name: true } },
           images: true,
         },
       }),
@@ -205,7 +205,7 @@ export default class AssetRepo {
     return prisma.asset.findUnique({
       where: { id: String(id) },
       include: {
-        owner: { select: { id: true, name: true, email: true } },
+        owner: { select: { id: true, name: true } },
         images: true,
       },
     });
@@ -249,7 +249,7 @@ export default class AssetRepo {
             }),
         },
         include: {
-          owner: { select: { id: true, name: true, email: true } },
+          owner: { select: { id: true, name: true } },
           images: true,
         },
       }),
