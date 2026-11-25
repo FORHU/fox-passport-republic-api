@@ -26,7 +26,7 @@ export default class EventRequestRepo {
     },
   } as const;
 
-  // Public landing page — approved events only
+  // Admin — approved events only
   static async findAllApproved() {
     return prisma.event.findMany({
       where: { requestStatus: "approved" },

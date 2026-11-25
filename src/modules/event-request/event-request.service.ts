@@ -318,7 +318,7 @@ export default class EventRequestSvc {
   }
 
   /**
-   * Approved event requests, for the public listing.
+   * Approved event requests, for admins only (api#478).
    *
    * Pass-through. It exists so controllers reach the data layer through a
    * service, which `tools/validate-architecture.mjs` enforces.
