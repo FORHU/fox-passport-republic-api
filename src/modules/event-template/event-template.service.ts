@@ -1,9 +1,18 @@
-import { AppError, notFound } from "../../utils/errors";
+import { AppError, badRequest, conflict, notFound } from "../../utils/errors";
+import {
+  ACCEPTED_MATCH,
+  acceptedMatchListings,
+  type LineKind,
+} from "./template-partners";
+import NotificationService from "../notifications/user-notification.service";
 import {
   EventCategory,
+  EventTemplateStatus,
   MatchConstraint,
+  MatchDeclineReason,
   MatchRequestStatus,
   Prisma,
+  VenueStatus,
 } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import EventTemplateRepo from "./event-template.repository";
@@ -201,7 +210,63 @@ export default class EventTemplateSvc {
     });
   }
 
+  /**
+   * Sends a package for review, once every required Supplier has accepted
+   * (api#461): the admin's approval then puts it live. Optional lines don't
+   * hold it up.
+   */
   static async submitTemplate(id: string, ownerId: string) {
+    const template = await prisma.eventTemplate.findUnique({
+      where: { id },
+      select: {
+        ownerId: true,
+        templateVenues: {
+          select: {
+            isOptional: true,
+            venueId: true,
+            matchRequestStatus: true,
+            venue: { select: { name: true } },
+          },
+        },
+        templateAssets: {
+          select: {
+            isOptional: true,
+            assetId: true,
+            matchRequestStatus: true,
+            asset: { select: { name: true } },
+          },
+        },
+        templateServices: {
+          select: {
+            isOptional: true,
+            serviceId: true,
+            matchRequestStatus: true,
+            service: { select: { name: true } },
+          },
+        },
+      },
+    });
+    if (template && template.ownerId === ownerId) {
+      const waitingOn = [
+        ...template.templateVenues
+          .filter((l) => l.venueId)
+          .map((l) => ({ ...l, name: l.venue?.name })),
+        ...template.templateAssets
+          .filter((l) => l.assetId)
+          .map((l) => ({ ...l, name: l.asset?.name })),
+        ...template.templateServices
+          .filter((l) => l.serviceId)
+          .map((l) => ({ ...l, name: l.service?.name })),
+      ].filter(
+        (l) => !l.isOptional && !ACCEPTED_MATCH.includes(l.matchRequestStatus),
+      );
+      if (waitingOn.length > 0) {
+        throw conflict(
+          `Waiting on ${waitingOn.map((l) => l.name ?? "a Supplier").join(", ")}. Every required Supplier must accept before review.`,
+          "SUPPLIERS_NOT_READY",
+        );
+      }
+    }
     return EventTemplateRepo.submitTemplate(id, ownerId);
   }
 
@@ -483,18 +548,100 @@ export default class EventTemplateSvc {
     // ignored. Pricing reads the listing itself; this keeps the row honest.
     const finalAgreedPrice = asset.price.toNumber() * quantity;
 
-    return EventTemplateRepo.attachAsset(
+    const request = await this.newLineRequest(
+      "asset",
+      ownerId,
+      assetId,
+      asset.ownerId,
+      matchedAt,
+    );
+    const line = await EventTemplateRepo.attachAsset(
       templateId,
       assetId,
       quantity,
-      matchedAt
-        ? { matched: true, matchConstraint: MatchConstraint.SAME_STATE }
-        : undefined,
+      request,
       description,
       matchedAt,
       finalAgreedPrice,
       isOptional,
     );
+    await this.askSupplier(request, asset.ownerId, asset.name, template.name);
+    return line;
+  }
+
+  /**
+   * How a line starts when the Event Foxer adds a listing to a package
+   * (api#459): as a request to its Supplier, which they accept or decline
+   * (#447). Venues and Providers alike. It starts accepted when the listing
+   * is the Event Foxer's own, or a partner's: a venue they hold an approved
+   * affiliation with (`partner`), or a listing that accepted one of their
+   * requests before. `matchedAt` (the match-search flow) also pins the line
+   * to the package's state, as before.
+   */
+  private static async newLineRequest(
+    kind: LineKind,
+    hostId: string,
+    listingId: string,
+    supplierId: string | null | undefined,
+    matchedAt?: Date,
+    partner = false,
+  ) {
+    const agreed =
+      supplierId === hostId ||
+      partner ||
+      (await acceptedMatchListings(hostId, kind, [listingId])).has(listingId);
+    return {
+      matched: true,
+      matchRequestStatus: agreed
+        ? MatchRequestStatus.accepted
+        : MatchRequestStatus.pending,
+      respondedAt: agreed ? new Date() : null,
+      // A request has 3 days to be answered (api#462).
+      requestedAt: new Date(),
+      remindedAt: null,
+      ...(matchedAt && { matchConstraint: MatchConstraint.SAME_STATE }),
+    };
+  }
+
+  /** Tells a Supplier they were asked to join a package (api#462). */
+  private static async askSupplier(
+    request: { matchRequestStatus: MatchRequestStatus },
+    supplierId: string | null | undefined,
+    listingName: string,
+    packageName: string,
+  ) {
+    if (request.matchRequestStatus !== MatchRequestStatus.pending) return;
+    if (!supplierId) return;
+    await NotificationService.create({
+      userId: supplierId,
+      type: "PACKAGE_INVITE",
+      title: "Asked to join a package",
+      message: `You're asked to add ${listingName} to ${packageName}. You have 3 days to answer.`,
+      metadata: { packageName },
+    }).catch((e) => console.error("Failed to notify a package request", e));
+  }
+
+  /**
+   * Makes a line optional or required (api#459). The line, and its
+   * Supplier's answer, stay: nothing they agreed to changes, since the price
+   * is always their listing's own (#264 C6).
+   */
+  static async setLineOptional(
+    templateId: string,
+    ownerId: string,
+    kind: LineKind,
+    listingId: string,
+    isOptional: boolean,
+  ) {
+    await this.verifyOwnership(templateId, ownerId);
+    const { count } = await EventTemplateRepo.setLineOptional(
+      kind,
+      templateId,
+      listingId,
+      isOptional,
+    );
+    if (count === 0) throw notFound("Package item");
+    return { templateId, kind, listingId, isOptional };
   }
 
   static async removeAsset(
@@ -558,17 +705,29 @@ export default class EventTemplateSvc {
     // See attachAsset: the service's own listing price, never the EventFoxer's.
     const finalAgreedPrice = service.price.toNumber();
 
-    return EventTemplateRepo.attachService(
+    const request = await this.newLineRequest(
+      "service",
+      ownerId,
+      serviceId,
+      service.ownerId,
+      matchedAt,
+    );
+    const line = await EventTemplateRepo.attachService(
       templateId,
       serviceId,
-      matchedAt
-        ? { matched: true, matchConstraint: MatchConstraint.SAME_STATE }
-        : undefined,
+      request,
       description,
       matchedAt,
       finalAgreedPrice,
       isOptional,
     );
+    await this.askSupplier(
+      request,
+      service.ownerId,
+      service.name,
+      template.name,
+    );
+    return line;
   }
 
   static async removeService(
@@ -619,12 +778,15 @@ export default class EventTemplateSvc {
     const venue = await prisma.venue.findUnique({ where: { id: venueId } });
     if (!venue) throw notFound("Venue");
 
-    // A venue may only be attached by its own mayor, or by an Event Foxer
-    // holding an approved VenueEventFoxerAffiliation with "template:attach"
-    // for this venue — the Studio's "Apply to host here" gate is UX only;
-    // this is the check that actually enforces it.
+    // Any live venue can be added, as any Provider can (api#459): its Mayor
+    // gets a request and accepts or declines. An approved affiliation with
+    // "template:attach" makes the Event Foxer a partner: the venue joins at
+    // once, at the affiliation's agreed price.
     let affiliation: { agreedPrice: Prisma.Decimal | null } | null = null;
     if (venue.mayorId !== ownerId) {
+      if (venue.status !== VenueStatus.available) {
+        throw new AppError("This venue isn't taking bookings", 400);
+      }
       const { default: VenueAffiliationSvc } =
         await import("../venue-affiliation/venue-affiliation.service");
       affiliation =
@@ -633,12 +795,6 @@ export default class EventTemplateSvc {
           ownerId,
           "template:attach",
         );
-      if (!affiliation) {
-        throw new AppError(
-          "Unauthorized: you need an approved affiliation with this venue's owner to attach it",
-          403,
-        );
-      }
     }
 
     if (
@@ -666,17 +822,25 @@ export default class EventTemplateSvc {
         ? affiliation.agreedPrice.toNumber()
         : venue.price.toNumber();
 
-    return EventTemplateRepo.attachVenue(
+    const request = await this.newLineRequest(
+      "venue",
+      ownerId,
+      venueId,
+      venue.mayorId,
+      matchedAt,
+      affiliation !== null,
+    );
+    const line = await EventTemplateRepo.attachVenue(
       templateId,
       venueId,
-      matchedAt
-        ? { matched: true, matchConstraint: MatchConstraint.SAME_STATE }
-        : undefined,
+      request,
       description,
       matchedAt,
       finalAgreedPrice,
       isOptional,
     );
+    await this.askSupplier(request, venue.mayorId, venue.name, template.name);
+    return line;
   }
 
   static async removeVenue(
@@ -821,12 +985,47 @@ export default class EventTemplateSvc {
     // Conditional Validation Rule
     this.validateMatchData(true, params.description, params.matchedAt);
 
+    // A new Provider, or a fresh ask after a decline, is a new invite: it
+    // starts pending with no answer (api#447). Editing the details of an
+    // invite the same Provider is still answering, or accepted, keeps it.
+    const current =
+      params.type === "venue"
+        ? await prisma.eventTemplateVenue
+            .findUnique({ where: { id: params.itemId } })
+            .then(
+              (r) => r && { holder: r.venueId, status: r.matchRequestStatus },
+            )
+        : params.type === "service"
+          ? await prisma.eventTemplateService
+              .findUnique({ where: { id: params.itemId } })
+              .then(
+                (r) =>
+                  r && { holder: r.serviceId, status: r.matchRequestStatus },
+              )
+          : await prisma.eventTemplateAsset
+              .findUnique({ where: { id: params.itemId } })
+              .then(
+                (r) => r && { holder: r.assetId, status: r.matchRequestStatus },
+              );
+    const freshInvite =
+      !current ||
+      current.holder !== params.providerId ||
+      current.status === MatchRequestStatus.declined;
+
     const matchData = {
       matched: true,
       matchConstraint: constraint,
       description: params.description,
       matchedAt: params.matchedAt,
       date: params.date,
+      ...(freshInvite && {
+        matchRequestStatus: MatchRequestStatus.pending,
+        declineReason: null,
+        declineNote: null,
+        respondedAt: null,
+        requestedAt: new Date(),
+        remindedAt: null,
+      }),
     };
 
     if (params.type === "venue")
@@ -884,6 +1083,11 @@ export default class EventTemplateSvc {
           select: {
             id: true,
             matchRequestStatus: true,
+            agreedPrice: true,
+            currency: true,
+            declineReason: true,
+            declineNote: true,
+            respondedAt: true,
             matchedAt: true,
             description: true,
             date: true,
@@ -901,6 +1105,11 @@ export default class EventTemplateSvc {
           select: {
             id: true,
             matchRequestStatus: true,
+            agreedPrice: true,
+            currency: true,
+            declineReason: true,
+            declineNote: true,
+            respondedAt: true,
             matchedAt: true,
             description: true,
             date: true,
@@ -918,6 +1127,11 @@ export default class EventTemplateSvc {
           select: {
             id: true,
             matchRequestStatus: true,
+            agreedPrice: true,
+            currency: true,
+            declineReason: true,
+            declineNote: true,
+            respondedAt: true,
             matchedAt: true,
             description: true,
             date: true,
@@ -978,6 +1192,11 @@ export default class EventTemplateSvc {
         select: {
           id: true,
           matchRequestStatus: true,
+          agreedPrice: true,
+          currency: true,
+          declineReason: true,
+          declineNote: true,
+          respondedAt: true,
           matchedAt: true,
           description: true,
           date: true,
@@ -999,6 +1218,11 @@ export default class EventTemplateSvc {
         select: {
           id: true,
           matchRequestStatus: true,
+          agreedPrice: true,
+          currency: true,
+          declineReason: true,
+          declineNote: true,
+          respondedAt: true,
           matchedAt: true,
           description: true,
           date: true,
@@ -1020,6 +1244,11 @@ export default class EventTemplateSvc {
         select: {
           id: true,
           matchRequestStatus: true,
+          agreedPrice: true,
+          currency: true,
+          declineReason: true,
+          declineNote: true,
+          respondedAt: true,
           matchedAt: true,
           description: true,
           date: true,
@@ -1053,12 +1282,18 @@ export default class EventTemplateSvc {
     );
   }
 
-  // Provider accepts or declines a match request.
+  /**
+   * A Provider accepts or declines a package invite (a matched template
+   * line). A decline names a reason the Event Foxer sees; `other` needs a
+   * note (api#447). An invite is answered once: only a pending one can be.
+   */
   static async respondToMatch(params: {
     matchId: string;
     type: "asset" | "service" | "venue";
     responderId: string;
     status: MatchRequestStatus;
+    reason?: MatchDeclineReason;
+    note?: string;
   }) {
     if (
       params.status !== MatchRequestStatus.accepted &&
@@ -1066,44 +1301,180 @@ export default class EventTemplateSvc {
     ) {
       throw new AppError("status must be 'accepted' or 'declined'", 400);
     }
+    const declining = params.status === MatchRequestStatus.declined;
+    const note = params.note?.trim() || null;
+    if (declining && !params.reason) {
+      throw badRequest("Choose why you're declining");
+    }
+    if (declining && params.reason === MatchDeclineReason.other && !note) {
+      throw badRequest("Add a note when the reason is Other");
+    }
 
-    if (params.type === "asset") {
-      const row = await prisma.eventTemplateAsset.findUnique({
-        where: { id: params.matchId },
-        include: { asset: true },
-      });
-      if (!row || row.asset?.ownerId !== params.responderId)
-        throw new AppError("Not found or unauthorized", 404);
-      return prisma.eventTemplateAsset.update({
-        where: { id: params.matchId },
-        data: { matchRequestStatus: params.status },
-      });
+    const found =
+      params.type === "asset"
+        ? await prisma.eventTemplateAsset
+            .findUnique({
+              where: { id: params.matchId },
+              include: { asset: { select: { ownerId: true } } },
+            })
+            .then((r) => r && { ...r, ownerId: r.asset?.ownerId })
+        : params.type === "service"
+          ? await prisma.eventTemplateService
+              .findUnique({
+                where: { id: params.matchId },
+                include: { service: { select: { ownerId: true } } },
+              })
+              .then((r) => r && { ...r, ownerId: r.service?.ownerId })
+          : params.type === "venue"
+            ? await prisma.eventTemplateVenue
+                .findUnique({
+                  where: { id: params.matchId },
+                  include: { venue: { select: { mayorId: true } } },
+                })
+                .then((r) => r && { ...r, ownerId: r.venue?.mayorId })
+            : undefined;
+    if (found === undefined) throw new AppError("Invalid type", 400);
+    if (!found || !found.matched || found.ownerId !== params.responderId) {
+      throw new AppError("Not found or unauthorized", 404);
     }
-    if (params.type === "service") {
-      const row = await prisma.eventTemplateService.findUnique({
-        where: { id: params.matchId },
-        include: { service: true },
-      });
-      if (!row || row.service?.ownerId !== params.responderId)
-        throw new AppError("Not found or unauthorized", 404);
-      return prisma.eventTemplateService.update({
-        where: { id: params.matchId },
-        data: { matchRequestStatus: params.status },
-      });
+    if (found.matchRequestStatus === MatchRequestStatus.expired) {
+      throw conflict("This invite has expired");
     }
-    if (params.type === "venue") {
-      const row = await prisma.eventTemplateVenue.findUnique({
-        where: { id: params.matchId },
-        include: { venue: true },
-      });
-      if (!row || row.venue?.mayorId !== params.responderId)
-        throw new AppError("Not found or unauthorized", 404);
-      return prisma.eventTemplateVenue.update({
-        where: { id: params.matchId },
-        data: { matchRequestStatus: params.status },
-      });
+    if (found.matchRequestStatus !== MatchRequestStatus.pending) {
+      throw conflict("You've already answered this invite");
     }
-    throw new AppError("Invalid type", 400);
+
+    const data = {
+      matchRequestStatus: params.status,
+      respondedAt: new Date(),
+      declineReason: declining ? params.reason : null,
+      declineNote: declining ? note : null,
+    };
+    // Only a still-pending row changes, so two answers at once can't both win.
+    const where = {
+      id: params.matchId,
+      matchRequestStatus: MatchRequestStatus.pending,
+    };
+    const { count } =
+      params.type === "asset"
+        ? await prisma.eventTemplateAsset.updateMany({ where, data })
+        : params.type === "service"
+          ? await prisma.eventTemplateService.updateMany({ where, data })
+          : await prisma.eventTemplateVenue.updateMany({ where, data });
+    if (count === 0) throw conflict("You've already answered this invite");
+
+    // Both the Provider's and the Event Foxer's lists are cached.
+    await eventTemplateCache.invalidateAll();
+    await this.tellEventFoxer(found.templateId, {
+      title: declining ? "A Supplier declined" : "A Supplier joined",
+      message: declining
+        ? `A Supplier declined to join your package (${params.reason}${note ? `: ${note}` : ""}).`
+        : "A Supplier joined your package.",
+    });
+    return { id: params.matchId, type: params.type, ...data };
+  }
+
+  /** Tells a package's Event Foxer something about it (api#462). */
+  static async tellEventFoxer(
+    templateId: string,
+    note: { title: string; message: string },
+  ) {
+    const template = await prisma.eventTemplate.findUnique({
+      where: { id: templateId },
+      select: { ownerId: true, name: true },
+    });
+    if (!template) return;
+    await NotificationService.create({
+      userId: template.ownerId,
+      type: "PACKAGE_ANSWER",
+      title: note.title,
+      message: `${note.message} ${template.name}`.trim(),
+      metadata: { templateId },
+    }).catch((e) => console.error("Failed to notify an Event Foxer", e));
+  }
+
+  /**
+   * A Supplier leaves a package they joined (api#461), with a reason. The
+   * line becomes declined; if the package is live and the line was required,
+   * it goes back to open (not public) for future bookings. Bookings already
+   * made are untouched: ADR 0010's replacement rules cover them.
+   */
+  static async leaveMatch(params: {
+    matchId: string;
+    type: "asset" | "service" | "venue";
+    supplierId: string;
+    reason: MatchDeclineReason;
+    note?: string;
+  }) {
+    const note = params.note?.trim() || null;
+    if (params.reason === MatchDeclineReason.other && !note) {
+      throw badRequest("Add a note when the reason is Other");
+    }
+    const found =
+      params.type === "asset"
+        ? await prisma.eventTemplateAsset
+            .findUnique({
+              where: { id: params.matchId },
+              include: { asset: { select: { ownerId: true } } },
+            })
+            .then((r) => r && { ...r, ownerId: r.asset?.ownerId })
+        : params.type === "service"
+          ? await prisma.eventTemplateService
+              .findUnique({
+                where: { id: params.matchId },
+                include: { service: { select: { ownerId: true } } },
+              })
+              .then((r) => r && { ...r, ownerId: r.service?.ownerId })
+          : await prisma.eventTemplateVenue
+              .findUnique({
+                where: { id: params.matchId },
+                include: { venue: { select: { mayorId: true } } },
+              })
+              .then((r) => r && { ...r, ownerId: r.venue?.mayorId });
+    if (!found || !found.matched || found.ownerId !== params.supplierId) {
+      throw notFound("Package you're in");
+    }
+    if (found.matchRequestStatus !== MatchRequestStatus.accepted) {
+      throw conflict("You can only leave a package you joined");
+    }
+
+    const data = {
+      matchRequestStatus: MatchRequestStatus.declined,
+      declineReason: params.reason,
+      declineNote: note,
+      respondedAt: new Date(),
+    };
+    const where = {
+      id: params.matchId,
+      matchRequestStatus: MatchRequestStatus.accepted,
+    };
+    const { count } =
+      params.type === "asset"
+        ? await prisma.eventTemplateAsset.updateMany({ where, data })
+        : params.type === "service"
+          ? await prisma.eventTemplateService.updateMany({ where, data })
+          : await prisma.eventTemplateVenue.updateMany({ where, data });
+    if (count === 0) throw conflict("You can only leave a package you joined");
+
+    let reopened = false;
+    if (!found.isOptional) {
+      const { count: back } = await prisma.eventTemplate.updateMany({
+        where: {
+          id: found.templateId,
+          status: EventTemplateStatus.published,
+        },
+        data: { status: EventTemplateStatus.draft, isPublic: false },
+      });
+      reopened = back > 0;
+    }
+    await eventTemplateCache.invalidateAll();
+    await this.tellEventFoxer(found.templateId, {
+      title: "A Supplier left",
+      message: reopened
+        ? "A Supplier left, so this package is open again until you find someone:"
+        : "A Supplier left your package:",
+    });
+    return { id: params.matchId, type: params.type, reopened, ...data };
   }
 
   /**

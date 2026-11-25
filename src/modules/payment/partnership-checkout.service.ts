@@ -1,6 +1,7 @@
 import { AppError, notFound } from "../../utils/errors";
 import Stripe from "stripe";
 import { prisma } from "../../utils/prisma";
+import { partnershipsLink } from "../../utils/notification-links";
 import InvoiceSvc from "./invoice.service";
 import CheckoutSvc from "./checkout.service";
 import PromotionSvc from "../promotion/promotion.service";
@@ -245,7 +246,7 @@ export default class PartnershipCheckoutSvc {
       type: "sponsorship_cancelled",
       title: "Sponsorship cancelled",
       message: `${proposal.title} was cancelled. ${formatCurrency(refund.amount.toNumber())} is being refunded.`,
-      metadata: { link: `/partnerships/${proposalId}` },
+      metadata: { link: partnershipsLink() },
     }).catch((e) =>
       console.error(
         "Failed to create sponsorship-cancellation notification",

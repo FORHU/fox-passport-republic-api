@@ -135,36 +135,32 @@ describe("Venue affiliation gating on EventTemplateSvc.attachVenue", () => {
     expect(result).toBeDefined();
   });
 
-  it("rejects an organizer with no affiliation at all", async () => {
-    const templateId = await makeTemplate(unaffiliatedOrganizerId);
-    await expect(
-      EventTemplateSvc.attachVenue(
+  // api#459: any live venue can be added, as any Provider can. Without an
+  // approved affiliation (with template:attach) the Mayor gets a request, at
+  // the venue's listed price.
+  it.each([
+    ["no affiliation at all", () => unaffiliatedOrganizerId],
+    ["an affiliation still pending", () => pendingOrganizerId],
+    [
+      "an approved affiliation without template:attach",
+      () => noCalendarPermOrganizerId,
+    ],
+  ])(
+    "sends the Mayor a request when the Event Foxer has %s",
+    async (_case, who) => {
+      const templateId = await makeTemplate(who());
+      const result: any = await EventTemplateSvc.attachVenue(
         templateId,
-        unaffiliatedOrganizerId,
+        who(),
         venueId,
-      ),
-    ).rejects.toThrow(/approved affiliation/);
-  });
+      );
+      expect(result.matched).toBe(true);
+      expect(result.matchRequestStatus).toBe("pending");
+      expect(result.agreedPrice.toNumber()).toBe(5000); // the listed price
+    },
+  );
 
-  it("rejects an organizer whose affiliation is still pending", async () => {
-    const templateId = await makeTemplate(pendingOrganizerId);
-    await expect(
-      EventTemplateSvc.attachVenue(templateId, pendingOrganizerId, venueId),
-    ).rejects.toThrow(/approved affiliation/);
-  });
-
-  it("rejects an approved affiliation that lacks the template:attach permission", async () => {
-    const templateId = await makeTemplate(noCalendarPermOrganizerId);
-    await expect(
-      EventTemplateSvc.attachVenue(
-        templateId,
-        noCalendarPermOrganizerId,
-        venueId,
-      ),
-    ).rejects.toThrow(/approved affiliation/);
-  });
-
-  it("lets an approved, permitted affiliate attach the venue and uses the affiliation's agreed price", async () => {
+  it("lets an approved, permitted affiliate attach the venue as a partner, at the affiliation's agreed price", async () => {
     const templateId = await makeTemplate(affiliatedOrganizerId);
     const result: any = await EventTemplateSvc.attachVenue(
       templateId,
@@ -172,6 +168,7 @@ describe("Venue affiliation gating on EventTemplateSvc.attachVenue", () => {
       venueId,
     );
     expect(result.agreedPrice.toNumber()).toBe(3000); // affiliation.agreedPrice, not venue.price (5000)
+    expect(result.matchRequestStatus).toBe("accepted");
   });
 
   // #264 C6: an EventFoxer can no longer set a Foxer's price. The Mayor's

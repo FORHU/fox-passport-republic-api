@@ -85,6 +85,9 @@ model Favorite {
   createdAt  DateTime @default(now())
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // One favourite per user and item, so a double click or two devices
+  // saving at once can't store it twice; also serves the per-user lookups.
+  @@unique([userId, entityType, entityId])
   @@map("favorites")
 }
 

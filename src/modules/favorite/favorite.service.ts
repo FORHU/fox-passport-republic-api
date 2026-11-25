@@ -1,4 +1,5 @@
 import FavoriteRepo from "./favorite.repository";
+import { notFound } from "../../utils/errors";
 import {
   FAVORITE_SELF,
   FavoriteType,
@@ -44,8 +45,11 @@ export default class FavoriteSvc {
     return FavoriteRepo.addFavorite(userId, targetId, type);
   }
 
-  static async removeFavorite(id: string) {
-    return FavoriteRepo.removeFavorite(id);
+  // Deleting by id used to take any id, so one user could remove another's
+  // favourite. Someone else's id now answers the same 404 as a missing one.
+  static async removeFavorite(id: string, userId: string) {
+    const removed = await FavoriteRepo.removeFavorite(id, userId);
+    if (removed === 0) throw notFound("Favorite");
   }
 
   static async removeFavoriteByListing(

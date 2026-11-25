@@ -77,6 +77,30 @@ describe("POST /api/v1/favorites/add", () => {
   });
 });
 
+describe("DELETE /api/v1/favorites/:id", () => {
+  // api#455: deleting by id is scoped to the signed-in user.
+  it("passes the caller to the service", async () => {
+    const res = await request(app)
+      .delete("/api/v1/favorites/fav-1")
+      .set("Authorization", bearer);
+
+    expect(res.status).toBe(200);
+    expect(svc.removeFavorite).toHaveBeenCalledWith("fav-1", USER);
+  });
+
+  it("answers 404 for someone else's favourite", async () => {
+    const { notFound } = await import("../src/utils/errors");
+    svc.removeFavorite.mockRejectedValueOnce(notFound("Favorite"));
+
+    const res = await request(app)
+      .delete("/api/v1/favorites/fav-of-another")
+      .set("Authorization", bearer);
+
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+  });
+});
+
 describe("DELETE /api/v1/favorites/remove/listing", () => {
   it("removes a Foxer", async () => {
     const res = await request(app)

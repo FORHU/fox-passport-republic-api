@@ -28,6 +28,29 @@ export default class NotificationRepository {
     });
   }
 
+  /**
+   * Which of these Republic posts and comments still exist (both are
+   * hard-deleted), with each comment's post and parent. Two primary-key
+   * lookups for a whole page of notifications.
+   */
+  static async findFeedTargets(postIds: string[], commentIds: string[]) {
+    const [posts, comments] = await Promise.all([
+      postIds.length
+        ? prisma.post.findMany({
+            where: { id: { in: postIds } },
+            select: { id: true },
+          })
+        : [],
+      commentIds.length
+        ? prisma.postComment.findMany({
+            where: { id: { in: commentIds } },
+            select: { id: true, postId: true, parentId: true },
+          })
+        : [],
+    ]);
+    return { posts, comments };
+  }
+
   static async countUnread(userId: string) {
     return prisma.notification.count({ where: { userId, isRead: false } });
   }

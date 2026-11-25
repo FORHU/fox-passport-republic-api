@@ -64,6 +64,7 @@ model User {
   organizerEventXp         OrganizerEventXp[]
   serviceTransactions      EventServiceTransaction[]    @relation("ServiceProvider")
   eventTemplates           EventTemplate[]
+  packageApplications      PackageApplication[]
   venueTransactions        EventVenueTransaction[]      @relation("VenueProvider")
   favorites                Favorite[]
   files                    File[]

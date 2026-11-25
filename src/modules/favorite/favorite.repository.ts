@@ -1,3 +1,4 @@
+import type { Favorite } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 
 export default class FavoriteRepo {
@@ -27,18 +28,24 @@ export default class FavoriteRepo {
   }
 
   // ADD (idempotent): the existing row when there is one, else a new one.
+  // An upsert on the (user, type, item) key, so two adds at once - a double
+  // click, or two devices - still leave one row. Returns the row in the same
+  // shape as a `getUserFavorites` entry, so the client can show the saved
+  // card at once instead of a blank placeholder.
   static async addFavorite(userId: string, targetId: string, type: string) {
-    const where = {
+    const key = {
       userId: String(userId),
       entityId: String(targetId),
       entityType: String(type),
     };
 
-    const existing = await prisma.favorite.findFirst({ where });
-    if (existing) return { added: true };
-
-    await prisma.favorite.create({ data: where });
-    return { added: true };
+    const row = await prisma.favorite.upsert({
+      where: { userId_entityType_entityId: key },
+      create: key,
+      update: {},
+    });
+    const [favorite] = await FavoriteRepo.hydrate([row]);
+    return { added: true, favorite };
   }
 
   static async userExists(userId: string) {
@@ -63,7 +70,11 @@ export default class FavoriteRepo {
       where: { userId: String(userId) },
       orderBy: { createdAt: "desc" },
     });
+    return FavoriteRepo.hydrate(favorites);
+  }
 
+  /** Favourite rows with the card data of what each one points at. */
+  static async hydrate(favorites: Favorite[]) {
     if (favorites.length === 0) return [];
 
     const venueIds = favorites
@@ -175,11 +186,13 @@ export default class FavoriteRepo {
     return !!favorite;
   }
 
-  // REMOVE BY ID
-  static async removeFavorite(id: string) {
-    return prisma.favorite.delete({
-      where: { id: String(id) },
+  // REMOVE BY ID - only the caller's own favourite. Returns how many rows
+  // went (0 when the id is someone else's, or gone).
+  static async removeFavorite(id: string, userId: string) {
+    const { count } = await prisma.favorite.deleteMany({
+      where: { id: String(id), userId: String(userId) },
     });
+    return count;
   }
 
   // REMOVE BY LISTING

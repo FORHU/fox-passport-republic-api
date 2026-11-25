@@ -5,6 +5,7 @@ import { hashPassword } from "../../utils/password";
 import { userCache } from "../../utils/cache-namespaces";
 import { fingerprint } from "../../utils/cache.util";
 import AdminSvc from "../admin/admin.service";
+import { revokeAllSessions } from "../auth/sessions.service";
 import ProviderSpecialtySvc from "./provider-specialty.service";
 
 /**
@@ -179,11 +180,16 @@ export default class UsersSvc {
     const user = await UsersRepo.findUserById(id);
     if (!user) throw new Error("User not found");
 
+    const changesPassword = Boolean(data.password);
     if (data.password) {
       data.password = await hashPassword(data.password);
     }
 
-    return UsersRepo.updateUser(id, data);
+    const updated = await UsersRepo.updateUser(id, data);
+    // As a password reset does (`revokeSessionsOnPasswordReset`): whoever
+    // held the old password is signed out everywhere.
+    if (changesPassword) await revokeAllSessions(id);
+    return updated;
   }
 
   // BECOME HOST — adds "host" to roleType array

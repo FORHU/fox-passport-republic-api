@@ -71,8 +71,10 @@ export default class EventRequestRepo {
     });
   }
 
-  static async findById(id: string) {
-    return prisma.event.findUnique({
+  // `tx`: inside a transaction that created this Event, only that
+  // transaction's client can see it (the match flow, api#465).
+  static async findById(id: string, tx: AppTransactionClient = prisma) {
+    return tx.event.findUnique({
       where: { id },
       include: {
         template: { include: { images: true } },

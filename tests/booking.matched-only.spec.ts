@@ -104,6 +104,8 @@ const TEMPLATE = {
       serviceId: "s1",
       service: { ownerId: "o2", name: "Photographer" },
       matched: true,
+      // A matched line counts only once its Supplier accepted (api#459).
+      matchRequestStatus: "accepted",
     },
   ],
   templateVenues: [
@@ -169,6 +171,23 @@ describe("booking only matched Suppliers automatically", () => {
     // Matched: booked as before.
     expect(services[0].status).toBe("pending");
     expect(services[0].confirmationDeadline).toBeUndefined();
+  });
+
+  it("asks first a Supplier whose request is still waiting, or declined (api#459)", async () => {
+    const template = structuredClone(TEMPLATE);
+    template.templateServices[0].matchRequestStatus = "pending";
+    template.templateVenues[0] = {
+      ...template.templateVenues[0],
+      matched: true,
+      matchRequestStatus: "declined",
+    } as (typeof template.templateVenues)[number];
+    templates.getPublicTemplateWithItemOwners.mockResolvedValue(template);
+
+    await book();
+
+    const { services, venues } = rows();
+    expect(services[0].status).toBe("pending_provider_confirmation");
+    expect(venues[0].status).toBe("pending_provider_confirmation");
   });
 
   it("tells each Supplier asked first, and says how many must answer", async () => {

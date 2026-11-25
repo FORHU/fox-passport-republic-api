@@ -5,6 +5,7 @@ import PricingSvc from "../pricing/pricing.service";
 import { commissionPctOf, lineSnapshot } from "../pricing/event-breakdown";
 import { TransactionStatus } from "@prisma/client";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
+import { bookingLink } from "../../utils/notification-links";
 import AvailabilitySvc from "../availability/availability.service";
 import TransactionStatusSvc from "../transaction-status/transaction-status.service";
 import NotificationSvc from "../notifications/user-notification.service";
@@ -14,6 +15,7 @@ import {
   TransactionKind,
   TransactionAction,
 } from "../transaction-status/transaction-status.types";
+import { hasAgreed } from "../event-template/template-partners";
 
 export default class EventTransactionSvc {
   static async getProviderDashboard(providerId: string) {
@@ -64,14 +66,21 @@ export default class EventTransactionSvc {
     bookingId: string,
     externalTx?: AppTransactionClient,
   ) {
-    const event = await EventRequestRepo.findById(eventId);
+    // Read through the caller's transaction when there is one: the match flow
+    // creates this Event (and maybe its template) in it, and the bare client
+    // can't see either until commit, so every match request failed (api#465).
+    const reader = externalTx ?? prisma;
+    const event = await EventRequestRepo.findById(eventId, reader);
     if (!event) throw new Error("Event not found");
     if (!event.templateId)
       throw new Error(
         "Event has no template — cannot create template-based transactions",
       );
 
-    const template = await EventTemplateRepo.findTemplateById(event.templateId);
+    const template = await EventTemplateRepo.findTemplateById(
+      event.templateId,
+      reader,
+    );
     if (!template) throw new Error("Template not found");
 
     // How each line is priced (#264 T7.1): with the rate stored on the Event
@@ -162,7 +171,7 @@ export default class EventTransactionSvc {
               agreedPrice: item.venue.price,
               ...snapshots.get(item.id),
               currency: item.currency,
-              status: item.matched
+              status: hasAgreed(item)
                 ? TransactionStatus.approved
                 : TransactionStatus.pending,
             },
@@ -268,7 +277,7 @@ export default class EventTransactionSvc {
         message: `${itemName} for ${event.name} was declined by its Supplier. The event host has been asked to replace it.`,
         metadata: {
           ...metadata,
-          ...(row.bookingId ? { link: `/bookings/${row.bookingId}` } : {}),
+          ...(row.bookingId ? { link: bookingLink(row.bookingId) } : {}),
         },
       });
     }

@@ -355,8 +355,10 @@ export default class EventTemplateRepo {
     };
   }
 
-  static async findTemplateById(id: string) {
-    return prisma.eventTemplate.findUnique({
+  // `tx`: inside a transaction that created this template, only that
+  // transaction's client can see it (the match flow, api#465).
+  static async findTemplateById(id: string, tx: AppTransactionClient = prisma) {
+    return tx.eventTemplate.findUnique({
       where: { id },
       include: {
         owner: {
@@ -483,6 +485,38 @@ export default class EventTemplateRepo {
       include: { owner: { select: { id: true, name: true } }, images: true },
       orderBy: { createdAt: "desc" },
     });
+  }
+
+  /** Sets one line's optional flag; the line and its answer stay (api#459). */
+  static async setLineOptional(
+    kind: "asset" | "service" | "venue",
+    templateId: string,
+    listingId: string,
+    isOptional: boolean,
+  ) {
+    const data = { isOptional };
+    if (kind === "asset") {
+      return this.retiring(
+        prisma.eventTemplateAsset.updateMany({
+          where: { templateId, assetId: listingId },
+          data,
+        }),
+      );
+    }
+    if (kind === "service") {
+      return this.retiring(
+        prisma.eventTemplateService.updateMany({
+          where: { templateId, serviceId: listingId },
+          data,
+        }),
+      );
+    }
+    return this.retiring(
+      prisma.eventTemplateVenue.updateMany({
+        where: { templateId, venueId: listingId },
+        data,
+      }),
+    );
   }
 
   static async removeAsset(templateId: string, assetId: string) {

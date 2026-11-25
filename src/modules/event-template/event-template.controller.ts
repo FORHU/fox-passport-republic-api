@@ -4,7 +4,7 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import { totalPages } from "../../utils/pagination";
 import EventTemplateSvc from "./event-template.service";
-import { EventCategory, Prisma } from "@prisma/client";
+import { EventCategory, MatchDeclineReason, Prisma } from "@prisma/client";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
 import {
   EVENT_DESCRIPTION_MAX,
@@ -274,6 +274,37 @@ export default class EventTemplateCtrl {
     } catch (e: unknown) {
       return sendServerError(res, e, { success: true });
     }
+  }
+
+  /**
+   * Makes a package line optional or required (api#459), keeping the line
+   * and its Supplier's answer. `kind` comes from the route.
+   */
+  static setLineOptional(kind: "asset" | "service" | "venue") {
+    return async (req: Request, res: Response) => {
+      const { error, value } = Joi.object({
+        isOptional: Joi.boolean().required(),
+      }).validate(req.body);
+      if (error) return res.status(400).json({ message: error.message });
+      try {
+        const ownerId = req.user?.userId;
+        if (!ownerId) return res.status(401).json({ message: "Unauthorized" });
+        const result = await EventTemplateSvc.setLineOptional(
+          req.params.id,
+          ownerId,
+          kind,
+          req.params.itemId,
+          value.isOptional,
+        );
+        return res.status(200).json({ success: true, data: result });
+      } catch (e: unknown) {
+        if (e instanceof AppError) return sendAppError(res, e);
+        const err = e as Error;
+        return res
+          .status(err.message.includes("Unauthorized") ? 403 : 400)
+          .json({ message: err.message });
+      }
+    };
   }
 
   static async removeAsset(req: Request, res: Response) {
@@ -567,10 +598,38 @@ export default class EventTemplateCtrl {
     }
   }
 
+  /** A Supplier leaves a package they joined, with a reason (api#461). */
+  static async leaveMatch(req: Request, res: Response) {
+    const { error, value } = Joi.object({
+      type: Joi.string().valid("asset", "service", "venue").required(),
+      reason: Joi.string()
+        .valid(...Object.values(MatchDeclineReason))
+        .required(),
+      note: Joi.string().trim().max(300).allow("").optional(),
+    }).validate(req.body);
+    if (error) return res.status(400).json({ message: error.message });
+    try {
+      const result = await EventTemplateSvc.leaveMatch({
+        matchId: req.params.matchId,
+        supplierId: req.user!.userId,
+        ...value,
+      });
+      return res.status(200).json({ success: true, data: result });
+    } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
+      return res.status(400).json({ message: (e as Error).message });
+    }
+  }
+
   static async respondToMatch(req: Request, res: Response) {
     const schema = Joi.object({
       type: Joi.string().valid("asset", "service", "venue").required(),
       status: Joi.string().valid("accepted", "declined").required(),
+      // A decline names why (api#447); the service checks it is given.
+      reason: Joi.string()
+        .valid(...Object.values(MatchDeclineReason))
+        .optional(),
+      note: Joi.string().trim().max(300).allow("").optional(),
     });
     const { error, value } = schema.validate(req.body);
     if (error) return res.status(400).json({ message: error.message });
