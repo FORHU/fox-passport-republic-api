@@ -246,7 +246,10 @@ model PostLike {
 model CommentLike {
   commentId String
   userId    String
-  createdAt DateTime @default(now())
+  // Same six reactions as a post, one per user per comment (api#427).
+  // Rows from before reactions read as a plain like.
+  type      ReactionType @default(like)
+  createdAt DateTime     @default(now())
 
   comment PostComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
   user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -127,7 +127,7 @@ describe("Republic notifications", () => {
     await FeedService.toggleCommentLike(mine.id, as("other"));
 
     const [n] = await notificationsOf(ids.owner, "feed:comment_like");
-    expect(n.message).toBe("Orla Other liked your comment.");
+    expect(n.message).toBe("Orla Other reacted to your comment.");
   });
 
   it("names who tagged you, in a new post or one already there", async () => {

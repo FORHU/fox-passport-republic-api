@@ -84,10 +84,18 @@ export const SOCKET_EVENTS = {
    * many posts at once, so refetching it on every comment (what a
    * DATA_INVALIDATE would ask for) costs far more than the number itself. */
   POST_COMMENTS_COUNT: "post:comments_count",
-  /** A public Republic post was just created on [tab] — sent to everyone
-   * connected, carrying no post id or content. Open feeds show a "New posts"
-   * pill instead of refetching, so nothing moves under the reader (app#308). */
+  /** A public Republic post was just created on [tab] by [authorId] — sent
+   * to everyone connected, carrying no post id or content. Open feeds show a
+   * "New posts" pill instead of refetching, so nothing moves under the reader
+   * (app#308); an open profile of that author refetches its posts (api#427). */
   FEED_NEW: "feed:new",
+  /** A public Republic post's reaction count changed — carries the post id
+   * and the new total, sent to everyone connected, like POST_COMMENTS_COUNT
+   * (api#427). Never says who reacted or with what. */
+  POST_REACTIONS_COUNT: "post:reactions_count",
+  /** A comment on a public Republic post has a new reaction count — carries
+   * the post id, comment id and the new total (api#427). */
+  COMMENT_REACTIONS_COUNT: "comment:reactions_count",
 } as const;
 
 export type SocketEvent = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];
