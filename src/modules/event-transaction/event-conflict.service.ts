@@ -79,6 +79,18 @@ export interface BookedEventDetail {
    * come (ADR 0010 slice 3). Null when there is none.
    */
   editableBookingId: string | null;
+  /** The citizen, for opening the event's chat with them. */
+  clientId: string;
+  /**
+   * A date change the host proposed, waiting for the citizen's answer
+   * (ADR 0010 decision 6); null when there is none.
+   */
+  pendingReschedule: {
+    proposalId: string;
+    proposedStartAt: Date;
+    proposedEndAt: Date;
+    expiresAt: Date;
+  } | null;
 }
 
 /** A booked item still counts only while it is waiting or approved. */
@@ -125,6 +137,7 @@ export function replaceByFor(since: Date, eventStart: Date): Date {
 const EVENT_WITH_SUPPLIERS = {
   id: true,
   name: true,
+  clientId: true,
   startAt: true,
   endAt: true,
   eventStatus: true,
@@ -184,8 +197,13 @@ const EVENT_WITH_SUPPLIERS = {
     select: {
       id: true,
       status: true,
+      // A date change (a reschedule) replaces no line; only swaps count below.
+      type: true,
       replacesTransactionId: true,
       appliedTransactionId: true,
+      proposedStartAt: true,
+      proposedEndAt: true,
+      expiresAt: true,
     },
   },
 } as const;
@@ -231,7 +249,8 @@ type EventRow = {
   editProposals?: {
     id: string;
     status: string;
-    replacesTransactionId: string;
+    type?: string;
+    replacesTransactionId: string | null;
     appliedTransactionId: string | null;
   }[];
 };
@@ -310,7 +329,10 @@ function supplierRows(e: EventRow): BookedSupplierRow[] {
     });
   }
 
-  const proposals = e.editProposals ?? [];
+  const proposals = (e.editProposals ?? []).filter(
+    (p): p is typeof p & { replacesTransactionId: string } =>
+      p.type !== "reschedule" && p.replacesTransactionId !== null,
+  );
   const replaced = new Set(
     proposals
       .filter((p) => p.status === "accepted")
@@ -451,9 +473,22 @@ export default class EventConflictSvc {
       where: { eventId: e.id, status: { in: ["pending", "confirmed"] } },
       select: { id: true, status: true },
     });
+    const reschedule = (e.editProposals ?? []).find(
+      (p) => p.type === "reschedule" && p.status === "pending",
+    );
     return {
       declinableBookingId: live?.status === "pending" ? live.id : null,
       editableBookingId: live?.id ?? null,
+      clientId: e.clientId,
+      pendingReschedule:
+        reschedule?.proposedStartAt && reschedule.proposedEndAt
+          ? {
+              proposalId: reschedule.id,
+              proposedStartAt: reschedule.proposedStartAt,
+              proposedEndAt: reschedule.proposedEndAt,
+              expiresAt: reschedule.expiresAt,
+            }
+          : null,
       eventId: e.id,
       eventName: e.name,
       startAt: e.startAt,

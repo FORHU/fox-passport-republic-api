@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import EventTransactionSvc from "./event-transaction.service";
 import EventConflictSvc from "./event-conflict.service";
 import EventEditSvc from "./event-edit.service";
+import EventRescheduleSvc from "./event-reschedule.service";
 import Joi from "joi";
 import { AppError, sendServerError } from "../../utils/errors";
 
@@ -172,6 +173,47 @@ export default class EventTransactionCtrl {
   }
 
   /**
+   * GET /event-transactions/event/:eventId/reschedule-preview?startAt=: what
+   * moving one of the Event Foxer's booked events would mean (ADR 0010
+   * decision 6): which Suppliers are free then and which must re-confirm.
+   */
+  static async reschedulePreview(req: Request, res: Response) {
+    const { error, value } = Joi.object({
+      startAt: Joi.date().iso().required(),
+    }).validate(req.query, { allowUnknown: true });
+    if (error) return res.status(400).json({ message: error.message });
+    try {
+      const data = await EventRescheduleSvc.preview(
+        req.user!.userId,
+        req.params.eventId as string,
+        value.startAt,
+      );
+      return res.status(200).json({ success: true, data });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: false });
+    }
+  }
+
+  /** POST /event-transactions/event/:eventId/reschedule: the host proposes a new date. */
+  static async proposeReschedule(req: Request, res: Response) {
+    const { error, value } = Joi.object({
+      startAt: Joi.date().iso().required(),
+      note: Joi.string().max(500).allow("").optional(),
+    }).validate(req.body ?? {});
+    if (error) return res.status(400).json({ message: error.message });
+    try {
+      const data = await EventRescheduleSvc.propose(
+        req.user!.userId,
+        req.params.eventId as string,
+        { startAt: value.startAt, note: value.note },
+      );
+      return res.status(201).json({ success: true, data });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: false });
+    }
+  }
+
+  /**
    * GET /event-transactions/booking/:bookingId/replacement: for the booking's
    * citizen or host, the Suppliers that need replacing, by when, and whether
    * cancelling now refunds in full (ADR 0010).
@@ -192,12 +234,16 @@ export default class EventTransactionCtrl {
   static async proposals(req: Request, res: Response) {
     const { error, value } = Joi.object({
       bookingId: Joi.string().required(),
+      // Date changes are listed only when asked for (ADR 0010 decision 6).
+      include: Joi.string().valid("reschedule").optional(),
     }).validate(req.query, { allowUnknown: true });
     if (error) return res.status(400).json({ message: error.message });
     try {
       const data = await EventEditSvc.forBooking(
         req.user!.userId,
         value.bookingId,
+        new Date(),
+        value.include === "reschedule",
       );
       return res.status(200).json({ success: true, data });
     } catch (e: unknown) {
