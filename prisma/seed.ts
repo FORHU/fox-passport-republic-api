@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { assertSchemaIsMigrated } from "./preflight";
+import { assertSeedVenues } from "./seeder/event-venues";
 import {
   seedUsers,
   seedVenues,
@@ -162,6 +163,8 @@ async function main() {
 
   // 14. Seed Promotions & Vouchers (fixed, memorable test codes)
   await seedPromotions(prisma);
+
+  await assertSeedVenues(prisma);
 
   console.log("Seeding completed successfully!");
 }

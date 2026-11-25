@@ -5,6 +5,13 @@ import {
   EventStatus,
   MatchRequestStatus,
 } from "@prisma/client";
+import {
+  BULK_EVENT_VENUES,
+  EVENT_VENUES,
+  PACKAGE_VENUES,
+  seedEventVenue,
+  seedPackageVenue,
+} from "./event-venues";
 
 // ── Deterministic IDs ────────────────────────────────────────────────────────
 const TEMPLATE_IDS = {
@@ -1713,6 +1720,13 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         });
       }
     }
+    for (const [templateId, venueId] of Object.entries(PACKAGE_VENUES)) {
+      // The multi-role packages exist only when that user does.
+      const exists = await prisma.eventTemplate.count({
+        where: { id: templateId },
+      });
+      if (exists) await seedPackageVenue(prisma, templateId, venueId);
+    }
     console.log(
       "✓ Template assets/services/venues attached with match statuses",
     );
@@ -1807,7 +1821,7 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         eventCategory: EventCategory.corporate,
         startAt: new Date(now.getTime() + 21 * 86400000),
         endAt: new Date(now.getTime() + 21 * 86400000 + 6 * 3600000),
-        guestCount: 200,
+        guestCount: 100,
         totalAmount: 80000,
         requestStatus: RequestStatus.pending,
         eventStatus: EventStatus.pending,
@@ -1892,6 +1906,15 @@ export async function seedEvents(prisma: PrismaClient, users: any[]) {
         },
         create: e,
       });
+      // The bulk events' totals are made up, so their venue takes no share.
+      await seedEventVenue(
+        prisma,
+        e.id,
+        EVENT_VENUES[e.id] ?? {
+          venueId: BULK_EVENT_VENUES[e.targetCity],
+          agreedPrice: 0,
+        },
+      );
       console.log(`✓ Seeded event: ${e.name}`);
     }
 

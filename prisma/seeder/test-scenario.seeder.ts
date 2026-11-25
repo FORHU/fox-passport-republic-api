@@ -78,6 +78,15 @@ async function main() {
       eventStatus: "ongoing",
     },
   });
+  await prisma.eventVenueTransaction.create({
+    data: {
+      eventId: event.id,
+      venueId: venue.id,
+      providerId: venueMayor.id,
+      status: "approved",
+      agreedPrice: 50000,
+    },
+  });
   console.log(`Created Event: ${event.name} (ID: ${event.id})`);
 
   // 5. Generate a lot of Gear (Assets) and Talent (Services)
