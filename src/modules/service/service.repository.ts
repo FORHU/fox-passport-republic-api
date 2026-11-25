@@ -50,7 +50,7 @@ export default class ServiceRepo {
       prisma.service.findMany({
         where,
         include: {
-          owner: { select: { id: true, name: true, email: true } },
+          owner: { select: { id: true, name: true } },
           images: true,
         },
         orderBy: { createdAt: "desc" },
@@ -149,7 +149,7 @@ export default class ServiceRepo {
         deletedAt: null,
       },
       include: {
-        owner: { select: { id: true, name: true, email: true } },
+        owner: { select: { id: true, name: true } },
         images: true,
       },
       orderBy: { createdAt: "desc" },
@@ -197,7 +197,7 @@ export default class ServiceRepo {
             }),
         },
         include: {
-          owner: { select: { id: true, name: true, email: true } },
+          owner: { select: { id: true, name: true } },
           images: true,
         },
       }),
@@ -208,7 +208,7 @@ export default class ServiceRepo {
     return prisma.service.findUnique({
       where: { id: String(id) },
       include: {
-        owner: { select: { id: true, name: true, email: true } },
+        owner: { select: { id: true, name: true } },
         images: true,
       },
     });
@@ -257,7 +257,7 @@ export default class ServiceRepo {
             }),
         },
         include: {
-          owner: { select: { id: true, name: true, email: true } },
+          owner: { select: { id: true, name: true } },
           images: true,
         },
       }),

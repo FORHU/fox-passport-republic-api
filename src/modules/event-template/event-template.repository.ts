@@ -67,7 +67,7 @@ export default class EventTemplateRepo {
         },
         include: {
           owner: {
-            select: { id: true, name: true, email: true, commissionPct: true },
+            select: { id: true, name: true, commissionPct: true },
           },
           images: true,
         },
@@ -114,7 +114,7 @@ export default class EventTemplateRepo {
         where,
         include: {
           owner: {
-            select: { id: true, name: true, email: true, commissionPct: true },
+            select: { id: true, name: true, commissionPct: true },
           },
           templateAssets: {
             include: { asset: { include: { images: { take: 1 } } } },
@@ -365,7 +365,6 @@ export default class EventTemplateRepo {
           select: {
             id: true,
             name: true,
-            email: true,
             commissionPct: true,
             // The host card's "Verified" badge (app#382) — display only.
             identityVerifiedAt: true,
@@ -396,7 +395,6 @@ export default class EventTemplateRepo {
             select: {
               id: true,
               name: true,
-              email: true,
               commissionPct: true,
               identityVerifiedAt: true,
             },
