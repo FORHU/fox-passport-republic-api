@@ -62,7 +62,7 @@ export default class SpecialtySuggestionRepo {
   static async approve(input: {
     slug: string;
     name: string;
-    listingRootId: string;
+    parentCategoryId: string;
     reviewerId: string;
   }) {
     return prisma.$transaction(async (tx) => {
@@ -70,7 +70,7 @@ export default class SpecialtySuggestionRepo {
         data: {
           slug: input.slug,
           name: input.name,
-          parentCategoryId: input.listingRootId,
+          parentCategoryId: input.parentCategoryId,
         },
       });
       await tx.providerSpecialtySuggestion.updateMany({

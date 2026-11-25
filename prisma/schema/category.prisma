@@ -1,7 +1,9 @@
 // The category catalog: display data for the category values listings carry.
 //
-// Two levels. The roots are the groups `event` and `listing`; every other row is
-// a subcategory of one of them. `slug` is the key that links a row to the
+// The roots are `event` and `listing`; every other row is a subcategory of one
+// of them. Provider specialties go one level deeper (api#503): a main category
+// (`isGroup`, such as Photo & Video) under `listing`, with its subcategories
+// (Photography, Videography) under it. Nothing is deeper. `slug` is the key that links a row to the
 // values stored on `Asset.category`, `Venue.category`, `Service.category` and
 // `EventTemplate.category`, so it never changes after creation. Listings still
 // validate their category against the enums in common.prisma, catalog.prisma
@@ -12,6 +14,10 @@ model Category {
   name                 String
   description          String?
   icon                 String?
+  /// A Provider main category under listing; its children are the specialties.
+  isGroup              Boolean                       @default(false)
+  /// No longer offered for new picks; still valid for Providers who hold it.
+  retiredAt            DateTime?
   parentCategoryId     String?
   parent               Category?                     @relation("CategoryTree", fields: [parentCategoryId], references: [id], onDelete: Restrict)
   children             Category[]                    @relation("CategoryTree")

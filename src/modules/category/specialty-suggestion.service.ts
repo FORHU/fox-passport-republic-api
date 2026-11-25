@@ -86,22 +86,39 @@ export default class SpecialtySuggestionSvc {
    * name the reviewer gives (or the one asked for), and closes every open
    * request for it.
    */
-  static async approve(id: string, actor: AuditActor, name?: string) {
+  static async approve(
+    id: string,
+    actor: AuditActor,
+    name?: string,
+    groupSlug?: string,
+  ) {
     const suggestion = await this.pending(id);
     if (await CategoryRepo.slugExists(suggestion.slug)) {
       throw conflict(
         "A category with this slug already exists; reject this suggestion",
       );
     }
-    const root = (await CategoryRepo.getTopLevelCategories()).find(
-      (c) => c.slug === "listing",
-    );
-    if (!root) throw notFound("Listing category");
+    // Under the main category the reviewer picks (api#503); without one it
+    // goes under Listing as before, and the picker lists it ungrouped.
+    let parentId: string;
+    if (groupSlug) {
+      const group = (await CategoryRepo.getProviderGroups()).find(
+        (g) => g.slug === groupSlug,
+      );
+      if (!group) throw badRequest(`Unknown main category: ${groupSlug}`);
+      parentId = group.id;
+    } else {
+      const root = (await CategoryRepo.getTopLevelCategories()).find(
+        (c) => c.slug === "listing",
+      );
+      if (!root) throw notFound("Listing category");
+      parentId = root.id;
+    }
 
     const category = await SpecialtySuggestionRepo.approve({
       slug: suggestion.slug,
       name: name?.trim() || suggestion.name,
-      listingRootId: root.id,
+      parentCategoryId: parentId,
       reviewerId: actor.userId,
     });
     await CategoryRepo.invalidateAll();

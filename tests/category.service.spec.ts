@@ -188,6 +188,96 @@ describe("CategorySvc.updateCategory", () => {
   });
 });
 
+describe("Provider main categories (api#503)", () => {
+  const PHOTO_VIDEO = "00000000-0000-4000-8000-000000000020";
+  const PHOTOGRAPHY = "00000000-0000-4000-8000-000000000021";
+  const EVENT_GROUP = "00000000-0000-4000-8000-000000000022";
+  const tree: Record<string, Record<string, unknown>> = {
+    ...rows,
+    [PHOTO_VIDEO]: {
+      id: PHOTO_VIDEO,
+      slug: "photo_video",
+      isGroup: true,
+      parentCategoryId: LISTING_ROOT,
+    },
+    [PHOTOGRAPHY]: {
+      id: PHOTOGRAPHY,
+      slug: "photography",
+      isGroup: false,
+      parentCategoryId: PHOTO_VIDEO,
+    },
+    // A main category in the wrong place: under event.
+    [EVENT_GROUP]: {
+      id: EVENT_GROUP,
+      slug: "odd_group",
+      isGroup: true,
+      parentCategoryId: EVENT_ROOT,
+    },
+  };
+  const input = { name: "Photo booth", slug: "photo_booth" };
+
+  beforeEach(() => {
+    repo.findById.mockImplementation(async (id: string) => tree[id] ?? null);
+    repo.hasChildren = vi.fn(async (id: string) => id === PHOTO_VIDEO);
+  });
+
+  it("takes a main category under Listing as a parent", async () => {
+    await expect(
+      CategorySvc.createCategory(
+        { ...input, parentCategoryId: PHOTO_VIDEO },
+        actor,
+      ),
+    ).resolves.toMatchObject({ parentCategoryId: PHOTO_VIDEO });
+  });
+
+  it("goes no deeper than a main category's subcategories", async () => {
+    await expect(
+      CategorySvc.createCategory(
+        { ...input, parentCategoryId: PHOTOGRAPHY },
+        actor,
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("refuses a main category that isn't under Listing", async () => {
+    await expect(
+      CategorySvc.createCategory(
+        { ...input, parentCategoryId: EVENT_GROUP },
+        actor,
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("moves a main category only under Listing", async () => {
+    await expect(
+      CategorySvc.updateCategory(
+        PHOTO_VIDEO,
+        { parentCategoryId: EVENT_ROOT },
+        actor,
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("won't put a category with subcategories under a main category", async () => {
+    tree.other_group = {
+      id: "other_group",
+      slug: "other_group",
+      isGroup: true,
+      parentCategoryId: LISTING_ROOT,
+    };
+    // photo_video is a main category itself, so the group rule refuses it
+    // first; a plain row with children is refused by the depth rule.
+    repo.hasChildren = vi.fn(async () => true);
+    await expect(
+      CategorySvc.updateCategory(
+        BIRTHDAY,
+        { parentCategoryId: "other_group" },
+        actor,
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+});
+
 describe("CategorySvc.getAllCategories", () => {
   const list = [
     { name: "birthday", isEventCategory: true, count: 0 },

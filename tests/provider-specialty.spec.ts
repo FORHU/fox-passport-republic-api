@@ -31,15 +31,134 @@ beforeEach(() => {
 });
 
 describe("catalog query", () => {
-  it("looks under the listing group and leaves out venue categories", async () => {
+  it("looks under the main categories and listing, leaving out venue categories", async () => {
     await CategoryRepo.getProviderSpecialties();
 
     const { where } = prisma.category.findMany.mock.calls[0][0];
-    expect(where.parent).toEqual({ slug: "listing" });
-    expect(where.slug.notIn).toEqual(
+    expect(where.isGroup).toBe(false);
+    expect(where.OR[0]).toEqual({
+      parent: { isGroup: true, parent: { slug: "listing" } },
+    });
+    expect(where.OR[1].parent).toEqual({ slug: "listing" });
+    expect(where.OR[1].slug.notIn).toEqual(
       expect.arrayContaining(["indoor", "outdoor", "hotel", "beach_resort"]),
     );
-    expect(where.slug.notIn).not.toContain("photography");
+    expect(where.OR[1].slug.notIn).not.toContain("photography");
+  });
+
+  it("gives each its main category, grouped, ungrouped last, retired left out (api#503)", async () => {
+    const photo = {
+      slug: "photo_video",
+      name: "Photo & Video",
+      icon: "photo_camera",
+      isGroup: true,
+    };
+    const music = {
+      slug: "music_entertainment",
+      name: "Music & Entertainment",
+      icon: "music_note",
+      isGroup: true,
+    };
+    const listing = {
+      slug: "listing",
+      name: "Listing",
+      icon: null,
+      isGroup: false,
+    };
+    prisma.category.findMany.mockResolvedValue([
+      {
+        slug: "videography",
+        name: "Videography",
+        retiredAt: null,
+        parent: photo,
+      },
+      {
+        slug: "photography",
+        name: "Photography",
+        retiredAt: null,
+        parent: photo,
+      },
+      { slug: "dj", name: "DJ", retiredAt: null, parent: music },
+      {
+        slug: "kite_flying",
+        name: "Kite flying",
+        retiredAt: null,
+        parent: listing,
+      },
+      {
+        slug: "entertainment",
+        name: "Entertainment",
+        retiredAt: new Date(),
+        parent: listing,
+      },
+    ]);
+
+    const list = await CategoryRepo.getProviderSpecialties();
+
+    expect(list).toEqual([
+      {
+        slug: "dj",
+        name: "DJ",
+        group: {
+          slug: "music_entertainment",
+          name: "Music & Entertainment",
+          icon: "music_note",
+        },
+      },
+      {
+        slug: "photography",
+        name: "Photography",
+        group: {
+          slug: "photo_video",
+          name: "Photo & Video",
+          icon: "photo_camera",
+        },
+      },
+      {
+        slug: "videography",
+        name: "Videography",
+        group: {
+          slug: "photo_video",
+          name: "Photo & Video",
+          icon: "photo_camera",
+        },
+      },
+      { slug: "kite_flying", name: "Kite flying", group: null },
+    ]);
+  });
+
+  it("still names a retired specialty, for Providers who hold it", async () => {
+    prisma.category.findMany.mockResolvedValue([
+      {
+        slug: "entertainment",
+        name: "Entertainment",
+        retiredAt: new Date(),
+        parent: null,
+      },
+    ]);
+    const names = await CategoryRepo.getProviderSpecialtyNames();
+    expect(names.get("entertainment")).toBe("Entertainment");
+  });
+
+  it("refuses a retired specialty for a new pick, keeps it for one who holds it", async () => {
+    prisma.category.findMany.mockResolvedValue([
+      { slug: "dj", name: "DJ", retiredAt: null, parent: null },
+      {
+        slug: "entertainment",
+        name: "Entertainment",
+        retiredAt: new Date(),
+        parent: null,
+      },
+    ]);
+    await expect(
+      ProviderSpecialtySvc.check(["entertainment"]),
+    ).resolves.toEqual({
+      ok: false,
+      message: "Unknown specialty: entertainment",
+    });
+    await expect(
+      ProviderSpecialtySvc.check(["dj", "entertainment"], ["entertainment"]),
+    ).resolves.toEqual({ ok: true, slugs: ["dj", "entertainment"] });
   });
 });
 

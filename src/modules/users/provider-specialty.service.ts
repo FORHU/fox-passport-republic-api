@@ -25,8 +25,9 @@ export default class ProviderSpecialtySvc {
       foxerSpecializations?: { roleType: string; category: string }[];
     },
   >(users: T[]) {
-    const catalog = await this.list();
-    const names = new Map(catalog.map((c) => [c.slug, c.name]));
+    // Retired specialties included, so one a Provider still holds keeps its
+    // name (api#503).
+    const names = await CategoryRepo.getProviderSpecialtyNames();
     return users.map((user) => {
       if (!user.roleType?.includes("providerFoxer")) return user;
       const slugs = [

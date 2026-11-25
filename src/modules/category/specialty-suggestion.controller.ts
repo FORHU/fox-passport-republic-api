@@ -19,6 +19,12 @@ const ID_PARAMS = Joi.object({ id: Joi.string().uuid().required() });
 
 const APPROVE_BODY = Joi.object({
   name: Joi.string().trim().min(2).max(100).optional(),
+  // The main category it goes under (api#503); none keeps it ungrouped.
+  group: Joi.string()
+    .trim()
+    .max(60)
+    .pattern(/^[a-z0-9_]+$/)
+    .optional(),
 });
 
 const actorOf = (req: Request) => ({
@@ -84,6 +90,7 @@ export default class SpecialtySuggestionController {
         params.value.id,
         actorOf(req),
         body.value.name,
+        body.value.group,
       );
       announceAdminQueueChanged();
       return res.status(200).json({

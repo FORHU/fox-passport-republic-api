@@ -26,7 +26,12 @@ export type CategorySummary = {
   description: string | null;
   icon: string | null;
   parentCategoryId: string | null;
+  /** The root it sits under, even two levels down. */
   group: CategoryGroup | null;
+  /** A Provider main category (api#503); no listing carries it. */
+  isGroup: boolean;
+  /** No longer offered for new Provider picks. */
+  retired: boolean;
 };
 
 export type CategoryWrite = {
@@ -73,7 +78,11 @@ export default class CategoryRepo {
       await Promise.all([
         prisma.category.findMany({
           where: { parentCategoryId: { not: null } },
-          include: { parent: { select: { slug: true } } },
+          include: {
+            parent: {
+              select: { slug: true, parent: { select: { slug: true } } },
+            },
+          },
         }),
         prisma.asset.groupBy({
           by: ["category"],
@@ -102,7 +111,11 @@ export default class CategoryRepo {
 
     // The catalog first, so every subcategory appears even with no listings.
     for (const row of catalog) {
-      const group = (row.parent?.slug ?? null) as CategoryGroup | null;
+      // The root: a specialty under a main category (api#503) is still a
+      // listing category.
+      const group = (row.parent?.parent?.slug ??
+        row.parent?.slug ??
+        null) as CategoryGroup | null;
       map.set(row.slug, {
         name: row.slug,
         count: 0,
@@ -115,6 +128,8 @@ export default class CategoryRepo {
         icon: row.icon,
         parentCategoryId: row.parentCategoryId,
         group,
+        isGroup: row.isGroup,
+        retired: row.retiredAt !== null,
       });
     }
 
@@ -136,6 +151,8 @@ export default class CategoryRepo {
         icon: null,
         parentCategoryId: null,
         group: isEvent ? "event" : "listing",
+        isGroup: false,
+        retired: false,
       };
       map.set(key, created);
       return created;
@@ -214,6 +231,12 @@ export default class CategoryRepo {
     throw new Error("Deleting categories is not supported yet");
   }
 
+  static async hasChildren(id: string) {
+    return (
+      (await prisma.category.count({ where: { parentCategoryId: id } })) > 0
+    );
+  }
+
   static async categoryExists(id: string) {
     return !!(await this.findById(id));
   }
@@ -227,18 +250,83 @@ export default class CategoryRepo {
   }
 
   /**
-   * The specialties a Provider can declare: the listing subcategories that are
-   * not venue categories, since a Provider lists services and equipment, never a
-   * venue. Read live, so a subcategory an admin adds is valid at once.
+   * Every Provider specialty row, retired ones included: the subcategories of a
+   * main category, plus the listing subcategories that sit directly under
+   * `listing` and are neither a venue category nor a main category (the older,
+   * ungrouped ones). Venue categories are left out: a Provider lists services
+   * and equipment, never a venue.
    */
-  static async getProviderSpecialties() {
+  private static async providerSpecialtyRows() {
     return prisma.category.findMany({
       where: {
-        parent: { slug: "listing" },
-        slug: { notIn: Object.values(VenueCategory) },
+        isGroup: false,
+        OR: [
+          { parent: { isGroup: true, parent: { slug: "listing" } } },
+          {
+            parent: { slug: "listing" },
+            slug: { notIn: Object.values(VenueCategory) },
+          },
+        ],
       },
-      select: { slug: true, name: true },
+      select: {
+        slug: true,
+        name: true,
+        retiredAt: true,
+        parent: {
+          select: { slug: true, name: true, icon: true, isGroup: true },
+        },
+      },
+    });
+  }
+
+  /**
+   * The specialties a Provider can declare, each with its main category
+   * (`group`, null for an older one that has none), grouped by main category
+   * and then by name, with the ungrouped ones last. Retired ones are left out.
+   * Read live, so a subcategory an admin adds is valid at once.
+   */
+  static async getProviderSpecialties(): Promise<ProviderSpecialty[]> {
+    const rows = await this.providerSpecialtyRows();
+    return rows
+      .filter((r) => !r.retiredAt)
+      .map((r) => ({
+        slug: r.slug,
+        name: r.name,
+        group: r.parent?.isGroup
+          ? { slug: r.parent.slug, name: r.parent.name, icon: r.parent.icon }
+          : null,
+      }))
+      .sort((a, b) => {
+        if (!a.group !== !b.group) return a.group ? -1 : 1;
+        const byGroup = (a.group?.name ?? "").localeCompare(
+          b.group?.name ?? "",
+        );
+        return byGroup !== 0 ? byGroup : a.name.localeCompare(b.name);
+      });
+  }
+
+  /**
+   * Display names for every Provider specialty, retired ones included, so a
+   * Provider who still holds one sees its name rather than its slug.
+   */
+  static async getProviderSpecialtyNames(): Promise<Map<string, string>> {
+    const rows = await this.providerSpecialtyRows();
+    return new Map(rows.map((r) => [r.slug, r.name]));
+  }
+
+  /** The main categories under `listing`, by name. */
+  static async getProviderGroups() {
+    return prisma.category.findMany({
+      where: { isGroup: true, parent: { slug: "listing" } },
+      select: { id: true, slug: true, name: true, icon: true },
       orderBy: { name: "asc" },
     });
   }
 }
+
+export type ProviderSpecialty = {
+  slug: string;
+  name: string;
+  /** Its main category; null for an older specialty that has none. */
+  group: { slug: string; name: string; icon: string | null } | null;
+};
