@@ -156,13 +156,14 @@ async function notifyMediaTags(
   );
   if (uniqueUserIds.length === 0) return;
 
+  const name = await actorName(actorId);
   await Promise.all(
     uniqueUserIds.map((userId) =>
       NotificationService.create({
         userId,
         type: "feed:media_tag",
         title: "You were tagged in a photo",
-        message: "Someone tagged you in a photo on the Republic feed.",
+        message: `${name} tagged you in a photo on the Republic feed.`,
         metadata: feedTargetMetadata({ postId }),
       }).catch((err) =>
         console.warn(
@@ -712,11 +713,12 @@ export default class FeedService {
     broadcastNewPost(post);
 
     if (original.authorId !== user.userId) {
+      const name = await actorName(user.userId);
       NotificationService.create({
         userId: original.authorId,
         type: "feed:repost",
         title: "Your post was reposted",
-        message: `${user.email} reposted your post.`,
+        message: `${name} reposted your post.`,
         metadata: {
           ...feedTargetMetadata({ postId }),
           repostId: post.id,
@@ -976,11 +978,12 @@ export default class FeedService {
     const result = await FeedRepo.toggleCommentLike(commentId, user.userId);
 
     if (result.liked && comment.authorId !== user.userId) {
+      const name = await actorName(user.userId);
       NotificationService.create({
         userId: comment.authorId,
         type: "feed:comment_like",
         title: "New Like on your Comment",
-        message: `${user.email} liked your comment.`,
+        message: `${name} liked your comment.`,
         metadata: {
           ...feedTargetMetadata({
             postId: comment.postId,
@@ -1016,11 +1019,12 @@ export default class FeedService {
     const tag = await FeedRepo.createMediaTag(postId, input);
 
     if (input.userId !== user.userId) {
+      const name = await actorName(user.userId);
       NotificationService.create({
         userId: input.userId,
         type: "feed:media_tag",
         title: "You were tagged in a photo",
-        message: `${user.email} tagged you in a photo on the Republic feed.`,
+        message: `${name} tagged you in a photo on the Republic feed.`,
         metadata: {
           ...feedTargetMetadata({ postId }),
           tagId: tag.id,
