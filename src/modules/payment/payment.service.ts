@@ -542,13 +542,10 @@ export default class PaymentSvc {
    * here. Everything below used to sit in the controller with its own `prisma`
    * calls; see `docs/REDIS-PLAN.md` §0b.
    *
-   * Nothing in here throws, except the events the controller runs inside
-   * `WebhookSvc.processEventWithIdempotency` (`account.updated`,
-   * `charge.dispute.*`): for those a throw leaves the event unprocessed and
-   * the 5xx makes Stripe retry it, which is what they need. For the rest a
-   * webhook that 500s gets retried by Stripe, and every one of these paths is
-   * either idempotent or already committed, so a retry storm would achieve
-   * nothing but load.
+   * Every event handled here runs inside the controller's
+   * `WebhookSvc.processEventWithIdempotency` (api#362): a redelivery is
+   * skipped, and a throw leaves the event unprocessed and the 5xx makes
+   * Stripe retry it. So a handler throws only for what a retry could fix.
    */
   static async handleStripeEvent(event: Stripe.Event): Promise<void> {
     switch (event.type) {
@@ -558,11 +555,9 @@ export default class PaymentSvc {
         );
         break;
 
-      case "payment_intent.payment_failed": {
-        const failedIntent = event.data.object as Stripe.PaymentIntent;
-        console.log(`❌ PaymentIntent failed: ${failedIntent.id}`);
+      case "payment_intent.payment_failed":
+        await this.markIntentFailed(event.data.object as Stripe.PaymentIntent);
         break;
-      }
 
       case "charge.refunded":
         await this.markChargeRefunded(event.data.object as Stripe.Charge);
@@ -666,18 +661,32 @@ export default class PaymentSvc {
       const recorded = await PaymentRepo.getPaymentByTransactionId(
         paymentIntent.id,
       );
-      const pendingPayment = recorded
-        ? null
-        : (await this.getBookingPayments(bookingId)).find(
-            (p) => p.status === PaymentStatus.pending,
-          );
-      const target = recorded ?? pendingPayment;
+      // A declined attempt left the payment `failed` (`markIntentFailed`);
+      // the retry that succeeds may come on a new PaymentIntent, so it
+      // settles that payment too rather than recording a second one.
+      const payments = recorded ? [] : await this.getBookingPayments(bookingId);
+      const openPayment =
+        payments.find((p) => p.status === PaymentStatus.pending) ??
+        payments.find((p) => p.status === PaymentStatus.failed);
+      const target = recorded ?? openPayment;
 
       if (target) {
+        // Swept as expired (`cancelExpiredPayments`) before this success
+        // arrived: the client was charged for a cancelled booking. A person
+        // decides (refund or reinstate); logged below as an AppError.
+        if (target.status === PaymentStatus.cancelled) {
+          throw new AppError(
+            "Payment was cancelled before Stripe confirmed it",
+            409,
+          );
+        }
         if (target.providerReference !== paymentIntent.id) {
           await PaymentRepo.setTransactionId(target.id, paymentIntent.id);
         }
-        if (target.status === PaymentStatus.pending) {
+        if (
+          target.status === PaymentStatus.pending ||
+          target.status === PaymentStatus.failed
+        ) {
           await this.updatePayment(target.id, {
             paymentStatus: PaymentStatus.paid,
           });
@@ -746,20 +755,86 @@ export default class PaymentSvc {
     }
   }
 
-  /** Stripe refunded a charge outside our own refund flow. */
+  /**
+   * A card payment for a booking was declined (api#362). The booking's
+   * payment is marked `failed` and linked to the PaymentIntent; the booking
+   * itself stays unpaid. The payer can retry, and a success then settles the
+   * same payment (`settleSucceededIntent`). Intents without
+   * `metadata.bookingId` are not booking payments (see `settleSucceededIntent`).
+   */
+  private static async markIntentFailed(
+    paymentIntent: Stripe.PaymentIntent,
+  ): Promise<void> {
+    const bookingId = paymentIntent.metadata?.bookingId;
+    const reason = paymentIntent.last_payment_error?.message ?? "unknown";
+    console.log(
+      `❌ PaymentIntent failed: ${paymentIntent.id} for booking ${bookingId ?? "-"}: ${reason}`,
+    );
+    if (!bookingId) return;
+
+    const recorded = await PaymentRepo.getPaymentByTransactionId(
+      paymentIntent.id,
+    );
+    const target =
+      recorded ??
+      (await this.getBookingPayments(bookingId)).find(
+        (p) => p.status === PaymentStatus.pending,
+      );
+    if (!target || target.status !== PaymentStatus.pending) return;
+
+    if (target.providerReference !== paymentIntent.id) {
+      await PaymentRepo.setTransactionId(target.id, paymentIntent.id);
+    }
+    await PaymentRepo.markFailed(target.id);
+  }
+
+  /**
+   * Stripe refunded a charge, from our own refund flow or the dashboard.
+   * `charge.refunded` is true only once the whole charge is refunded; a
+   * partial refund arrives with it false and `amount_refunded` set (api#362).
+   *
+   * A full refund does not change the booking: our cancellation flow cancels
+   * it itself, and a refund made in the Stripe dashboard on a booking that is
+   * still on is a call for a person (owner decision, api#362).
+   */
   private static async markChargeRefunded(
     charge: Stripe.Charge,
   ): Promise<void> {
-    if (!charge.refunded || !charge.payment_intent) return;
+    if (!charge.payment_intent || !(charge.amount_refunded > 0)) return;
 
     const piId =
       typeof charge.payment_intent === "string"
         ? charge.payment_intent
         : charge.payment_intent.id;
 
-    const payment = await PaymentRepo.findFirstByTransactionId(piId);
+    const payment = await PaymentRepo.getPaymentByTransactionId(piId);
     if (!payment) return;
 
-    await PaymentRepo.markRefunded(payment.id);
+    const full = charge.refunded;
+    const { count } = await PaymentRepo.markRefundStatus(payment.id, full);
+    if (!full || count === 0) return;
+
+    const bookingId = payment.invoice?.items[0]?.sourceId;
+    const booking = bookingId
+      ? await BookingRepo.findPaymentContext(bookingId)
+      : null;
+    if (
+      booking &&
+      (booking.status === BookingStatus.pending ||
+        booking.status === BookingStatus.confirmed ||
+        booking.status === BookingStatus.active)
+    ) {
+      console.error(
+        "[PAYMENT-ATTENTION] Payment fully refunded at Stripe but the booking is still on - check whether it should be cancelled:",
+        JSON.stringify({
+          bookingId,
+          bookingStatus: booking.status,
+          paymentId: payment.id,
+          paymentIntentId: piId,
+          amountRefunded: charge.amount_refunded,
+          currency: charge.currency,
+        }),
+      );
+    }
   }
 }

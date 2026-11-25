@@ -112,6 +112,75 @@ describe("settleSucceededIntent", () => {
     expect(spies.update).not.toHaveBeenCalled();
   });
 
+  // api#362: a declined card left the payment `failed`; the retry that
+  // succeeds settles that same payment, even on a new PaymentIntent.
+  it("settles a payment a declined attempt left failed", async () => {
+    setup({
+      pending: [
+        { id: "pay_1", status: PaymentStatus.failed, providerReference: "pi_old" },
+      ],
+    });
+    await settle();
+
+    expect(spies.setRef).toHaveBeenCalledWith("pay_1", "pi_test_1");
+    expect(spies.update).toHaveBeenCalledWith("pay_1", {
+      paymentStatus: PaymentStatus.paid,
+    });
+    expect(spies.create).not.toHaveBeenCalled();
+    expect(spies.confirm).toHaveBeenCalledWith("bk_1");
+  });
+
+  it("settles a failed payment already linked to the same PaymentIntent", async () => {
+    setup({
+      recorded: {
+        id: "pay_1",
+        status: PaymentStatus.failed,
+        providerReference: "pi_test_1",
+      },
+    });
+    await settle();
+
+    expect(spies.setRef).not.toHaveBeenCalled();
+    expect(spies.update).toHaveBeenCalledWith("pay_1", {
+      paymentStatus: PaymentStatus.paid,
+    });
+    expect(spies.confirm).toHaveBeenCalledWith("bk_1");
+  });
+
+  it("flags a success for a payment already swept as expired, and changes nothing", async () => {
+    setup({
+      recorded: {
+        id: "pay_1",
+        status: PaymentStatus.cancelled,
+        providerReference: "pi_test_1",
+      },
+    });
+
+    await expect(settle()).resolves.toBeUndefined();
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("[PAYMENT-ATTENTION]"),
+      expect.stringContaining("cancelled before Stripe confirmed"),
+    );
+    expect(spies.update).not.toHaveBeenCalled();
+    expect(spies.create).not.toHaveBeenCalled();
+    expect(spies.confirm).not.toHaveBeenCalled();
+  });
+
+  it("prefers a pending payment over an older failed one", async () => {
+    setup({
+      pending: [
+        { id: "pay_failed", status: PaymentStatus.failed, providerReference: "pi_old" },
+        pendingPayment,
+      ],
+    });
+    await settle();
+
+    expect(spies.update).toHaveBeenCalledWith("pay_1", {
+      paymentStatus: PaymentStatus.paid,
+    });
+  });
+
   it("finishes a payment a previous delivery only got as far as tagging", async () => {
     setup({
       recorded: {
