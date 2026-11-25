@@ -181,6 +181,8 @@ describe("EventConflictSvc.needsAttention", () => {
         itemName: "Sound system",
         reason: "declined",
         cause: null,
+        declineReason: null,
+        declineNote: null,
         pendingProposalId: null,
         replaceBy: null,
       },

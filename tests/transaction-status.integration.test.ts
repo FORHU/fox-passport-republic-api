@@ -411,6 +411,57 @@ describe("TransactionStatusSvc — centralized transitions, authorization, deadl
       expect((result as any).rejectionReason).toBe("supplier_declined_busy");
     });
 
+    it("stores the Supplier's reason and note (api#476)", async () => {
+      const row = await makeAdHocRow({
+        status: "approved",
+        confirmationDeadline: null,
+      });
+      const result = await prisma.$transaction((tx) =>
+        TransactionStatusSvc.transition(tx, {
+          id: row.id,
+          kind: "asset",
+          action: "decline",
+          actorId: providerId,
+          reason: "other",
+          note: "  The truck broke down.  ",
+        }),
+      );
+      expect((result as any).declineReason).toBe("other");
+      // Trimmed before it is stored.
+      expect((result as any).declineNote).toBe("The truck broke down.");
+    });
+
+    it("stores a reason on a turned-down request too, and a blank note as none", async () => {
+      const row = await makeAdHocRow();
+      const result = await prisma.$transaction((tx) =>
+        TransactionStatusSvc.transition(tx, {
+          id: row.id,
+          kind: "asset",
+          action: "reject",
+          actorId: providerId,
+          reason: "closed",
+          note: "   ",
+        }),
+      );
+      expect((result as any).rejectionReason).toBe("provider_declined");
+      expect((result as any).declineReason).toBe("closed");
+      expect((result as any).declineNote).toBeNull();
+    });
+
+    it("clears an old reason when a decline gives none", async () => {
+      const row = await makeAdHocRow({
+        status: "approved",
+        confirmationDeadline: null,
+      });
+      await prisma.eventAssetTransaction.update({
+        where: { id: row.id },
+        data: { declineReason: "not_suitable", declineNote: "Too loud" },
+      });
+      const result = await decline(row.id, providerId);
+      expect((result as any).declineReason).toBeNull();
+      expect((result as any).declineNote).toBeNull();
+    });
+
     it("lets the provider decline an item already approved, while unpaid", async () => {
       const row = await makeAdHocRow({
         status: "approved",

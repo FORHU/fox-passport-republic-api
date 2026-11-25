@@ -1,4 +1,7 @@
-import type { EventEditProposalStatus } from "@prisma/client";
+import type {
+  EventEditProposalStatus,
+  SupplierDeclineReason,
+} from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { notFound } from "../../utils/errors";
 import NotificationSvc from "../notifications/user-notification.service";
@@ -32,6 +35,9 @@ export interface ConflictIssue {
   reason: ConflictReason;
   /** "busy" when a declining Supplier has another booking then. */
   cause: "busy" | null;
+  /** The Supplier's own reason and words when it said no (api#476). */
+  declineReason: SupplierDeclineReason | null;
+  declineNote: string | null;
   /** A replacement the host proposed, waiting for the citizen's answer. */
   pendingProposalId: string | null;
   /** When the citizen may cancel for a full refund if it isn't replaced. */
@@ -56,6 +62,9 @@ export interface BookedSupplierRow {
   reason: ConflictReason | null;
   /** "busy" when a declining Supplier has another booking then. */
   cause: "busy" | null;
+  /** The Supplier's own reason and words when it said no (api#476). */
+  declineReason: SupplierDeclineReason | null;
+  declineNote: string | null;
   /** A replacement the host proposed, waiting for the citizen's answer. */
   pendingProposalId: string | null;
   /** When the citizen may cancel for a full refund if it isn't replaced. */
@@ -156,6 +165,8 @@ const EVENT_WITH_SUPPLIERS = {
       assetId: true,
       status: true,
       rejectionReason: true,
+      declineReason: true,
+      declineNote: true,
       attentionSince: true,
       updatedAt: true,
       provider: { select: { name: true } },
@@ -168,6 +179,8 @@ const EVENT_WITH_SUPPLIERS = {
       serviceId: true,
       status: true,
       rejectionReason: true,
+      declineReason: true,
+      declineNote: true,
       attentionSince: true,
       updatedAt: true,
       provider: { select: { name: true } },
@@ -180,6 +193,8 @@ const EVENT_WITH_SUPPLIERS = {
       venueId: true,
       status: true,
       rejectionReason: true,
+      declineReason: true,
+      declineNote: true,
       attentionSince: true,
       updatedAt: true,
       provider: { select: { name: true } },
@@ -220,6 +235,8 @@ type EventRow = {
     id: string;
     status: string;
     rejectionReason: string | null;
+    declineReason?: SupplierDeclineReason | null;
+    declineNote?: string | null;
     attentionSince?: Date | null;
     updatedAt?: Date;
     assetId?: string;
@@ -230,6 +247,8 @@ type EventRow = {
     id: string;
     status: string;
     rejectionReason: string | null;
+    declineReason?: SupplierDeclineReason | null;
+    declineNote?: string | null;
     attentionSince?: Date | null;
     updatedAt?: Date;
     serviceId?: string;
@@ -240,6 +259,8 @@ type EventRow = {
     id: string;
     status: string;
     rejectionReason: string | null;
+    declineReason?: SupplierDeclineReason | null;
+    declineNote?: string | null;
     attentionSince?: Date | null;
     updatedAt?: Date;
     venueId?: string;
@@ -277,7 +298,10 @@ const declineCause = (t: { rejectionReason: string | null }): "busy" | null =>
 
 /** Every Supplier of an event, each with why it needs replacing, if it does. */
 function supplierRows(e: EventRow): BookedSupplierRow[] {
-  type Raw = Omit<BookedSupplierRow, "pendingProposalId" | "replaceBy">;
+  type Raw = Omit<
+    BookedSupplierRow,
+    "pendingProposalId" | "replaceBy" | "declineReason" | "declineNote"
+  >;
   const raw: Raw[] = [];
   const rows = { push: (r: Raw) => raw.push(r) };
 
@@ -367,6 +391,8 @@ function supplierRows(e: EventRow): BookedSupplierRow[] {
       rejectionReason: string | null;
       attentionSince?: Date | null;
       updatedAt?: Date;
+      declineReason?: SupplierDeclineReason | null;
+      declineNote?: string | null;
     }
   >(
     [
@@ -398,6 +424,9 @@ function supplierRows(e: EventRow): BookedSupplierRow[] {
         ...r,
         reason,
         pendingProposalId: waiting.get(r.transactionId) ?? null,
+        // Only while the line needs replacing because its Supplier said no.
+        declineReason: reason === "declined" ? (t.declineReason ?? null) : null,
+        declineNote: reason === "declined" ? (t.declineNote ?? null) : null,
         replaceBy: reason && since ? replaceByFor(since, e.startAt) : null,
       };
     });
@@ -438,6 +467,8 @@ export default class EventConflictSvc {
             itemName: r.itemName,
             reason: r.reason,
             cause: r.cause,
+            declineReason: r.declineReason,
+            declineNote: r.declineNote,
             pendingProposalId: r.pendingProposalId,
             replaceBy: r.replaceBy,
           });
