@@ -241,6 +241,10 @@ const ALLOW_LIST = new Set([
   // keyed by the session user id. FeedRepo.recordViews skips the caller's own
   // posts and posts they can't see; rate limited per account.
   "feed.routes.ts POST /views",
+  // Comment reactions (api#427): the signed-in user sets only their own
+  // reaction, keyed by the session user id. FeedService.setCommentReaction
+  // checks the comment belongs to the post and the caller can see the post.
+  "feed.routes.ts POST /:id/comments/:commentId/reaction",
 ]);
 
 const BANNED_GUARDS = ["requireRole", "requireAdmin", "requireHost"];

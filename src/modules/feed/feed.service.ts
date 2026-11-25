@@ -29,6 +29,8 @@ import { can } from "../../types/permissions";
 import {
   announceNewPost,
   announcePostCommentsCount,
+  announcePostReactionsCount,
+  announceCommentReactionsCount,
 } from "../../infrastructure/socket/invalidate";
 
 /**
@@ -44,8 +46,14 @@ export interface GetFeedInput extends QueryFeedOptions {
 }
 
 /** Tells open feeds a public post exists. Best-effort, like the comment count. */
-function broadcastNewPost(post: { visibility: PostVisibility; tab: FeedTab }) {
-  if (post.visibility === PostVisibility.public) announceNewPost(post.tab);
+function broadcastNewPost(post: {
+  visibility: PostVisibility;
+  tab: FeedTab;
+  authorId: string;
+}) {
+  if (post.visibility === PostVisibility.public) {
+    announceNewPost(post.tab, post.authorId);
+  }
 }
 
 export interface MediaTagInput {
@@ -766,6 +774,12 @@ export default class FeedService {
 
     const result = await FeedRepo.setReaction(postId, user.userId, type);
 
+    // Live count for everyone else looking at the post (api#427). Public
+    // posts only, as for the comment count: the event reaches every socket.
+    if (post.visibility === PostVisibility.public) {
+      announcePostReactionsCount(postId, result.likesCount);
+    }
+
     if (type && !post.isLikedByMe && post.authorId !== user.userId) {
       const name = await actorName(user.userId);
       NotificationService.create({
@@ -968,31 +982,98 @@ export default class FeedService {
     return deleted;
   }
 
+  /**
+   * Sets, swaps or (with `type: null`) removes the viewer's reaction on a
+   * comment — the same six reactions as a post (api#427). The comment must
+   * belong to `postId` and the post must be visible to the viewer, as for
+   * reading its comments.
+   */
+  static async setCommentReaction(
+    postId: string,
+    commentId: string,
+    user: AuthenticatedUser,
+    type: ReactionType | null,
+  ) {
+    const comment = await FeedRepo.findCommentById(commentId);
+    if (!comment || comment.postId !== postId) {
+      throw notFound("Comment");
+    }
+    return FeedService.applyCommentReaction(comment, user, type);
+  }
+
+  /**
+   * The original heart toggle, kept for clients that only know likes
+   * (mobile): no reaction becomes "like", any reaction is removed.
+   */
   static async toggleCommentLike(commentId: string, user: AuthenticatedUser) {
     const comment = await FeedRepo.findCommentById(commentId);
     if (!comment) {
       throw notFound("Comment");
     }
-    const result = await FeedRepo.toggleCommentLike(commentId, user.userId);
+    const current = await FeedRepo.findCommentReaction(commentId, user.userId);
+    const result = await FeedService.applyCommentReaction(
+      comment,
+      user,
+      current ? null : ReactionType.like,
+    );
+    return { liked: result.liked, likesCount: result.likesCount };
+  }
 
-    if (result.liked && comment.authorId !== user.userId) {
+  private static async applyCommentReaction(
+    comment: {
+      id: string;
+      postId: string;
+      authorId: string;
+      parentId: string | null;
+    },
+    user: AuthenticatedUser,
+    type: ReactionType | null,
+  ) {
+    const post = await FeedRepo.findPostById(comment.postId, user.userId);
+    if (!post) {
+      throw notFound("Post");
+    }
+
+    const { previous, ...result } = await FeedRepo.setCommentReaction(
+      comment.id,
+      user.userId,
+      type,
+    );
+
+    if (post.visibility === PostVisibility.public) {
+      announceCommentReactionsCount(
+        comment.postId,
+        comment.id,
+        result.likesCount,
+      );
+    }
+
+    // Only a new reaction notifies; swapping one emoji for another doesn't.
+    if (type && !previous && comment.authorId !== user.userId) {
+      const name = await actorName(user.userId);
       NotificationService.create({
         userId: comment.authorId,
         type: "feed:comment_like",
-        title: "New Like on your Comment",
-        message: `${user.email} liked your comment.`,
+        title: "New Reaction on your Comment",
+        message: `${name} reacted to your comment.`,
         metadata: {
           ...feedTargetMetadata({
             postId: comment.postId,
-            commentId,
+            commentId: comment.id,
             parentCommentId: comment.parentId,
           }),
           likerId: user.userId,
+          reaction: type,
         },
-      }).catch(() => {});
+      }).catch((err) =>
+        console.warn(
+          "[FeedService] Best-effort comment reaction notification failed:",
+          err,
+        ),
+      );
     }
 
-    return result;
+    return { ...result, liked: result.reaction !== null };
   }
 
   static async addMediaTag(

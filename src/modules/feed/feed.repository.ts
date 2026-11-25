@@ -1013,22 +1013,26 @@ export default class FeedRepo {
               ? {
                   likes: {
                     where: { userId: viewerId },
-                    select: { userId: true },
+                    select: { type: true },
                   },
                 }
               : {}),
           },
         },
         ...(viewerId
-          ? { likes: { where: { userId: viewerId }, select: { userId: true } } }
+          ? { likes: { where: { userId: viewerId }, select: { type: true } } }
           : {}),
       },
     });
 
-    function withLikeFlag<T extends { likes?: unknown[] | null }>(c: T) {
-      const isLikedByMe = viewerId ? (c.likes?.length ?? 0) > 0 : false;
+    // `isLikedByMe` stays for older clients (mobile) that only know a
+    // heart; `myReaction` is which of the six the viewer picked.
+    function withLikeFlag<
+      T extends { likes?: { type: ReactionType }[] | null },
+    >(c: T) {
+      const myReaction = viewerId ? (c.likes?.[0]?.type ?? null) : null;
       const { likes: _likes, ...rest } = c;
-      return { ...rest, isLikedByMe };
+      return { ...rest, isLikedByMe: myReaction !== null, myReaction };
     }
 
     return comments.map((c) => ({
@@ -1103,12 +1107,33 @@ export default class FeedRepo {
     });
   }
 
-  static async toggleCommentLike(commentId: string, userId: string) {
-    const existing = await prisma.commentLike.findUnique({
-      where: { commentId_userId: { commentId, userId } },
-    });
+  // Same model as setReaction on a post: `type: null` removes the viewer's
+  // reaction; otherwise it is set or swapped, one per user per comment.
+  // `likesCount` stays the total number of reactions; `previous` is what the
+  // viewer had, read in the same transaction (so a double click can't both
+  // look like a first reaction).
+  static async setCommentReaction(
+    commentId: string,
+    userId: string,
+    type: ReactionType | null,
+  ) {
     return prisma.$transaction(async (tx) => {
-      if (existing) {
+      const existing = await tx.commentLike.findUnique({
+        where: { commentId_userId: { commentId, userId } },
+      });
+
+      if (!type) {
+        if (!existing) {
+          const comment = await tx.postComment.findUniqueOrThrow({
+            where: { id: commentId },
+            select: { likesCount: true },
+          });
+          return {
+            reaction: null,
+            previous: null,
+            likesCount: comment.likesCount,
+          };
+        }
         await tx.commentLike.delete({
           where: { commentId_userId: { commentId, userId } },
         });
@@ -1117,16 +1142,46 @@ export default class FeedRepo {
           data: { likesCount: { decrement: 1 } },
           select: { likesCount: true },
         });
-        return { liked: false, likesCount: Math.max(0, updated.likesCount) };
+        return {
+          reaction: null,
+          previous: existing.type,
+          likesCount: Math.max(0, updated.likesCount),
+        };
       }
-      await tx.commentLike.create({ data: { commentId, userId } });
+
+      if (existing) {
+        await tx.commentLike.update({
+          where: { commentId_userId: { commentId, userId } },
+          data: { type },
+        });
+        const comment = await tx.postComment.findUniqueOrThrow({
+          where: { id: commentId },
+          select: { likesCount: true },
+        });
+        return {
+          reaction: type,
+          previous: existing.type,
+          likesCount: comment.likesCount,
+        };
+      }
+
+      await tx.commentLike.create({ data: { commentId, userId, type } });
       const updated = await tx.postComment.update({
         where: { id: commentId },
         data: { likesCount: { increment: 1 } },
         select: { likesCount: true },
       });
-      return { liked: true, likesCount: updated.likesCount };
+      return { reaction: type, previous: null, likesCount: updated.likesCount };
     });
+  }
+
+  /** The viewer's reaction on a comment, or null. */
+  static async findCommentReaction(commentId: string, userId: string) {
+    const row = await prisma.commentLike.findUnique({
+      where: { commentId_userId: { commentId, userId } },
+      select: { type: true },
+    });
+    return row?.type ?? null;
   }
 
   // @mention autocomplete — plain prefix match on name/username, capped

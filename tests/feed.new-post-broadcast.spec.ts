@@ -43,17 +43,18 @@ beforeEach(() => {
 });
 
 describe("feed:new broadcast", () => {
-  it("announces a public post with its tab only", async () => {
+  it("announces a public post with its tab and author only", async () => {
     repo.createPost.mockResolvedValue({
       id: "p1",
       tab: "community",
       visibility: "public",
+      authorId: "u1",
     });
     await FeedService.createPost(user, {
       type: "citizen_experience",
       content: "Sunset run tonight",
     });
-    expect(announceNewPost).toHaveBeenCalledWith("community");
+    expect(announceNewPost).toHaveBeenCalledWith("community", "u1");
   });
 
   it.each(["followers", "only_me"])(
@@ -85,8 +86,9 @@ describe("feed:new broadcast", () => {
       id: "p2",
       tab: "marketplace",
       visibility: "public",
+      authorId: "u1",
     });
     await FeedService.repost("orig", user, "");
-    expect(announceNewPost).toHaveBeenCalledWith("marketplace");
+    expect(announceNewPost).toHaveBeenCalledWith("marketplace", "u1");
   });
 });
