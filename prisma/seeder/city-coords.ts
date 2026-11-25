@@ -77,6 +77,9 @@ export const LANDMARK_COORDS: Record<string, { lat: number; lng: number }> = {
   "Eastwood City Open Park": { lat: 14.6111, lng: 121.0805 },
   "QC Memorial Amphitheater": { lat: 14.6517, lng: 121.0494 },
 
+  // Laguna
+  "Laguna Lakeside Resort": { lat: 14.2117, lng: 121.1653 },
+
   // Cebu
   "Skyline Cebu IT Park": { lat: 10.3298, lng: 123.9061 },
   "Waterfront Cebu City Hotel": { lat: 10.3255, lng: 123.9069 },

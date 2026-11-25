@@ -113,9 +113,9 @@ const STAMP_DATA: Record<
     },
     {
       bookingId: "seed-booking-may-wedding-01",
-      eventName: "Garcia-Reyes Wedding Reception",
+      eventName: "Cruz-Dela Rosa Wedding",
       eventDate: new Date("2026-05-20"),
-      location: "Boracay, Philippines",
+      location: "Tagaytay, Philippines",
       xpEarned: 100,
     },
     {
@@ -296,6 +296,17 @@ export async function seedPassports(prisma: PrismaClient, users: any[]) {
       // Stamps
       const stamps = STAMP_DATA[user.email] ?? [];
       for (const s of stamps) {
+        // A stamp's venue is its event's (api#480).
+        const held = await prisma.eventVenueTransaction.findFirst({
+          where: {
+            event: { bookings: { some: { id: s.bookingId } } },
+            included: true,
+            status: "approved",
+          },
+          orderBy: { createdAt: "asc" },
+          select: { venueId: true },
+        });
+        const venueId = held?.venueId ?? null;
         await prisma.passportStamp.upsert({
           where: { bookingId: s.bookingId },
           create: {
@@ -304,9 +315,11 @@ export async function seedPassports(prisma: PrismaClient, users: any[]) {
             eventName: s.eventName,
             eventDate: s.eventDate,
             location: s.location,
+            venueId,
             xpEarned: s.xpEarned,
           },
           update: {
+            venueId,
             eventName: s.eventName,
             eventDate: s.eventDate,
             location: s.location,

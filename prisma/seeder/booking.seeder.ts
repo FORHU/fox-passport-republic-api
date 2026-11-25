@@ -7,6 +7,7 @@ import {
   RequestStatus,
 } from "@prisma/client";
 import PaymentRepo from "../../src/modules/payment/payment.repository";
+import { EVENT_VENUES, seedEventVenue } from "./event-venues";
 
 export async function seedBookings(prisma: PrismaClient, users: any[]) {
   try {
@@ -106,6 +107,7 @@ export async function seedBookings(prisma: PrismaClient, users: any[]) {
         },
         create: ev,
       });
+      await seedEventVenue(prisma, ev.id, EVENT_VENUES[ev.id]);
       console.log(`✓ Seeded May event: ${ev.id}`);
     }
 

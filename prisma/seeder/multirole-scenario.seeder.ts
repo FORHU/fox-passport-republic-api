@@ -266,7 +266,7 @@ async function upsertEvent(
   return event.id;
 }
 
-async function seedHugoSlots(hostId: string, eventId: string) {
+async function seedHugoSlots(hostId: string, eventId: string, venueId: string) {
   const name = `Hugo's Reunion package ${TAG}`;
   const fields = {
     ownerId: hostId,
@@ -297,6 +297,18 @@ async function seedHugoSlots(hostId: string, eventId: string) {
   });
   await prisma.eventTemplateAsset.deleteMany({
     where: { templateId: template.id },
+  });
+  await prisma.eventTemplateVenue.deleteMany({
+    where: { templateId: template.id },
+  });
+  await prisma.eventTemplateVenue.create({
+    data: {
+      templateId: template.id,
+      venueId,
+      matched: true,
+      matchRequestStatus: "accepted",
+      matchedAt: new Date(),
+    },
   });
   await prisma.eventTemplateService.create({
     data: {
@@ -387,7 +399,7 @@ async function main() {
 
   // Hugo's Reunion is looking for a DJ and some gear: open slots, with no
   // listing in them yet, for a Talent, Performer or Gear Foxer to bid on.
-  await seedHugoSlots(u.host, hugoEventId);
+  await seedHugoSlots(u.host, hugoEventId, hall1);
 
   // Reset this scenario's own state, then lay it down again.
   await prisma.appointment.deleteMany({
@@ -439,6 +451,19 @@ async function main() {
       status: "approved",
       agreedPrice: 7000,
     },
+  });
+
+  // Sunset Market and Hugo's Reunion are held at Mika's halls too.
+  await prisma.eventVenueTransaction.createMany({
+    data: [
+      { eventId: upcomingId, venueId: hall2 },
+      { eventId: hugoEventId, venueId: hall1 },
+    ].map((line) => ({
+      ...line,
+      providerId: u.multi,
+      status: "approved" as const,
+      agreedPrice: 20000,
+    })),
   });
 
   // Waiting for Mika's answer, one for each kind of provider.

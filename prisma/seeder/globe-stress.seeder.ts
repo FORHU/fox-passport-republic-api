@@ -1,4 +1,11 @@
-import { EventCategory, PrismaClient } from "@prisma/client";
+import {
+  BillingRate,
+  EventCategory,
+  MatchRequestStatus,
+  PrismaClient,
+  VenueCategory,
+  VenueStatus,
+} from "@prisma/client";
 import { randomUUID } from "node:crypto";
 
 const CITIES = [
@@ -70,6 +77,29 @@ export function buildGlobeStressEventData(ownerId: string) {
   );
 }
 
+const venueIdOf = (city: string) =>
+  `seed-globe-venue-${city.toLowerCase().replace(/\s+/g, "-")}`;
+
+/** One venue in each city, for its packages (api#480). */
+export function buildGlobeStressVenueData(mayorId: string) {
+  return CITIES.map((c) => ({
+    id: venueIdOf(c.city),
+    mayorId,
+    category: VenueCategory.indoor,
+    name: `Globe Load Test Venue · ${c.city}`,
+    description: "Synthetic, development-only venue.",
+    capacity: 200,
+    price: 20000,
+    billingRate: BillingRate.daily,
+    address: "1 Load Test Street",
+    city: c.city,
+    country: c.country,
+    lat: c.lat,
+    lng: c.lng,
+    status: VenueStatus.available,
+  }));
+}
+
 export async function seedGlobeStressEvents(
   prisma: PrismaClient,
   ownerId: string,
@@ -78,6 +108,19 @@ export async function seedGlobeStressEvents(
   const result = await prisma.eventTemplate.createMany({
     data,
     skipDuplicates: true,
+  });
+  await prisma.venue.createMany({
+    data: buildGlobeStressVenueData(ownerId),
+    skipDuplicates: true,
+  });
+  await prisma.eventTemplateVenue.createMany({
+    data: data.map((t) => ({
+      templateId: t.id,
+      venueId: venueIdOf(t.targetCity),
+      matched: true,
+      matchRequestStatus: MatchRequestStatus.accepted,
+      matchedAt: new Date(),
+    })),
   });
 
   console.log(
