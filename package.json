@@ -15,6 +15,7 @@
     "seed:paws": "pnpm exec tsx prisma/seeder/paws-leaderboard.seeder.ts",
     "seed:perks": "pnpm exec tsx prisma/seeder/perks.seeder.ts",
     "seed:organizers": "pnpm exec tsx prisma/seeder/organizer-scenario.seeder.ts",
+    "seed:declines": "pnpm exec tsx prisma/seeder/decline-scenario.seeder.ts",
     "seed:reels": "pnpm exec tsx prisma/seeder/reels.seeder.ts",
     "seed:reels:remote": "pnpm exec tsx prisma/seeder/reels-remote.seeder.ts",
     "format": "prettier --write \"src/**/*.ts\"",
