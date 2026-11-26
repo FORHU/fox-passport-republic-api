@@ -69,6 +69,7 @@ vi.mock("../src/modules/review/review.repository", () => ({
 vi.mock("../src/modules/event-request/event-request.repository", () => ({
   default: {
     updateRequestStatus: vi.fn().mockResolvedValue({}),
+    hasVenueLine: vi.fn().mockResolvedValue(true),
     rejectRequest: vi.fn().mockResolvedValue({}),
   },
 }));

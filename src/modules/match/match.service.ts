@@ -10,6 +10,7 @@ import PaymentSvc from "../payment/payment.service";
 import { prisma } from "../../utils/prisma";
 import BookingRepo from "../booking/booking.repository";
 import AppointmentAccess from "../appointment/appointment.access";
+import { venueRequired } from "../event-template/package-venue";
 
 export default class MatchSvc {
   static async createMatchRequest(data: {
@@ -224,6 +225,12 @@ export default class MatchSvc {
     }
     if (event.requestStatus !== "pending")
       throw new AppError("Match already processed", 409);
+    // A request with no package names no venue; it needs one first (api#481).
+    if (!(await EventRequestRepo.hasVenueLine(eventId))) {
+      throw venueRequired(
+        "This request has no venue, so it can't be accepted. Ask the client to book one of your packages.",
+      );
+    }
 
     await EventRequestRepo.updateRequestStatus(eventId, "approved");
 

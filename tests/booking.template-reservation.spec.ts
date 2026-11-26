@@ -84,8 +84,18 @@ const TEMPLATE = {
     { id: "ts1", serviceId: "s1", service: { ownerId: "o2" } },
   ],
   templateVenues: [
-    { id: "tv1", venueId: "v1", venue: { mayorId: "m1" }, matched: true },
-    { id: "tv2", venueId: "v2", venue: { mayorId: "m2" }, matched: true },
+    {
+      id: "tv1",
+      venueId: "v1",
+      venue: { mayorId: "m1", status: "available" },
+      matched: true,
+    },
+    {
+      id: "tv2",
+      venueId: "v2",
+      venue: { mayorId: "m2", status: "available" },
+      matched: true,
+    },
   ],
 };
 
@@ -184,6 +194,7 @@ describe("BookingSvc.bookFromTemplate reservations", () => {
     );
     expect(createBooking).toHaveBeenCalledWith(
       expect.objectContaining({ totalAmount: 21240 }),
+      { venueChecked: true },
     );
 
     const rows = eventRepo.createEscrowTransactions.mock.calls[0][1];

@@ -1,6 +1,5 @@
-import { EventCategory, EventStatus } from "@prisma/client";
+import { EventStatus } from "@prisma/client";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
-import { toEnum } from "../../utils/enums";
 import EventRequestRepo from "./event-request.repository";
 import EventTemplateRepo from "../event-template/event-template.repository";
 import EventTemplateSvc from "../event-template/event-template.service";
@@ -8,6 +7,7 @@ import PricingSvc from "../pricing/pricing.service";
 import { breakdownTotals } from "../pricing/event-breakdown";
 import { can } from "../../types/permissions";
 import { notFound } from "../../utils/errors";
+import { hasVenue, venueRequired } from "../event-template/package-venue";
 import { sendApprovedEmail } from "../../utils/emails/approved";
 import { sendRejectedEmail } from "../../utils/emails/rejected";
 import AppointmentAccess from "../appointment/appointment.access";
@@ -15,36 +15,18 @@ import NotificationService from "../notifications/user-notification.service";
 import { announceAdminQueueChanged } from "../../infrastructure/socket/invalidate";
 
 export default class EventRequestSvc {
-  static async createDirectEvent(data: {
-    clientId: string;
-    name: string;
-    description: string;
-    eventCategory: string;
-    startAt: Date;
-    endAt: Date;
-    guestCount: number;
-    totalAmount?: number;
-    currency?: string;
-  }) {
-    const eventCategory = toEnum(EventCategory, data.eventCategory);
-    if (!eventCategory) throw new Error("Invalid event category");
-
-    return EventRequestRepo.create({
-      client: { connect: { id: data.clientId } },
-      host: { connect: { id: data.clientId } },
-      name: data.name,
-      description: data.description,
-      eventCategory,
-      startAt: data.startAt,
-      endAt: data.endAt,
-      guestCount: data.guestCount,
-      // Never the client's own figure (#264 T9.2): a booking on this Event
-      // charges `totalAmount`, so a client could set their own price. A
-      // direct Event has no Foxers, so it costs nothing (Q6). The field is
-      // still accepted so older clients don't get a 400.
-      totalAmount: 0,
-      requestStatus: "approved",
-    });
+  /** A client's request for a package: it names where it will be held. */
+  static async requestPackage(
+    data: Parameters<typeof EventRequestSvc.spawnRequestFromTemplate>[0],
+  ) {
+    const template = await EventTemplateRepo.findTemplateById(data.templateId);
+    if (!template) throw notFound("Event template");
+    if (!hasVenue(template.templateVenues)) {
+      throw venueRequired(
+        "This package has no venue yet, so it can't be booked.",
+      );
+    }
+    return this.spawnRequestFromTemplate(data);
   }
 
   static async spawnRequestFromTemplate(
@@ -124,6 +106,9 @@ export default class EventRequestSvc {
       throw new Error(
         "Unauthorized: Only the assigned host can approve this request",
       );
+    }
+    if (!(await EventRequestRepo.hasVenue(id))) {
+      throw venueRequired("This event has no venue, so it can't be approved.");
     }
 
     const updated = await EventRequestRepo.updateRequestStatus(id, "approved");

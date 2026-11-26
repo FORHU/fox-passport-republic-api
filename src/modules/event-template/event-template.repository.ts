@@ -286,7 +286,7 @@ export default class EventTemplateRepo {
    */
   static async findPublicTemplateWithItemOwners(id: string) {
     return prisma.eventTemplate.findUnique({
-      where: { id, isPublic: true },
+      where: { id, isPublic: true, status: EventTemplateStatus.published },
       include: {
         // The EventFoxer's rate prices the booking (#264 T8).
         owner: { select: { id: true, commissionPct: true } },
@@ -679,6 +679,29 @@ export default class EventTemplateRepo {
         where: { templateId, venueId },
       }),
     );
+  }
+
+  /** A published package left with no venue goes back to a draft. */
+  static async reopenIfNoVenue(id: string): Promise<boolean> {
+    const { count } = await this.retiring(
+      prisma.eventTemplate.updateMany({
+        where: {
+          id,
+          status: EventTemplateStatus.published,
+          templateVenues: { none: { venueId: { not: null } } },
+        },
+        data: { status: EventTemplateStatus.draft, isPublic: false },
+      }),
+    );
+    return count > 0;
+  }
+
+  /** A package's venue lines, as `hasVenue` reads them. */
+  static async findVenueLines(id: string) {
+    return prisma.eventTemplateVenue.findMany({
+      where: { templateId: id },
+      select: { id: true, venueId: true, venue: { select: { status: true } } },
+    });
   }
 
   // TRENDING — top N public templates in a category ranked by approved-Event count

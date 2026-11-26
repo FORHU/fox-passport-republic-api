@@ -147,6 +147,25 @@ export default class PassportRepo {
     });
   }
 
+  /** Where an Event is held, when its venue line belongs to no one booking. */
+  static async findVenueForEvent(eventId: string) {
+    return prisma.eventVenueTransaction.findFirst({
+      where: {
+        eventId,
+        included: true,
+        bookingId: null,
+        status: TransactionStatus.approved,
+      },
+      orderBy: { createdAt: "asc" },
+      select: {
+        venueId: true,
+        venue: {
+          select: { id: true, name: true, city: true, stampIconUrl: true },
+        },
+      },
+    });
+  }
+
   /** Distinct venues this passport has stamps from, for the milestone badges. */
   static async findDistinctStampVenues(passportId: string) {
     return prisma.passportStamp.groupBy({

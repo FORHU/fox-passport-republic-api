@@ -2,6 +2,11 @@ import { prisma, AppTransactionClient } from "../../utils/prisma";
 import { EventStatus, Prisma, RequestStatus } from "@prisma/client";
 import { toEnum } from "../../utils/enums";
 
+const LIVE_VENUE_LINE = {
+  included: true,
+  status: { notIn: ["rejected", "cancelled"] },
+} satisfies Prisma.EventVenueTransactionWhereInput;
+
 export default class EventRequestRepo {
   static async create(
     data: Prisma.EventCreateInput,
@@ -73,6 +78,36 @@ export default class EventRequestRepo {
 
   // `tx`: inside a transaction that created this Event, only that
   // transaction's client can see it (the match flow, api#465).
+  /**
+   * Whether an Event has a venue (epic api#477): a live line of its own, or
+   * its package's while its lines aren't made yet.
+   */
+  static async hasVenue(id: string): Promise<boolean> {
+    const count = await prisma.event.count({
+      where: {
+        id,
+        OR: [
+          { venueTransactions: { some: LIVE_VENUE_LINE } },
+          {
+            venueTransactions: { none: {} },
+            template: {
+              templateVenues: { some: { venue: { status: "available" } } },
+            },
+          },
+        ],
+      },
+    });
+    return count > 0;
+  }
+
+  /** Whether an Event has a live venue line of its own. */
+  static async hasVenueLine(id: string): Promise<boolean> {
+    const count = await prisma.eventVenueTransaction.count({
+      where: { eventId: id, ...LIVE_VENUE_LINE },
+    });
+    return count > 0;
+  }
+
   static async findById(id: string, tx: AppTransactionClient = prisma) {
     return tx.event.findUnique({
       where: { id },

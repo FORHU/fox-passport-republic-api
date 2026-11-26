@@ -34,6 +34,8 @@ const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
 import { cached, invalidate, versionedCache } from "../../utils/cache.util";
 import { notifyDecision } from "../notifications/decision-notification";
 import { sendDecisionEmail } from "../notifications/decision-email";
+import { hasVenue, venueRequired } from "../event-template/package-venue";
+import EventTemplateRepo from "../event-template/event-template.repository";
 import {
   announceAdminQueueChanged,
   announceToAdmins,
@@ -847,6 +849,11 @@ export default class AdminSvc {
   }
 
   static async approveEventTemplate(id: string) {
+    if (!hasVenue(await EventTemplateRepo.findVenueLines(id))) {
+      throw venueRequired(
+        "This package has no venue taking bookings, so it can't be published.",
+      );
+    }
     const template = await AdminRepo.publishEventTemplate(id);
 
     await this.settled({
@@ -885,7 +892,10 @@ export default class AdminSvc {
 
     // Make the parent template publicly discoverable (skip for template-less
     // events)
-    if (event.templateId) {
+    if (
+      event.templateId &&
+      hasVenue(await EventTemplateRepo.findVenueLines(event.templateId))
+    ) {
       await AdminRepo.setTemplatePublic(event.templateId, true);
     }
 

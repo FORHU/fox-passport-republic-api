@@ -112,7 +112,7 @@ const TEMPLATE = {
     {
       id: "tv1",
       venueId: "v1",
-      venue: { mayorId: "m1", name: "Sky Hall" },
+      venue: { mayorId: "m1", name: "Sky Hall", status: "available" },
       matched: false,
     },
   ],

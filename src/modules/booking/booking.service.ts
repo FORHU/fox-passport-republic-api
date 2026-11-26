@@ -7,6 +7,11 @@ import EventRequestRepo from "../event-request/event-request.repository";
 import EventRequestSvc from "../event-request/event-request.service";
 import AppointmentAccess from "../appointment/appointment.access";
 import EventTemplateSvc from "../event-template/event-template.service";
+import {
+  hasVenue,
+  VENUE_REQUIRED,
+  venueRequired,
+} from "../event-template/package-venue";
 import PaymentSvc from "../payment/payment.service";
 import PaymentRepo from "../payment/payment.repository";
 import PayoutSvc from "../payout/payout.service";
@@ -508,7 +513,10 @@ export default class BookingSvc {
     ];
   }
 
-  static async createBooking(data: CreateBookingInput) {
+  static async createBooking(
+    data: CreateBookingInput,
+    { venueChecked = false } = {},
+  ) {
     await this.requireVerifiedIdentity(data.userId);
 
     const {
@@ -694,6 +702,11 @@ export default class BookingSvc {
     if (!data.eventId) throw new AppError("eventId is required", 400);
     const event = await EventRequestRepo.findById(data.eventId);
     if (!event) throw notFound("Event");
+    if (!venueChecked && !(await EventRequestRepo.hasVenue(data.eventId))) {
+      throw venueRequired(
+        "This event has no venue yet, so it can't be booked.",
+      );
+    }
 
     // early_bird: if template has publicOpenAt in the future, only early_bird holders can book
     const { default: PassportSvc } =
@@ -1422,6 +1435,15 @@ export default class BookingSvc {
     if (!template) {
       throw new BookingError("Template not found or not approved", 404);
     }
+    if (!hasVenue(template.templateVenues, excludedVenueIds)) {
+      throw new BookingError(
+        hasVenue(template.templateVenues)
+          ? "A package is booked with its venue. Keep the venue to continue."
+          : "This package has no venue yet, so it can't be booked.",
+        409,
+        VENUE_REQUIRED,
+      );
+    }
 
     if (template.maxAttendees) {
       const currentAttendees = await WaitlistSvc.getCurrentAttendees(
@@ -1550,12 +1572,16 @@ export default class BookingSvc {
       throw toPackageConflict(err);
     }
 
-    const booking = await this.createBooking({
-      userId: input.userId,
-      eventId: event.id,
-      guestCount: input.guestCount,
-      totalAmount,
-    });
+    const booking = await this.createBooking(
+      {
+        userId: input.userId,
+        eventId: event.id,
+        guestCount: input.guestCount,
+        totalAmount,
+      },
+      // Checked above; its venue line is made below, with the booking's id.
+      { venueChecked: true },
+    );
 
     // ADR 0010: with AUTO_BOOK_MATCHED_ONLY, a Supplier the Event Foxer is
     // not matched with is asked first: its line waits for its answer (24
