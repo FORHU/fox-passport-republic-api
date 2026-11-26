@@ -37,6 +37,9 @@ router.patch(
   authenticate,
   RoleRequestController.resubmitDocuments,
 );
+// The applicant takes back their own open application (api#367); ownership
+// is checked in the service.
+router.patch("/:id/withdraw", authenticate, RoleRequestController.withdraw);
 
 // Admin routes
 router.get(

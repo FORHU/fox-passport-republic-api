@@ -62,4 +62,15 @@ describe("approving an application", () => {
     expect(userUpdate).not.toHaveBeenCalled();
     expect(updateRequestStatus).toHaveBeenCalled();
   });
+
+  // api#367: the applicant withdrew it between the admin's read and write.
+  it("grants nothing when it stopped being pending meanwhile", async () => {
+    findRequestById.mockResolvedValue(request(["venueFoxer"]));
+    updateRequestStatus.mockResolvedValue(null);
+
+    await expect(
+      RoleRequestService.reviewApplication("req-1", "admin-1", "approved"),
+    ).rejects.toThrow("This application has already been processed");
+    expect(userUpdate).not.toHaveBeenCalled();
+  });
 });

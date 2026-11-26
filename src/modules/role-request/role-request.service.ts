@@ -1,4 +1,6 @@
-import RoleRequestRepo from "./role-request.repository";
+import RoleRequestRepo, {
+  OPEN_REQUEST_STATUSES,
+} from "./role-request.repository";
 import UsersRepo from "../users/users.repository";
 import { RoleType, RequestStatus } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
@@ -6,8 +8,15 @@ import {
   acceptedMimeTypes,
   FILE_UNSUPPORTED,
 } from "../../utils/file-signature";
-import { badRequest } from "../../utils/errors";
+import { badRequest, notFound } from "../../utils/errors";
 import NotificationService from "../notifications/user-notification.service";
+
+/** How a closed request reads in "This application was already …". */
+const DECIDED_LABEL: Partial<Record<RequestStatus, string>> = {
+  [RequestStatus.approved]: "approved",
+  [RequestStatus.rejected]: "rejected",
+  [RequestStatus.withdrawn]: "withdrawn",
+};
 
 /**
  * Provider-specific application payload. Each RoleType supplies a different
@@ -185,11 +194,15 @@ export default class RoleRequestService {
       throw new Error(`User already has the ${roleType} role`);
     }
 
-    // 2. Check for existing pending application for this role
+    // 2. Check for an open application for this role: pending, or sent back
+    // for document revision (api#367; it used to see pending only, so a sent
+    // back applicant could open a second application for the same role).
     const pending = await RoleRequestRepo.findPendingRequest(userId, roleType);
     if (pending) {
       throw new Error(
-        `An application for the ${roleType} role is already pending`,
+        pending.status === RequestStatus.revision_requested
+          ? `Your application for the ${roleType} role was sent back for document fixes. Resubmit those documents or withdraw it before applying again`
+          : `An application for the ${roleType} role is already pending`,
       );
     }
 
@@ -268,6 +281,11 @@ export default class RoleRequestService {
               : null,
         },
       );
+      // No longer pending: its applicant withdrew it after the read above
+      // (api#367). Nothing is granted for it.
+      if (!updatedRequest) {
+        throw new Error("This application has already been processed");
+      }
 
       // 3. If approved, grant the role and copy declared specializations
       if (status === RequestStatus.approved) {
@@ -405,6 +423,38 @@ export default class RoleRequestService {
     );
 
     return { updated, reopened: remainingFlagged.length === 0 };
+  }
+
+  /**
+   * The applicant withdraws their own application while no admin has decided
+   * it: pending, or sent back for document revision (api#367). Someone else's
+   * request answers as not found, so its existence isn't confirmed.
+   */
+  static async withdrawApplication(requestId: string, userId: string) {
+    const request = await RoleRequestRepo.findRequestStatus(requestId);
+    if (!request || request.userId !== userId) {
+      throw notFound("Application");
+    }
+    if (!OPEN_REQUEST_STATUSES.includes(request.status)) {
+      throw badRequest(
+        `This application was already ${DECIDED_LABEL[request.status] ?? request.status} and can't be withdrawn`,
+        "APPLICATION_DECIDED",
+      );
+    }
+    // Conditional on still being open: an admin decision that lands between
+    // the read above and this write wins, and the applicant is told.
+    const withdrawn = await RoleRequestRepo.withdrawRequest(requestId, userId);
+    if (withdrawn === 0) {
+      throw badRequest(
+        "This application was decided while you were withdrawing it",
+        "APPLICATION_DECIDED",
+      );
+    }
+    return {
+      id: request.id,
+      roleType: request.roleType,
+      status: RequestStatus.withdrawn,
+    };
   }
 
   /**
