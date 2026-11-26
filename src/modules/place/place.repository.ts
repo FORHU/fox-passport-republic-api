@@ -59,11 +59,25 @@ export default class PlaceRepo {
   /** How many packages and events are held at this creator's Places. */
   static async countUsesByCreator(creatorId: string) {
     const place = { creatorId: String(creatorId) };
-    const [templates, events] = await Promise.all([
+    const [templates, events, changes] = await Promise.all([
       prisma.eventTemplate.count({ where: { place } }),
       prisma.event.count({ where: { place } }),
+      prisma.eventLocationChange.count({
+        where: { OR: [{ fromPlace: place }, { toPlace: place }] },
+      }),
     ]);
-    return { templates, events };
+    return { templates, events, changes };
+  }
+
+  /** Whether a guest's booking at an event held here is confirmed. */
+  static async hasConfirmedBookings(placeId: string) {
+    const count = await prisma.booking.count({
+      where: {
+        event: { placeId: String(placeId) },
+        status: { in: ["confirmed", "active", "completed"] },
+      },
+    });
+    return count > 0;
   }
 
   static async update(id: string, data: Prisma.PlaceUncheckedUpdateInput) {

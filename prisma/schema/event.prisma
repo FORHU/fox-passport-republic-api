@@ -186,6 +186,7 @@ model Event {
   /// a venue line or a Place. Public responses carry only its name and city.
   placeId              String?
   place                Place?                     @relation(fields: [placeId], references: [id], onDelete: Restrict)
+  locationChanges      EventLocationChange[]
   posts                Post[]
   partnerInvestments   PartnerInvestment[]
   partnershipProposals PartnershipProposal[]
