@@ -44,6 +44,7 @@ import eventRoutes from "../modules/event/event.routes";
 import followRoutes from "../modules/follow/follow.routes";
 import referralRoutes from "../modules/referral/referral.routes";
 import blockRoutes from "../modules/block/block.routes";
+import placeRoutes from "../modules/place/place.routes";
 import reportsRoutes from "../modules/reports/reports.routes";
 import biddingRoutes from "../modules/bidding/bidding.routes";
 import partnershipRoutes from "../modules/partnership/partnership.routes";
@@ -86,6 +87,7 @@ router.use("/v1/categories", categoryRoutes);
 router.use("/v1/follows", followRoutes);
 router.use("/v1/referrals", referralRoutes);
 router.use("/v1/blocks", blockRoutes);
+router.use("/v1/places", placeRoutes);
 router.use("/v1/reports", reportsRoutes);
 
 // Feature Routes

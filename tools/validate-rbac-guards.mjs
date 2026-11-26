@@ -218,6 +218,14 @@ const ALLOW_LIST = new Set([
   // service answers 404 for anyone else's request. Self-service, so no
   // capability permission applies.
   "role-request.routes.ts PATCH /:id/withdraw",
+  // Places (api#518, api#519): any signed-in account may make one (every
+  // account is a Citizen). PlaceSvc lets only the creator list, edit and
+  // archive their own, and only the creator or an admin read one.
+  "place.routes.ts POST /",
+  "place.routes.ts GET /mine",
+  "place.routes.ts GET /:id",
+  "place.routes.ts PATCH /:id",
+  "place.routes.ts DELETE /:id",
   // Rewards & Wallet (Phase 2): self-service wallet overview, catalog browsing,
   // and coin redemption scoped to caller's own balance and passport
   "reward.routes.ts GET /me",
