@@ -389,6 +389,20 @@ export default class VenueRepo {
     };
   }
 
+  /**
+   * What still points at this Mayor's venues. None of it lets a venue be
+   * deleted (api#482), so neither can the account that would cascade to them.
+   */
+  static async countVenueUsesByMayor(mayorId: string) {
+    const venue = { mayorId: String(mayorId) };
+    const [packages, bookings, stamps] = await Promise.all([
+      prisma.eventTemplateVenue.count({ where: { venue } }),
+      prisma.eventVenueTransaction.count({ where: { venue } }),
+      prisma.passportStamp.count({ where: { venue } }),
+    ]);
+    return { packages, bookings, stamps };
+  }
+
   static async archiveVenue(id: string) {
     return this.retiring(
       prisma.venue.update({

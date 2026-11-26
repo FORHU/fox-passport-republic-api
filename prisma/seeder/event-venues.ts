@@ -280,10 +280,11 @@ export async function assertSeedVenues(prisma: PrismaClient) {
       },
       select: { id: true },
     }),
-    prisma.passportStamp.findMany({
-      where: { bookingId: seeded, venueId: null },
-      select: { bookingId: true },
-    }),
+    // Raw: before api#482's migration a stamp could have no venue, which the
+    // client's types no longer allow.
+    prisma.$queryRaw<{ bookingId: string }[]>`
+      SELECT "bookingId" FROM passport_stamps
+      WHERE "bookingId" LIKE 'seed-%' AND "venueId" IS NULL`,
   ]);
   const missing = [
     ...packages.map((p) => p.id),

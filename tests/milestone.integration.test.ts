@@ -57,6 +57,30 @@ async function newBooking(
   });
 }
 
+/** One venue per user for their stamps: a stamp always names one (api#482). */
+const venueOf = new Map<string, string>();
+async function stampVenue(userId: string) {
+  const known = venueOf.get(userId);
+  if (known) return known;
+  const venue = await prisma.venue.create({
+    data: {
+      mayorId: userId,
+      category: "indoor",
+      name: `${tag} hall ${userId.slice(0, 8)}`,
+      description: "A hall",
+      capacity: 50,
+      price: 100,
+      billingRate: "daily",
+      address: "1 Test Street",
+      city: "Manila",
+      country: "Philippines",
+      status: "available",
+    },
+  });
+  venueOf.set(userId, venue.id);
+  return venue.id;
+}
+
 /** Attending a booking is a passport stamp on it. */
 async function attend(userId: string, bookingId: string) {
   const passport = await prisma.passport.upsert({
@@ -64,10 +88,12 @@ async function attend(userId: string, bookingId: string) {
     create: { userId },
     update: {},
   });
+  const venueId = await stampVenue(userId);
   return prisma.passportStamp.create({
     data: {
       passportId: passport.id,
       bookingId,
+      venueId,
       eventName: "Milestone test event",
       eventDate: new Date(),
       xpEarned: 0,
@@ -100,6 +126,9 @@ afterAll(async () => {
   });
   await prisma.rewardEvent.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.passport.deleteMany({ where: { userId: { in: userIds } } });
+  await prisma.venue.deleteMany({
+    where: { id: { in: [...venueOf.values()] } },
+  });
   if (challengeKeys.length) {
     await prisma.challenge.deleteMany({
       where: { key: { in: challengeKeys } },

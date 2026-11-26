@@ -124,7 +124,9 @@ model EventTemplateVenue {
   requestedAt        DateTime           @default(now())
   remindedAt         DateTime?
   template           EventTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  venue              Venue?             @relation(fields: [venueId], references: [id])
+  // Null only on a match request line not filled yet. A venue in a package
+  // can't be deleted from under it (api#482).
+  venue              Venue?             @relation(fields: [venueId], references: [id], onDelete: Restrict)
 
   @@map("event_template_venues")
 }

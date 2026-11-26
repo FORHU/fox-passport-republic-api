@@ -306,7 +306,12 @@ export async function seedPassports(prisma: PrismaClient, users: any[]) {
           orderBy: { createdAt: "asc" },
           select: { venueId: true },
         });
-        const venueId = held?.venueId ?? null;
+        // Every stamp names its venue (api#482): a seeded booking without
+        // one is a seed bug, not a stamp to write.
+        const venueId = held?.venueId;
+        if (!venueId) {
+          throw new Error(`Seed stamp for ${s.bookingId} has no venue`);
+        }
         await prisma.passportStamp.upsert({
           where: { bookingId: s.bookingId },
           create: {

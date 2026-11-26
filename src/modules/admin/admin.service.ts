@@ -23,6 +23,7 @@ import { STRIPE_SECRET_KEY } from "../../config";
 import { toStripeCents } from "../../utils/pricing";
 import IdempotencySvc from "../idempotency/idempotency.service";
 import { AppError } from "../../utils/errors";
+import VenueSvc from "../venue/venue.service";
 import { recordAudit } from "../audit/audit.service";
 import { revokeAllSessions } from "../auth/sessions.service";
 import AppointmentService from "../appointment/appointment.service";
@@ -1007,6 +1008,10 @@ export default class AdminSvc {
         );
       }
     }
+
+    // Their venues go with them, unless something still uses one (api#482).
+    // Checked before anything is ended or revoked.
+    await VenueSvc.assertOwnerDeletable(target.id);
 
     // End active appointments and teams if applicable
     if (target.roleType.includes(RoleType.organizer)) {

@@ -45,7 +45,11 @@ async function counts(db: Prisma.TransactionClient) {
         venueTransactions: { none: {} },
       },
     }),
-    db.passportStamp.count({ where: { bookingId: seeded, venueId: null } }),
+    // Raw: before api#482's migration a stamp could have no venue, which the
+    // client's types no longer allow.
+    db.$queryRaw<[{ n: number }]>`
+      SELECT count(*)::int AS n FROM passport_stamps
+      WHERE "bookingId" LIKE 'seed-%' AND "venueId" IS NULL`.then(([r]) => r.n),
     db.user.count(),
   ]);
   return { packages, events, stamps, users };
@@ -130,10 +134,10 @@ async function run(db: Prisma.TransactionClient) {
       location: "Tagaytay, Philippines",
     },
   });
-  const stamps = await db.passportStamp.findMany({
-    where: { bookingId: { startsWith: "seed-" }, venueId: null },
-    select: { id: true, bookingId: true },
-  });
+  // Raw, as in `counts`: a stamp without a venue predates api#482.
+  const stamps = await db.$queryRaw<{ id: string; bookingId: string }[]>`
+    SELECT id, "bookingId" FROM passport_stamps
+    WHERE "bookingId" LIKE 'seed-%' AND "venueId" IS NULL`;
   for (const s of stamps) {
     const held = await db.eventVenueTransaction.findFirst({
       where: {
