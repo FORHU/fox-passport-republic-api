@@ -40,3 +40,38 @@ export function normalizePhone(
     ? parsed.number
     : null;
 }
+
+/**
+ * Countries where a contact number must be a mobile number (landlines are
+ * refused). Kept in step with the web's MOBILE_ONLY (shared/lib/phone.ts).
+ */
+export const MOBILE_ONLY = new Set(["PH"]);
+
+/**
+ * A contact number (a Venue Foxer's) as E.164: normalizePhone, and a mobile
+ * number where its country is in MOBILE_ONLY — `+639171234567` passes,
+ * the Manila landline `+63 2 8123 4567` doesn't. Else null.
+ */
+export function normalizeContactPhone(
+  raw: string,
+  defaultCountry = "PH",
+): string | null {
+  const e164 = normalizePhone(raw, defaultCountry);
+  if (!e164) return null;
+  const parsed = parsePhoneNumberFromString(e164);
+  return parsed?.country &&
+    MOBILE_ONLY.has(parsed.country) &&
+    parsed.getType() !== "MOBILE"
+    ? null
+    : e164;
+}
+
+/** The country a number is in: its own `+code`, else `defaultCountry`. */
+export function phoneCountry(raw: string, defaultCountry: string): string {
+  const trimmed = raw.trim();
+  return (
+    (trimmed.startsWith("+")
+      ? parsePhoneNumberFromString(trimmed)?.country
+      : undefined) ?? defaultCountry
+  );
+}
