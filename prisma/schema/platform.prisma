@@ -30,6 +30,7 @@ model File {
   providerFoxerSelfie     ProviderFoxerApplication[]  @relation("ProviderFoxerSelfie")
   providerFoxerTinId      ProviderFoxerApplication[]  @relation("ProviderFoxerTinId")
   providerFoxerValidId1   ProviderFoxerApplication[]  @relation("ProviderFoxerValidId1")
+  providerFoxerPortfolio  ProviderFoxerApplication[]  @relation("ProviderFoxerPortfolio")
   providerSpecialtyPhotos ProviderApplicationSpecialtyPhoto[]
   eventFoxerBirPermit     EventFoxerApplication[]     @relation("EventFoxerBirPermit")
   eventFoxerNbi           EventFoxerApplication[]     @relation("EventFoxerNBI")
@@ -40,6 +41,7 @@ model File {
   organizerValidId1       OrganizerApplication[]      @relation("OrganizerValidId1")
   organizerClearance      OrganizerApplication[]      @relation("OrganizerBackgroundClearance")
   organizerSelfie         OrganizerApplication[]      @relation("OrganizerSelfie")
+  organizerPortfolio      OrganizerApplication[]      @relation("OrganizerPortfolio")
   investorProof           InvestorApplication[]       @relation("InvestorProof")
   venueFoxerBirPermit     VenueFoxerApplication[]     @relation("VenueFoxerBirPermit")
   venueFoxerNbi           VenueFoxerApplication[]     @relation("VenueFoxerNBI")

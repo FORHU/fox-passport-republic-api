@@ -52,6 +52,41 @@ describe("validateOrganizerApplication", () => {
     expect(data.experience).toBe(4);
   });
 
+  it("accepts 30 years without a CV (api#423)", () => {
+    const data: Record<string, unknown> = { ...valid(), experience: "30" };
+    expect(validateOrganizerApplication(data)).toBeNull();
+    expect(data.experience).toBe(30);
+    expect(data.claimedExperience).toBeUndefined();
+  });
+
+  it("refuses a claim over 30 years without a CV", () => {
+    expect(validateOrganizerApplication({ ...valid(), experience: "31" })).toBe(
+      "Claiming more than 30 years of experience needs a CV with references",
+    );
+  });
+
+  it("keeps a claim of 33 years as 30+, its bracket's start", () => {
+    const data: Record<string, unknown> = {
+      ...valid(),
+      experience: "33",
+      portfolioFileId: "file-cv",
+    };
+    expect(validateOrganizerApplication(data)).toBeNull();
+    expect(data.experience).toBe(30);
+    expect(data.claimedExperience).toBe(30);
+  });
+
+  it("keeps a claim of 50 years with a CV, the most there is", () => {
+    const data: Record<string, unknown> = {
+      ...valid(),
+      experience: "50",
+      portfolioFileId: "file-cv",
+    };
+    expect(validateOrganizerApplication(data)).toBeNull();
+    expect(data.experience).toBe(50);
+    expect(data.claimedExperience).toBe(50);
+  });
+
   it("accepts both event and venue categories as specializations", () => {
     expect(
       validateOrganizerApplication({
@@ -66,7 +101,10 @@ describe("validateOrganizerApplication", () => {
     ["location", { location: "" }],
     ["negative experience", { experience: -1 }],
     ["fractional experience", { experience: 2.5 }],
-    ["experience over 100", { experience: 101 }],
+    ["experience over 50", { experience: 51 }],
+    ["experience over 50, as text", { experience: "51" }],
+    ["experience left out", { experience: "" }],
+    ["experience that isn't digits", { experience: "0x10" }],
     ["an unknown specialization", { specializations: ["karaoke"] }],
     ["a service category", { specializations: ["catering"] }],
   ])("rejects %s", (_label, override) => {

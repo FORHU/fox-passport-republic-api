@@ -284,6 +284,10 @@ model ProviderFoxerApplication {
   specializations      String[]    @default([])
   portfolioUrls        String[]    @default([])
   experience           Int?
+  // More than 30 years, as the applicant claimed it; they must attach a CV
+  // with references (portfolioFile). An admin who can't confirm it lowers
+  // `experience` to 30 and keeps this, so it can be restored (api#423).
+  claimedExperience    Int?
   nbiClearanceIdNumber String?
   tinNumber            String?
   // See VenueFoxerApplication.tinCountry.
@@ -293,9 +297,12 @@ model ProviderFoxerApplication {
   tinIdFileId          String?
   birPermitFileId      String?
   selfieFileId         String?
+  // The CV behind a claim of more than 30 years (api#423).
+  portfolioFileId      String?
   createdAt            DateTime    @default(now())
   updatedAt            DateTime    @updatedAt
   birPermitFile        File?       @relation("ProviderFoxerBirPermit", fields: [birPermitFileId], references: [id])
+  portfolioFile        File?       @relation("ProviderFoxerPortfolio", fields: [portfolioFileId], references: [id])
   nbiFile              File?       @relation("ProviderFoxerNBI", fields: [nbiFileId], references: [id])
   request              RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
   selfieFile           File?       @relation("ProviderFoxerSelfie", fields: [selfieFileId], references: [id])
@@ -369,6 +376,8 @@ model EventFoxerApplication {
   requestId       String      @unique
   bio             String?
   experience      String?
+  // See ProviderFoxerApplication.claimedExperience.
+  claimedExperience Int?
   location        String?
   specializations String[]
   // Links to work hosted elsewhere, like ProviderFoxerApplication's (app#371).
@@ -505,6 +514,8 @@ model OrganizerApplication {
   requestId                 String      @unique
   bio                       String
   experience                Int
+  // See ProviderFoxerApplication.claimedExperience.
+  claimedExperience         Int?
   location                  String
   // Values from EventCategory and VenueCategory — the kinds of events and
   // venues this person has helped run.
@@ -512,10 +523,13 @@ model OrganizerApplication {
   validId1FileId            String?
   backgroundClearanceFileId String?
   selfieFileId              String?
+  // The CV behind a claim of more than 30 years (api#423).
+  portfolioFileId           String?
   createdAt                 DateTime    @default(now())
   updatedAt                 DateTime    @updatedAt
   request                   RoleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
   validId1                  File?       @relation("OrganizerValidId1", fields: [validId1FileId], references: [id])
+  portfolioFile             File?       @relation("OrganizerPortfolio", fields: [portfolioFileId], references: [id])
   backgroundClearanceFile   File?       @relation("OrganizerBackgroundClearance", fields: [backgroundClearanceFileId], references: [id])
   selfieFile                File?       @relation("OrganizerSelfie", fields: [selfieFileId], references: [id])
 

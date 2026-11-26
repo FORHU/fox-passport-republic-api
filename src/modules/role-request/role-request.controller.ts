@@ -11,6 +11,10 @@ import {
 import { normalizePhone } from "../../utils/phone";
 import { checkPortfolioUrls } from "../../utils/portfolio-urls";
 import {
+  applyExperienceClaim,
+  checkYearsOfExperience,
+} from "../../utils/years-of-experience";
+import {
   isPrismaError,
   sendFailure,
   sendServerError,
@@ -165,11 +169,12 @@ export function validateOrganizerApplication(
   if (typeof data.location !== "string" || data.location.trim().length === 0) {
     return "Location is required";
   }
-  const experience = Number(data.experience);
-  if (!Number.isInteger(experience) || experience < 0 || experience > 100) {
-    return "Years of experience must be between 0 and 100";
-  }
-  data.experience = experience;
+  const experience = checkYearsOfExperience(data.experience, true);
+  if (!experience.ok) return experience.message;
+  data.experience = experience.years;
+  // Called once any upload is stored, so the CV is in portfolioFileId.
+  const claimError = applyExperienceClaim(data, experience.years);
+  if (claimError) return claimError;
   const specializations = data.specializations ?? [];
   if (
     !Array.isArray(specializations) ||
@@ -386,6 +391,8 @@ export default class RoleRequestController {
           message: "The application details could not be read.",
         });
       }
+      // Set only from a checked claim over 30 years, never by the client.
+      delete data.claimedExperience;
 
       // A retired role gets a pointer to Provider, not "Invalid role type".
       // Checked before any document is stored.
@@ -447,6 +454,30 @@ export default class RoleRequestController {
             .json({ success: false, message: links.message });
         }
         data.portfolioUrls = links.urls;
+
+        // Optional for both. The Event Foxer column is text, the Provider's
+        // a number.
+        const experience = checkYearsOfExperience(data.experience);
+        if (!experience.ok) {
+          return res
+            .status(400)
+            .json({ success: false, message: experience.message });
+        }
+        if (experience.years !== undefined) {
+          data.experience =
+            roleType === RoleType.eventFoxer
+              ? String(experience.years)
+              : experience.years;
+        }
+        const claimError = applyExperienceClaim(
+          data,
+          experience.years,
+          !!(req.files as Record<string, unknown[]> | undefined)?.portfolioFile
+            ?.length,
+        );
+        if (claimError) {
+          return res.status(400).json({ success: false, message: claimError });
+        }
       }
 
       // Store each uploaded document
@@ -488,23 +519,6 @@ export default class RoleRequestController {
       }
 
       if (roleType === RoleType.providerFoxer) {
-        if (
-          data.experience !== undefined &&
-          data.experience !== null &&
-          data.experience !== ""
-        ) {
-          const experience = Number(data.experience);
-          if (
-            !Number.isInteger(experience) ||
-            experience < 0 ||
-            experience > 100
-          ) {
-            return res.status(400).json({
-              success: false,
-              message: "Years of experience must be between 0 and 100",
-            });
-          }
-        }
         if (
           typeof data.nbiClearanceIdNumber === "string" &&
           data.nbiClearanceIdNumber.length > 0 &&
@@ -597,8 +611,13 @@ export default class RoleRequestController {
           .status(401)
           .json({ success: false, message: "Unauthorized" });
       const { id } = req.params;
-      const { status, rejectionReason, flaggedDocuments, revisionNote } =
-        req.body;
+      const {
+        status,
+        rejectionReason,
+        flaggedDocuments,
+        revisionNote,
+        experienceDecision,
+      } = req.body;
 
       if (!id)
         return res
@@ -624,6 +643,16 @@ export default class RoleRequestController {
           message: "Flag at least one document to request revision",
         });
       }
+      if (
+        experienceDecision !== undefined &&
+        experienceDecision !== "base" &&
+        experienceDecision !== "claimed"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'experienceDecision must be "base" or "claimed"',
+        });
+      }
 
       const updatedRequest = await RoleRequestService.reviewApplication(
         id,
@@ -632,6 +661,7 @@ export default class RoleRequestController {
         rejectionReason,
         flaggedDocuments,
         revisionNote,
+        experienceDecision,
       );
 
       announceAdminQueueChanged();
