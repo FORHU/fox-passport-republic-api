@@ -1,7 +1,13 @@
 import { AppError, notFound } from "../../utils/errors";
 import { isPhAddress, isPhilippines } from "../locations/ph-geo";
 import PlaceRepo from "./place.repository";
-import { canSeePlaceAddress, fullPlace, type PlaceViewer } from "./place-view";
+import AppointmentAccess from "../appointment/appointment.access";
+import {
+  canSeePlaceAddress,
+  fullPlace,
+  placeForViewer,
+  type PlaceViewer,
+} from "./place-view";
 
 export interface PlaceInput {
   name: string;
@@ -68,6 +74,62 @@ export default class PlaceSvc {
     const place = await PlaceRepo.findById(id);
     if (!place || !canSeePlaceAddress(viewer, place)) throw notFound("Place");
     return fullPlace(place);
+  }
+
+  /**
+   * A Place someone may hold their own package or event at: theirs, and not
+   * archived (api#520). Anyone else's is "not found", as everywhere.
+   */
+  static async assertUsableBy(userId: string, placeId: string) {
+    const place = await PlaceRepo.findById(placeId);
+    if (!place || place.creatorId !== userId) throw notFound("Place");
+    if (place.archivedAt) {
+      throw new AppError("This place is archived.", 409, "PLACE_ARCHIVED");
+    }
+    return place;
+  }
+
+  /**
+   * The Place an event is held at, as this viewer may see it (api#520): the
+   * full address for the people taking part, name and city for anyone else.
+   * The apps ask here for the address instead of every event response
+   * carrying it.
+   */
+  static async getForEvent(viewer: PlaceViewer, eventId: string) {
+    const event = await PlaceRepo.findEventPlace(eventId);
+    if (!event?.place) throw notFound("Place");
+    const userId = viewer.userId ?? "";
+    const [participation, coordinator] = userId
+      ? await Promise.all([
+          PlaceRepo.findEventParticipation(eventId, userId),
+          // Appointed Event Coordinators hold this; Check-in Helpers don't.
+          AppointmentAccess.canOnEvent(
+            eventId,
+            userId,
+            "event:message-attendees",
+          ),
+        ])
+      : [{ confirmedGuest: false, acceptedSupplier: false }, false];
+    return placeForViewer(viewer, event.place, {
+      ...participation,
+      eventOwner: !!userId && event.organizerId === userId,
+      eventCoordinator: coordinator,
+    });
+  }
+
+  /**
+   * Deleting an account deletes its Places, and a Place an event or package
+   * is held at can't go (api#520). Say so before anything is touched.
+   */
+  static async assertCreatorDeletable(userId: string) {
+    const uses = await PlaceRepo.countUsesByCreator(userId);
+    if (uses.templates + uses.events > 0) {
+      throw new AppError(
+        "This account has places that events or packages are held at, so it can't be deleted. Contact support.",
+        409,
+        "PLACE_IN_USE",
+      );
+    }
   }
 
   /** Only the creator edits, and never an archived Place. */

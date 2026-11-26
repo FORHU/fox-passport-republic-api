@@ -223,6 +223,9 @@ const ALLOW_LIST = new Set([
   // archive their own, and only the creator or an admin read one.
   "place.routes.ts POST /",
   "place.routes.ts GET /mine",
+  // An event's Place (api#520): PlaceSvc.getForEvent gives the full address
+  // only to the people taking part, name and city to anyone else.
+  "place.routes.ts GET /event/:eventId",
   "place.routes.ts GET /:id",
   "place.routes.ts PATCH /:id",
   "place.routes.ts DELETE /:id",

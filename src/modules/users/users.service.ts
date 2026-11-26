@@ -19,6 +19,7 @@ import ProviderSpecialtySvc from "./provider-specialty.service";
 const USER_TTL = 120;
 import { isOnline } from "../../infrastructure/socket/presence";
 import VenueSvc from "../venue/venue.service";
+import PlaceSvc from "../place/place.service";
 
 export default class UsersSvc {
   static async getPresence(userId: string) {
@@ -234,6 +235,7 @@ export default class UsersSvc {
     if (!user) throw new Error("User not found");
     // Their venues go with them, unless something still uses one (api#482).
     await VenueSvc.assertOwnerDeletable(id);
+    await PlaceSvc.assertCreatorDeletable(id);
 
     return UsersRepo.deleteUser(id);
   }

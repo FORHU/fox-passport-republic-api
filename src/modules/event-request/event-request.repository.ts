@@ -1,3 +1,4 @@
+import { PUBLIC_PLACE_SELECT } from "../place/place-view";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
 import { EventStatus, Prisma, RequestStatus } from "@prisma/client";
 import { toEnum } from "../../utils/enums";
@@ -79,14 +80,16 @@ export default class EventRequestRepo {
   // `tx`: inside a transaction that created this Event, only that
   // transaction's client can see it (the match flow, api#465).
   /**
-   * Whether an Event has a venue (epic api#477): a live line of its own, or
-   * its package's while its lines aren't made yet.
+   * Whether an Event has its location (epic #477, then #517): a live venue
+   * line of its own, its package's venue while its lines aren't made yet, or
+   * a live Place (api#520).
    */
   static async hasVenue(id: string): Promise<boolean> {
     const count = await prisma.event.count({
       where: {
         id,
         OR: [
+          { place: { archivedAt: null } },
           { venueTransactions: { some: LIVE_VENUE_LINE } },
           {
             venueTransactions: { none: {} },
@@ -100,12 +103,15 @@ export default class EventRequestRepo {
     return count > 0;
   }
 
-  /** Whether an Event has a live venue line of its own. */
+  /** Whether an Event has a live venue line of its own, or a live Place. */
   static async hasVenueLine(id: string): Promise<boolean> {
-    const count = await prisma.eventVenueTransaction.count({
-      where: { eventId: id, ...LIVE_VENUE_LINE },
-    });
-    return count > 0;
+    const [lines, atPlace] = await Promise.all([
+      prisma.eventVenueTransaction.count({
+        where: { eventId: id, ...LIVE_VENUE_LINE },
+      }),
+      prisma.event.count({ where: { id, place: { archivedAt: null } } }),
+    ]);
+    return lines + atPlace > 0;
   }
 
   static async findById(id: string, tx: AppTransactionClient = prisma) {
@@ -113,6 +119,8 @@ export default class EventRequestRepo {
       where: { id },
       include: {
         template: { include: { images: true } },
+        // Name and city only; the address is asked for separately (api#520).
+        place: { select: PUBLIC_PLACE_SELECT },
         client: { select: { name: true, email: true } },
         host: { select: { name: true, email: true } },
         assetTransactions: {

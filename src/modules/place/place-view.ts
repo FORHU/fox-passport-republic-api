@@ -14,6 +14,20 @@ import { can, type AuthorizationSubject } from "../../types/permissions";
  * Coordinators, and Suppliers with an accepted line.
  */
 
+/**
+ * The Place columns any response may carry (plus `archivedAt`, for the
+ * location rule). Queries that embed a Place in an event or package select
+ * these, never the whole row, so a street address can't leak by accident.
+ */
+export const PUBLIC_PLACE_SELECT = {
+  id: true,
+  name: true,
+  city: true,
+  state: true,
+  country: true,
+  archivedAt: true,
+} as const;
+
 export interface PlaceViewer extends AuthorizationSubject {
   userId?: string | null;
 }

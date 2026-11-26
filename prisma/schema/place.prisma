@@ -21,6 +21,8 @@ model Place {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   creator     User      @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  templates   EventTemplate[]
+  events      Event[]
 
   @@index([creatorId, archivedAt])
   @@map("places")

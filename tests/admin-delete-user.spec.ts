@@ -62,6 +62,9 @@ vi.mock("../src/utils/prisma", () => ({
     eventTemplateVenue: { count: vi.fn(async () => 0) },
     eventVenueTransaction: { count: vi.fn(async () => 0) },
     passportStamp: { count: vi.fn(async () => 0) },
+    // ...and nothing is held at their Places (api#520).
+    eventTemplate: { count: vi.fn(async () => 0) },
+    event: { count: vi.fn(async () => 0) },
     eventAssetBid: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     auditLog: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {

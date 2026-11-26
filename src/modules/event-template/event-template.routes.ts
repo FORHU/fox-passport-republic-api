@@ -95,6 +95,20 @@ router.delete(
   EventTemplateCtrl.removeService,
 );
 
+// A package held at a Place instead of a venue (api#520)
+router.put(
+  "/:id/place",
+  authenticate,
+  requirePermission("template:manage"),
+  EventTemplateCtrl.setPlace,
+);
+router.delete(
+  "/:id/place",
+  authenticate,
+  requirePermission("template:manage"),
+  EventTemplateCtrl.clearPlace,
+);
+
 // Venue associations
 router.post(
   "/:id/venues",

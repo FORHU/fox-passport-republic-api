@@ -57,6 +57,15 @@ export default class PlaceCtrl {
     }
   }
 
+  static async getForEvent(req: Request, res: Response) {
+    try {
+      const data = await PlaceSvc.getForEvent(req.user!, req.params.eventId);
+      return res.status(200).json({ success: true, data });
+    } catch (e) {
+      return fail(res, e);
+    }
+  }
+
   static async get(req: Request, res: Response) {
     try {
       const data = await PlaceSvc.get(req.user!, req.params.id);

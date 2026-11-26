@@ -24,6 +24,7 @@ import { toStripeCents } from "../../utils/pricing";
 import IdempotencySvc from "../idempotency/idempotency.service";
 import { AppError } from "../../utils/errors";
 import VenueSvc from "../venue/venue.service";
+import PlaceSvc from "../place/place.service";
 import { recordAudit } from "../audit/audit.service";
 import { revokeAllSessions } from "../auth/sessions.service";
 import AppointmentService from "../appointment/appointment.service";
@@ -35,7 +36,7 @@ const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
 import { cached, invalidate, versionedCache } from "../../utils/cache.util";
 import { notifyDecision } from "../notifications/decision-notification";
 import { sendDecisionEmail } from "../notifications/decision-email";
-import { hasVenue, venueRequired } from "../event-template/package-venue";
+import { hasLocation, venueRequired } from "../event-template/package-venue";
 import EventTemplateRepo from "../event-template/event-template.repository";
 import {
   announceAdminQueueChanged,
@@ -850,9 +851,10 @@ export default class AdminSvc {
   }
 
   static async approveEventTemplate(id: string) {
-    if (!hasVenue(await EventTemplateRepo.findVenueLines(id))) {
+    const location = await EventTemplateRepo.findLocation(id);
+    if (!hasLocation(location.lines, location.place)) {
       throw venueRequired(
-        "This package has no venue taking bookings, so it can't be published.",
+        "This package has no venue taking bookings and no place, so it can't be published.",
       );
     }
     const template = await AdminRepo.publishEventTemplate(id);
@@ -895,7 +897,9 @@ export default class AdminSvc {
     // events)
     if (
       event.templateId &&
-      hasVenue(await EventTemplateRepo.findVenueLines(event.templateId))
+      (await EventTemplateRepo.findLocation(event.templateId).then((l) =>
+        hasLocation(l.lines, l.place),
+      ))
     ) {
       await AdminRepo.setTemplatePublic(event.templateId, true);
     }
@@ -1012,6 +1016,7 @@ export default class AdminSvc {
     // Their venues go with them, unless something still uses one (api#482).
     // Checked before anything is ended or revoked.
     await VenueSvc.assertOwnerDeletable(target.id);
+    await PlaceSvc.assertCreatorDeletable(target.id);
 
     // End active appointments and teams if applicable
     if (target.roleType.includes(RoleType.organizer)) {
