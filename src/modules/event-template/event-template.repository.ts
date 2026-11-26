@@ -254,6 +254,9 @@ export default class EventTemplateRepo {
               venue: {
                 select: {
                   id: true,
+                  // Cards name the venue with its city (api#511). Never the
+                  // street address.
+                  name: true,
                   city: true,
                   price: true,
                   category: true,

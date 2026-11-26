@@ -93,6 +93,24 @@ describe("public listing responses", () => {
     expect(body).not.toContain(email);
   });
 
+  it("the package list names each package's venue and city, not its address (api#511)", async () => {
+    const res = await request(apiApp)
+      .get("/api/v1/event-templates/browse")
+      .query({ city: `City ${run}` });
+    expect(res.status).toBe(200);
+    const rows: {
+      id: string;
+      templateVenues?: { venue?: Record<string, unknown> }[];
+    }[] = res.body.data ?? res.body.templates ?? res.body;
+    const row = rows.find((r) => r.id === ids.template);
+    const venue = row?.templateVenues?.[0]?.venue;
+    expect(venue).toMatchObject({
+      name: `Listing ${run}`,
+      city: `City ${run}`,
+    });
+    expect(venue).not.toHaveProperty("address");
+  });
+
   it.each([
     "/venues",
     "/venues/catalog",
