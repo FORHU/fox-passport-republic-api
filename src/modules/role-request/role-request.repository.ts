@@ -1,5 +1,11 @@
 import { prisma } from "../../utils/prisma";
-import { RoleType, RequestStatus } from "@prisma/client";
+import { Prisma, RoleType, RequestStatus } from "@prisma/client";
+
+/** A role request no admin has decided yet, which its applicant can withdraw. */
+export const OPEN_REQUEST_STATUSES: RequestStatus[] = [
+  RequestStatus.pending,
+  RequestStatus.revision_requested,
+];
 
 export default class RoleRequestRepo {
   /**
@@ -26,15 +32,41 @@ export default class RoleRequestRepo {
   }
 
   /**
-   * Find a pending request for a user and role
+   * Find an open request for a user and role: one still waiting for review,
+   * or sent back for document revision (api#367). Either blocks a second
+   * application for the same role.
    */
   static async findPendingRequest(userId: string, roleType: RoleType) {
     return prisma.roleRequest.findFirst({
       where: {
         userId,
         roleType,
-        status: RequestStatus.pending,
+        status: { in: OPEN_REQUEST_STATUSES },
       },
+    });
+  }
+
+  /**
+   * The applicant withdraws their own open request (api#367). Conditional on
+   * the owner and an open status, so an admin decision landing at the same
+   * moment wins cleanly: the count is 0 and nothing changes.
+   */
+  static async withdrawRequest(id: string, userId: string) {
+    const { count } = await prisma.roleRequest.updateMany({
+      where: { id, userId, status: { in: OPEN_REQUEST_STATUSES } },
+      data: {
+        status: RequestStatus.withdrawn,
+        flaggedDocuments: [],
+        revisionNote: null,
+      },
+    });
+    return count;
+  }
+
+  static async findRequestStatus(id: string) {
+    return prisma.roleRequest.findUnique({
+      where: { id },
+      select: { id: true, userId: true, roleType: true, status: true },
     });
   }
 
@@ -182,7 +214,9 @@ export default class RoleRequestRepo {
   }
 
   /**
-   * Update request status
+   * Update request status. Only a request still pending is decided: one its
+   * applicant withdrew a moment earlier (api#367) stays withdrawn, and the
+   * answer is null.
    */
   static async updateRequestStatus(
     id: string,
@@ -195,10 +229,20 @@ export default class RoleRequestRepo {
       revisionNote?: string | null;
     },
   ) {
-    return prisma.roleRequest.update({
-      where: { id },
-      data,
-    });
+    try {
+      return await prisma.roleRequest.update({
+        where: { id, status: RequestStatus.pending },
+        data,
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2025"
+      ) {
+        return null;
+      }
+      throw e;
+    }
   }
 
   /**

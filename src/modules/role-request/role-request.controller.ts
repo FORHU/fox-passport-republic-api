@@ -679,6 +679,40 @@ export default class RoleRequestController {
   }
 
   /**
+   * Applicant: withdraw their own application while no admin has decided it
+   * (api#367). 404 for a missing request or someone else's, 400 for one
+   * already decided.
+   */
+  static async withdraw(req: Request, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthorized" });
+      const { id } = req.params;
+      if (!id)
+        return res
+          .status(400)
+          .json({ success: false, message: "Request ID required" });
+
+      const withdrawn = await RoleRequestService.withdrawApplication(
+        id,
+        userId,
+      );
+      // The admin Role Applications list drops it from the review queue.
+      announceAdminQueueChanged();
+      return res.status(200).json({
+        success: true,
+        message: "Application withdrawn",
+        data: withdrawn,
+      });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: true });
+    }
+  }
+
+  /**
    * Applicant: resubmit just the documents flagged on their own
    * revision_requested application. Files are already-uploaded fileIds
    * (same direct-to-S3 flow the initial apply form uses), keyed by the same

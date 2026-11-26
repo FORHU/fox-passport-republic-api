@@ -50,6 +50,10 @@ enum RequestStatus {
   // RoleRequest.flaggedDocuments/revisionNote) and the applicant can fix
   // just those instead of resubmitting the whole application.
   revision_requested
+  // The applicant took back their own open (pending or revision_requested)
+  // role application before an admin decided it (api#367). Kept on record;
+  // they can apply for the role again.
+  withdrawn
 }
 
 enum PaymentStatus {
