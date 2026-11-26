@@ -1,0 +1,27 @@
+/// A non-commercial event location: a home, a garden, a beach (epic api#517,
+/// api#518). Unlike a Venue it has no price, no Mayor and no bookings of its
+/// own. Private by default: only its creator lists it; who else sees the
+/// street address is decided per viewer in `place-view.ts` (api#519).
+model Place {
+  id          String    @id @default(uuid())
+  /// The Citizen or Provider Foxer who made it, and who reuses it.
+  creatorId   String
+  /// Public: shown to anyone who can see the event.
+  name        String
+  city        String
+  state       String?
+  country     String    @default("Philippines")
+  /// Private: only for people taking part (see `canSeePlaceAddress`).
+  addressLine String
+  lat         Float
+  lng         Float
+  notes       String?
+  /// Archived instead of deleted, so events that used it keep it.
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  creator     User      @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId, archivedAt])
+  @@map("places")
+}
