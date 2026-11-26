@@ -1,5 +1,10 @@
 import { prisma } from "../../utils/prisma";
-import { EventCategory, VenueCategory } from "@prisma/client";
+import {
+  AssetCategory,
+  EventCategory,
+  ServiceCategory,
+  VenueCategory,
+} from "@prisma/client";
 import { cached, invalidate } from "../../utils/cache.util";
 
 /** The two roots of the catalog; every other category sits under one of them. */
@@ -295,6 +300,7 @@ export default class CategoryRepo {
         group: r.parent?.isGroup
           ? { slug: r.parent.slug, name: r.parent.name, icon: r.parent.icon }
           : null,
+        listingKind: listingKindOf(r.slug),
       }))
       .sort((a, b) => {
         if (!a.group !== !b.group) return a.group ? -1 : 1;
@@ -329,4 +335,20 @@ export type ProviderSpecialty = {
   name: string;
   /** Its main category; null for an older specialty that has none. */
   group: { slug: string; name: string; icon: string | null } | null;
+  /**
+   * Which listing it is offered as: gear (`asset`) or a `service`; null for
+   * one no listing can carry yet, such as a newly approved suggestion.
+   */
+  listingKind: "asset" | "service" | null;
 };
+
+const ASSET_CATEGORIES = new Set<string>(Object.values(AssetCategory));
+const SERVICE_CATEGORIES = new Set<string>(Object.values(ServiceCategory));
+
+/** A specialty's listing kind, from the listing category enums. */
+export const listingKindOf = (slug: string): "asset" | "service" | null =>
+  ASSET_CATEGORIES.has(slug)
+    ? "asset"
+    : SERVICE_CATEGORIES.has(slug)
+      ? "service"
+      : null;

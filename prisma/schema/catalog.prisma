@@ -180,6 +180,25 @@ enum ServiceCategory {
   dj
   live_band
   mc
+  // The catalog subcategories that are services (api#503 follow-up).
+  photo_booth
+  drone_coverage
+  live_streaming
+  solo_performer
+  dancers
+  kids_entertainers
+  cakes_desserts
+  mobile_bar
+  food_carts
+  flowers
+  balloons
+  event_coordinators
+  ushers
+  security
+  cleaning
+  hair_makeup
+  bridal_cars
+  guest_shuttles
 }
 
 enum AssetCondition {

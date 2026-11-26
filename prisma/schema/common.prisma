@@ -6,6 +6,16 @@ enum AssetCategory {
   decorations
   equipment
   other
+  // The catalog subcategories that are rented out (api#503 follow-up).
+  lighting
+  led_screens
+  stage_truss
+  special_effects
+  tents
+  linens_tableware
+  generators_power
+  backdrops_props
+  gowns_suits
 }
 
 enum VenueCategory {
