@@ -1,13 +1,13 @@
 ---
 domain: Fox Passport Republic
-updated: 2026-08-27
+updated: 2026-11-26
 ---
 
 # Fox Passport Republic
 
 An event-booking marketplace. Citizens book Events (and the Assets/Services attached to them) that EventFoxers assemble out of inventory supplied by VenueFoxers and Providers.
 
-This file mirrors the `RoleType` / `SystemRole` enums in `prisma/schema.prisma`.
+This file mirrors the `RoleType` / `SystemRole` enums in `prisma/schema/`.
 **When they disagree, the schema wins** — it is the source of truth, and this file
 is the source of truth for the app's copy at `fox-passport-republic-app/CONTEXT.md`.
 
@@ -18,18 +18,22 @@ A user with no approved RoleType yet (`roleType: []`). The default state for eve
 _Avoid_: Regular user, plain user
 
 **RoleType**:
-A supply-side capability a citizen can apply for and be approved to hold: `venueFoxer`, `eventFoxer`, `providerFoxer`, `organizer` or `investor`. A user may hold more than one simultaneously. Distinct from `SystemRole` (`user`/`admin`), which governs platform administration, not marketplace participation.
+A supply-side capability a citizen can apply for and be approved to hold: `venueFoxer`, `eventFoxer`, `providerFoxer`, `organizer` or `investor`. A user may hold more than one simultaneously. People see them as Venue Foxer, Event Foxer, Provider Foxer, Event Coordinator (`organizer`, shown under Provider Foxer) and Partner Foxer (`investor`, hidden from role selection since 23 Nov 2026). Distinct from `SystemRole`, which governs platform administration, not marketplace participation.
 _Avoid_: Role (ambiguous with SystemRole), permission
+
+**SystemRole**:
+Platform administration: `user` (everyone), `admin_secretary` (reviews the approval queues and moderates content, nothing else), and `admin` (everything: users and roles, categories, policies, fees, payments, refunds, disputes, promotions, rewards settings). Grants are in `src/types/permissions.ts`.
+_Avoid_: Role (for this)
 
 **Foxer**:
 Umbrella term for a supply-side role-holder: a Provider, VenueFoxer or EventFoxer.
 
 **Provider**:
-Role-holder (`providerFoxer`) who supplies physical Assets (equipment, furniture, decorations, sound systems) and Services (catering, design, staffing, and performer categories such as photography, DJ, live band, MC) into the marketplace, for standalone booking or attachment to Event Templates. One role covers all three kinds of supply; performer categories still need `performer:manage` and the rest `service:manage`, and a Provider holds both. Replaced GearFoxer, ServiceFoxer (Talent Foxer) and PerformerFoxer, which were folded into it and removed on 9 Nov 2026 — see `docs/adr/0008-retire-legacy-supply-roles.md`.
+Role-holder (`providerFoxer`) who supplies physical Assets (equipment, furniture, decorations, sound systems) and Services (catering, design, staffing, and performer categories such as photography, DJ, live band, MC) into the marketplace, for standalone booking or attachment to Event Templates. One role covers all three kinds of supply; performer categories still need `performer:manage` and the rest `service:manage`, and a Provider holds both. A Provider has at least one specialty (sub-category) and may have many, and is booked for one thing at a time. Fulfilling a service (photography, DJ, catering) never makes a Provider the **Event Owner**. Replaced GearFoxer, ServiceFoxer (Talent Foxer) and PerformerFoxer, which were folded into it and removed on 9 Nov 2026 — see `docs/adr/0008-retire-legacy-supply-roles.md`.
 _Avoid_: GearFoxer, ServiceFoxer, Talent Foxer, PerformerFoxer (retired roles)
 
 **VenueFoxer**:
-Role-holder who owns/operates Venues. VenueFoxers list Venues; they don't assemble Events. A Venue is bare space — unlike an Asset or Service, it isn't a sellable experience on its own, so (unlike Providers) VenueFoxers have no standalone booking path. A VenueFoxer only earns when an EventFoxer selects their Venue into an Event; this is intentional, not a gap.
+Role-holder who owns/operates Venues. VenueFoxers list Venues; they don't assemble Events. A Venue is bare space — unlike an Asset or Service, it isn't a sellable experience on its own. A VenueFoxer earns when an EventFoxer selects their Venue into an Event. A direct venue booking path exists in code (`BookingSvc.createBooking` with a `venueId` and no event); it is **not an approved product feature** (decided 26 Nov 2026) and stays off until it is.
 _Avoid_: Owner (for a venue — see **Mayor**)
 
 **EventFoxer**:
@@ -39,9 +43,27 @@ _Avoid_: Host (old name)
 **Investor**:
 Role-holder who provides funding rather than operational supply. Application requires proof of funds and an investment range, unlike the other RoleTypes.
 
-**Organizer**:
-A RoleType a citizen applies for and is admin-approved to hold, which makes them eligible to be **Appointed** to help run a specific Event or Venue. Holding the role alone grants nothing over any Event or Venue — only an Appointment does.
-_Avoid_: Delegate, staff, co-host
+**Event Coordinator** (`organizer`):
+A role a citizen applies for and is admin-approved to hold, which makes them eligible to be **Appointed** to help run a specific Event or Venue. Holding the role alone grants nothing over any Event or Venue — only an Appointment does. Shown to people as **Event Coordinator** under Provider Foxer. In code it is still its own `organizer` RoleType; the product decision (26 Nov 2026) is that it is a specialty or responsibility of a Provider Foxer, not a separate account role, and the code is to follow once that design is approved.
+_Avoid_: Organizer (in the UI), delegate, staff, co-host
+
+**Partner Foxer** (`investor`):
+Internal role for funding: equipment inventory hubs, venue equity, event sponsorships (`PartnerInvestment`, `PartnershipProposal`). Hidden from role selection; its data and API remain.
+
+**Venue**:
+A commercial event location listed by a VenueFoxer (its **Mayor**), with a price, availability and bookings through Events. Status: `draft` → `pending` → `available` once an admin approves; `rejected`; `archived` instead of deleted.
+
+**Event venue rule**:
+Every Event has a Venue (epic #477, built). A package can't be sent for review, published or booked without one that is taking bookings (`409 VENUE_REQUIRED`); the venue line is never optional; a passport stamp names its venue. Decided on 26 Nov 2026, not built yet: an Event may instead have a **Place**, so the rule becomes "a Venue or a Place".
+
+**Place** (decided, not built):
+A non-commercial event location: a home, a garden, a park. Stores a name, full address, city, province or state, country, map pin, optional notes and its creator; saved to the Citizen or Provider Foxer who created it, private by default and reusable. No price (₱0), no Mayor, no bookings of its own. Others see only its name and city; the full address goes only to confirmed participants, the Event Coordinator, assigned Suppliers who need it, and admins, enforced by the API. After a booking is confirmed its location changes are recorded and guests are notified. Design pending review: library `requirements/places-match-requests-stamps.md`.
+
+**Passport Stamp**:
+A system-generated record of a Citizen's attended experience. Today: one per attended booking (`bookingId` unique), naming its Venue. Decided, not built: a stamp may name a Venue or a Place, shows only the name and city (never a street address), is issued only after verified attendance, and is one per Citizen per Event.
+
+**Match Request**:
+A Citizen asking a Foxer directly from the Foxer's match page (`POST /matches`). Today it creates an Event and a pending Booking in one step, charges at once when the total is above ₱0, and the Foxer accepts or declines (a decline refunds); accepting needs a venue on the request. Decided, not built: every match request has a Venue (from a package, or picked by the Citizen) or a Place; a Mayor who isn't a partner has 72 hours to accept and the Citizen pays only after; an "Own idea" request gets a **quotation** from the coordinating Provider Foxer and the Citizen pays only after accepting it.
 
 **Mayor**:
 The VenueFoxer a Venue belongs to — exactly one per Venue. The only one who can make or revoke Appointments on that Venue, and the only one who sets its prices.
