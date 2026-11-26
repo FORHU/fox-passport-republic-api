@@ -36,13 +36,16 @@ export class AchievementRepo {
       }),
       // Distinct venues visited
       prisma.passportStamp.findMany({
-        where: { passport: { userId } },
+        where: { passport: { userId }, venueId: { not: null } },
         select: { venueId: true },
         distinct: ["venueId"],
       }),
       // Distinct cities visited
       prisma.passportStamp.findMany({
-        where: { passport: { userId } },
+        where: {
+          passport: { userId },
+          venueId: { not: null },
+        },
         include: {
           venue: { select: { city: true } },
         },
