@@ -226,6 +226,12 @@ const ALLOW_LIST = new Set([
   // An event's Place (api#520): PlaceSvc.getForEvent gives the full address
   // only to the people taking part, name and city to anyone else.
   "place.routes.ts GET /event/:eventId",
+  // Location changes (api#521): PlaceLocationSvc lets only the Event Owner
+  // or an appointed Event Coordinator change it, only people who may see the
+  // address read the history, and only a confirmed guest acknowledge.
+  "place.routes.ts POST /event/:eventId/location",
+  "place.routes.ts GET /event/:eventId/location-changes",
+  "place.routes.ts POST /location-changes/:id/acknowledge",
   "place.routes.ts GET /:id",
   "place.routes.ts PATCH /:id",
   "place.routes.ts DELETE /:id",

@@ -34,6 +34,7 @@ model Booking {
   editRequests          BookingEditRequest[]
   eventEditProposals    EventEditProposal[]
   stamp                 PassportStamp?
+  locationAcknowledgements EventLocationAcknowledgement[]
 
   @@map("bookings")
 }

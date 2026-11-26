@@ -6,6 +6,7 @@ import {
   canSeePlaceAddress,
   fullPlace,
   placeForViewer,
+  type PlaceEventAccess,
   type PlaceViewer,
 } from "./place-view";
 
@@ -96,25 +97,33 @@ export default class PlaceSvc {
    * carrying it.
    */
   static async getForEvent(viewer: PlaceViewer, eventId: string) {
-    const event = await PlaceRepo.findEventPlace(eventId);
+    const { event, access } = await this.eventAccess(viewer, eventId);
     if (!event?.place) throw notFound("Place");
+    return placeForViewer(viewer, event.place, access);
+  }
+
+  /** An event at a Place, and the viewer's part in it (api#520, api#521). */
+  static async eventAccess(viewer: PlaceViewer, eventId: string) {
+    const event = await PlaceRepo.findEventPlace(eventId);
     const userId = viewer.userId ?? "";
-    const [participation, coordinator] = userId
-      ? await Promise.all([
-          PlaceRepo.findEventParticipation(eventId, userId),
-          // Appointed Event Coordinators hold this; Check-in Helpers don't.
-          AppointmentAccess.canOnEvent(
-            eventId,
-            userId,
-            "event:message-attendees",
-          ),
-        ])
-      : [{ confirmedGuest: false, acceptedSupplier: false }, false];
-    return placeForViewer(viewer, event.place, {
+    const [participation, coordinator] =
+      event && userId
+        ? await Promise.all([
+            PlaceRepo.findEventParticipation(eventId, userId),
+            // Appointed Event Coordinators hold this; Check-in Helpers don't.
+            AppointmentAccess.canOnEvent(
+              eventId,
+              userId,
+              "event:message-attendees",
+            ),
+          ])
+        : [{ confirmedGuest: false, acceptedSupplier: false }, false];
+    const access: PlaceEventAccess = {
       ...participation,
-      eventOwner: !!userId && event.organizerId === userId,
+      eventOwner: !!userId && event?.organizerId === userId,
       eventCoordinator: coordinator,
-    });
+    };
+    return { event, access };
   }
 
   /**
@@ -123,7 +132,7 @@ export default class PlaceSvc {
    */
   static async assertCreatorDeletable(userId: string) {
     const uses = await PlaceRepo.countUsesByCreator(userId);
-    if (uses.templates + uses.events > 0) {
+    if (uses.templates + uses.events + uses.changes > 0) {
       throw new AppError(
         "This account has places that events or packages are held at, so it can't be deleted. Contact support.",
         409,
@@ -148,6 +157,16 @@ export default class PlaceSvc {
     patch: Partial<PlaceInput>,
   ) {
     const place = await this.ownLive(creatorId, id);
+    // Once a guest's booking at it is confirmed, the address is theirs to
+    // rely on: a change goes through the event's recorded location change
+    // (api#521), never an edit in place.
+    if (await PlaceRepo.hasConfirmedBookings(id)) {
+      throw new AppError(
+        "Guests have confirmed bookings at this place. Change the event's location instead, so they are told.",
+        409,
+        "PLACE_LOCKED",
+      );
+    }
     const next = {
       name: patch.name?.trim() ?? place.name,
       addressLine: patch.addressLine?.trim() ?? place.addressLine,

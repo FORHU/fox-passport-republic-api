@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import PlaceSvc from "./place.service";
+import PlaceLocationSvc from "./place-location.service";
 import { AppError, sendAppError } from "../../utils/errors";
 
 /** Sends a service error as its status, anything else as a 500. */
@@ -60,6 +61,46 @@ export default class PlaceCtrl {
   static async getForEvent(req: Request, res: Response) {
     try {
       const data = await PlaceSvc.getForEvent(req.user!, req.params.eventId);
+      return res.status(200).json({ success: true, data });
+    } catch (e) {
+      return fail(res, e);
+    }
+  }
+
+  static async changeEventPlace(req: Request, res: Response) {
+    const { error, value } = Joi.object({
+      placeId: Joi.string().required(),
+      reason: Joi.string().trim().min(3).max(500).required(),
+    }).validate(req.body);
+    if (error)
+      return res.status(400).json({ success: false, message: error.message });
+    try {
+      const data = await PlaceLocationSvc.changeEventPlace(
+        req.user!,
+        req.params.eventId,
+        value,
+      );
+      return res.status(200).json({ success: true, data });
+    } catch (e) {
+      return fail(res, e);
+    }
+  }
+
+  static async listEventChanges(req: Request, res: Response) {
+    try {
+      const data = await PlaceLocationSvc.listEventChanges(
+        req.user!,
+        req.params.eventId,
+      );
+      return res.status(200).json({ success: true, data });
+    } catch (e) {
+      return fail(res, e);
+    }
+  }
+
+  static async acknowledgeChange(req: Request, res: Response) {
+    try {
+      const data = await PlaceLocationSvc.acknowledge(req.user!, req.params.id);
       return res.status(200).json({ success: true, data });
     } catch (e) {
       return fail(res, e);

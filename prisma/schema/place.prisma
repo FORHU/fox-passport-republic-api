@@ -23,7 +23,49 @@ model Place {
   creator     User      @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   templates   EventTemplate[]
   events      Event[]
+  changesFrom EventLocationChange[] @relation("LocationChangeFrom")
+  changesTo   EventLocationChange[] @relation("LocationChangeTo")
 
   @@index([creatorId, archivedAt])
   @@map("places")
+}
+
+/// A recorded move of an event from one Place to another once a booking is
+/// confirmed (api#521). Snapshots keep where it was and where it went, so the
+/// history survives later edits; a location is never silently overwritten.
+model EventLocationChange {
+  id            String    @id @default(uuid())
+  eventId       String
+  fromPlaceId   String?
+  toPlaceId     String
+  /// { name, addressLine, city, state, country, lat, lng } at the time.
+  fromSnapshot  Json
+  toSnapshot    Json
+  reason        String
+  /// A different city, province or country: confirmed guests must
+  /// acknowledge it, and keep their booking's cancellation and refund terms.
+  material      Boolean
+  /// The Event Owner or Event Coordinator who made it.
+  requestedById String
+  createdAt     DateTime  @default(now())
+  event         Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  fromPlace     Place?    @relation("LocationChangeFrom", fields: [fromPlaceId], references: [id], onDelete: Restrict)
+  toPlace       Place     @relation("LocationChangeTo", fields: [toPlaceId], references: [id], onDelete: Restrict)
+  acknowledgements EventLocationAcknowledgement[]
+
+  @@index([eventId, createdAt])
+  @@map("event_location_changes")
+}
+
+/// A confirmed guest acknowledging a material location change (api#521).
+model EventLocationAcknowledgement {
+  id             String              @id @default(uuid())
+  changeId       String
+  bookingId      String
+  acknowledgedAt DateTime            @default(now())
+  change         EventLocationChange @relation(fields: [changeId], references: [id], onDelete: Cascade)
+  booking        Booking             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@unique([changeId, bookingId])
+  @@map("event_location_acknowledgements")
 }

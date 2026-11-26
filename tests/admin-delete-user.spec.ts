@@ -65,6 +65,7 @@ vi.mock("../src/utils/prisma", () => ({
     // ...and nothing is held at their Places (api#520).
     eventTemplate: { count: vi.fn(async () => 0) },
     event: { count: vi.fn(async () => 0) },
+    eventLocationChange: { count: vi.fn(async () => 0) },
     eventAssetBid: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     auditLog: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
