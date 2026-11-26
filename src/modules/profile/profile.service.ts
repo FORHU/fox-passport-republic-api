@@ -10,6 +10,7 @@ import { hashPassword, verifyPassword } from "../../utils/password";
 import OnboardingSvc from "../onboarding/onboarding.service";
 import { recordChange, type AuditActor } from "../audit/audit.service";
 import { notFound } from "../../utils/errors";
+import VenueSvc from "../venue/venue.service";
 import { RoleType } from "@prisma/client";
 import ProviderSpecialtySvc from "../users/provider-specialty.service";
 
@@ -369,6 +370,9 @@ export default class ProfileSvc {
     if (!isPasswordValid) {
       throw new Error("Password is incorrect");
     }
+
+    // Their venues go with them, unless something still uses one (api#482).
+    await VenueSvc.assertOwnerDeletable(userId);
 
     // Delete user (cascade will handle related records)
     await ProfileRepo.deleteUser(userId);

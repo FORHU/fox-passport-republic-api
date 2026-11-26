@@ -58,6 +58,10 @@ vi.mock("../src/utils/prisma", () => ({
       deleteMany: vi.fn(async () => ({ count: 0 })),
     },
     eventServiceBid: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    // What still uses the user's venues (api#482): nothing, here.
+    eventTemplateVenue: { count: vi.fn(async () => 0) },
+    eventVenueTransaction: { count: vi.fn(async () => 0) },
+    passportStamp: { count: vi.fn(async () => 0) },
     eventAssetBid: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     auditLog: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {

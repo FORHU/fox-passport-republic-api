@@ -840,6 +840,22 @@ export default class VenueSvc {
     return venue;
   }
 
+  /**
+   * Deleting an account deletes its venues. A venue in a package, a booking or
+   * a guest's stamp can't be deleted (api#482): say so plainly, before
+   * anything is touched, instead of failing halfway on a foreign key.
+   */
+  static async assertOwnerDeletable(userId: string) {
+    const uses = await VenueRepo.countVenueUsesByMayor(userId);
+    if (uses.packages + uses.bookings + uses.stamps > 0) {
+      throw new AppError(
+        "This account owns venues that are part of packages, bookings or guests' passport stamps, so it can't be deleted. Remove the venues from packages, or contact support.",
+        409,
+        "VENUE_IN_USE",
+      );
+    }
+  }
+
   static async deleteVenue(params: {
     id: string;
     requesterId: string;
