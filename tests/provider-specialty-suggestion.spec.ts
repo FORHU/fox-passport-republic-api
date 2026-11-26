@@ -23,6 +23,14 @@ const categoryRepo = vi.hoisted(() => ({
     { id: "00000000-0000-4000-8000-000000000002", slug: "listing" },
   ]),
   invalidateAll: vi.fn(async () => {}),
+  getProviderGroups: vi.fn(async () => [
+    {
+      id: "00000000-0000-4000-8000-000000000003",
+      slug: "photo_video",
+      name: "Photo & Video",
+      icon: null,
+    },
+  ]),
 }));
 vi.mock("../src/modules/category/category.repository", () => ({
   default: categoryRepo,
@@ -219,7 +227,7 @@ describe("reviewing suggestions", () => {
     expect(repo.approve).toHaveBeenCalledWith({
       slug: "drone_photography",
       name: "Aerial Photography",
-      listingRootId: LISTING_ROOT,
+      parentCategoryId: LISTING_ROOT,
       reviewerId: "sugg-admin",
     });
     expect(categoryRepo.invalidateAll).toHaveBeenCalledTimes(1);
@@ -229,6 +237,30 @@ describe("reviewing suggestions", () => {
       "new-category",
       expect.objectContaining({ fromSuggestion: SUGGESTION }),
     );
+  });
+
+  it("approves under the main category the reviewer picks (api#503)", async () => {
+    const res = await request(app)
+      .post(`${BASE}/${SUGGESTION}/approve`)
+      .set("Authorization", bearer("admin"))
+      .send({ group: "photo_video" });
+
+    expect(res.status).toBe(200);
+    expect(repo.approve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parentCategoryId: "00000000-0000-4000-8000-000000000003",
+      }),
+    );
+  });
+
+  it("refuses a main category that doesn't exist", async () => {
+    const res = await request(app)
+      .post(`${BASE}/${SUGGESTION}/approve`)
+      .set("Authorization", bearer("admin"))
+      .send({ group: "plumbing" });
+
+    expect(res.status).toBe(400);
+    expect(repo.approve).not.toHaveBeenCalled();
   });
 
   it("keeps the asked-for name when the reviewer gives none", async () => {

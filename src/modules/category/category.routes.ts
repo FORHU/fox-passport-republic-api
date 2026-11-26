@@ -13,6 +13,8 @@ router.get("/", CategoryCtrl.getAllCategories);
 router.get("/top-level", CategoryCtrl.getTopLevelCategories);
 // Before "/:id", which would otherwise take "provider-specialties" as an id.
 router.get("/provider-specialties", CategoryCtrl.getProviderSpecialties);
+// The main categories (api#503), for placing an approved suggestion.
+router.get("/provider-groups", CategoryCtrl.getProviderGroups);
 // Specialty suggestions (api#440). Anyone signed in may ask; only catalog
 // managers see the queue and decide.
 router.post(

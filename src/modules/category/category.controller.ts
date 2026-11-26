@@ -92,6 +92,20 @@ export default class CategoryController {
     }
   }
 
+  // GET PROVIDER MAIN CATEGORIES (public, api#503)
+  static async getProviderGroups(_req: Request, res: Response) {
+    try {
+      const groups = await CategorySvc.getProviderGroups();
+      return res.status(200).json({
+        success: true,
+        count: groups.length,
+        data: groups,
+      });
+    } catch (e: unknown) {
+      return sendServerError(res, e, { success: false });
+    }
+  }
+
   // GET CATEGORY BY ID
   static async getCategoryById(req: Request, res: Response) {
     try {

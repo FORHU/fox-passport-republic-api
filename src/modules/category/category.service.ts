@@ -40,16 +40,46 @@ export default class CategorySvc {
   }
 
   /**
-   * The catalog is two levels deep: a subcategory's parent must be a root.
-   * Holding that here means no chain of parents can ever loop.
+   * A subcategory's parent is a root, or a Provider main category under
+   * Listing (api#503), never deeper. A main category itself only sits under
+   * Listing, and a row with subcategories of its own can't go under a main
+   * category. Holding that here means no chain of parents can ever loop.
+   * `moving` is the row being moved; omitted for a new one.
    */
-  private static async assertRootParent(parentCategoryId: string) {
+  private static async assertParent(
+    parentCategoryId: string,
+    moving?: { id: string; isGroup: boolean },
+  ) {
     const parent = await CategoryRepo.findById(parentCategoryId);
     if (!parent) {
       throw badRequest("Parent category not found");
     }
-    if (parent.parentCategoryId) {
-      throw badRequest("The parent must be Event or Listing");
+    if (moving?.isGroup) {
+      const root = parent.parentCategoryId ? null : parent;
+      if (root?.slug !== "listing") {
+        throw badRequest("A main category can only sit under Listing");
+      }
+      return;
+    }
+    if (!parent.parentCategoryId) return;
+
+    const grandparent = parent.isGroup
+      ? await CategoryRepo.findById(parent.parentCategoryId)
+      : null;
+    if (
+      !parent.isGroup ||
+      !grandparent ||
+      grandparent.parentCategoryId ||
+      grandparent.slug !== "listing"
+    ) {
+      throw badRequest(
+        "The parent must be Event, Listing or a Provider main category",
+      );
+    }
+    if (moving && (await CategoryRepo.hasChildren(moving.id))) {
+      throw badRequest(
+        "A category with subcategories can't go under a main category",
+      );
     }
   }
 
@@ -58,7 +88,7 @@ export default class CategorySvc {
     if (await CategoryRepo.slugExists(data.slug)) {
       throw conflict("A category with this slug already exists");
     }
-    await this.assertRootParent(data.parentCategoryId);
+    await this.assertParent(data.parentCategoryId);
 
     const category = await CategoryRepo.createCategory(data);
     await CategoryRepo.invalidateAll();
@@ -94,7 +124,10 @@ export default class CategorySvc {
       if (data.parentCategoryId === id) {
         throw new AppError("Category cannot be its own parent", 400);
       }
-      await this.assertRootParent(data.parentCategoryId);
+      await this.assertParent(data.parentCategoryId, {
+        id,
+        isGroup: existing.isGroup,
+      });
     }
 
     const { slug: _slug, ...changes } = data;
@@ -124,8 +157,13 @@ export default class CategorySvc {
     return CategoryRepo.getTopLevelCategories();
   }
 
+  /** The Provider main categories, for placing a new specialty under one. */
+  static async getProviderGroups() {
+    return CategoryRepo.getProviderGroups();
+  }
+
   /**
-   * Every specialty a Provider can declare ({ slug, name }), the same list the
+   * Every specialty a Provider can declare ({ slug, name, group }), the same list the
    * API checks applications and profile edits against (RR-3), so forms never
    * offer a value the API would refuse.
    */
