@@ -8,6 +8,7 @@ import EventRequestSvc from "../event-request/event-request.service";
 import AppointmentAccess from "../appointment/appointment.access";
 import EventTemplateSvc from "../event-template/event-template.service";
 import {
+  hasLocation,
   hasVenue,
   VENUE_REQUIRED,
   venueRequired,
@@ -704,7 +705,7 @@ export default class BookingSvc {
     if (!event) throw notFound("Event");
     if (!venueChecked && !(await EventRequestRepo.hasVenue(data.eventId))) {
       throw venueRequired(
-        "This event has no venue yet, so it can't be booked.",
+        "This event has no venue or place yet, so it can't be booked.",
       );
     }
 
@@ -1435,11 +1436,13 @@ export default class BookingSvc {
     if (!template) {
       throw new BookingError("Template not found or not approved", 404);
     }
-    if (!hasVenue(template.templateVenues, excludedVenueIds)) {
+    if (
+      !hasLocation(template.templateVenues, template.place, excludedVenueIds)
+    ) {
       throw new BookingError(
         hasVenue(template.templateVenues)
           ? "A package is booked with its venue. Keep the venue to continue."
-          : "This package has no venue yet, so it can't be booked.",
+          : "This package has no venue or place yet, so it can't be booked.",
         409,
         VENUE_REQUIRED,
       );

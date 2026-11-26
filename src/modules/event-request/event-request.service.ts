@@ -7,7 +7,7 @@ import PricingSvc from "../pricing/pricing.service";
 import { breakdownTotals } from "../pricing/event-breakdown";
 import { can } from "../../types/permissions";
 import { notFound } from "../../utils/errors";
-import { hasVenue, venueRequired } from "../event-template/package-venue";
+import { hasLocation, venueRequired } from "../event-template/package-venue";
 import { sendApprovedEmail } from "../../utils/emails/approved";
 import { sendRejectedEmail } from "../../utils/emails/rejected";
 import AppointmentAccess from "../appointment/appointment.access";
@@ -21,9 +21,9 @@ export default class EventRequestSvc {
   ) {
     const template = await EventTemplateRepo.findTemplateById(data.templateId);
     if (!template) throw notFound("Event template");
-    if (!hasVenue(template.templateVenues)) {
+    if (!hasLocation(template.templateVenues, template.place)) {
       throw venueRequired(
-        "This package has no venue yet, so it can't be booked.",
+        "This package has no venue or place yet, so it can't be booked.",
       );
     }
     return this.spawnRequestFromTemplate(data);
@@ -77,6 +77,10 @@ export default class EventRequestSvc {
         client: { connect: { id: data.clientId } },
         host: { connect: { id: template.ownerId } },
         template: { connect: { id: data.templateId } },
+        // Held where its package is: a Place, or its venue line (api#520).
+        ...(template.placeId
+          ? { place: { connect: { id: template.placeId } } }
+          : {}),
         name: data.name,
         description: data.description,
         eventCategory: template.category,
@@ -108,7 +112,9 @@ export default class EventRequestSvc {
       );
     }
     if (!(await EventRequestRepo.hasVenue(id))) {
-      throw venueRequired("This event has no venue, so it can't be approved.");
+      throw venueRequired(
+        "This event has no venue or place, so it can't be approved.",
+      );
     }
 
     const updated = await EventRequestRepo.updateRequestStatus(id, "approved");

@@ -10,6 +10,8 @@ const router = Router();
 
 router.post("/", authenticate, PlaceCtrl.create);
 router.get("/mine", authenticate, PlaceCtrl.listMine);
+// The Place an event is held at, as the viewer may see it (api#520).
+router.get("/event/:eventId", authenticate, PlaceCtrl.getForEvent);
 router.get("/:id", authenticate, PlaceCtrl.get);
 router.patch("/:id", authenticate, PlaceCtrl.update);
 // Archives: a Place is never deleted, so events that used it keep it.

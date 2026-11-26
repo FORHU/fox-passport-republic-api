@@ -33,9 +33,14 @@ model EventTemplate {
   templateAssets       EventTemplateAsset[]
   templateServices     EventTemplateService[]
   templateVenues       EventTemplateVenue[]
+  /// Held at a Place instead of a Venue (epic #517, api#520): a package has
+  /// a venue line or a Place, never both and never neither.
+  placeId              String?
+  place                Place?               @relation(fields: [placeId], references: [id], onDelete: Restrict)
   applications         PackageApplication[]
   waitlist             Waitlist[]
 
+  @@index([placeId])
   @@map("event_templates")
 }
 
@@ -177,6 +182,10 @@ model Event {
   template             EventTemplate?             @relation(fields: [templateId], references: [id])
   serviceTransactions  EventServiceTransaction[]
   venueTransactions    EventVenueTransaction[]
+  /// Held at a Place instead of a Venue (epic #517, api#520): exactly one of
+  /// a venue line or a Place. Public responses carry only its name and city.
+  placeId              String?
+  place                Place?                     @relation(fields: [placeId], references: [id], onDelete: Restrict)
   posts                Post[]
   partnerInvestments   PartnerInvestment[]
   partnershipProposals PartnershipProposal[]
@@ -193,6 +202,7 @@ model Event {
   eventServiceBids     EventServiceBid[]
   eventAssetBids       EventAssetBid[]
 
+  @@index([placeId])
   @@map("events")
 }
 

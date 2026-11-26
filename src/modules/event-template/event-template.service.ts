@@ -4,7 +4,13 @@ import {
   acceptedMatchListings,
   type LineKind,
 } from "./template-partners";
-import { hasVenue, venueRequired } from "./package-venue";
+import {
+  hasLocation,
+  hasVenue,
+  locationConflict,
+  venueRequired,
+} from "./package-venue";
+import PlaceSvc from "../place/place.service";
 import NotificationService from "../notifications/user-notification.service";
 import {
   EventCategory,
@@ -228,6 +234,7 @@ export default class EventTemplateSvc {
       where: { id },
       select: {
         ownerId: true,
+        place: { select: { archivedAt: true } },
         templateVenues: {
           select: {
             isOptional: true,
@@ -255,9 +262,9 @@ export default class EventTemplateSvc {
       },
     });
     if (template && template.ownerId === ownerId) {
-      if (!hasVenue(template.templateVenues)) {
+      if (!hasLocation(template.templateVenues, template.place)) {
         throw venueRequired(
-          "Add a venue that is taking bookings before sending this package for review.",
+          "Add a venue that is taking bookings, or a place, before sending this package for review.",
         );
       }
       const waitingOn = [
@@ -782,6 +789,12 @@ export default class EventTemplateSvc {
 
     const template = await EventTemplateRepo.findTemplateById(templateId);
     if (!template) throw notFound("Template");
+    // A package is at a venue or a Place, never both (api#520).
+    if (template.placeId) {
+      throw locationConflict(
+        "This package is held at a place. Remove the place before adding a venue.",
+      );
+    }
 
     // Event Studio re-sends the package's venue on every Publish. Attaching it
     // again used to add a second row for the same venue, which every total
@@ -874,6 +887,31 @@ export default class EventTemplateSvc {
     await this.verifyOwnership(id, ownerId);
     await EventTemplateRepo.deleteTemplate(id);
     return { message: "Event template deleted successfully" };
+  }
+
+  /**
+   * Holds a package at one of its owner's own Places instead of a venue
+   * (api#520). A package with a venue line can't take a Place: remove the
+   * venue first.
+   */
+  static async setPlace(templateId: string, ownerId: string, placeId: string) {
+    const template = await this.verifyOwnership(templateId, ownerId);
+    await PlaceSvc.assertUsableBy(ownerId, placeId);
+    if (
+      hasVenue(template.templateVenues) ||
+      template.templateVenues.some((l) => l.venueId)
+    ) {
+      throw locationConflict(
+        "This package has a venue. Remove the venue before choosing a place.",
+      );
+    }
+    return EventTemplateRepo.setPlace(templateId, placeId);
+  }
+
+  /** Takes a package off its Place. */
+  static async clearPlace(templateId: string, ownerId: string) {
+    await this.verifyOwnership(templateId, ownerId);
+    return EventTemplateRepo.setPlace(templateId, null);
   }
 
   private static async verifyOwnership(templateId: string, ownerId: string) {

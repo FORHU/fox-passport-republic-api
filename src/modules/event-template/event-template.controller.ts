@@ -453,6 +453,44 @@ export default class EventTemplateCtrl {
     }
   }
 
+  /** Holds the package at one of the owner's own Places (api#520). */
+  static async setPlace(req: Request, res: Response) {
+    const { error, value } = Joi.object({
+      placeId: Joi.string().required(),
+    }).validate(req.body);
+    if (error) return res.status(400).json({ message: error.message });
+    try {
+      const result = await EventTemplateSvc.setPlace(
+        req.params.id,
+        req.user!.userId,
+        value.placeId,
+      );
+      return res.status(200).json({ message: "Place set", result });
+    } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
+      const err = e as Error;
+      return res
+        .status(err.message.includes("Unauthorized") ? 403 : 400)
+        .json({ message: err.message });
+    }
+  }
+
+  static async clearPlace(req: Request, res: Response) {
+    try {
+      const result = await EventTemplateSvc.clearPlace(
+        req.params.id,
+        req.user!.userId,
+      );
+      return res.status(200).json({ message: "Place removed", result });
+    } catch (e: unknown) {
+      if (e instanceof AppError) return sendAppError(res, e);
+      const err = e as Error;
+      return res
+        .status(err.message.includes("Unauthorized") ? 403 : 400)
+        .json({ message: err.message });
+    }
+  }
+
   static async removeVenue(req: Request, res: Response) {
     try {
       const ownerId = req.user?.userId;

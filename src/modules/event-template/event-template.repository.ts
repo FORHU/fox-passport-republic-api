@@ -1,3 +1,4 @@
+import { PUBLIC_PLACE_SELECT } from "../place/place-view";
 import { prisma, AppTransactionClient } from "../../utils/prisma";
 import { eventTemplateCache } from "../../utils/cache-namespaces";
 import {
@@ -125,6 +126,7 @@ export default class EventTemplateRepo {
           templateVenues: {
             include: { venue: { include: { images: { take: 1 } } } },
           },
+          place: { select: PUBLIC_PLACE_SELECT },
           images: true,
         },
         orderBy: { createdAt: "desc" },
@@ -265,6 +267,7 @@ export default class EventTemplateRepo {
               },
             },
           },
+          place: { select: PUBLIC_PLACE_SELECT },
           owner: { select: { id: true, name: true, commissionPct: true } },
         },
         skip,
@@ -298,6 +301,7 @@ export default class EventTemplateRepo {
           include: { service: { include: { owner: true } } },
         },
         templateVenues: { include: { venue: { include: { mayor: true } } } },
+        place: { select: PUBLIC_PLACE_SELECT },
       },
     });
   }
@@ -376,6 +380,7 @@ export default class EventTemplateRepo {
         templateAssets: { include: { asset: true } },
         templateServices: { include: { service: true } },
         templateVenues: { include: { venue: true } },
+        place: { select: PUBLIC_PLACE_SELECT },
         images: true,
       },
     });
@@ -409,6 +414,7 @@ export default class EventTemplateRepo {
           templateAssets: { include: { asset: true } },
           templateServices: { include: { service: true } },
           templateVenues: { include: { venue: true } },
+          place: { select: PUBLIC_PLACE_SELECT },
           images: true,
         },
       }),
@@ -705,6 +711,33 @@ export default class EventTemplateRepo {
       where: { templateId: id },
       select: { id: true, venueId: true, venue: { select: { status: true } } },
     });
+  }
+
+  /** A package's venue lines and Place, for the location rule (api#520). */
+  static async findLocation(id: string) {
+    const [lines, template] = await Promise.all([
+      this.findVenueLines(id),
+      prisma.eventTemplate.findUnique({
+        where: { id },
+        select: { place: { select: { archivedAt: true } } },
+      }),
+    ]);
+    return { lines, place: template?.place ?? null };
+  }
+
+  /** Puts a package at a Place, or clears it (api#520). */
+  static async setPlace(id: string, placeId: string | null) {
+    return this.retiring(
+      prisma.eventTemplate.update({
+        where: { id },
+        data: { placeId },
+        select: {
+          id: true,
+          placeId: true,
+          place: { select: PUBLIC_PLACE_SELECT },
+        },
+      }),
+    );
   }
 
   // TRENDING — top N public templates in a category ranked by approved-Event count
