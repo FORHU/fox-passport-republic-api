@@ -95,7 +95,6 @@ const bookingWrites: [string, () => Promise<unknown>][] = [
   ["markConfirmed", () => BookingRepo.markConfirmed("b1")],
   ["cancel", () => BookingRepo.cancel("b1")],
   ["markPaymentCancelled", () => BookingRepo.markPaymentCancelled("p1")],
-  ["markPaymentRefunded", () => BookingRepo.markPaymentRefunded("p1")],
   [
     "setPaymentTransaction",
     () =>
@@ -130,7 +129,9 @@ const paymentWrites: [string, () => Promise<unknown>][] = [
     () => PaymentRepo.updatePayment("p1", { paymentStatus: "paid" as never }),
   ],
   ["setTransactionId", () => PaymentRepo.setTransactionId("p1", "pi_1")],
-  ["markRefunded", () => PaymentRepo.markRefunded("p1")],
+  ["markFailed", () => PaymentRepo.markFailed("p1")],
+  // `markRefundStatusFromRefunds` writes through this one.
+  ["markRefundStatus", () => PaymentRepo.markRefundStatus("p1", false)],
   ["cancelExpiredPayments", () => PaymentRepo.cancelExpiredPayments()],
 ];
 

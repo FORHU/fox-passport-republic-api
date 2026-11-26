@@ -35,7 +35,10 @@ vi.mock("../src/utils/prisma", () => ({
   },
 }));
 vi.mock("../src/modules/payment/payment.repository", () => ({
-  default: { getBookingPayments: m.payments },
+  default: {
+    getBookingPayments: m.payments,
+    markRefundStatusFromRefunds: vi.fn(),
+  },
 }));
 vi.mock("../src/modules/event-transaction/event-conflict.service", () => ({
   default: { fullRefundDue: m.fullRefundDue },
@@ -44,7 +47,6 @@ vi.mock("../src/modules/booking/booking.repository", () => ({
   default: {
     findForCancellation: m.findForCancellation,
     createRefund: m.createRefund,
-    markPaymentRefunded: vi.fn(),
     markPaymentCancelled: vi.fn(),
     cancel: m.cancel,
   },

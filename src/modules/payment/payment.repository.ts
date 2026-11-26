@@ -5,6 +5,7 @@ import {
   PaymentStatus,
   InvoiceSourceType,
   InvoiceStatus,
+  RefundStatus,
 } from "@prisma/client";
 
 /**
@@ -220,30 +221,65 @@ export default class PaymentRepo {
     );
   }
 
-  /**
-   * The three queries the Stripe webhook used to run against `prisma` itself.
-   *
-   * `findFirstByTransactionId` is deliberately not `getPaymentByTransactionId`
-   * above: that one is a `findUnique` carrying the invoice and its payer, and
-   * the refund handler needs neither. Moved verbatim.
-   */
-  static async findFirstByTransactionId(providerReference: string) {
-    return prisma.payment.findFirst({ where: { providerReference } });
-  }
-
+  /** Writes for the Stripe webhook (`PaymentSvc.handleStripeEvent`). */
   static async setTransactionId(id: string, providerReference: string) {
     return this.retiring(
       prisma.payment.update({ where: { id }, data: { providerReference } }),
     );
   }
 
-  static async markRefunded(id: string) {
+  /**
+   * Stripe declined the payment. Only a `pending` payment moves: a success
+   * that was already recorded is never undone by a late failure event. The
+   * booking stays as it was (unpaid); a retry that succeeds settles the
+   * payment through `PaymentSvc.settleSucceededIntent` (api#362).
+   */
+  static async markFailed(id: string) {
     return this.retiring(
-      prisma.payment.update({
-        where: { id },
-        data: { status: PaymentStatus.refunded },
+      prisma.payment.updateMany({
+        where: { id, status: PaymentStatus.pending },
+        data: { status: PaymentStatus.failed },
       }),
     );
+  }
+
+  /**
+   * A refund went through: `refunded` when nothing is left to give back, else
+   * `partially_refunded` (api#362; before, any refund marked it `refunded`).
+   * A payment already `refunded` is never moved back: payouts count
+   * `partially_refunded` as money kept. A partial refund only moves a `paid`
+   * payment.
+   */
+  static async markRefundStatus(id: string, full: boolean) {
+    return this.retiring(
+      prisma.payment.updateMany({
+        where: full
+          ? { id, status: { not: PaymentStatus.refunded } }
+          : { id, status: PaymentStatus.paid },
+        data: {
+          status: full
+            ? PaymentStatus.refunded
+            : PaymentStatus.partially_refunded,
+        },
+      }),
+    );
+  }
+
+  /**
+   * `markRefundStatus` from our own Refund records: full once the succeeded
+   * refunds add up to the payment's amount.
+   */
+  static async markRefundStatusFromRefunds(id: string) {
+    const [payment, refunded] = await Promise.all([
+      prisma.payment.findUnique({ where: { id }, select: { amount: true } }),
+      prisma.refund.aggregate({
+        where: { paymentId: id, status: RefundStatus.succeeded },
+        _sum: { amount: true },
+      }),
+    ]);
+    const total = refunded?._sum?.amount;
+    if (!payment || !total || total.lte(0)) return { count: 0 };
+    return this.markRefundStatus(id, total.gte(payment.amount));
   }
 
   // Check if payment exists
@@ -289,10 +325,12 @@ export default class PaymentRepo {
     const cutoff = new Date(Date.now() - PENDING_PAYMENT_TTL_MS);
 
     // 1. Find stale pending payments, and the bookings they belong to via
-    // their invoice's `booking`-sourced InvoiceItem.
+    // their invoice's `booking`-sourced InvoiceItem. A `failed` payment (a
+    // declined card, api#362) is still unpaid and goes the same way, or a
+    // booking abandoned after a decline would stay pending forever.
     const expiredPayments = await prisma.payment.findMany({
       where: {
-        status: PaymentStatus.pending,
+        status: { in: [PaymentStatus.pending, PaymentStatus.failed] },
         createdAt: { lt: cutoff },
         invoice: { isNot: null },
       },

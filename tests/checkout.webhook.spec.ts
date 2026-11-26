@@ -339,6 +339,30 @@ describe("Stripe webhook dispatch — new Checkout Session flow vs legacy Paymen
     vi.restoreAllMocks();
   });
 
+  // api#362: a repeated failure or refund must change nothing the second
+  // time (no second refund email or notification).
+  it.each([
+    ["payment_intent.payment_failed", { id: "pi_fail_dup", metadata: {} }],
+    ["charge.refunded", { id: "ch_dup", payment_intent: "pi_x" }],
+    ["refund.updated", { id: "re_dup", status: "succeeded" }],
+  ])("%s delivered twice is handled once", async (type, object) => {
+    const spy = vi
+      .spyOn(PaymentSvc, "handleStripeEvent")
+      .mockResolvedValue(undefined);
+
+    mockEvent = { id: `evt_dup_${type}`, type, data: { object } };
+
+    expect((await postWebhook()).status).toBe(200);
+    expect((await postWebhook()).status).toBe(200);
+    expect(spy).toHaveBeenCalledTimes(1);
+    const logged = await prisma.paymentProviderEvent.findFirst({
+      where: { providerEventId: `evt_dup_${type}` },
+    });
+    expect(logged?.processed).toBe(true);
+
+    vi.restoreAllMocks();
+  });
+
   it("an unrelated event type (account.updated) is untouched by the new branching", async () => {
     const spy = vi.spyOn(PaymentSvc, "handleStripeEvent");
 

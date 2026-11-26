@@ -2085,8 +2085,10 @@ export default class BookingSvc {
         reason: matchedRuleInfo,
       });
 
+      // By amount: a policy refund below 100% leaves the payment
+      // `partially_refunded`, not `refunded` (api#362).
       if (refundStatus === "succeeded") {
-        await BookingRepo.markPaymentRefunded(payment.id);
+        await PaymentRepo.markRefundStatusFromRefunds(payment.id);
       }
 
       refunds.push(refund);

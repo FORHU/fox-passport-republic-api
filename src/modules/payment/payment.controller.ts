@@ -314,6 +314,11 @@ export default class PaymentController {
       );
     } else if (
       event.type === "payment_intent.succeeded" ||
+      // A declined booking payment, and refunds: a redelivery must not
+      // re-send the refund email or notification (api#362).
+      event.type === "payment_intent.payment_failed" ||
+      event.type === "charge.refunded" ||
+      event.type === "refund.updated" ||
       // A Foxer's Connect account changed (onboarding finished): it can
       // retry their payouts, so it must run once per event.
       event.type === "account.updated" ||

@@ -317,7 +317,7 @@ export default class RefundSvc {
       if (newRefundStatus === RefundStatus.succeeded && refund.payment) {
         // Through the repository, which retires the cached booking: payments
         // are part of it, and the citizen is watching this one.
-        await PaymentRepo.markRefunded(refund.payment.id);
+        await PaymentRepo.markRefundStatusFromRefunds(refund.payment.id);
       }
 
       return updated;
@@ -355,7 +355,7 @@ export default class RefundSvc {
     });
 
     if (refund.payment) {
-      await PaymentRepo.markRefunded(refund.payment.id);
+      await PaymentRepo.markRefundStatusFromRefunds(refund.payment.id);
     }
 
     return updated;
@@ -495,7 +495,7 @@ export default class RefundSvc {
     });
 
     if (existing.payment) {
-      await PaymentRepo.markRefunded(existing.payment.id);
+      await PaymentRepo.markRefundStatusFromRefunds(existing.payment.id);
     }
 
     const recipient = this.resolveRefundRecipient(existing);

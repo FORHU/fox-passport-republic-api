@@ -130,7 +130,19 @@ All in `prisma/schema/money.prisma`, spread across `src/modules/payment/` and `s
 
 Key services: `InvoiceSvc` (`invoice.service.ts`), `CheckoutSvc` + `StripeAdapter` (Stripe Checkout Session creation), `EventCheckoutSvc` (builds invoice items from an Event's accepted transactions, uses a Postgres advisory lock to serialize concurrent checkout creation for the same event), `PartnershipCheckoutSvc` (same pattern for sponsorships), `WebhookSvc` (idempotent webhook processing → marks paid → redeems voucher → `allocatePayouts`).
 
-**One Stripe webhook route** handles both systems: `POST /v1/payments/webhook` → `PaymentController.handleWebhook` branches by event type. `checkout.session.completed`/`.expired` → `WebhookSvc` (Central Payment). Everything else (`payment_intent.succeeded`, `charge.refunded`, `refund.updated`, `account.updated`, `charge.dispute.*`) → the original `PaymentSvc.handleStripeEvent`. `payment_intent.succeeded`, `account.updated` and `charge.dispute.*` run inside `WebhookSvc.processEventWithIdempotency`: a redelivery is skipped, and a failure answers 5xx so Stripe retries.
+**One Stripe webhook route** handles both systems: `POST /v1/payments/webhook` → `PaymentController.handleWebhook` branches by event type. `checkout.session.completed`/`.expired` → `WebhookSvc` (Central Payment). Everything else (`payment_intent.succeeded`, `charge.refunded`, `refund.updated`, `account.updated`, `charge.dispute.*`) → the original `PaymentSvc.handleStripeEvent`. Every handled event runs inside `WebhookSvc.processEventWithIdempotency`: a redelivery is skipped, and a failure answers 5xx so Stripe retries.
+
+**What each event does to a direct booking (api#362):**
+
+| Event | Payment | Booking |
+| --- | --- | --- |
+| `payment_intent.succeeded` | `pending` or `failed` → `paid` | `pending` → `confirmed` |
+| `payment_intent.payment_failed` | `pending` → `failed` (linked to the PaymentIntent) | unchanged (`pending`, unpaid); a retry that succeeds settles the same payment. Not retried within 30 minutes, the expiry sweep cancels the `failed` payment and the booking, as it does a `pending` one; a success that arrives after that is logged `[PAYMENT-ATTENTION]` |
+| `charge.refunded` | partial → `partially_refunded`, full → `refunded` (by Stripe's `amount_refunded`) | unchanged; a full refund on a `pending`/`confirmed`/`active` booking logs `[PAYMENT-ATTENTION]` for a person |
+| `refund.updated` (`succeeded`) | `partially_refunded` or `refunded`, by the succeeded `Refund` rows against the amount paid | unchanged |
+| `checkout.session.expired` | none (Event / Sponsorship invoices only, no booking) | — |
+
+A `refunded` payment never moves back to `partially_refunded` (payouts count `partially_refunded` as money kept). The citizen cancellation refund and the admin retry / manual-resolve paths use the same amount rule.
 
 **Two signing secrets (api#363).** Stripe sends events about connected (Foxer) accounts, such as `account.updated` when onboarding finishes, only to a **Connect** endpoint, and every endpoint has its own signing secret. A request is accepted if it verifies against `STRIPE_WEBHOOK_SECRET` (platform endpoint) or `STRIPE_CONNECT_WEBHOOK_SECRET` (Connect endpoint) — `src/utils/stripe-webhook.ts`. Before, only the first was checked, so Connect events were refused and Foxers' onboarding never registered.
 

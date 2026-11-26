@@ -375,15 +375,6 @@ export default class BookingRepo {
     );
   }
 
-  static async markPaymentRefunded(paymentId: string) {
-    return this.retiring(
-      prisma.payment.update({
-        where: { id: paymentId },
-        data: { status: PaymentStatus.refunded },
-      }),
-    );
-  }
-
   static async setPaymentTransaction(
     paymentId: string,
     data: { transactionId: string; method: string },
