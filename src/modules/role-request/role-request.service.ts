@@ -8,6 +8,10 @@ import {
 } from "../../utils/file-signature";
 import { badRequest } from "../../utils/errors";
 import NotificationService from "../notifications/user-notification.service";
+import {
+  BASE_MAX_YEARS_OF_EXPERIENCE,
+  EXPERIENCE_CV_PDF_MESSAGE,
+} from "../../utils/years-of-experience";
 
 /**
  * Provider-specific application payload. Each RoleType supplies a different
@@ -102,6 +106,22 @@ async function assertPortfolioDocument(fileId: unknown) {
   }
 }
 
+/**
+ * The CV behind a claim of more than 30 years is a PDF only (api#423), so the
+ * admin checking it can read it in the browser. A plain portfolio may still
+ * be Word.
+ */
+async function assertPdfCv(fileId: unknown) {
+  if (typeof fileId !== "string" || fileId === "") return;
+  const file = await prisma.file.findUnique({
+    where: { id: fileId },
+    select: { type: true },
+  });
+  if (file?.type !== "application/pdf") {
+    throw badRequest(EXPERIENCE_CV_PDF_MESSAGE);
+  }
+}
+
 // What a portfolio may be but an identity document may not: Word files.
 const PORTFOLIO_ONLY_TYPES = acceptedMimeTypes("portfolio").filter(
   (type) => !acceptedMimeTypes("document").includes(type),
@@ -165,6 +185,9 @@ async function providerSpecialtyRows(userId: string, details: unknown) {
   };
 }
 
+/** How an admin settles a claim of more than 30 years (api#423). */
+export type ExperienceDecision = "base" | "claimed";
+
 export default class RoleRequestService {
   /**
    * Submit an application for a specific role
@@ -202,6 +225,9 @@ export default class RoleRequestService {
       DOCUMENT_COLUMNS.map((column) => cleanedData[column]),
     );
     await assertPortfolioDocument(cleanedData.portfolioFileId);
+    if (cleanedData.claimedExperience != null) {
+      await assertPdfCv(cleanedData.portfolioFileId);
+    }
     await assertIdentityDocuments(
       DOCUMENT_COLUMNS.filter((column) => column !== "portfolioFileId").map(
         (column) => cleanedData[column],
@@ -232,6 +258,10 @@ export default class RoleRequestService {
    * matching DOCUMENT_FIELD_TO_DB_COLUMN) and `revisionNote` explains why —
    * everything else on the application stands, and the applicant fixes just
    * those documents via resubmitDocuments instead of reapplying from scratch.
+   *
+   * `experienceDecision` settles a claim of more than 30 years (api#423):
+   * "base" lowers `experience` to 30, as when the CV and its references don't
+   * bear it out; "claimed" restores the claim. The claim itself is kept.
    */
   static async reviewApplication(
     requestId: string,
@@ -240,6 +270,7 @@ export default class RoleRequestService {
     rejectionReason?: string,
     flaggedDocuments?: string[],
     revisionNote?: string,
+    experienceDecision?: ExperienceDecision,
   ) {
     const result = await prisma.$transaction(async (tx) => {
       // 1. Fetch request
@@ -247,6 +278,28 @@ export default class RoleRequestService {
       if (!request) throw new Error("Application not found");
       if (request.status !== RequestStatus.pending) {
         throw new Error("This application has already been processed");
+      }
+
+      if (experienceDecision) {
+        const app = request[
+          `${request.roleType}Application` as keyof typeof request
+        ] as { claimedExperience?: number | null } | null;
+        const claimed = app?.claimedExperience;
+        if (!claimed) {
+          throw new Error(
+            "This application doesn't claim more than 30 years of experience",
+          );
+        }
+        const years =
+          experienceDecision === "base"
+            ? BASE_MAX_YEARS_OF_EXPERIENCE
+            : claimed;
+        // The Event Foxer column is text.
+        await RoleRequestRepo.updateApplicationExperience(
+          APPLICATION_MODEL_BY_ROLE[request.roleType],
+          requestId,
+          request.roleType === RoleType.eventFoxer ? String(years) : years,
+        );
       }
 
       // 2. Update status
@@ -376,6 +429,12 @@ export default class RoleRequestService {
 
     await assertOwnDocuments(userId, Object.values(documents));
     await assertPortfolioDocument(documents.portfolioFile);
+    const application = request[
+      `${request.roleType}Application` as keyof typeof request
+    ] as { claimedExperience?: number | null } | null | undefined;
+    if (application?.claimedExperience != null) {
+      await assertPdfCv(documents.portfolioFile);
+    }
     await assertIdentityDocuments(
       Object.entries(documents)
         .filter(([key]) => key !== "portfolioFile")

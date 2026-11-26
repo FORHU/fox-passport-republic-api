@@ -291,3 +291,115 @@ describe("Portfolio links and files (app#371)", () => {
     expect(submitted().portfolioFileId).toBe("file-1");
   });
 });
+
+describe("Years of experience: 0 to 30, or up to 50 with a CV (api#423)", () => {
+  it.each([
+    ["eventFoxer", { specializations: ["wedding"] }],
+    ["providerFoxer", { specializations: ["dj"] }],
+  ])(
+    "refuses a %s with 51 years, before storing anything",
+    async (roleType, data) => {
+      const res = await apply(
+        roleType,
+        { ...data, experience: "51" },
+        { withFile: true },
+      );
+      expect(res.statusCode).toBe(400);
+      expect(res.body.message).toBe(
+        "Years of experience must be between 0 and 50",
+      );
+      expect(storePrivateDocument).not.toHaveBeenCalled();
+      expect(submitApplication).not.toHaveBeenCalled();
+    },
+  );
+
+  it("refuses an Event Foxer's experience that isn't whole years", async () => {
+    const res = await apply("eventFoxer", {
+      specializations: ["wedding"],
+      experience: "2.5",
+    });
+    expect(res.statusCode).toBe(400);
+    expect(submitApplication).not.toHaveBeenCalled();
+  });
+
+  it("stores an Event Foxer's 30 years as text, its column's type", async () => {
+    const res = await apply("eventFoxer", {
+      specializations: ["wedding"],
+      experience: " 30 ",
+    });
+    expect(res.statusCode).toBe(201);
+    expect(submitted().experience).toBe("30");
+    expect(submitted().claimedExperience).toBeUndefined();
+  });
+
+  it("stores a Provider's 30 years as a number", async () => {
+    const res = await apply("providerFoxer", {
+      specializations: ["dj"],
+      experience: "30",
+    });
+    expect(res.statusCode).toBe(201);
+    expect(submitted().experience).toBe(30);
+  });
+
+  it.each([
+    ["eventFoxer", { specializations: ["wedding"] }],
+    ["providerFoxer", { specializations: ["dj"] }],
+  ])(
+    "refuses a %s claiming 31 years without a CV, before storing anything",
+    async (roleType, data) => {
+      const res = await apply(
+        roleType,
+        { ...data, experience: "31" },
+        { withFile: true },
+      );
+      expect(res.statusCode).toBe(400);
+      expect(res.body.message).toBe(
+        "Claiming more than 30 years of experience needs a CV with references",
+      );
+      expect(storePrivateDocument).not.toHaveBeenCalled();
+      expect(submitApplication).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps an Event Foxer's claim of 42 years as 40+ with an uploaded CV", async () => {
+    const res = await apply("eventFoxer", {
+      specializations: ["wedding"],
+      experience: "42",
+      portfolioFileId: "file-cv",
+    });
+    expect(res.statusCode).toBe(201);
+    // Stored as its bracket's start: 40–44 is "40+".
+    expect(submitted().experience).toBe("40");
+    expect(submitted().claimedExperience).toBe(40);
+  });
+
+  it("keeps a Provider's claim of 50 years with a CV sent in the request", async () => {
+    const res = await apply(
+      "providerFoxer",
+      { specializations: ["dj"], experience: "50" },
+      { files: { portfolioFile: [{ originalname: "cv.pdf" }] } },
+    );
+    expect(res.statusCode).toBe(201);
+    expect(submitted().experience).toBe(50);
+    expect(submitted().claimedExperience).toBe(50);
+    expect(submitted().portfolioFileId).toBe("file-1");
+  });
+
+  it("ignores a claimedExperience the client sends itself", async () => {
+    const res = await apply("eventFoxer", {
+      specializations: ["wedding"],
+      experience: "5",
+      claimedExperience: 50,
+    });
+    expect(res.statusCode).toBe(201);
+    expect(submitted().claimedExperience).toBeUndefined();
+  });
+
+  it("still takes an application that leaves experience out", async () => {
+    const res = await apply("eventFoxer", {
+      specializations: ["wedding"],
+      experience: "",
+    });
+    expect(res.statusCode).toBe(201);
+  });
+});

@@ -205,6 +205,47 @@ describe("resubmitting a flagged portfolio", () => {
     expect(updateApplicationFiles).not.toHaveBeenCalled();
   });
 
+  it("refuses a Word CV behind a claim of more than 30 years (api#423)", async () => {
+    findRequestById.mockResolvedValue({
+      id: "req-1",
+      userId: "u1",
+      roleType: "eventFoxer",
+      status: "revision_requested",
+      flaggedDocuments: ["portfolioFile"],
+      eventFoxerApplication: { claimedExperience: 40 },
+    });
+    fileFind.mockResolvedValue({ type: DOCX_MIME });
+    await expect(
+      RoleRequestService.resubmitDocuments("req-1", "u1", {
+        portfolioFile: "file-docx",
+      }),
+    ).rejects.toMatchObject({
+      status: 400,
+      message: "The CV behind more than 30 years of experience must be a PDF",
+    });
+    expect(updateApplicationFiles).not.toHaveBeenCalled();
+  });
+
+  it("takes a PDF CV behind a claim", async () => {
+    findRequestById.mockResolvedValue({
+      id: "req-1",
+      userId: "u1",
+      roleType: "eventFoxer",
+      status: "revision_requested",
+      flaggedDocuments: ["portfolioFile"],
+      eventFoxerApplication: { claimedExperience: 40 },
+    });
+    fileFind.mockResolvedValue({ type: "application/pdf" });
+    await RoleRequestService.resubmitDocuments("req-1", "u1", {
+      portfolioFile: "file-pdf",
+    });
+    expect(updateApplicationFiles).toHaveBeenCalledWith(
+      "eventFoxerApplication",
+      "req-1",
+      { portfolioFileId: "file-pdf" },
+    );
+  });
+
   it("accepts a Word document", async () => {
     fileFind.mockResolvedValue({ type: DOCX_MIME });
     await RoleRequestService.resubmitDocuments("req-1", "u1", {

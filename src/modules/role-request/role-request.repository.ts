@@ -78,6 +78,8 @@ export default class RoleRequestRepo {
             tinIdFile: true,
             birPermitFile: true,
             selfieFile: true,
+            // The CV behind a claim of more than 30 years (api#423).
+            portfolioFile: true,
             // The wizard's per-specialty lines and work photos (api#440).
             specialtyDetails: {
               include: {
@@ -95,6 +97,7 @@ export default class RoleRequestRepo {
             validId1: true,
             backgroundClearanceFile: true,
             selfieFile: true,
+            portfolioFile: true,
           },
         },
       },
@@ -152,6 +155,8 @@ export default class RoleRequestRepo {
             tinIdFile: true,
             birPermitFile: true,
             selfieFile: true,
+            // The CV behind a claim of more than 30 years (api#423).
+            portfolioFile: true,
             // The wizard's per-specialty lines and work photos (api#440).
             specialtyDetails: {
               include: {
@@ -169,6 +174,7 @@ export default class RoleRequestRepo {
             validId1: true,
             backgroundClearanceFile: true,
             selfieFile: true,
+            portfolioFile: true,
           },
         },
       },
@@ -216,6 +222,30 @@ export default class RoleRequestRepo {
     return applicationDelegate.update({
       where: { requestId },
       data: fileColumns,
+    });
+  }
+
+  /**
+   * Set the years of experience on a request's application row, when an admin
+   * lowers a claim over 30 years or confirms it (api#423).
+   */
+  static async updateApplicationExperience(
+    applicationModel: string,
+    requestId: string,
+    experience: number | string,
+  ) {
+    const applicationDelegate = prisma[
+      applicationModel as keyof typeof prisma
+    ] as unknown as {
+      update: (args: {
+        where: { requestId: string };
+        data: { experience: number | string };
+      }) => Promise<unknown>;
+    };
+
+    return applicationDelegate.update({
+      where: { requestId },
+      data: { experience },
     });
   }
 
