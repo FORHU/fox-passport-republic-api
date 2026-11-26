@@ -65,15 +65,16 @@ model PassportStamp {
   eventName  String
   eventDate  DateTime
   location   String?
-  // Every stamp names its venue (api#477, api#482), and the venue can't be
-  // deleted from under it.
-  venueId    String
+  // A stamp's venue can't be deleted from under it (api#482). Not required:
+  // a stamp will name a Venue or a Place (decided 2026-11-26), enforced
+  // with the Place work.
+  venueId    String?
   xpEarned   Int
   imageUrl   String?
   createdAt  DateTime @default(now())
   passport   Passport @relation(fields: [passportId], references: [id], onDelete: Cascade)
   booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  venue      Venue    @relation(fields: [venueId], references: [id], onDelete: Restrict)
+  venue      Venue?   @relation(fields: [venueId], references: [id], onDelete: Restrict)
   posts      Post[]
 
   @@map("passport_stamps")

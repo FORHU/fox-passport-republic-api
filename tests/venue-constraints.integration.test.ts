@@ -3,7 +3,7 @@ import { prisma } from "../src/utils/prisma";
 import UsersSvc from "../src/modules/users/users.service";
 import VenueSvc from "../src/modules/venue/venue.service";
 
-/** The database backs the venue rule (epic api#477, api#482). */
+/** A venue in use can't be deleted (epic api#477, api#482). */
 describe("venue rule constraints", () => {
   const run = Math.random().toString(36).slice(2, 8);
   let owner = "";
@@ -129,10 +129,11 @@ describe("venue rule constraints", () => {
     });
   });
 
-  it("a stamp's venue can't be null", async () => {
-    await expect(
-      prisma.$executeRaw`UPDATE passport_stamps SET "venueId" = NULL WHERE id = ${stamp}`,
-    ).rejects.toThrow();
+  it("a stamp's venue is not required: it will be a Venue or a Place", async () => {
+    const columns = await prisma.$queryRaw<{ is_nullable: string }[]>`
+      SELECT is_nullable FROM information_schema.columns
+      WHERE table_name = 'passport_stamps' AND column_name = 'venueId'`;
+    expect(columns[0]?.is_nullable).toBe("YES");
   });
 
   it("a venue in a package or a stamp can't be deleted", async () => {

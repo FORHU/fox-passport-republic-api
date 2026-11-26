@@ -170,7 +170,7 @@ export default class PassportRepo {
   static async findDistinctStampVenues(passportId: string) {
     return prisma.passportStamp.groupBy({
       by: ["venueId"],
-      where: { passportId },
+      where: { passportId, venueId: { not: null } },
     });
   }
 
