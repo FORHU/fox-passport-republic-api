@@ -134,7 +134,12 @@ export default class ConversationRepository {
         messages: {
           orderBy: { createdAt: "desc" },
           take: 1,
-          select: { content: true, senderId: true },
+          select: {
+            content: true,
+            senderId: true,
+            sharedPostId: true,
+            attachmentUrls: true,
+          },
         },
         _count: {
           select: {
@@ -191,7 +196,12 @@ export default class ConversationRepository {
         messages: {
           orderBy: { createdAt: "desc" },
           take: 1,
-          select: { content: true, senderId: true },
+          select: {
+            content: true,
+            senderId: true,
+            sharedPostId: true,
+            attachmentUrls: true,
+          },
         },
         _count: {
           select: {

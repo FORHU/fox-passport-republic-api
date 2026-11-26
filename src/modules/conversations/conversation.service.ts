@@ -331,7 +331,12 @@ export default class ConversationService {
       participants?: {
         user: { id: string; name: string; imgId: string | null };
       }[];
-      messages?: { content: string; senderId: string }[];
+      messages?: {
+        content: string;
+        senderId: string;
+        sharedPostId?: string | null;
+        attachmentUrls?: string[];
+      }[];
       _count?: { messages: number };
       settings?: { muted: boolean; pinnedAt: Date | null }[];
       inboxVenueId?: string | null;
@@ -364,6 +369,10 @@ export default class ConversationService {
         ? {
             content: lastMessage.content,
             isMine: lastMessage.senderId === userId,
+            // A post or file sent without a caption has empty content; these
+            // let the inbox say "Sent a post" instead of a blank line.
+            hasSharedPost: !!lastMessage.sharedPostId,
+            hasAttachments: (lastMessage.attachmentUrls?.length ?? 0) > 0,
           }
         : null,
       isMuted: settings?.muted ?? false,
