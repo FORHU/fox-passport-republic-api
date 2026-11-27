@@ -231,12 +231,18 @@ export default class PricingSvc {
    *   template's `platformFeePct`.
    * - The processing fee is `PROCESSING_FEE_PERCENT` unless `processingFeePct`
    *   is given.
+   * - `days` (default 1) prices an event booked over several days: every
+   *   Foxer's price is per day, and the fees follow from it.
    */
   static async calculateEventBreakdown(
     template: EventTemplateForBreakdown,
     commissionPct: number,
     exclusions?: EventBreakdownExclusions,
-    options?: { processingFeePct?: number; eventFoxerId?: string },
+    options?: {
+      processingFeePct?: number;
+      eventFoxerId?: string;
+      days?: number;
+    },
   ): Promise<EventBreakdown> {
     const [breakdown] = await this.calculateEventBreakdowns(
       [
@@ -245,6 +251,7 @@ export default class PricingSvc {
           commissionPct,
           exclusions,
           eventFoxerId: options?.eventFoxerId,
+          days: options?.days,
         },
       ],
       options,
@@ -263,17 +270,31 @@ export default class PricingSvc {
       exclusions?: EventBreakdownExclusions;
       /** The EventFoxer; their approved venue affiliations set those venues' prices. */
       eventFoxerId?: string;
+      /** How many days the event runs; each line's price is per day. */
+      days?: number;
     }[],
     options?: { processingFeePct?: number },
   ): Promise<EventBreakdown[]> {
     const affiliationPrices = await this.fetchAffiliationVenuePrices(entries);
-    const linesPerEntry = entries.map((e) =>
-      eventTemplateLines(
+    const linesPerEntry = entries.map((e) => {
+      const lines = eventTemplateLines(
         e.template,
         e.exclusions,
         e.eventFoxerId ? affiliationPrices.get(e.eventFoxerId) : undefined,
-      ),
-    );
+      );
+      const days = e.days ?? 1;
+      if (!Number.isInteger(days) || days < 1) {
+        throw new AppError("days must be a whole number of 1 or more", 400);
+      }
+      return days === 1
+        ? lines
+        : lines.map((line) => ({
+            ...line,
+            unitPrice: new Prisma.Decimal(line.unitPrice?.toString() ?? 0).mul(
+              days,
+            ),
+          }));
+    });
     const rules = linesPerEntry.some((lines) => lines.length > 0)
       ? await this.fetchEventItemRules()
       : [];

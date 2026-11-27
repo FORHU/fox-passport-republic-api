@@ -180,7 +180,7 @@ describe("BookingSvc.bookFromTemplate reservations", () => {
       expect.objectContaining({ id: "t1" }),
       10,
       expect.objectContaining({ excludedVenueIds: ["tv2"] }),
-      { eventFoxerId: "foxer" },
+      { eventFoxerId: "foxer", days: 1 },
     );
     expect(eventRepo.createFromTemplate).toHaveBeenCalledWith(
       expect.objectContaining({
