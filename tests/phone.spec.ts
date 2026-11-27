@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { GeoDirectory } from "../src/modules/locations/locations.service";
-import { normalizePhone } from "../src/utils/phone";
+import {
+  normalizeContactPhone,
+  normalizePhone,
+  phoneCountry,
+} from "../src/utils/phone";
 
 /**
  * The countries endpoint serves libphonenumber's calling code (the dataset's
@@ -35,5 +39,28 @@ describe("normalizePhone", () => {
 
   it("refuses a number wrapped in other text", () => {
     expect(normalizePhone("call 09171234567")).toBeNull();
+  });
+});
+
+describe("normalizeContactPhone", () => {
+  it("accepts a Philippine mobile number", () => {
+    expect(normalizeContactPhone("0917 123 4567")).toBe("+639171234567");
+    expect(normalizeContactPhone("+63 905 123 4567")).toBe("+639051234567");
+  });
+
+  it("refuses a Philippine landline", () => {
+    expect(normalizePhone("+63 2 8123 4567")).toBe("+63281234567");
+    expect(normalizeContactPhone("+63 2 8123 4567")).toBeNull();
+  });
+
+  it("keeps landlines outside the Philippines", () => {
+    expect(normalizeContactPhone("+44 20 7946 0958")).toBe("+442079460958");
+  });
+});
+
+describe("phoneCountry", () => {
+  it("is the number's own +code, else the default", () => {
+    expect(phoneCountry("+1 415 555 0132", "PH")).toBe("US");
+    expect(phoneCountry("0917 123 4567", "PH")).toBe("PH");
   });
 });

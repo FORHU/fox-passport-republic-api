@@ -8,7 +8,11 @@ import {
   DEFAULT_TIN_COUNTRY,
   validateTin,
 } from "../../utils/tax-id-formats";
-import { normalizePhone } from "../../utils/phone";
+import {
+  MOBILE_ONLY,
+  normalizeContactPhone,
+  phoneCountry,
+} from "../../utils/phone";
 import { checkPortfolioUrls } from "../../utils/portfolio-urls";
 import {
   applyExperienceClaim,
@@ -349,10 +353,11 @@ export function checkProviderDetails(
 }
 
 /**
- * Checks a Venue Foxer's contact number with the same rule as the profile
- * phone (utils/phone) and rewrites it as E.164 for storage. A number without
- * its `+code` is read as Philippine — what the mobile app sends. Returns the
- * message to show, or null.
+ * Checks a Venue Foxer's contact number (utils/phone normalizeContactPhone:
+ * valid in its country, and a mobile number in the Philippines) and rewrites
+ * it as E.164 for storage. A number without its `+code` is read in the
+ * application's country (`tinCountry`, checked by checkTin first), else as
+ * Philippine — what the mobile app sends. Returns the message to show, or null.
  */
 export function checkContactNumber(
   data: Record<string, unknown>,
@@ -361,9 +366,15 @@ export function checkContactNumber(
   if (typeof raw !== "string" || raw.trim() === "") {
     return "Contact number is required";
   }
-  const e164 = normalizePhone(raw.trim());
+  const country =
+    typeof data.tinCountry === "string" && data.tinCountry
+      ? data.tinCountry
+      : DEFAULT_TIN_COUNTRY;
+  const e164 = normalizeContactPhone(raw.trim(), country);
   if (!e164) {
-    return "Enter a valid contact number with its country code, like +63 917 123 4567.";
+    return MOBILE_ONLY.has(phoneCountry(raw, country))
+      ? "Enter a valid Philippine mobile number, like +63 917 123 4567."
+      : "Enter a valid contact number with its country code, like +63 917 123 4567.";
   }
   data.contactNumber = e164;
   return null;
