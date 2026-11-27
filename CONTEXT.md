@@ -1,6 +1,6 @@
 ---
 domain: Fox Passport Republic
-updated: 2026-11-26
+updated: 2026-11-27
 ---
 
 # Fox Passport Republic
@@ -11,6 +11,17 @@ This file mirrors the `RoleType` / `SystemRole` enums in `prisma/schema/`.
 **When they disagree, the schema wins** — it is the source of truth, and this file
 is the source of truth for the app's copy at `fox-passport-republic-app/CONTEXT.md`.
 
+**Role model** (approved 27 Nov 2026, [ADR 0012](docs/adr/0012-investor-stays-its-own-role.md)): four separate things, never merged.
+
+| Concept | What it is | Grants permissions |
+|---|---|---|
+| Account | Every user is a **Citizen** | Citizen actions only |
+| **RoleType** | Marketplace roles: Provider Foxer, Venue Foxer, Event Foxer, Event Coordinator, Investor. Any combination on one account | Yes |
+| Provider **specialty** | What a Provider offers (Caterer, DJ, Photographer, Gear…). Several per Provider | No; a category tag |
+| **SystemRole** | Admin level: user, admin secretary, admin | Yes |
+
+Provider Foxer is the umbrella business-partner *experience*: Investor and Event Coordinator are shown under it, but each stays its own RoleType, because permissions come from RoleTypes, not specialties. One FoxPassport API, one database and one Better Auth sign-in serve the web, mobile and Partners apps (Republic Events, `fox-passport-republic-partners-app`), which add experiences, never a second copy of these rules.
+
 ## Language
 
 **Citizen**:
@@ -18,7 +29,7 @@ A user with no approved RoleType yet (`roleType: []`). The default state for eve
 _Avoid_: Regular user, plain user
 
 **RoleType**:
-A supply-side capability a citizen can apply for and be approved to hold: `venueFoxer`, `eventFoxer`, `providerFoxer`, `organizer` or `investor`. A user may hold more than one simultaneously. People see them as Venue Foxer, Event Foxer, Provider Foxer, Event Coordinator (`organizer`, shown under Provider Foxer) and Partner Foxer (`investor`, hidden from role selection since 23 Nov 2026). Distinct from `SystemRole`, which governs platform administration, not marketplace participation.
+A supply-side capability a citizen can apply for and be approved to hold: `venueFoxer`, `eventFoxer`, `providerFoxer`, `organizer` or `investor`. A user may hold more than one simultaneously. People see them as Venue Foxer, Event Foxer, Provider Foxer, Event Coordinator (`organizer`, shown under Provider Foxer) and Partner Foxer (`investor`, hidden from role selection in the web and mobile apps since 23 Nov 2026; offered under Provider Foxer in the Partners app). Distinct from `SystemRole`, which governs platform administration, not marketplace participation.
 _Avoid_: Role (ambiguous with SystemRole), permission
 
 **SystemRole**:
@@ -41,7 +52,7 @@ Role-holder who assembles Events: an Event Template attaches an existing Venue (
 _Avoid_: Host (old name)
 
 **Investor**:
-Role-holder who provides funding rather than operational supply. Application requires proof of funds and an investment range, unlike the other RoleTypes.
+Role-holder who provides funding rather than operational supply. Application requires proof of funds and an investment range, unlike the other RoleTypes. Its own `investor` RoleType with its own permissions (`partnership:propose`, `payouts:onboard`; registering an investment checks the role in `InvestmentSvc`). Shown to people under Provider Foxer, in the Partners app, never as a Provider specialty (27 Nov 2026, ADR 0012). Collecting investment money, limits on revenue shares and legal agreements are not built and are out of the initial Partners scope.
 
 **Event Coordinator** (`organizer`):
 A role a citizen applies for and is admin-approved to hold, which makes them eligible to be **Appointed** to help run a specific Event or Venue. Holding the role alone grants nothing over any Event or Venue — only an Appointment does. Shown to people as **Event Coordinator** under Provider Foxer. In code it is still its own `organizer` RoleType. Approved on 26 Nov 2026, not built yet: Event Coordinator becomes a **specialty** of a Provider Foxer; existing Event Coordinators are migrated to Provider Foxers with that specialty, keeping their accounts, appointments and history. Not every Provider gets the specialty.
