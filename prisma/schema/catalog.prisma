@@ -103,6 +103,9 @@ model Venue {
   // at the column level for existing rows, but required by the create
   // endpoint going forward — see VenueCtrl.createVenue's Joi schema.
   boundary             Json?
+  // How far the venue serves, as the owner chose it (mobile#498): replaces
+  // the drawn radius in the apps. Null for venues saved before it existed.
+  coverageArea         VenueCoverage?
   status               VenueStatus             @default(draft)
   rejectionReason      String?
   spaceType            String[]
@@ -232,6 +235,16 @@ enum VenueStatus {
   available
   archived
   rejected
+}
+
+/// Where a venue is available (mobile#498), narrowest first.
+enum VenueCoverage {
+  local
+  municipal
+  city
+  province
+  national
+  international
 }
 
 enum BillingRate {
