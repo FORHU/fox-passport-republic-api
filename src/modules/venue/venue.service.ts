@@ -8,6 +8,7 @@ import {
   BillingRate,
   VenueCategory,
   SystemRole,
+  VenueCoverage,
   Prisma,
 } from "@prisma/client";
 import {
@@ -222,6 +223,7 @@ export default class VenueSvc {
     stageConfig?: string;
     setupOptions?: string[];
     operatingHours?: Prisma.InputJsonValue;
+    coverageArea?: VenueCoverage | null;
     blockedDates?: Date[];
     minBookingTime?: number;
     depositRequirements?: string;
@@ -571,6 +573,7 @@ export default class VenueSvc {
       stageConfig: string;
       setupOptions: string[];
       operatingHours: Prisma.InputJsonValue;
+      coverageArea: VenueCoverage | null;
       blockedDates: Date[];
       minBookingTime: number;
       depositRequirements: string;

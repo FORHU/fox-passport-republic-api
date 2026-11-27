@@ -6,6 +6,7 @@ import CancellationPolicySvc from "../cancellation-policy/cancellation-policy.se
 import {
   VenueStatus,
   VenueCategory,
+  VenueCoverage,
   BillingRate,
   Prisma,
 } from "@prisma/client";
@@ -58,6 +59,7 @@ interface CreateVenuePayload {
   stageConfig?: string;
   setupOptions?: string[];
   operatingHours?: Prisma.InputJsonValue;
+  coverageArea?: VenueCoverage | null;
   blockedDates?: Date[];
   minBookingTime?: number;
   depositRequirements?: string;
@@ -148,6 +150,14 @@ export default class VenueCtrl {
       stageConfig: Joi.string().optional(),
       setupOptions: Joi.array().items(Joi.string()).optional(),
       operatingHours: Joi.any().optional(),
+      // mobile#498: one of six areas; null clears it on an update.
+      coverageArea: Joi.string()
+        .valid(...Object.values(VenueCoverage))
+        .allow(null)
+        .optional()
+        .messages({
+          "any.only": `Coverage area must be one of: ${Object.values(VenueCoverage).join(", ")}.`,
+        }),
       blockedDates: Joi.array().items(Joi.date().iso()).optional(),
       minBookingTime: quantityJoi().optional(),
       depositRequirements: Joi.string().optional(),
@@ -342,6 +352,14 @@ export default class VenueCtrl {
       stageConfig: Joi.string().optional(),
       setupOptions: Joi.array().items(Joi.string()).optional(),
       operatingHours: Joi.any().optional(),
+      // mobile#498: one of six areas; null clears it on an update.
+      coverageArea: Joi.string()
+        .valid(...Object.values(VenueCoverage))
+        .allow(null)
+        .optional()
+        .messages({
+          "any.only": `Coverage area must be one of: ${Object.values(VenueCoverage).join(", ")}.`,
+        }),
       blockedDates: Joi.array().items(Joi.date().iso()).optional(),
       minBookingTime: quantityJoi().optional(),
       depositRequirements: Joi.string().optional(),

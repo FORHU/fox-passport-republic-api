@@ -4,6 +4,7 @@ import {
   VenueStatus,
   BillingRate,
   VenueCategory,
+  VenueCoverage,
   Prisma,
 } from "@prisma/client";
 import { RESERVING_TRANSACTION_STATUSES } from "../availability/availability.types";
@@ -68,6 +69,7 @@ export default class VenueRepo {
     stageConfig?: string;
     setupOptions: string[];
     operatingHours?: Prisma.InputJsonValue;
+    coverageArea?: VenueCoverage | null;
     blockedDates: Date[];
     minBookingTime?: number;
     depositRequirements?: string;
@@ -298,6 +300,7 @@ export default class VenueRepo {
       billingRate: BillingRate;
       cancellationPolicyId: string;
       operatingHours: Prisma.InputJsonValue;
+      coverageArea: VenueCoverage | null;
     }>,
   ) {
     const { imgIds, ...rest } = data;
